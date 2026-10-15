@@ -97,7 +97,9 @@ saved station has a **Start schedule from now** button on its row.
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
-For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.3.1.0/`
+The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.3.1.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.3.1.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 
