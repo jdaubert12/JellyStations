@@ -2,7 +2,7 @@
 param([string]$Configuration = "Release")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.3.0.0"
+$version = "1.3.1.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.TvStation\bin\$Configuration\net10.0\Jellyfin.Plugin.TvStation.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -21,7 +21,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Films split across files (Blu-ray part1/part2 that Jellyfin stacks into one movie) are scheduled at their full combined length and play straight through as one program. Also fixes repeated encoder restarts when a file ends a second before its listed runtime."
+    changelog = "Blocks: new per-block option to let the pool or filler finish its last program past the block end instead of cutting it (on for new blocks). Settings page gets a header and sectioned cards; the plugin page now has a title in the dashboard."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true
