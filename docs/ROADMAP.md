@@ -18,7 +18,8 @@ Conventions for every step:
 
 Pool / slots / lineup modes, shuffle with episodes-in-order, marathons, per-source weight, season
 range and specials toggle, movies/shows filter on container sources, seasonal windows, import and
-export, station logos, Jellyfin 12.2 / .NET 10.
+export, station logos, Jellyfin 12.2 / .NET 10. Multi-part (stacked) movies play at full length as
+consecutive segments on one clock (2026-10-15), which is also the groundwork for mid-roll breaks.
 
 ---
 
