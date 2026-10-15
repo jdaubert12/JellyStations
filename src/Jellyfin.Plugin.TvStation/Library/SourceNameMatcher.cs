@@ -80,6 +80,13 @@ public static partial class SourceNameMatcher
     /// </summary>
     public static Guid? Pick(IEnumerable<NameCandidate> candidates, ParsedSourceName parsed)
     {
+        // A library whose titles still carry "(2020)" (no metadata provider) compares on the bare title too.
+        candidates = candidates.Select(c =>
+        {
+            var y = YearSuffix().Match(c.Name ?? string.Empty);
+            return y.Success ? c with { Name = y.Groups["name"].Value.Trim(), Year = c.Year ?? int.Parse(y.Groups["year"].Value) } : c;
+        }).ToList();
+
         var byName = candidates.Where(c => Same(c.Name, parsed.Name) && SeriesAgrees(c, parsed) && NumbersAgree(c, parsed)).ToList();
         if (byName.Count == 0 && parsed.Season.HasValue && parsed.Episode.HasValue)
         {

@@ -14,9 +14,11 @@ Write-Host "Building $Configuration..." -ForegroundColor Cyan
 dotnet build $proj -c $Configuration --nologo -v q
 if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 
-$dll = Join-Path $root "src\Jellyfin.Plugin.TvStation\bin\$Configuration\net10.0\Jellyfin.Plugin.TvStation.dll"
+# Stage dll + meta.json through package.ps1: Jellyfin drops a plugin folder that has no manifest.
+& (Join-Path $PSScriptRoot "package.ps1") -Configuration $Configuration | Out-Null
+$stage = Join-Path $root "dist\TvStation_$version"
 New-Item -ItemType Directory -Force $pluginDir | Out-Null
-Copy-Item $dll $pluginDir -Force
+Copy-Item (Join-Path $stage "*") $pluginDir -Force
 Write-Host "Installed to $pluginDir" -ForegroundColor Green
 
 if (-not $NoRestart) {

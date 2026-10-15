@@ -84,6 +84,17 @@ public class SourceNameMatcherTests
     }
 
     [Fact]
+    public void Pick_CandidateTitlesWithYearSuffix_CompareOnBareTitle()
+    {
+        // Libraries without a metadata provider keep "(2020)" in the title; the year inside it breaks ties too.
+        var candidates = new[] { new NameCandidate(A, "Movie Alpha (2020)", 1995), new NameCandidate(B, "Dune (1984)"), new NameCandidate(C, "Dune (2021)") };
+        Assert.Equal(A, SourceNameMatcher.Pick(candidates, SourceNameMatcher.Parse(SourceKind.Movie, "Movie Alpha (2020)")));
+        Assert.Equal(A, SourceNameMatcher.Pick(candidates, SourceNameMatcher.Parse(SourceKind.Movie, "Movie Alpha")));
+        Assert.Equal(C, SourceNameMatcher.Pick(candidates, SourceNameMatcher.Parse(SourceKind.Movie, "Dune (2021)")));
+        Assert.Null(SourceNameMatcher.Pick(candidates, SourceNameMatcher.Parse(SourceKind.Movie, "Dune")));
+    }
+
+    [Fact]
     public void Pick_Normalizes_CurlyApostrophesAndDashes()
     {
         var candidates = new[] { new NameCandidate(A, "Harry Potter and the Philosopher’s Stone", 2001) };

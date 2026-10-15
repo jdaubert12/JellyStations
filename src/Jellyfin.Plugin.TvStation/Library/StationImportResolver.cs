@@ -258,11 +258,12 @@ public sealed class StationImportResolver
             return Array.Empty<NameCandidate>();
         }
 
+        // SearchTerm is cleaned (lower-cased, diacritics removed) by Jellyfin before matching; NameContains is not.
         return _libraryManager.GetItemList(new InternalItemsQuery
         {
             IncludeItemTypes = new[] { kind },
             Recursive = true,
-            NameContains = name,
+            SearchTerm = name,
             Limit = 100,
             DtoOptions = new DtoOptions(false)
         }).Select(i => new NameCandidate(i.Id, i.Name ?? string.Empty, i.ProductionYear));
