@@ -197,6 +197,40 @@ analyzer, then suggestion rules and the dashboard view on top of it.
 
 ---
 
+## Phase 5 — broadcast feel and reach
+
+From a 2026-10-15 survey of ErsatzTV, Tunarr, dizqueTV, PseudoTV Live and Airwave. We already
+match their core (shuffle with episodes in order, marathons, time blocks, filler, dayparts,
+seasonal channels, watermark, suggestions, native guide). These are the gaps worth closing, in
+order; the first three together turn a station into a broadcast, the fourth lets clients outside
+Jellyfin tune in.
+
+1. **Pre-roll and post-roll bumpers.** Per station: an ident before every program and/or a clip
+   after it, chosen from the bumper sources (optionally separate pre/post lists), on top of the
+   existing gap fill. Pre/post time comes out of the reserved break so the grid still holds.
+   Small; builds on `BumperFill`.
+2. **Mid-roll breaks at chapters.** Per station: break every N minutes or at Jellyfin chapter
+   marks (whichever the user picks), minimum break length, bumpers fill the break. The
+   restreamer plays the program as segments (seek to the chapter, same clock), the schedule
+   entry stays one guide item. Medium; the risky part is the segment handover in
+   `FfmpegRestreamer`, verify on the dev container with the stream test.
+3. **Cooldown.** Per pool: a movie or series may not repeat within N hours. Implemented in
+   `PoolOrdering` as a soft rule after series spacing (swap forward until the gap is met, give up
+   quietly like the other soft rules). Matters most on small movie stations (Ghibli, Holiday).
+   Small.
+4. **M3U and XMLTV export.** `GET /TvStation/Channels.m3u` and `GET /TvStation/Guide.xml` with a
+   per-plugin access token in the URL, serving the same MPEG-TS stream the Live TV path uses and
+   the same schedule as XMLTV, so VLC, Kodi, Tivimate, Plex or Emby can tune in. Document the
+   token in Settings. Medium.
+
+Considered and parked: off-air hours (a daypart rule approximates it), date ranges on blocks,
+custom guide titles per block, studio and people sources, smart (search) collections, multi-part
+episode grouping, rerun blocks, channel redirects, on-demand channels (contradicts the always-on
+clock), DVR (files are already in the library), music videos, AI lineup builder (the rule-based
+suggester covers it). Revisit when someone asks.
+
+---
+
 ## Open questions
 
 - Rating ladder for non-US ratings (BBFC "12A", "15"; German FSK). Start with the two US ladders
