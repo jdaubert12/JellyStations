@@ -162,19 +162,19 @@ analyzer, then suggestion rules and the dashboard view on top of it.
   item reference whose id is unknown here by kind and display name (year breaks ties for movies,
   episodes fall back to series + S/E numbers, seasons to the number); unmatched references are
   dropped and listed in the import result. Real-server set moved to `examples/stations/`.
-- **Library analysis.** One pass over the library producing the facts suggestions are built
-  from: hours per genre, episodes and rating per series, titles per collection, franchises from
-  shared title prefixes, counts per decade, kids content by rating, holiday content by tag.
-  Pure `Library/` code with tests, exposed as `GET /TvStation/Library/Analysis`; the Phase 4
-  health report reads the same data. Small to medium.
+- **Library analysis — DONE 2026-10-15.** `LibraryAnalysisService` collects `LibraryFact`s per
+  library (episode rating/genres/tags inherited from the series) and `LibraryAnalyzer` aggregates
+  them: totals, kids/family/unrated hours, genres, series, collections, franchises
+  (`FranchiseDetector`, title prefixes), decades, ratings, tags, libraries. Cached 15 minutes,
+  `GET /TvStation/Library/Analysis?refresh=true` recomputes. The health report reads the same data.
 - **Suggest stations.** Rule set over the analysis: genre channels with ≥ N hours, series with
   ≥ M episodes, franchise lineups from collection names or title prefixes, decade channels, a
   kids channel from TV-Y/TV-Y7/G content, a holiday station from tags. Each rule yields a ready
   station definition (sources, mode, blocks where it fits, suggested name). Presented as a
   checklist with hours of content per suggestion that creates the ticked stations via the
   existing create path, channel numbers assigned in order. Medium.
-- **Franchise detection.** Shared helper for the analyzer and for a "pick a franchise" source type.
-  Small once the analyzer exists.
+- **Franchise detection — DONE 2026-10-15** as part of the analyzer (`FranchiseDetector`). A
+  "pick a franchise" source type can build on it later.
 - **Block templates.** Save a slot block's day/time/sources as a template, reuse across stations.
   Small.
 - **Exclusion by tag — DONE 2026-10-14.** Per-station and global excluded tags (hand picks and

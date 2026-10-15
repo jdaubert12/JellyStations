@@ -117,6 +117,10 @@ edits (name, number, logo) do not. A nightly task re-scans the library for stati
 Items without a known runtime are skipped and listed in the editor; refresh their metadata in
 Jellyfin and press **Recompile content**.
 
+`GET /TvStation/Library/Analysis` returns a one-pass summary of the library: hours per genre, every
+series with episode count and rating, collections, franchises detected from shared title prefixes,
+decades, ratings, tags and libraries. It is the basis for station suggestions and the health report.
+
 ## Settings
 
 - **Default encoding**: resolution, frame rate, bitrates, encoder, preset, GOP. All programs on a

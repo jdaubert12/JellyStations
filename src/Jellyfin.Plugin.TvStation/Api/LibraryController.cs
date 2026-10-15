@@ -15,10 +15,12 @@ namespace Jellyfin.Plugin.TvStation.Api;
 public sealed class LibraryController : ControllerBase
 {
     private readonly LibrarySearchService _search;
+    private readonly LibraryAnalysisService _analysis;
 
-    public LibraryController(LibrarySearchService search)
+    public LibraryController(LibrarySearchService search, LibraryAnalysisService analysis)
     {
         _search = search;
+        _analysis = analysis;
     }
 
     /// <summary>Searches the library. kinds is a comma-separated list: Movie, Series, Season, Episode, BoxSet, Playlist.</summary>
@@ -48,4 +50,11 @@ public sealed class LibraryController : ControllerBase
 
     [HttpGet("Libraries")]
     public ActionResult<IEnumerable<LibraryFolderDto>> Libraries() => Ok(_search.Libraries());
+
+    /// <summary>
+    /// One pass over the library: hours per genre, series with episode counts and ratings, collections, franchises
+    /// detected from titles, decades, ratings, tags and libraries. Cached for 15 minutes unless refresh=true.
+    /// </summary>
+    [HttpGet("Analysis")]
+    public ActionResult<LibraryAnalysisDto> Analysis([FromQuery] bool refresh = false) => Ok(_analysis.Get(refresh));
 }

@@ -25,6 +25,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<StationCompiler>();
         serviceCollection.AddSingleton<LibrarySearchService>();
         serviceCollection.AddSingleton<StationImportResolver>();
+        serviceCollection.AddSingleton<LibraryAnalysisService>();
 
         serviceCollection.AddSingleton<IScheduleResolver>(sp =>
         {
