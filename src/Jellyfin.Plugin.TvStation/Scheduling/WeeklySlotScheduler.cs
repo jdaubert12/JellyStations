@@ -252,8 +252,9 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         var entries = new List<ScheduleEntry>();
         var occurrences = OccurrencesOfWeek(w);
 
-        foreach (var occ in occurrences)
+        for (var i = 0; i < occurrences.Count; i++)
         {
+            var occ = occurrences[i];
             if (occ.StartUtc > state.CarryEnd)
             {
                 FillFiller(entries, state, state.CarryEnd, occ.StartUtc);
@@ -261,14 +262,18 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
 
             var block = _input.Blocks[occ.BlockIndex];
             var blockStart = occ.StartUtc > state.CarryEnd ? occ.StartUtc : state.CarryEnd;
+            var reached = occ.EndUtc;
             if (blockStart < occ.EndUtc)
             {
-                FillBlock(entries, state, block, blockStart, occ.EndUtc);
+                // The remainder stream may run past the block end up to whatever comes next: the next block of the
+                // week, or the first block of the next week (the same instant the end-of-week filler targets).
+                var next = i + 1 < occurrences.Count ? occurrences[i + 1].StartUtc : (w >= 0 ? EndGapTarget(w) : WeekStartUtc(w + 1));
+                reached = FillBlock(entries, state, block, blockStart, occ.EndUtc, block.RemainderMayOverrun ? next : occ.EndUtc);
             }
 
-            if (occ.EndUtc > state.CarryEnd)
+            if (reached > state.CarryEnd)
             {
-                state.CarryEnd = occ.EndUtc;
+                state.CarryEnd = reached;
             }
         }
 
@@ -305,15 +310,18 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         return BumperFill.Expand(entries, _input.Bumpers, e => StableHash.Seed(_input.StationId, _input.Revision, "bumper", e.StartUtc.Ticks));
     }
 
-    private void FillBlock(List<ScheduleEntry> entries, WeekState state, SlotBlockInput block, DateTime start, DateTime end)
+    /// <summary>Fills a block occurrence; returns the instant covered, which exceeds <paramref name="end"/> only when the remainder stream overran.</summary>
+    private DateTime FillBlock(List<ScheduleEntry> entries, WeekState state, SlotBlockInput block, DateTime start, DateTime end, DateTime overrunLimit)
     {
         var scope = "block:" + block.Id.ToString("N");
         var cursor = state.BlockCursor(block.Id);
         var reached = FillBlockItems(entries, block.Items, block.Order, cursor, scope, start, end, block.Overflow == SlotOverflow.TruncateLast, block.Name);
         if (reached < end)
         {
-            FillFiller(entries, state, reached, end);
+            return FillFiller(entries, state, reached, end, overrunLimit > end ? overrunLimit : null);
         }
+
+        return end;
     }
 
     /// <summary>Packs block items into [start, end) in cursor order. Returns the instant up to which the range was covered.</summary>
@@ -364,14 +372,14 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
     /// air right now stay unplayed and come up later in the pass; when nothing unplayed may air, the next pass
     /// starts; when nothing in the pool may air, the card shows until something may.
     /// </summary>
-    private void FillFiller(List<ScheduleEntry> entries, WeekState state, DateTime start, DateTime end)
+    private DateTime FillFiller(List<ScheduleEntry> entries, WeekState state, DateTime start, DateTime end, DateTime? overrunLimit = null)
     {
         var items = _filler.Items;
         var label = _filler.Label;
         if (items.Count == 0 || items.All(i => i.RuntimeTicks <= 0))
         {
             entries.Add(Slate(start, end, label));
-            return;
+            return end;
         }
 
         var cursor = state.FillerCursor;
@@ -405,7 +413,15 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
                 continue;
             }
 
-            // Nothing unplayed fits: cut the item when a meaningful part of it fits, otherwise show the card.
+            // Nothing unplayed fits before the end. Past a block end the same stream carries on anyway, so when
+            // allowed let the item finish (padded to the grid) as long as it ends before whatever comes next.
+            if (overrunLimit.HasValue && t + item.Runtime <= overrunLimit.Value)
+            {
+                cursor.Mark(p);
+                return Place(entries, item, t, overrunLimit.Value, label);
+            }
+
+            // Cut the item when a meaningful part of it fits, otherwise show the card.
             if (remaining >= Min(MinTruncatedFiller, TimeSpan.FromTicks(item.RuntimeTicks / 2)))
             {
                 entries.Add(Program(item, t, end, true, label));
@@ -416,8 +432,10 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
                 entries.Add(Slate(t, end, label));
             }
 
-            return;
+            return end;
         }
+
+        return end;
     }
 
     /// <summary>Starts the cursor's pass if it has not started, and the next pass when every item of it has played.</summary>

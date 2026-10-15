@@ -61,6 +61,7 @@ public sealed class ScheduleInput
                 Duration = TimeSpan.FromMinutes(Math.Clamp(b.DurationMinutes, 1, 24 * 60)),
                 Order = b.Order,
                 Overflow = b.Overflow,
+                RemainderMayOverrun = b.RemainderMayOverrun,
                 Items = compiled.Blocks.TryGetValue(b.Id, out var items) ? items : new List<PlayableItem>()
             })
             .ToList();
@@ -141,6 +142,8 @@ public sealed class SlotBlockInput
     public PlayOrder Order { get; init; }
 
     public SlotOverflow Overflow { get; init; }
+
+    public bool RemainderMayOverrun { get; init; }
 
     public IReadOnlyList<PlayableItem> Items { get; init; } = Array.Empty<PlayableItem>();
 }

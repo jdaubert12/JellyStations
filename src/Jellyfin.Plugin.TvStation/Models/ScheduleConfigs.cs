@@ -60,6 +60,13 @@ public sealed class SlotBlock
     public PlayOrder Order { get; set; } = PlayOrder.Sequential;
 
     public SlotOverflow Overflow { get; set; } = SlotOverflow.FillerRemainder;
+
+    /// <summary>
+    /// When the block's own content ends early and the pool / filler takes the remainder: let that stream's last item
+    /// finish past the block end instead of cutting it, unless another block starts right then. Off keeps the
+    /// pre-1.4 behaviour (cut at the block end); the editor turns it on for new blocks.
+    /// </summary>
+    public bool RemainderMayOverrun { get; set; }
 }
 
 public sealed class FillerConfig

@@ -930,6 +930,7 @@
       b.Sources.forEach(normalizeSource);
       b.Order = b.Order || 'Sequential';
       b.Overflow = b.Overflow || 'FillerRemainder';
+      b.RemainderMayOverrun = !!b.RemainderMayOverrun;
       b.StartLocal = b.StartLocal || '20:00';
       if (b.DurationMinutes === undefined || b.DurationMinutes === null) {
         b.DurationMinutes = 60;
@@ -1599,7 +1600,8 @@
       DurationMinutes: 60,
       Sources: [],
       Order: 'Sequential',
-      Overflow: 'FillerRemainder'
+      Overflow: 'FillerRemainder',
+      RemainderMayOverrun: true
     };
   }
 
@@ -1691,6 +1693,7 @@
         selectHtml(p + 'order', 'Play order', [['Sequential', 'Sequential – continue where the last occurrence left off'], ['Shuffle', 'Shuffle – re-rolled every occurrence'], ['ShuffleEpisodesInOrder', 'Shuffle shows, episodes in order – re-rolled every occurrence']]) +
         selectHtml(p + 'overflow', 'When the next item does not fit', [['FillerRemainder', 'Hand the remainder to ' + betweenBlocksName()], ['TruncateLast', 'Play it anyway and cut it off at the block end']]) +
       '</div>' +
+      '<label class="emby-checkbox-label tvs-block-overrun"><input type="checkbox" id="' + p + 'overrun"><span>When ' + betweenBlocksName() + ' takes the remainder, let its last program finish past the block end instead of cutting it (unless another block starts right then)</span></label>' +
       '<div class="tvs-days-label">Days</div>' +
       '<div class="tvs-days">' +
         DAYS.map(d => '<label class="tvs-day"><input type="checkbox" data-day="' + d + '"><span>' + DAY_SHORT[d] + '</span></label>').join('') +
@@ -1704,6 +1707,7 @@
     q('dur').value = b.DurationMinutes;
     q('order').value = b.Order || 'Sequential';
     q('overflow').value = b.Overflow || 'FillerRemainder';
+    q('overrun').checked = !!b.RemainderMayOverrun;
 
     const refreshHead = () => {
       titleBox.firstChild.textContent = b.Name || 'Untitled block';
@@ -1715,6 +1719,7 @@
     q('dur').addEventListener('input', () => { b.DurationMinutes = parseInt(q('dur').value, 10) || 0; refreshHead(); });
     q('order').addEventListener('change', () => { b.Order = q('order').value; });
     q('overflow').addEventListener('change', () => { b.Overflow = q('overflow').value; });
+    q('overrun').addEventListener('change', () => { b.RemainderMayOverrun = q('overrun').checked; });
 
     $all('input[data-day]', body).forEach(cb => {
       const day = cb.getAttribute('data-day');
@@ -1842,7 +1847,8 @@
       DurationMinutes: parseInt(t.DurationMinutes, 10) || 60,
       Sources: JSON.parse(JSON.stringify(t.Sources || [])),
       Order: t.Order || 'Sequential',
-      Overflow: t.Overflow || 'FillerRemainder'
+      Overflow: t.Overflow || 'FillerRemainder',
+      RemainderMayOverrun: !!t.RemainderMayOverrun
     };
     block.Sources.forEach(normalizeSource);
     return block;

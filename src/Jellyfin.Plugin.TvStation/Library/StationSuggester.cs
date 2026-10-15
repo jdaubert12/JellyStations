@@ -142,7 +142,8 @@ public static class StationSuggester
                     StartLocal = "19:00",
                     DurationMinutes = Math.Max(30, minutes),
                     Order = PlayOrder.Sequential,
-                    Overflow = SlotOverflow.FillerRemainder
+                    Overflow = SlotOverflow.FillerRemainder,
+                    RemainderMayOverrun = true
                 };
                 for (var j = 0; j < f.ItemIds.Count; j++)
                 {
