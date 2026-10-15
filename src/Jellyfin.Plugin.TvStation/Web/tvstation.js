@@ -457,7 +457,7 @@
       type: method,
       url: ApiClient.getUrl('TvStation/' + path, query || undefined)
     };
-    if (body !== undefined) {
+    if (body !== undefined && body !== null) {
       options.data = JSON.stringify(body);
       options.contentType = 'application/json';
     }

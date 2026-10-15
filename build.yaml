@@ -1,7 +1,7 @@
 ---
 name: "TvStation"
 guid: "b7f3c1d2-5e8a-4f0b-9c6d-2a1e7f4b8d31"
-version: "1.2.0.0"
+version: "1.2.1.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "Justin"
@@ -15,6 +15,7 @@ category: "LiveTV"
 artifacts:
   - "Jellyfin.Plugin.TvStation.dll"
 changelog: >
+  1.2.1.0: Fix "Suggest stations" failing to load (GET request sent a body).
   1.2.0.0: Time blocks on Pool stations (a movie block at 18:00 while the pool keeps its shuffle, marathons and daytime rules); logo overlay over the video; Import matches movies, series, seasons, episodes and collections by name on another server; library analysis endpoint; Suggest stations on the dashboard (genres, series, kids and family, franchises, collections, decades, seasonal); block templates; per-station minimum runtime.
   1.1.0.0: Pool stations can carry weekly time blocks (for example a movie every evening 18:00-21:00) while the pool keeps playing between them with its shuffle, series spacing, marathons and daytime rules. Slots-mode filler is unchanged.
   1.0.0.0: Initial release.
