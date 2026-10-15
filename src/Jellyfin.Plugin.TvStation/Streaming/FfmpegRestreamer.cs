@@ -109,17 +109,21 @@ public sealed class FfmpegRestreamer : IDisposable
 
                 CurrentEntry = entry;
 
+                // A multi-part item (Blu-ray split into part1/part2) plays as consecutive segments on one clock:
+                // the part the offset falls in now, then the loop comes back here for the next part.
+                var segment = entry.Item?.SegmentAt(resolved.Offset);
                 var playable = entry.Kind != EntryKind.Slate
                     && entry.Item is not null
+                    && segment is not null
                     && entry.ProgramId != lastFailedProgramId
-                    && File.Exists(entry.Item.Path);
+                    && File.Exists(segment.Part.Path);
 
                 if (!playable)
                 {
-                    if (entry.Kind != EntryKind.Slate && entry.Item is not null && entry.ProgramId != lastFailedProgramId)
+                    if (entry.Kind != EntryKind.Slate && entry.Item is not null && segment is not null && entry.ProgramId != lastFailedProgramId)
                     {
-                        _logger.LogWarning("TvStation [{Station}]: file missing for {Title}: {Path}", _stationName, entry.Item.DisplayTitle, entry.Item.Path);
-                        Note("File missing: " + entry.Item.Path);
+                        _logger.LogWarning("TvStation [{Station}]: file missing for {Title}: {Path}", _stationName, entry.Item.DisplayTitle, segment.Part.Path);
+                        Note("File missing: " + segment.Part.Path);
                     }
 
                     var text = entry.Kind == EntryKind.Slate ? _cardText : Station.DefaultCardText;
@@ -128,15 +132,20 @@ public sealed class FfmpegRestreamer : IDisposable
                 }
 
                 var item = entry.Item!;
-                var seek = resolved.Offset;
-                var duration = entry.IsTruncated || entry.EndUtc < entry.StartUtc + item.Runtime ? remaining : (TimeSpan?)null;
+                var part = segment!;
+                var seek = part.Seek;
+                // Cut the file when the schedule ends before it does; otherwise play the file (this part) to its end.
+                var cut = remaining < part.Remaining;
+                var duration = cut ? remaining : (TimeSpan?)null;
+                var segmentEnd = now + (cut ? remaining : part.Remaining);
                 var overlay = OverlayInput();
-                var args = FfmpegArgsBuilder.ForFile(item, seek, duration, NextTsOffset(), _profile, overlay);
+                var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, seek, duration, NextTsOffset(), _profile, overlay);
 
                 _logger.LogInformation(
-                    "TvStation [{Station}]: playing {Title} from {Seek} ({Remaining} remaining)",
+                    "TvStation [{Station}]: playing {Title}{Part} from {Seek} ({Remaining} remaining)",
                     _stationName,
                     item.DisplayTitle,
+                    item.IsMultiPart ? " part " + (part.Index + 1) + "/" + item.Parts.Count : string.Empty,
                     seek.ToString(@"hh\:mm\:ss"),
                     remaining.ToString(@"hh\:mm\:ss"));
                 _logger.LogDebug("TvStation ffmpeg {Args}", FfmpegArgsBuilder.ToLogString(args));
@@ -150,7 +159,8 @@ public sealed class FfmpegRestreamer : IDisposable
                     break;
                 }
 
-                var endedEarly = DateTime.UtcNow < entry.EndUtc - MinSegment;
+                // Early means before this segment's planned end: a part finishing on time is not a failure.
+                var endedEarly = DateTime.UtcNow < segmentEnd - MinSegment;
                 if (exitCode != 0 && ran < TimeSpan.FromSeconds(5) && overlay is not null)
                 {
                     // The overlay filter (or the logo file) is the likely culprit: drop the overlay for this session and replay.

@@ -175,7 +175,7 @@ public sealed class LibrarySearchService
             Name = item.Name ?? string.Empty,
             Kind = KindName(item),
             Year = item.ProductionYear,
-            RuntimeTicks = item.RunTimeTicks,
+            RuntimeTicks = LibraryContentResolver.TotalRuntimeTicks(item),
             HasImage = item.HasImage(ImageType.Primary)
         };
 

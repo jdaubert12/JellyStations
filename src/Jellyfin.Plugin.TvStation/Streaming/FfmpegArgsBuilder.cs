@@ -13,8 +13,12 @@ public static class FfmpegArgsBuilder
     /// <summary>A logo to draw over the video: image path plus placement.</summary>
     public sealed record LogoOverlayInput(string Path, LogoCorner Corner, int Opacity, int HeightPercent);
 
-    /// <summary>Arguments to play a file from an offset, normalized to the profile, as real-time MPEG-TS on stdout.</summary>
+    /// <summary>Arguments to play an item's (first) file from an offset, normalized to the profile, as real-time MPEG-TS on stdout.</summary>
     public static List<string> ForFile(PlayableItem item, TimeSpan seek, TimeSpan? duration, TimeSpan tsOffset, EncodingProfile p, LogoOverlayInput? overlay = null)
+        => ForSource(item.Path, item.HasAudio, item.AudioStreamIndex, seek, duration, tsOffset, p, overlay);
+
+    /// <summary>Arguments to play one file (an item, or one part of a multi-part item) from an offset.</summary>
+    public static List<string> ForSource(string path, bool hasAudio, int? audioStreamIndex, TimeSpan seek, TimeSpan? duration, TimeSpan tsOffset, EncodingProfile p, LogoOverlayInput? overlay = null)
     {
         var args = new List<string>();
         Common(args);
@@ -27,9 +31,9 @@ public static class FfmpegArgsBuilder
         }
 
         args.Add("-i");
-        args.Add(item.Path);
+        args.Add(path);
 
-        var needSilence = !item.HasAudio;
+        var needSilence = !hasAudio;
         if (needSilence)
         {
             args.Add("-f");
@@ -58,7 +62,7 @@ public static class FfmpegArgsBuilder
             args.Add("-shortest");
         }
 
-        var audioMap = needSilence ? "1:a:0" : "0:a:" + (item.AudioStreamIndex ?? 0).ToString(CultureInfo.InvariantCulture) + "?";
+        var audioMap = needSilence ? "1:a:0" : "0:a:" + (audioStreamIndex ?? 0).ToString(CultureInfo.InvariantCulture) + "?";
         if (overlay is null)
         {
             args.Add("-map");

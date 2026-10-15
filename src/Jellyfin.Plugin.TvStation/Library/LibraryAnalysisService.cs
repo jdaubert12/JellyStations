@@ -105,7 +105,13 @@ public sealed class LibraryAnalysisService
 
             foreach (var item in items)
             {
-                if (item is not Video video || video.RunTimeTicks is null || video.RunTimeTicks <= 0 || !seen.Add(video.Id))
+                if (item is not Video video || !seen.Add(video.Id))
+                {
+                    continue;
+                }
+
+                var runtime = LibraryContentResolver.TotalRuntimeTicks(video);
+                if (runtime is null or <= 0)
                 {
                     continue;
                 }
@@ -117,7 +123,7 @@ public sealed class LibraryAnalysisService
                     Title = video.Name ?? string.Empty,
                     Rating = video.OfficialRating,
                     Year = video.ProductionYear,
-                    RuntimeTicks = video.RunTimeTicks.Value,
+                    RuntimeTicks = runtime.Value,
                     Genres = video.Genres?.ToList() ?? new List<string>(),
                     Tags = video.Tags?.ToList() ?? new List<string>(),
                     LibraryId = libraryId,

@@ -451,9 +451,16 @@ public sealed class LibraryContentResolver
             return null;
         }
 
-        if (video.RunTimeTicks is null || video.RunTimeTicks <= 0)
+        var parts = PartsOf(video);
+        if (parts.Any(v => v.RunTimeTicks is null || v.RunTimeTicks <= 0))
         {
             excluded.Add(new ExcludedItem { ItemId = item.Id, Name = DisplayName(video), Reason = ExclusionReason.NoRuntime });
+            return null;
+        }
+
+        if (parts.Any(v => string.IsNullOrEmpty(v.Path)))
+        {
+            excluded.Add(new ExcludedItem { ItemId = item.Id, Name = DisplayName(video), Reason = ExclusionReason.NoPath });
             return null;
         }
 
@@ -461,7 +468,7 @@ public sealed class LibraryContentResolver
         {
             ItemId = video.Id,
             Path = video.Path,
-            RuntimeTicks = video.RunTimeTicks.Value,
+            RuntimeTicks = parts.Sum(v => v.RunTimeTicks!.Value),
             Genres = video.Genres?.ToList() ?? new List<string>(),
             Tags = video.Tags?.ToList() ?? new List<string>(),
             Overview = video.Overview,
@@ -472,6 +479,13 @@ public sealed class LibraryContentResolver
             AudioStreamIndex = PickAudioStream(video, audioLanguage),
             HasAudio = HasAudioTrack(video)
         };
+
+        if (parts.Count > 1)
+        {
+            playable.Parts = parts
+                .Select(v => new PlayablePart { Path = v.Path, RuntimeTicks = v.RunTimeTicks!.Value, AudioStreamIndex = PickAudioStream(v, audioLanguage), HasAudio = HasAudioTrack(v) })
+                .ToList();
+        }
 
         if (video is Episode episode)
         {
@@ -504,6 +518,43 @@ public sealed class LibraryContentResolver
         }
 
         return playable;
+    }
+
+    /// <summary>The video and, for a stacked (multi-part) video, its additional parts in play order.</summary>
+    public static IReadOnlyList<Video> PartsOf(Video video)
+    {
+        try
+        {
+            if (video.IsStacked)
+            {
+                var list = new List<Video> { video };
+                list.AddRange(video.GetAdditionalParts());
+                return list;
+            }
+        }
+        catch (Exception)
+        {
+            // Parts could not be resolved; treat as a single file.
+        }
+
+        return new[] { video };
+    }
+
+    /// <summary>Runtime across every part of a stacked video, or null when any part lacks one.</summary>
+    public static long? TotalRuntimeTicks(BaseItem item)
+    {
+        if (item is not Video video)
+        {
+            return item.RunTimeTicks;
+        }
+
+        var parts = PartsOf(video);
+        if (parts.Any(v => v.RunTimeTicks is null || v.RunTimeTicks <= 0))
+        {
+            return null;
+        }
+
+        return parts.Sum(v => v.RunTimeTicks!.Value);
     }
 
     private static string DisplayName(Video v) => v is Episode e ? $"{e.SeriesName} - {e.Name}" : v.Name ?? v.Id.ToString();

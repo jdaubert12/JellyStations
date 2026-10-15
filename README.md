@@ -114,7 +114,9 @@ Edits that change the schedule (content, mode, anchor, padding, time zone) bump 
 edits (name, number, logo) do not. A nightly task re-scans the library for stations with
 *nightly refresh* enabled so new episodes join the rotation.
 
-Items without a known runtime are skipped and listed in the editor; refresh their metadata in
+Films split across files (Blu-ray `part1` / `part2`, which Jellyfin stacks into one movie) are
+scheduled at their full combined length and play straight through, one guide entry. Items without a
+known runtime are skipped and listed in the editor; refresh their metadata in
 Jellyfin and press **Recompile content**.
 
 **Suggest stations** on the dashboard turns the library analysis into ready-made channels: genres and
