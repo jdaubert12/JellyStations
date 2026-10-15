@@ -2,7 +2,7 @@
 param([string]$Configuration = "Release")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.1.0.0"
+$version = "1.2.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.TvStation\bin\$Configuration\net10.0\Jellyfin.Plugin.TvStation.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -21,7 +21,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Pool stations can carry weekly time blocks (for example a movie every evening 18:00-21:00) while the pool keeps playing between them with its shuffle, series spacing, marathons and daytime rules. Slots-mode filler is unchanged."
+    changelog = "Time blocks on Pool stations (a movie block at 18:00 while the pool keeps its shuffle, marathons and daytime rules); logo overlay over the video; Import matches movies, series, seasons, episodes and collections by name on another server; library analysis endpoint; Suggest stations on the dashboard (genres, series, kids and family, franchises, collections, decades, seasonal); block templates; per-station minimum runtime."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

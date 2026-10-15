@@ -90,14 +90,14 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.1.0.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.1.0.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.1.0.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.1.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.1.0.0\`
+2. Copy it into a folder named `TvStation_1.2.0.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.2.0.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.2.0.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.2.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.2.0.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
-For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.1.0.0/`
+For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.2.0.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 
