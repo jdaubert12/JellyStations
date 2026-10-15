@@ -5,12 +5,19 @@
   <title>TV Stations</title>
 </head>
 <body>
-  <div id="TvStationPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+  <div id="TvStationPage" data-role="page" class="page type-interior pluginConfigurationPage" data-title="TV Stations" data-require="emby-input,emby-button,emby-select,emby-checkbox">
     <style>
       #TvStationPage .tvs-hidden { display: none !important; }
       #TvStationPage .tvs-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5em; margin: 0 0 1em; }
       #TvStationPage .tvs-toolbar .sectionTitle { flex: 1 1 auto; margin: 0; }
       #TvStationPage .tvs-subtitle { margin: 1.2em 0 .4em; font-size: 1.05em; font-weight: 500; }
+      #TvStationPage .tvs-toolbar .tvs-page-head { flex: 1 1 auto; }
+      #TvStationPage .tvs-page-head h2 { margin: 0 0 .15em; }
+      #TvStationPage .tvs-page-head .tvs-secondary { display: block; font-size: .9em; }
+      #TvStationPage .tvs-section { background: rgba(128,128,128,.10); border: 1px solid rgba(128,128,128,.28); border-radius: .6em; padding: 1em 1.25em 1.25em; margin: 0 0 1.25em; }
+      #TvStationPage .tvs-section > .sectionTitle { display: flex; align-items: center; gap: .5em; margin: 0 0 .7em; padding-bottom: .55em; border-bottom: 1px solid rgba(128,128,128,.28); font-size: 1.15em; }
+      #TvStationPage .tvs-section > .sectionTitle .material-icons { font-size: 1.25em; opacity: .85; }
+      #TvStationPage .tvs-section > .fieldDescription:first-of-type { margin: 0 0 .9em; }
       #TvStationPage .tvs-grid2 { display: grid; grid-template-columns: 1fr 1fr; column-gap: 1.5em; }
       #TvStationPage .tvs-grid2 > * { min-width: 0; }
       @media (max-width: 800px) { #TvStationPage .tvs-grid2 { grid-template-columns: 1fr; } }
@@ -460,26 +467,29 @@
         <!-- ===================== Settings ===================== -->
         <div id="tvsViewSettings" class="tvs-view tvs-hidden">
           <div class="tvs-toolbar">
-            <h2 class="sectionTitle">Settings</h2>
+            <div class="tvs-page-head">
+              <h2 class="sectionTitle">Settings</h2>
+              <span class="tvs-secondary">Plugin-wide defaults for every station. Encoding can be overridden per station; everything else applies everywhere.</span>
+            </div>
             <button is="emby-button" type="button" id="tvsBtnSettingsBack" class="raised emby-button"><span>Back to list</span></button>
           </div>
           <div id="tvsSettingsErrors" class="tvs-error tvs-hidden"></div>
 
-          <div class="verticalSection">
-            <h3 class="sectionTitle">Default encoding</h3>
+          <div class="verticalSection tvs-section">
+            <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">tune</span>Default encoding</h3>
             <div class="fieldDescription">Every program on every station is normalized to this profile so the stream never changes format mid-air. Stations can override it individually.</div>
             <div id="tvsSettingsEncoding"></div>
           </div>
 
-          <div class="verticalSection">
-            <h3 class="sectionTitle">Block templates</h3>
+          <div class="verticalSection tvs-section">
+            <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">bookmark</span>Block templates</h3>
             <div class="fieldDescription">Time blocks saved from a station editor with the bookmark button. Pick one from the dropdown next to “Add block” to reuse it on any station.</div>
             <div id="tvsTemplateEmpty" class="tvs-secondary">No templates saved yet.</div>
             <div id="tvsTemplateList" class="paperList"></div>
           </div>
 
-          <div class="verticalSection">
-            <h3 class="sectionTitle">Streaming</h3>
+          <div class="verticalSection tvs-section">
+            <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">cast</span>Streaming</h3>
             <div class="tvs-grid2">
               <div class="inputContainer">
                 <input is="emby-input" id="tvsLinger" label="Linger seconds" type="number" min="0" max="600" step="1">
@@ -496,8 +506,8 @@
             </div>
           </div>
 
-          <div class="verticalSection">
-            <h3 class="sectionTitle">Guide</h3>
+          <div class="verticalSection tvs-section">
+            <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">event</span>Guide</h3>
             <div class="tvs-grid2">
               <div class="inputContainer">
                 <input is="emby-input" id="tvsMaxGuideDays" label="Max guide days" type="number" min="1" max="30" step="1">
@@ -506,16 +516,16 @@
             </div>
           </div>
 
-          <div class="verticalSection">
-            <h3 class="sectionTitle">Content rules</h3>
+          <div class="verticalSection tvs-section">
+            <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">label_off</span>Content rules</h3>
             <div class="inputContainer">
               <input is="emby-input" id="tvsGlobalExcludedTags" label="Excluded tags (all stations)" type="text" autocomplete="off" placeholder="e.g. christmas">
               <div class="fieldDescription">Comma-separated library tags kept off every station unless the station opts out. Hand-picked items and Tag sources for the same tag still play, so a seasonal "everything tagged christmas" station keeps working. Changing this recompiles all stations.</div>
             </div>
           </div>
 
-          <div class="verticalSection">
-            <h3 class="sectionTitle">Station break slate</h3>
+          <div class="verticalSection tvs-section">
+            <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">tv</span>Station break slate</h3>
             <div class="tvs-inline" style="margin:.5em 0 1em">
               <label for="tvsSlateColor">Background color</label>
               <input type="color" id="tvsSlateColor" class="tvs-color" value="#101010">
