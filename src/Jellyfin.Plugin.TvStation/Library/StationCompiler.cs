@@ -32,14 +32,14 @@ public sealed class StationCompiler
         {
             foreach (var block in station.Slots.Blocks)
             {
-                compiled.Blocks[block.Id] = ApplyExclusions(Expand(block.Sources), excludedIds, compiled);
+                compiled.Blocks[block.Id] = DropShort(ApplyExclusions(Expand(block.Sources), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
             }
         }
 
         switch (station.Mode)
         {
             case ScheduleMode.Pool:
-                compiled.Pool = ApplyExclusions(Expand(station.Pool.Sources), excludedIds, compiled);
+                compiled.Pool = DropShort(ApplyExclusions(Expand(station.Pool.Sources), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
                 CompileBlocks();
                 break;
 
@@ -57,7 +57,7 @@ public sealed class StationCompiler
 
             case ScheduleMode.Slots:
                 CompileBlocks();
-                compiled.Filler = ApplyExclusions(Expand(station.Slots.Filler.Sources), excludedIds, compiled);
+                compiled.Filler = DropShort(ApplyExclusions(Expand(station.Slots.Filler.Sources), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
                 break;
         }
 
@@ -121,6 +121,31 @@ public sealed class StationCompiler
             {
                 compiled.UserExcluded.Add(item);
                 compiled.Excluded.Add(new ExcludedItem { ItemId = item.ItemId, Name = item.DisplayTitle, Reason = ExclusionReason.UserExcluded });
+            }
+        }
+
+        return kept;
+    }
+
+    /// <summary>Drops items shorter than the station minimum, recording each once as <see cref="ExclusionReason.TooShort"/>.</summary>
+    public static List<PlayableItem> DropShort(List<PlayableItem> items, int minMinutes, CompiledStation compiled)
+    {
+        if (minMinutes <= 0)
+        {
+            return items;
+        }
+
+        var minTicks = TimeSpan.FromMinutes(minMinutes).Ticks;
+        var kept = new List<PlayableItem>(items.Count);
+        foreach (var item in items)
+        {
+            if (item.RuntimeTicks >= minTicks)
+            {
+                kept.Add(item);
+            }
+            else if (compiled.Excluded.All(e => e.ItemId != item.ItemId))
+            {
+                compiled.Excluded.Add(new ExcludedItem { ItemId = item.ItemId, Name = item.DisplayTitle, Reason = ExclusionReason.TooShort });
             }
         }
 

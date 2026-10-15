@@ -68,6 +68,9 @@ public sealed class Station
     /// <summary>Also apply the plugin-wide excluded tags from Settings (default on).</summary>
     public bool UseGlobalExcludedTags { get; set; } = true;
 
+    /// <summary>Items shorter than this many minutes are skipped (pool, filler and blocks; not lineups or bumpers). 0 = off.</summary>
+    public int MinRuntimeMinutes { get; set; }
+
     public BumperConfig Bumpers { get; set; } = new();
 
     /// <summary>Text on the station card shown during gaps. Null = "We'll be right back".</summary>

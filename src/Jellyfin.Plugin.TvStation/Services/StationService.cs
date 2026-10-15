@@ -433,6 +433,7 @@ public sealed class StationService
 
         s.LogoOverlay ??= new LogoOverlayConfig();
         s.LogoOverlay.Normalize();
+        s.MinRuntimeMinutes = Math.Clamp(s.MinRuntimeMinutes, 0, 600);
         s.ActiveWindows ??= new List<SeasonWindow>();
         s.ExcludedItemIds = (s.ExcludedItemIds ?? new List<Guid>()).Where(g => g != Guid.Empty).Distinct().ToList();
         s.ExcludedTags = NormalizeTags(s.ExcludedTags);
@@ -655,7 +656,8 @@ public sealed class StationService
             s.PaddingGridMinutes,
             s.PaddingByLength,
             s.TimeZoneId,
-            s.Bumpers
+            s.Bumpers,
+            s.MinRuntimeMinutes
         });
     }
 }

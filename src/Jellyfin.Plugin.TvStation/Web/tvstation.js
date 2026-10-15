@@ -44,7 +44,10 @@
     NoRuntime: 'No runtime in metadata',
     NoPath: 'No file path',
     NotFound: 'Item no longer exists',
-    NotVideo: 'Not a video item'
+    NotVideo: 'Not a video item',
+    UserExcluded: 'Excluded on this station',
+    TagExcluded: 'Excluded by tag',
+    TooShort: 'Shorter than the station minimum'
   };
   const RESOLUTIONS = [['1920x1080', '1920 × 1080 (1080p)'], ['1280x720', '1280 × 720 (720p)'], ['854x480', '854 × 480 (480p)'], ['custom', 'Custom']];
   const ENCODERS = [['libx264', 'libx264 (software)'], ['h264_nvenc', 'h264_nvenc (NVIDIA)'], ['h264_qsv', 'h264_qsv (Intel Quick Sync)'], ['h264_vaapi', 'h264_vaapi (VA-API)'], ['custom', 'Custom…']];
@@ -67,7 +70,10 @@
     settingsEncoding: null,
     statusTimer: null,
     openLogs: {},         // session UniqueId -> bool
-    deleteTimer: null
+    deleteTimer: null,
+    settings: null,       // GlobalSettings as last loaded in the settings view
+    suggestions: [],
+    blockTemplates: []
   };
 
   // ------------------------------------------------------------------------------------------
@@ -541,7 +547,7 @@
   // Views
   // ------------------------------------------------------------------------------------------
 
-  const VIEW_IDS = { list: '#tvsViewList', editor: '#tvsViewEditor', settings: '#tvsViewSettings', status: '#tvsViewStatus' };
+  const VIEW_IDS = { list: '#tvsViewList', editor: '#tvsViewEditor', settings: '#tvsViewSettings', status: '#tvsViewStatus', suggest: '#tvsViewSuggest' };
 
   function showView(name) {
     if (state.view === 'status' && name !== 'status') {
@@ -898,6 +904,7 @@
       ExcludedItemIds: [],
       ExcludedTags: [],
       UseGlobalExcludedTags: true,
+      MinRuntimeMinutes: 0,
       Bumpers: { Enabled: false, Sources: [], BreakMinutes: 0, MaxClipMinutes: 5 },
       CardText: null
     };
@@ -941,6 +948,7 @@
     s.ExcludedTags = Array.isArray(s.ExcludedTags) ? s.ExcludedTags : [];
     s.PaddingByLength = !!s.PaddingByLength;
     s.UseGlobalExcludedTags = s.UseGlobalExcludedTags !== false;
+    s.MinRuntimeMinutes = Math.max(0, parseInt(s.MinRuntimeMinutes, 10) || 0);
     s.Bumpers = s.Bumpers || {};
     s.Bumpers.Enabled = !!s.Bumpers.Enabled;
     s.Bumpers.Sources = Array.isArray(s.Bumpers.Sources) ? s.Bumpers.Sources : [];
@@ -1054,6 +1062,8 @@
     setVal('#tvsCardText', d.CardText || '');
     setVal('#tvsExcludedTags', d.ExcludedTags.join(', '));
     setChecked('#tvsUseGlobalTags', d.UseGlobalExcludedTags !== false);
+    setVal('#tvsMinRuntime', d.MinRuntimeMinutes || 0);
+    loadBlockTemplates();
     setChecked('#tvsBumpersEnabled', !!d.Bumpers.Enabled);
     setVal('#tvsBumperBreak', d.Bumpers.BreakMinutes || 0);
     setVal('#tvsBumperMax', d.Bumpers.MaxClipMinutes || 5);
@@ -1252,6 +1262,7 @@
     d.LogoOverlay.HeightPercent = Math.min(25, Math.max(3, parseInt(val('#tvsOverlaySize'), 10) || 8));
     d.ExcludedTags = parseTagList(val('#tvsExcludedTags'));
     d.UseGlobalExcludedTags = checked('#tvsUseGlobalTags');
+    d.MinRuntimeMinutes = Math.max(0, parseInt(val('#tvsMinRuntime'), 10) || 0);
     d.Bumpers.Enabled = checked('#tvsBumpersEnabled');
     d.Bumpers.BreakMinutes = Math.max(0, parseInt(val('#tvsBumperBreak'), 10) || 0);
     d.Bumpers.MaxClipMinutes = Math.max(1, parseInt(val('#tvsBumperMax'), 10) || 5);
@@ -1658,6 +1669,7 @@
         renderBlocks();
       }
     })));
+    head.appendChild(iconButton('bookmark', 'Save as template (under the block name)', stop(() => saveBlockTemplate(b))));
     head.appendChild(iconButton('delete', 'Remove block', stop(() => {
       blocks.splice(index, 1);
       delete state.expandedBlocks[b._key];
@@ -1796,6 +1808,165 @@
       return;
     }
     box.appendChild(el('div', { className: 'tvs-warn' }, el('ul', null, warnings.map(w => el('li', { text: w })))));
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // Block templates
+  // ------------------------------------------------------------------------------------------
+
+  function loadBlockTemplates() {
+    return api('GET', 'BlockTemplates').then(list => {
+      state.blockTemplates = Array.isArray(list) ? list : [];
+      renderBlockTemplateSelect();
+    }).catch(() => {
+      state.blockTemplates = [];
+      renderBlockTemplateSelect();
+    });
+  }
+
+  function renderBlockTemplateSelect() {
+    const select = $('#tvsBlockTemplateSelect');
+    if (!select) {
+      return;
+    }
+    clear(select).appendChild(el('option', { value: '', text: state.blockTemplates.length ? 'Blank block' : 'Blank block (no templates saved)' }));
+    state.blockTemplates.forEach(t => select.appendChild(el('option', { value: t.Id, text: 'Template: ' + t.Name + ' – ' + blockSummary(t) })));
+  }
+
+  function blockFromTemplate(t) {
+    const block = {
+      _key: 'b' + (++state.blockSeq),
+      Name: t.Name || '',
+      Days: (t.Days || []).slice(),
+      StartLocal: t.StartLocal || '20:00',
+      DurationMinutes: parseInt(t.DurationMinutes, 10) || 60,
+      Sources: JSON.parse(JSON.stringify(t.Sources || [])),
+      Order: t.Order || 'Sequential',
+      Overflow: t.Overflow || 'FillerRemainder'
+    };
+    block.Sources.forEach(normalizeSource);
+    return block;
+  }
+
+  function saveBlockTemplate(b) {
+    const name = (b.Name || '').trim();
+    if (!name) {
+      toast('Give the block a name first; the template is saved under it.');
+      return;
+    }
+    const payload = toPayload({ Slots: { Blocks: [b] } }).Slots.Blocks[0];
+    delete payload.Id;
+    api('POST', 'BlockTemplates', payload).then(list => {
+      state.blockTemplates = Array.isArray(list) ? list : [];
+      renderBlockTemplateSelect();
+      toast('Template “' + name + '” saved.');
+    }).catch(err => alertErrors(err, 'Could not save template'));
+  }
+
+  function renderSettingsTemplates(templates) {
+    const list = clear($('#tvsTemplateList'));
+    show($('#tvsTemplateEmpty'), !templates.length);
+    templates.forEach(t => {
+      const row = el('div', { className: 'listItem' }, [
+        el('span', { className: 'material-icons listItemIcon bookmark', 'aria-hidden': 'true' }),
+        el('div', { className: 'listItemBody two-line' }, [
+          el('div', { className: 'listItemBodyText', text: t.Name }),
+          el('div', { className: 'listItemBodyText secondary', text: blockSummary(t) + ' · ' + (t.Order || 'Sequential') })
+        ])
+      ]);
+      row.appendChild(iconButton('delete', 'Delete template', () => {
+        api('DELETE', 'BlockTemplates/' + t.Id, null, null, true).then(() => {
+          state.settings.BlockTemplates = (state.settings.BlockTemplates || []).filter(x => x.Id !== t.Id);
+          renderSettingsTemplates(state.settings.BlockTemplates);
+          toast('Template deleted.');
+        }).catch(err => alertErrors(err, 'Could not delete template'));
+      }));
+      list.appendChild(row);
+    });
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // Suggestions
+  // ------------------------------------------------------------------------------------------
+
+  function openSuggestions(refresh) {
+    loading(true);
+    api('GET', 'Suggestions', null, suggestQuery(refresh)).then(list => {
+      state.suggestions = Array.isArray(list) ? list : [];
+      renderSuggestions();
+      showView('suggest');
+    }).catch(err => alertErrors(err, 'Could not build suggestions')).then(() => loading(false));
+  }
+
+  /** Query for the suggestions endpoint: optional re-scan and the lowered thresholds for small libraries. */
+  function suggestQuery(refresh) {
+    const q = {};
+    if (refresh) { q.refresh = true; }
+    if (checked('#tvsSuggestSmall')) { q.minHours = 1; q.minEpisodes = 5; }
+    return q;
+  }
+
+  function renderSuggestions() {
+    const box = clear($('#tvsSuggestList'));
+    renderErrorBox($('#tvsSuggestError'), null);
+    const list = state.suggestions;
+    show($('#tvsSuggestEmpty'), list.length === 0);
+    const categories = [];
+    list.forEach(s => {
+      if (categories.indexOf(s.Category) < 0) {
+        categories.push(s.Category);
+      }
+    });
+    categories.forEach(cat => {
+      box.appendChild(el('h3', { className: 'sectionTitle', text: cat }));
+      list.filter(s => s.Category === cat).forEach(s => {
+        const cb = el('input', { type: 'checkbox', 'data-key': s.Key });
+        cb.disabled = !!s.Exists;
+        const row = el('div', { className: 'listItem' }, [
+          el('label', { className: 'tvs-suggest-pick' }, cb),
+          el('div', { className: 'listItemBody two-line' }, [
+            el('div', { className: 'listItemBodyText' }, [
+              el('span', { text: s.Name }),
+              badge(MODE_LABEL[s.Station.Mode] || s.Station.Mode, 'on'),
+              s.Exists ? badge('Already exists', 'off') : null
+            ]),
+            el('div', { className: 'listItemBodyText secondary', text: s.Hours + ' h · ' + s.Description })
+          ])
+        ]);
+        box.appendChild(row);
+      });
+    });
+    updateSuggestCount();
+  }
+
+  function selectedSuggestionKeys() {
+    return $all('#tvsSuggestList input[type=checkbox]:checked').map(c => c.getAttribute('data-key'));
+  }
+
+  function updateSuggestCount() {
+    const n = selectedSuggestionKeys().length;
+    $('#tvsBtnSuggestCreate').disabled = n === 0;
+    $('#tvsSuggestCount').textContent = n ? n + ' selected' : '';
+  }
+
+  function createSelectedSuggestions() {
+    const keys = selectedSuggestionKeys();
+    if (!keys.length) {
+      return;
+    }
+    loading(true);
+    const q = suggestQuery(false);
+    api('POST', 'Suggestions/Create', { Keys: keys, TimeZoneId: guessTimeZone(), MinHours: q.minHours || null, MinEpisodes: q.minEpisodes || null }).then(res => {
+      const parts = [];
+      if (res.Created.length) { parts.push('created ' + res.Created.length); }
+      if (res.Errors.length) { parts.push(res.Errors.length + ' failed'); }
+      toast('Suggestions: ' + (parts.join(', ') || 'nothing to do') + '.');
+      return loadStations().then(() => api('GET', 'Suggestions', null, suggestQuery(false))).then(list => {
+        state.suggestions = Array.isArray(list) ? list : [];
+        renderSuggestions();
+        renderErrorBox($('#tvsSuggestError'), res.Errors.length ? res.Errors : null);
+      });
+    }).catch(err => alertErrors(err, 'Could not create stations')).then(() => loading(false));
   }
 
   // ------------------------------------------------------------------------------------------
@@ -2426,7 +2597,8 @@
   function openSettings() {
     loading(true);
     api('GET', 'Settings').then(settings => {
-      renderSettings(settings || {});
+      state.settings = settings || {};
+      renderSettings(state.settings);
       showView('settings');
     }).catch(err => alertErrors(err, 'Could not load settings')).then(() => loading(false));
   }
@@ -2447,6 +2619,7 @@
     setChecked('#tvsShowText', s.ShowTextOnSlate !== false);
     setChecked('#tvsShowLogo', s.ShowLogoOnSlate !== false);
     setVal('#tvsGlobalExcludedTags', Array.isArray(s.ExcludedTags) ? s.ExcludedTags.join(', ') : '');
+    renderSettingsTemplates(Array.isArray(s.BlockTemplates) ? s.BlockTemplates : []);
   }
 
   function saveSettings() {
@@ -2459,7 +2632,8 @@
       SlateBackgroundColor: val('#tvsSlateColor') || '#101010',
       ShowTextOnSlate: checked('#tvsShowText'),
       ShowLogoOnSlate: checked('#tvsShowLogo'),
-      ExcludedTags: parseTagList(val('#tvsGlobalExcludedTags'))
+      ExcludedTags: parseTagList(val('#tvsGlobalExcludedTags')),
+      BlockTemplates: (state.settings && state.settings.BlockTemplates) || []
     };
     const errors = [];
     if (isNaN(payload.LingerSeconds)) {
@@ -2691,11 +2865,20 @@
     on('#tvsEncodingEnabled', 'change', () => show($('#tvsStationEncoding'), checked('#tvsEncodingEnabled')));
     on('#tvsOverlayEnabled', 'change', () => show($('#tvsOverlayOptions'), checked('#tvsOverlayEnabled')));
     on('#tvsBtnAddBlock', 'click', () => {
-      const block = newBlock();
+      const templateId = val('#tvsBlockTemplateSelect');
+      const template = state.blockTemplates.find(t => t.Id === templateId);
+      const block = template ? blockFromTemplate(template) : newBlock();
       state.draft.Slots.Blocks.push(block);
       state.expandedBlocks[block._key] = true;
+      setVal('#tvsBlockTemplateSelect', '');
       renderBlocks();
     });
+    on('#tvsBtnSuggest', 'click', () => openSuggestions(false));
+    on('#tvsBtnSuggestRefresh', 'click', () => openSuggestions(true));
+    on('#tvsSuggestSmall', 'change', () => openSuggestions(false));
+    on('#tvsBtnSuggestBack', 'click', () => showView('list'));
+    on('#tvsBtnSuggestCreate', 'click', createSelectedSuggestions);
+    on('#tvsSuggestList', 'change', updateSuggestCount);
     on('#tvsLogoFile', 'change', ev => {
       const file = ev.target.files && ev.target.files[0];
       if (file) {

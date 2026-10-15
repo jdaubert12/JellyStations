@@ -117,6 +117,16 @@ edits (name, number, logo) do not. A nightly task re-scans the library for stati
 Items without a known runtime are skipped and listed in the editor; refresh their metadata in
 Jellyfin and press **Recompile content**.
 
+**Suggest stations** on the dashboard turns the library analysis into ready-made channels: genres and
+series with enough hours, a kids channel and family movies by rating, franchise marathons and a
+"Franchise Nights" slots station from titles that share a prefix, collections, decades, and seasonal
+channels from holiday tags. Tick the ones you want and they are created with the next free channel
+numbers, editable like any other station.
+
+A time block can be saved as a **template** (bookmark button on the block) and added to any station
+from the dropdown next to "Add block". Templates are managed in Settings. A station can also **skip
+items shorter than** a number of minutes, which keeps shorts and stubs out of pools and blocks.
+
 `GET /TvStation/Library/Analysis` returns a one-pass summary of the library: hours per genre, every
 series with episode count and rating, collections, franchises detected from shared title prefixes,
 decades, ratings, tags and libraries. It is the basis for station suggestions and the health report.

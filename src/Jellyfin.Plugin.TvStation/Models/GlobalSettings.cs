@@ -25,4 +25,7 @@ public sealed class GlobalSettings
     /// only air on a seasonal station). Hand-picked items and Tag sources for the same tag are never affected.
     /// </summary>
     public List<string> ExcludedTags { get; set; } = new();
+
+    /// <summary>Saved time blocks (days, time, sources, order) that can be added to any station.</summary>
+    public List<SlotBlock> BlockTemplates { get; set; } = new();
 }

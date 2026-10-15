@@ -74,5 +74,8 @@ public enum ExclusionReason
     UserExcluded,
 
     /// <summary>Removed because it carries a tag on the station's or the global excluded-tags list.</summary>
-    TagExcluded
+    TagExcluded,
+
+    /// <summary>Shorter than the station's minimum runtime.</summary>
+    TooShort
 }

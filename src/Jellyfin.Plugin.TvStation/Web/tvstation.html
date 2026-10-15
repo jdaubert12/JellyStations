@@ -28,6 +28,8 @@
       #TvStationPage .tvs-badge.warn { background: rgba(255,152,0,.22); border-color: rgba(255,152,0,.6); }
       #TvStationPage .tvs-badge.kind { text-transform: none; opacity: .85; }
       #TvStationPage .tvs-season { margin: .8em 0 1.2em; }
+      #TvStationPage .tvs-suggest-pick { display: flex; align-items: center; padding: 0 .6em 0 .2em; }
+      #TvStationPage .tvs-suggest-pick input { width: 1.2em; height: 1.2em; }
       #TvStationPage .tvs-inline-btn { margin-left: .8em; padding: .3em .9em; font-size: .85em; }
       #TvStationPage .tvs-season-row { display: flex; flex-wrap: wrap; align-items: center; gap: .4em .6em; margin: .4em 0; }
       #TvStationPage .tvs-season-row select { width: auto; min-width: 6.5em; }
@@ -120,6 +122,7 @@
           <div class="tvs-toolbar">
             <h2 class="sectionTitle">TV Stations</h2>
             <button is="emby-button" type="button" id="tvsBtnNew" class="raised button-submit emby-button"><span>New station</span></button>
+            <button is="emby-button" type="button" id="tvsBtnSuggest" class="raised emby-button" title="Stations the library could support, ready to create"><span>Suggest stations</span></button>
             <button is="emby-button" type="button" id="tvsBtnRefreshGuide" class="raised emby-button" title="Ask Jellyfin to refresh the Live TV guide now"><span>Refresh guide</span></button>
             <button is="emby-button" type="button" id="tvsBtnSettings" class="raised emby-button"><span>Settings</span></button>
             <button is="emby-button" type="button" id="tvsBtnStatus" class="raised emby-button"><span>Status</span></button>
@@ -130,6 +133,22 @@
           <div id="tvsListError" class="tvs-error tvs-hidden"></div>
           <div id="tvsStationEmpty" class="tvs-empty tvs-hidden">No stations yet. Click “New station” to create your first channel.</div>
           <div id="tvsStationList" class="paperList"></div>
+        </div>
+
+        <!-- ===================== Suggestions ===================== -->
+        <div id="tvsViewSuggest" class="tvs-view tvs-hidden">
+          <div class="tvs-toolbar">
+            <h2 class="sectionTitle">Suggested stations</h2>
+            <span id="tvsSuggestCount" class="tvs-secondary"></span>
+            <button is="emby-button" type="button" id="tvsBtnSuggestCreate" class="raised button-submit emby-button"><span>Create selected</span></button>
+            <label class="emby-checkbox-label" style="width:auto;margin:0 .5em"><input is="emby-checkbox" type="checkbox" id="tvsSuggestSmall"><span>Include small channels (1 h / 5 episodes)</span></label>
+            <button is="emby-button" type="button" id="tvsBtnSuggestRefresh" class="raised emby-button" title="Re-scan the library"><span>Re-scan library</span></button>
+            <button is="emby-button" type="button" id="tvsBtnSuggestBack" class="raised emby-button"><span>Back to list</span></button>
+          </div>
+          <div class="fieldDescription">Built from what is in the library: genres and series with enough hours, kids and family content by rating, franchises found from titles, collections, decades and holiday tags. Tick the ones you want; they are created with the next free channel numbers and can be edited afterwards like any station.</div>
+          <div id="tvsSuggestError" class="tvs-error tvs-hidden"></div>
+          <div id="tvsSuggestEmpty" class="tvs-empty tvs-hidden">Nothing to suggest yet. Add more movies or shows, or lower your expectations.</div>
+          <div id="tvsSuggestList" class="paperList"></div>
         </div>
 
         <!-- ===================== Station editor ===================== -->
@@ -219,6 +238,10 @@
             <div class="inputContainer">
               <input is="emby-input" id="tvsExcludedTags" label="Exclude tags" type="text" autocomplete="off" placeholder="e.g. christmas, halloween">
               <div class="fieldDescription">Comma-separated library tags. Items carrying one are kept off this station when a source expands to them. Hand-picked movies and episodes, and a Tag source for the same tag, are never affected.</div>
+            </div>
+            <div class="inputContainer">
+              <input is="emby-input" id="tvsMinRuntime" label="Skip items shorter than (minutes)" type="number" min="0" max="600" step="1">
+              <div class="fieldDescription">Drops shorts, trailers and stubs from the pool, filler and blocks. 0 = off. Lineups and bumpers are not affected.</div>
             </div>
             <div class="checkboxContainer checkboxContainer-withDescription">
               <label class="emby-checkbox-label">
@@ -325,6 +348,7 @@
             <div id="tvsPanelBlocks" class="tvs-panel">
               <div class="tvs-toolbar" style="margin-top:1em">
                 <h4 class="tvs-subtitle sectionTitle" style="margin:0">Time blocks</h4>
+                <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsBlockTemplateSelect" title="Start the new block from a saved template" style="width:auto;max-width:20em"><option value="">Blank block</option></select>
                 <button is="emby-button" type="button" id="tvsBtnAddBlock" class="raised emby-button"><span>Add block</span></button>
               </div>
               <div class="fieldDescription" id="tvsBlocksHelp"></div>
@@ -445,6 +469,13 @@
             <h3 class="sectionTitle">Default encoding</h3>
             <div class="fieldDescription">Every program on every station is normalized to this profile so the stream never changes format mid-air. Stations can override it individually.</div>
             <div id="tvsSettingsEncoding"></div>
+          </div>
+
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Block templates</h3>
+            <div class="fieldDescription">Time blocks saved from a station editor with the bookmark button. Pick one from the dropdown next to “Add block” to reuse it on any station.</div>
+            <div id="tvsTemplateEmpty" class="tvs-secondary">No templates saved yet.</div>
+            <div id="tvsTemplateList" class="paperList"></div>
           </div>
 
           <div class="verticalSection">

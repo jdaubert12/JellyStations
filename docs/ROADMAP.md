@@ -167,21 +167,22 @@ analyzer, then suggestion rules and the dashboard view on top of it.
   them: totals, kids/family/unrated hours, genres, series, collections, franchises
   (`FranchiseDetector`, title prefixes), decades, ratings, tags, libraries. Cached 15 minutes,
   `GET /TvStation/Library/Analysis?refresh=true` recomputes. The health report reads the same data.
-- **Suggest stations.** Rule set over the analysis: genre channels with ≥ N hours, series with
-  ≥ M episodes, franchise lineups from collection names or title prefixes, decade channels, a
-  kids channel from TV-Y/TV-Y7/G content, a holiday station from tags. Each rule yields a ready
-  station definition (sources, mode, blocks where it fits, suggested name). Presented as a
-  checklist with hours of content per suggestion that creates the ticked stations via the
-  existing create path, channel numbers assigned in order. Medium.
+- **Suggest stations — DONE 2026-10-15.** `StationSuggester` (pure, tested) over the analysis:
+  genres ≥ 8 h, series ≥ 20 episodes, Kids TV (libraries capped at G) and Family Movies (PG),
+  franchise marathon lineups (≥ 3 titles) plus a "Franchise Nights" slots station, collections,
+  decades ≥ 8 h, seasonal channels from holiday tags with their guide window. "Suggest stations"
+  view on the dashboard; `GET /TvStation/Suggestions`, `POST /TvStation/Suggestions/Create`.
 - **Franchise detection — DONE 2026-10-15** as part of the analyzer (`FranchiseDetector`). A
   "pick a franchise" source type can build on it later.
-- **Block templates.** Save a slot block's day/time/sources as a template, reuse across stations.
-  Small.
+- **Block templates — DONE 2026-10-15.** Bookmark button on a block saves it under its name
+  (`/TvStation/BlockTemplates`, stored in settings); the dropdown next to "Add block" starts a new
+  block from a template; Settings lists and deletes them.
 - **Exclusion by tag — DONE 2026-10-14.** Per-station and global excluded tags (hand picks and
   Tag sources for the same tag exempt), a Tag source kind, `GET /TvStation/Library/Tags`, and
   "by tag" rows in the content view. Changing the global list recompiles every station.
-- **Other rule exclusions.** "Skip episodes under 5 minutes", "skip items without a runtime" as
-  pool-level switches. Small.
+- **Other rule exclusions — DONE 2026-10-15.** "Skip items shorter than N minutes" per station
+  (pool, filler, blocks; reason `TooShort` in the content view). Items without a runtime were
+  already skipped.
 
 ## Phase 4 — operations and polish
 

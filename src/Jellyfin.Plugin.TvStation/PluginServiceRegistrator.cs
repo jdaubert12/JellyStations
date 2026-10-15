@@ -47,6 +47,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<GuideRefreshService>();
         serviceCollection.AddSingleton<StreamSessionManager>();
         serviceCollection.AddSingleton<StationService>();
+        serviceCollection.AddSingleton<StationSuggestionService>();
         serviceCollection.AddSingleton<ILiveTvService, TvStationLiveTvService>();
         serviceCollection.AddHostedService<TvStationHostedService>();
     }
