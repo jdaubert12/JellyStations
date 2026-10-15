@@ -154,12 +154,27 @@ the station row's excluded count rises by one.
 
 ## Phase 3 — curation help
 
-- **Suggest stations.** Rule set over the library: genre channels with ≥ N hours, series with ≥ M
-  episodes, franchise lineups from collection names or title prefixes, decade channels, a kids
-  channel from TV-Y/TV-Y7/G content. Presented as a checklist that creates stations via the
-  existing create path. Medium.
-- **Franchise detection.** Shared helper for the above and for a "pick a franchise" source type.
-  Small once suggestions exist.
+Order: import by name first (it makes `stations/` shippable as examples), then the analyzer,
+then suggestion rules and the dashboard view on top of it.
+
+- **Resolve import sources by name.** Sources already carry `DisplayName` beside `ItemId`. On
+  import, when the id is unknown on this server, look the item up by kind and name (series,
+  movie, collection, playlist, library; genres and tags already match by name) and report what
+  could not be matched instead of silently dropping it. Move the real-server set to
+  `examples/stations/` with a note that hand-picked sources resolve by title. Small.
+- **Library analysis.** One pass over the library producing the facts suggestions are built
+  from: hours per genre, episodes and rating per series, titles per collection, franchises from
+  shared title prefixes, counts per decade, kids content by rating, holiday content by tag.
+  Pure `Library/` code with tests, exposed as `GET /TvStation/Library/Analysis`; the Phase 4
+  health report reads the same data. Small to medium.
+- **Suggest stations.** Rule set over the analysis: genre channels with ≥ N hours, series with
+  ≥ M episodes, franchise lineups from collection names or title prefixes, decade channels, a
+  kids channel from TV-Y/TV-Y7/G content, a holiday station from tags. Each rule yields a ready
+  station definition (sources, mode, blocks where it fits, suggested name). Presented as a
+  checklist with hours of content per suggestion that creates the ticked stations via the
+  existing create path, channel numbers assigned in order. Medium.
+- **Franchise detection.** Shared helper for the analyzer and for a "pick a franchise" source type.
+  Small once the analyzer exists.
 - **Block templates.** Save a slot block's day/time/sources as a template, reuse across stations.
   Small.
 - **Exclusion by tag — DONE 2026-10-14.** Per-station and global excluded tags (hand picks and
