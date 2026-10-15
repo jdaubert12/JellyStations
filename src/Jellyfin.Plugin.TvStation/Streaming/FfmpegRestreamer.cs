@@ -195,6 +195,14 @@ public sealed class FfmpegRestreamer : IDisposable
                 else
                 {
                     consecutiveFailures = 0;
+
+                    // The file ran out a hair before the clock (metadata runtime vs. real length): wait it out rather
+                    // than re-spawning ffmpeg for a fraction of a second until the offset moves on.
+                    var gap = segmentEnd - DateTime.UtcNow;
+                    if (gap > TimeSpan.FromMilliseconds(200))
+                    {
+                        await Task.Delay(gap, ct).ConfigureAwait(false);
+                    }
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
