@@ -67,6 +67,13 @@ public sealed class SlotBlock
     /// pre-1.4 behaviour (cut at the block end); the editor turns it on for new blocks.
     /// </summary>
     public bool RemainderMayOverrun { get; set; }
+
+    /// <summary>
+    /// Let the program already playing finish before the block starts, delaying the block by up to this many
+    /// minutes; the block then keeps its full duration (capped by the next block). 0 = start on time and cut the
+    /// program. The editor sets 30 for new blocks.
+    /// </summary>
+    public int MaxStartDelayMinutes { get; set; }
 }
 
 public sealed class FillerConfig

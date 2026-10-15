@@ -62,6 +62,7 @@ public sealed class ScheduleInput
                 Order = b.Order,
                 Overflow = b.Overflow,
                 RemainderMayOverrun = b.RemainderMayOverrun,
+                MaxStartDelay = TimeSpan.FromMinutes(Math.Clamp(b.MaxStartDelayMinutes, 0, 240)),
                 Items = compiled.Blocks.TryGetValue(b.Id, out var items) ? items : new List<PlayableItem>()
             })
             .ToList();
@@ -144,6 +145,9 @@ public sealed class SlotBlockInput
     public SlotOverflow Overflow { get; init; }
 
     public bool RemainderMayOverrun { get; init; }
+
+    /// <summary>How late the block may start so the previous program can finish. Zero = start on time.</summary>
+    public TimeSpan MaxStartDelay { get; init; }
 
     public IReadOnlyList<PlayableItem> Items { get; init; } = Array.Empty<PlayableItem>();
 }

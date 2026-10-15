@@ -143,7 +143,8 @@ public static class StationSuggester
                     DurationMinutes = Math.Max(30, minutes),
                     Order = PlayOrder.Sequential,
                     Overflow = SlotOverflow.FillerRemainder,
-                    RemainderMayOverrun = true
+                    RemainderMayOverrun = true,
+                    MaxStartDelayMinutes = 30
                 };
                 for (var j = 0; j < f.ItemIds.Count; j++)
                 {

@@ -465,6 +465,7 @@ public sealed class StationService
 
             b.Days ??= new List<DayOfWeek>();
             b.Sources ??= new List<ContentSource>();
+            b.MaxStartDelayMinutes = Math.Clamp(b.MaxStartDelayMinutes, 0, 240);
             NormalizeSources(b.Sources);
         }
     }

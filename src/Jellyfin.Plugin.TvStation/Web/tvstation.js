@@ -931,6 +931,7 @@
       b.Order = b.Order || 'Sequential';
       b.Overflow = b.Overflow || 'FillerRemainder';
       b.RemainderMayOverrun = !!b.RemainderMayOverrun;
+      b.MaxStartDelayMinutes = Math.min(240, Math.max(0, parseInt(b.MaxStartDelayMinutes, 10) || 0));
       b.StartLocal = b.StartLocal || '20:00';
       if (b.DurationMinutes === undefined || b.DurationMinutes === null) {
         b.DurationMinutes = 60;
@@ -1601,7 +1602,8 @@
       Sources: [],
       Order: 'Sequential',
       Overflow: 'FillerRemainder',
-      RemainderMayOverrun: true
+      RemainderMayOverrun: true,
+      MaxStartDelayMinutes: 30
     };
   }
 
@@ -1692,6 +1694,7 @@
         inputHtml(p + 'dur', 'Duration (minutes)', 'number', { min: 1, max: 1440, step: 1 }) +
         selectHtml(p + 'order', 'Play order', [['Sequential', 'Sequential – continue where the last occurrence left off'], ['Shuffle', 'Shuffle – re-rolled every occurrence'], ['ShuffleEpisodesInOrder', 'Shuffle shows, episodes in order – re-rolled every occurrence']]) +
         selectHtml(p + 'overflow', 'When the next item does not fit', [['FillerRemainder', 'Hand the remainder to ' + betweenBlocksName()], ['TruncateLast', 'Play it anyway and cut it off at the block end']]) +
+        inputHtml(p + 'delay', 'Start up to this many minutes late so the previous program can finish', 'number', { min: 0, max: 240, step: 5 }, '0 = start on time and cut the program. When the block starts late it keeps its full duration, unless another block follows.') +
       '</div>' +
       '<label class="emby-checkbox-label tvs-block-overrun"><input type="checkbox" id="' + p + 'overrun"><span>When ' + betweenBlocksName() + ' takes the remainder, let its last program finish past the block end instead of cutting it (unless another block starts right then)</span></label>' +
       '<div class="tvs-days-label">Days</div>' +
@@ -1708,6 +1711,7 @@
     q('order').value = b.Order || 'Sequential';
     q('overflow').value = b.Overflow || 'FillerRemainder';
     q('overrun').checked = !!b.RemainderMayOverrun;
+    q('delay').value = b.MaxStartDelayMinutes || 0;
 
     const refreshHead = () => {
       titleBox.firstChild.textContent = b.Name || 'Untitled block';
@@ -1720,6 +1724,7 @@
     q('order').addEventListener('change', () => { b.Order = q('order').value; });
     q('overflow').addEventListener('change', () => { b.Overflow = q('overflow').value; });
     q('overrun').addEventListener('change', () => { b.RemainderMayOverrun = q('overrun').checked; });
+    q('delay').addEventListener('input', () => { b.MaxStartDelayMinutes = Math.min(240, Math.max(0, parseInt(q('delay').value, 10) || 0)); });
 
     $all('input[data-day]', body).forEach(cb => {
       const day = cb.getAttribute('data-day');
@@ -1848,7 +1853,8 @@
       Sources: JSON.parse(JSON.stringify(t.Sources || [])),
       Order: t.Order || 'Sequential',
       Overflow: t.Overflow || 'FillerRemainder',
-      RemainderMayOverrun: !!t.RemainderMayOverrun
+      RemainderMayOverrun: !!t.RemainderMayOverrun,
+      MaxStartDelayMinutes: Math.min(240, Math.max(0, parseInt(t.MaxStartDelayMinutes, 10) || 0))
     };
     block.Sources.forEach(normalizeSource);
     return block;

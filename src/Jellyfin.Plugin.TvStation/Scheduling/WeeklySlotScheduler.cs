@@ -255,20 +255,36 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         for (var i = 0; i < occurrences.Count; i++)
         {
             var occ = occurrences[i];
+            var block = _input.Blocks[occ.BlockIndex];
+
+            // Whatever comes after this block: the next block of the week, or the first block of the next week
+            // (the same instant the end-of-week filler targets). Overruns and late starts never cross it.
+            var next = i + 1 < occurrences.Count ? occurrences[i + 1].StartUtc : (w >= 0 ? EndGapTarget(w) : WeekStartUtc(w + 1));
+
             if (occ.StartUtc > state.CarryEnd)
             {
-                FillFiller(entries, state, state.CarryEnd, occ.StartUtc);
+                // The stream before the block may finish its program past the block start when the block allows a
+                // late start, within the block's delay allowance and never into the block's own end.
+                var latest = Min(Min(occ.StartUtc + block.MaxStartDelay, occ.EndUtc), next);
+                var gapReached = FillFiller(entries, state, state.CarryEnd, occ.StartUtc, block.MaxStartDelay > TimeSpan.Zero && latest > occ.StartUtc ? latest : null);
+                if (gapReached > state.CarryEnd)
+                {
+                    state.CarryEnd = gapReached;
+                }
             }
 
-            var block = _input.Blocks[occ.BlockIndex];
             var blockStart = occ.StartUtc > state.CarryEnd ? occ.StartUtc : state.CarryEnd;
-            var reached = occ.EndUtc;
-            if (blockStart < occ.EndUtc)
+            var blockEnd = occ.EndUtc;
+            if (blockStart > occ.StartUtc && block.MaxStartDelay > TimeSpan.Zero)
             {
-                // The remainder stream may run past the block end up to whatever comes next: the next block of the
-                // week, or the first block of the next week (the same instant the end-of-week filler targets).
-                var next = i + 1 < occurrences.Count ? occurrences[i + 1].StartUtc : (w >= 0 ? EndGapTarget(w) : WeekStartUtc(w + 1));
-                reached = FillBlock(entries, state, block, blockStart, occ.EndUtc, block.RemainderMayOverrun ? next : occ.EndUtc);
+                // Started late to let a program finish: keep the full duration, up to whatever comes next.
+                blockEnd = Min(blockStart + (occ.EndUtc - occ.StartUtc), next);
+            }
+
+            var reached = blockEnd > occ.EndUtc ? blockEnd : occ.EndUtc;
+            if (blockStart < blockEnd)
+            {
+                reached = FillBlock(entries, state, block, blockStart, blockEnd, block.RemainderMayOverrun ? next : blockEnd);
             }
 
             if (reached > state.CarryEnd)
@@ -578,6 +594,8 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
     }
 
     private static TimeSpan Min(TimeSpan a, TimeSpan b) => a < b ? a : b;
+
+    private static DateTime Min(DateTime a, DateTime b) => a < b ? a : b;
 
     private int[] Perm(string scope, PlayOrder order, IReadOnlyList<PlayableItem> items, long round)
     {
