@@ -1,0 +1,14 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:12.2
+    container_name: tvstation-jf
+    ports:
+      - "8096:8096"
+    volumes:
+      - ./config:/config
+      - ./cache:/cache
+      - ./media:/media:ro
+    environment:
+      - JELLYFIN_PublishedServerUrl=http://localhost:8096
+      - TZ=America/New_York
+    restart: unless-stopped

@@ -1,0 +1,42 @@
+{
+ "Name": "Retro Movies",
+ "ChannelNumber": "10",
+ "CallSign": "RETRO",
+ "Enabled": true,
+ "TimeZoneId": "America/New_York",
+ "AnchorUtc": "2026-10-14T10:00:00Z",
+ "PaddingGridMinutes": 15,
+ "Mode": "Pool",
+ "Pool": {
+  "Sources": [
+   {
+    "Kind": "Library",
+    "ItemId": "f137a2dd21bbc1b99aa5c0f6bf02a805",
+    "DisplayName": "Movies",
+    "ItemKinds": [],
+    "Weight": 1,
+    "YearTo": 1989
+   }
+  ],
+  "Order": "Shuffle",
+  "AvoidSameSeriesBackToBack": true,
+  "MarathonMin": 1,
+  "MarathonMax": 1,
+  "DaypartRules": []
+ },
+ "Slots": {
+  "Blocks": [],
+  "Filler": {
+   "Sources": [],
+   "Order": "Shuffle"
+  }
+ },
+ "Lineup": {
+  "Items": []
+ },
+ "AutoRecompileNightly": true,
+ "ActiveWindows": [],
+ "ExcludedItemIds": [
+  "a8a7322f234baaa15fffffe328488f10"
+ ]
+}

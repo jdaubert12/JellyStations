@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>TV Stations</title>
+</head>
+<body>
+  <div id="TvStationPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+    <style>
+      #TvStationPage .tvs-hidden { display: none !important; }
+      #TvStationPage .tvs-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .5em; margin: 0 0 1em; }
+      #TvStationPage .tvs-toolbar .sectionTitle { flex: 1 1 auto; margin: 0; }
+      #TvStationPage .tvs-subtitle { margin: 1.2em 0 .4em; font-size: 1.05em; font-weight: 500; }
+      #TvStationPage .tvs-grid2 { display: grid; grid-template-columns: 1fr 1fr; column-gap: 1.5em; }
+      #TvStationPage .tvs-grid2 > * { min-width: 0; }
+      @media (max-width: 800px) { #TvStationPage .tvs-grid2 { grid-template-columns: 1fr; } }
+      #TvStationPage .tvs-inline { display: flex; flex-wrap: wrap; align-items: center; gap: .6em; }
+      #TvStationPage .tvs-actions { display: flex; flex-wrap: wrap; gap: .6em; margin-top: 1.5em; }
+      #TvStationPage .tvs-secondary { opacity: .7; font-size: .9em; }
+      #TvStationPage .tvs-info { opacity: .8; font-size: .9em; margin: .4em 0; }
+      #TvStationPage .tvs-ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #TvStationPage .tvs-empty { padding: 1.5em 1em; text-align: center; opacity: .7; border: 1px dashed rgba(255,255,255,.2); border-radius: 6px; }
+
+      #TvStationPage .tvs-badge { display: inline-block; padding: .05em .55em; margin-left: .4em; border-radius: 1em; font-size: .72em; font-weight: 500; letter-spacing: .02em; text-transform: uppercase; vertical-align: middle; border: 1px solid rgba(255,255,255,.25); color: inherit; }
+      #TvStationPage .tvs-badge.on { background: rgba(82,181,75,.22); border-color: rgba(82,181,75,.6); }
+      #TvStationPage .tvs-badge.off { opacity: .55; }
+      #TvStationPage .tvs-badge.live { background: rgba(0,164,220,.25); border-color: rgba(0,164,220,.7); }
+      #TvStationPage .tvs-badge.warn { background: rgba(255,152,0,.22); border-color: rgba(255,152,0,.6); }
+      #TvStationPage .tvs-badge.kind { text-transform: none; opacity: .85; }
+      #TvStationPage .tvs-season { margin: .8em 0 1.2em; }
+      #TvStationPage .tvs-inline-btn { margin-left: .8em; padding: .3em .9em; font-size: .85em; }
+      #TvStationPage .tvs-season-row { display: flex; flex-wrap: wrap; align-items: center; gap: .4em .6em; margin: .4em 0; }
+      #TvStationPage .tvs-season-row select { width: auto; min-width: 6.5em; }
+      #TvStationPage .tvs-season-row input[type=text] { width: 9em; }
+      #TvStationPage .tvs-season-row button { background: none; border: 0; color: inherit; cursor: pointer; font: inherit; opacity: .7; }
+      #TvStationPage .tvs-season-row button:hover { opacity: 1; }
+
+      #TvStationPage .tvs-station { align-items: center; }
+      #TvStationPage .tvs-chnum { flex: none; width: 3em; height: 3em; margin-right: .8em; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 600; background: rgba(255,255,255,.1); }
+      #TvStationPage .tvs-logo { height: 3em; max-width: 7em; margin-right: .8em; object-fit: contain; border-radius: 4px; background: rgba(255,255,255,.06); }
+      #TvStationPage .tvs-station-actions { display: flex; align-items: center; flex: none; }
+
+      #TvStationPage .tvs-chips { display: flex; flex-wrap: wrap; gap: .4em; margin: .5em 0; }
+      #TvStationPage .tvs-chip { display: inline-flex; align-items: center; gap: .35em; max-width: 100%; padding: .2em .65em; border-radius: 1em; font-size: .9em; color: inherit; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.06); }
+      #TvStationPage .tvs-chip .kind { opacity: .65; font-size: .8em; text-transform: uppercase; letter-spacing: .03em; }
+      #TvStationPage .tvs-chip .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #TvStationPage .tvs-chip button { background: none; border: 0; padding: 0 0 0 .2em; margin: 0; color: inherit; cursor: pointer; font: inherit; line-height: 1; opacity: .7; }
+      #TvStationPage .tvs-chip button:hover { opacity: 1; }
+      #TvStationPage .tvs-chip.toggle { cursor: pointer; user-select: none; }
+      #TvStationPage .tvs-chip .badge { opacity: .75; font-size: .8em; white-space: nowrap; }
+      #TvStationPage .tvs-chip.editing { border-color: rgba(255,255,255,.6); }
+      #TvStationPage .tvs-source-editor { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: .6em 1.2em; align-items: flex-end; padding: .6em .8em; margin: .1em 0 .3em; border: 1px solid rgba(255,255,255,.2); border-radius: .4em; background: rgba(255,255,255,.04); }
+      #TvStationPage .tvs-source-editor .f { display: flex; flex-direction: column; gap: .25em; font-size: .85em; }
+      #TvStationPage .tvs-source-editor .f.row { flex-direction: row; align-items: center; gap: .4em; }
+      #TvStationPage .tvs-source-editor input[type=number] { width: 5.5em; }
+      #TvStationPage .tvs-source-editor .title { flex-basis: 100%; font-size: .85em; opacity: .8; }
+      #TvStationPage .tvs-chip.active { background: rgba(0,164,220,.3); border-color: rgba(0,164,220,.75); }
+
+      #TvStationPage .tvs-results { max-height: 22em; overflow-y: auto; margin-top: .4em; border: 1px solid rgba(255,255,255,.12); border-radius: 4px; }
+      #TvStationPage .tvs-result { display: flex; align-items: center; gap: .7em; padding: .35em .6em; border-bottom: 1px solid rgba(255,255,255,.08); }
+      #TvStationPage .tvs-result:last-child { border-bottom: 0; }
+      #TvStationPage .tvs-result .body { flex: 1 1 auto; min-width: 0; }
+      #TvStationPage .tvs-thumb { flex: none; width: 2.6em; height: 3.6em; border-radius: 3px; object-fit: cover; background: rgba(255,255,255,.08); }
+      #TvStationPage .tvs-thumb.placeholder { display: flex; align-items: center; justify-content: center; opacity: .5; }
+      #TvStationPage .tvs-results .tvs-msg { padding: .8em; opacity: .7; }
+
+      #TvStationPage .tvs-tablewrap { overflow-x: auto; }
+      #TvStationPage .tvs-table { width: 100%; border-collapse: collapse; font-size: .95em; }
+      #TvStationPage .tvs-table th, #TvStationPage .tvs-table td { text-align: left; padding: .35em .5em; vertical-align: top; border-bottom: 1px solid rgba(255,255,255,.1); }
+      #TvStationPage .tvs-table th { opacity: .7; font-weight: 500; white-space: nowrap; }
+      #TvStationPage .tvs-table td.nowrap { white-space: nowrap; }
+      #TvStationPage .tvs-content-filter { max-width: 22em; margin-left: auto; }
+      #TvStationPage .tvs-table tr.excluded td { opacity: .45; text-decoration: line-through; }
+      #TvStationPage .tvs-table tr.excluded td.actions { text-decoration: none; opacity: 1; }
+      #TvStationPage .tvs-table td.actions button { background: none; border: 1px solid rgba(255,255,255,.3); border-radius: 1em; color: inherit; cursor: pointer; font: inherit; font-size: .85em; padding: .1em .7em; }
+      #TvStationPage .tvs-table td.actions button:hover { border-color: rgba(255,255,255,.7); }
+      #TvStationPage .tvs-table tr.slate { opacity: .5; font-style: italic; }
+      #TvStationPage .tvs-table tr.bumper { opacity: .7; font-size: .9em; }
+      #TvStationPage .tvs-table tr.now { background: rgba(0,164,220,.18); }
+      #TvStationPage .tvs-table tr.now td:first-child { box-shadow: inset 3px 0 0 rgba(0,164,220,.9); }
+      #TvStationPage .tvs-table tr.dayhead td { padding-top: 1em; font-weight: 600; opacity: .85; border-bottom: 0; }
+      #TvStationPage .tvs-table tr.logrow td { padding: 0 .5em .6em; }
+
+      #TvStationPage .tvs-card { margin-bottom: .8em; border: 1px solid rgba(255,255,255,.14); border-radius: 6px; background: rgba(255,255,255,.03); }
+      #TvStationPage .tvs-card-head { display: flex; align-items: center; gap: .4em; padding: .3em .4em .3em .6em; cursor: pointer; }
+      #TvStationPage .tvs-card-head .title { flex: 1 1 auto; min-width: 0; }
+      #TvStationPage .tvs-card-head .title .name { font-weight: 500; }
+      #TvStationPage .tvs-card-head .material-icons.expand_more { transition: transform .15s; }
+      #TvStationPage .tvs-card.open .tvs-card-head .material-icons.expand_more { transform: rotate(180deg); }
+      #TvStationPage .tvs-card-body { padding: .2em 1em 1em; border-top: 1px solid rgba(255,255,255,.1); }
+
+      #TvStationPage .tvs-days { display: flex; flex-wrap: wrap; gap: .35em; margin: .4em 0 1em; }
+      #TvStationPage .tvs-day { display: inline-flex; align-items: center; gap: .35em; padding: .3em .7em; border-radius: 4px; border: 1px solid rgba(255,255,255,.2); cursor: pointer; user-select: none; font-size: .95em; }
+      #TvStationPage .tvs-day input { margin: 0; }
+      #TvStationPage .tvs-day.active { background: rgba(0,164,220,.3); border-color: rgba(0,164,220,.75); }
+      #TvStationPage .tvs-days-label { opacity: .7; font-size: .9em; margin-top: .6em; }
+
+      #TvStationPage .tvs-error { margin-bottom: 1em; padding: .6em 1em; border-radius: 4px; border: 1px solid rgba(244,67,54,.7); background: rgba(244,67,54,.15); }
+      #TvStationPage .tvs-error ul, #TvStationPage .tvs-warn ul { margin: .3em 0 0 1.2em; padding: 0; }
+      #TvStationPage .tvs-warn { margin: .5em 0; padding: .5em 1em; border-radius: 4px; border: 1px solid rgba(255,152,0,.7); background: rgba(255,152,0,.12); }
+      #TvStationPage .tvs-ok { color: rgba(82,181,75,1); }
+      #TvStationPage .tvs-bad { color: rgba(244,67,54,1); }
+
+      #TvStationPage pre.tvs-log { max-height: 14em; overflow: auto; margin: .3em 0 0; padding: .5em; border-radius: 4px; font-size: .8em; white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,.3); }
+      #TvStationPage .tvs-kv { display: grid; grid-template-columns: max-content 1fr; gap: .3em 1.2em; margin-bottom: 1em; }
+      #TvStationPage .tvs-kv dt { opacity: .7; }
+      #TvStationPage .tvs-kv dd { margin: 0; word-break: break-all; }
+      #TvStationPage .tvs-lineup .listItem { padding-top: .25em; padding-bottom: .25em; }
+      #TvStationPage .tvs-index { flex: none; width: 2.2em; opacity: .6; text-align: right; margin-right: .8em; }
+      #TvStationPage input[type="color"].tvs-color { width: 4em; height: 2.2em; padding: 0; border: 1px solid rgba(255,255,255,.2); background: transparent; vertical-align: middle; }
+      #TvStationPage .tvs-logo-preview { height: 4em; max-width: 12em; object-fit: contain; border-radius: 4px; background: rgba(255,255,255,.06); }
+      #TvStationPage .material-icons.tvs-icon-inline { font-size: 1.2em; vertical-align: middle; margin-right: .2em; }
+    </style>
+
+    <div data-role="content">
+      <div class="content-primary">
+
+        <!-- ===================== Station list ===================== -->
+        <div id="tvsViewList" class="tvs-view">
+          <div class="tvs-toolbar">
+            <h2 class="sectionTitle">TV Stations</h2>
+            <button is="emby-button" type="button" id="tvsBtnNew" class="raised button-submit emby-button"><span>New station</span></button>
+            <button is="emby-button" type="button" id="tvsBtnRefreshGuide" class="raised emby-button" title="Ask Jellyfin to refresh the Live TV guide now"><span>Refresh guide</span></button>
+            <button is="emby-button" type="button" id="tvsBtnSettings" class="raised emby-button"><span>Settings</span></button>
+            <button is="emby-button" type="button" id="tvsBtnStatus" class="raised emby-button"><span>Status</span></button>
+            <button is="emby-button" type="button" id="tvsBtnExport" class="raised emby-button" title="Download all stations as a JSON file"><span>Export</span></button>
+            <button is="emby-button" type="button" id="tvsBtnImport" class="raised emby-button" title="Create or update stations from a JSON file"><span>Import</span></button>
+            <input type="file" id="tvsImportFile" accept=".json,application/json" class="tvs-hidden">
+          </div>
+          <div id="tvsListError" class="tvs-error tvs-hidden"></div>
+          <div id="tvsStationEmpty" class="tvs-empty tvs-hidden">No stations yet. Click “New station” to create your first channel.</div>
+          <div id="tvsStationList" class="paperList"></div>
+        </div>
+
+        <!-- ===================== Station editor ===================== -->
+        <div id="tvsViewEditor" class="tvs-view tvs-hidden">
+          <div class="tvs-toolbar">
+            <h2 class="sectionTitle" id="tvsEditorTitle">New station</h2>
+            <button is="emby-button" type="button" id="tvsBtnEditorBack" class="raised emby-button"><span>Back to list</span></button>
+          </div>
+          <div id="tvsEditorErrors" class="tvs-error tvs-hidden"></div>
+
+          <div class="verticalSection">
+            <h3 class="sectionTitle">General</h3>
+            <div class="tvs-grid2">
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsName" label="Name" type="text" autocomplete="off">
+                <div class="fieldDescription">Shown as the channel name in the guide.</div>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsChannel" label="Channel number" type="text" autocomplete="off">
+                <div class="fieldDescription">A number such as 5 or 5.1. Must be unique across stations.</div>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsCallSign" label="Call sign" type="text" autocomplete="off">
+                <div class="fieldDescription">Optional short identifier, e.g. WKRP.</div>
+              </div>
+              <div class="selectContainer">
+                <label class="selectLabel" for="tvsTimeZone">Time zone</label>
+                <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsTimeZone"></select>
+                <div class="fieldDescription">Used for slot block start times and the day-of-week boundary.</div>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsAnchor" label="Schedule anchor" type="datetime-local">
+                <div class="fieldDescription">The schedule epoch: cycles and weeks are counted from this moment, so the schedule is reproducible. Changing it reshuffles the entire schedule.</div>
+                <div class="tvs-inline" style="margin-top:.5em">
+                  <button is="emby-button" type="button" id="tvsBtnResetAnchor" class="raised emby-button"><span>Reset anchor to now</span></button>
+                  <span id="tvsAnchorHint" class="tvs-secondary"></span>
+                  <button is="emby-button" type="button" id="tvsBtnAnchorNow" class="raised emby-button tvs-inline-btn" title="Start the schedule from now (rounded down to the padding grid)"><span>Set to now</span></button>
+                </div>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsCardText" label="Station card text" type="text" maxlength="80" placeholder="We'll be right back">
+                <div class="fieldDescription">Shown on the card during gaps and breaks.</div>
+              </div>
+              <div class="selectContainer">
+                <label class="selectLabel" for="tvsPadding">Padding grid</label>
+                <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsPadding">
+                  <option value="0">None – programs play back to back</option>
+                  <option value="5">5 minutes</option>
+                  <option value="10">10 minutes</option>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">60 minutes</option>
+                  <option value="length">By length – half hours up to 60 min, whole hours beyond</option>
+                </select>
+                <div class="fieldDescription">With a grid, a “Station Break” slate pads each program so the next one starts on the grid (e.g. :00 / :30), like a real channel. “By length” gives a 22-minute episode a half-hour slot and a 95-minute film a two-hour slot. Without padding, programs start as soon as the previous ends.</div>
+              </div>
+            </div>
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsEnabled">
+                <span>Enabled</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">Disabled stations are hidden from the guide and cannot be streamed.</div>
+            </div>
+            <div class="tvs-season">
+              <div class="inputLabel">Season (optional)</div>
+              <div class="fieldDescription">Leave empty to list the channel all year. Otherwise it only appears in the guide between these dates each year (station time zone, inclusive). Ranges may cross New Year, e.g. Dec 1 to Jan 6.</div>
+              <div id="tvsSeasonRows"></div>
+              <div class="tvs-season-row">
+                <button is="emby-button" type="button" id="tvsBtnAddSeason" class="raised emby-button"><span>Add date range</span></button>
+                <select is="emby-select" class="emby-select" id="tvsSeasonPreset" title="Add a common holiday range">
+                  <option value="">Add a preset…</option>
+                  <option value="halloween">Halloween (Oct 1 – Oct 31)</option>
+                  <option value="thanksgiving">Thanksgiving (Nov 15 – Nov 30)</option>
+                  <option value="christmas">Christmas (Dec 1 – Jan 6)</option>
+                  <option value="holidays">Holiday season (Nov 20 – Jan 6)</option>
+                  <option value="newyear">New Year (Dec 26 – Jan 7)</option>
+                  <option value="valentines">Valentine's (Feb 1 – Feb 14)</option>
+                  <option value="stpatricks">St. Patrick's (Mar 10 – Mar 17)</option>
+                  <option value="easter">Spring / Easter (Mar 20 – Apr 30)</option>
+                  <option value="july4">Independence Day (Jun 28 – Jul 7)</option>
+                  <option value="summer">Summer (Jun 1 – Aug 31)</option>
+                  <option value="winter">Winter (Dec 1 – Feb 28)</option>
+                </select>
+              </div>
+            </div>
+            <div class="inputContainer">
+              <input is="emby-input" id="tvsExcludedTags" label="Exclude tags" type="text" autocomplete="off" placeholder="e.g. christmas, halloween">
+              <div class="fieldDescription">Comma-separated library tags. Items carrying one are kept off this station when a source expands to them. Hand-picked movies and episodes, and a Tag source for the same tag, are never affected.</div>
+            </div>
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsUseGlobalTags">
+                <span>Also apply the excluded tags from Settings</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">Turn off for a station that should play tagged items regardless of the plugin-wide list.</div>
+            </div>
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsNightly">
+                <span>Refresh content nightly</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">Recompile the station every night so newly added library items are picked up automatically.</div>
+            </div>
+          </div>
+
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Logo</h3>
+            <div class="tvs-inline">
+              <img id="tvsLogoImg" class="tvs-logo-preview tvs-hidden" alt="Station logo">
+              <span id="tvsLogoNone" class="tvs-secondary">No logo uploaded.</span>
+              <input type="file" id="tvsLogoFile" accept="image/png,image/jpeg,image/webp,image/gif">
+            </div>
+            <div class="fieldDescription" id="tvsLogoHint">PNG, JPEG, WebP or GIF up to 5 MB. Shown in the guide and on station-break slates.</div>
+          </div>
+
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Programming</h3>
+            <div class="selectContainer">
+              <label class="selectLabel" for="tvsMode">Mode</label>
+              <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsMode">
+                <option value="Pool">Pool – a content pool, with optional time blocks</option>
+                <option value="Slots">Slots – weekly time blocks with filler in between</option>
+                <option value="Lineup">Lineup – a hand-ordered list that loops forever</option>
+              </select>
+              <div class="fieldDescription" id="tvsModeHelp"></div>
+            </div>
+
+            <!-- Pool -->
+            <div id="tvsPanelPool" class="tvs-panel">
+              <h4 class="tvs-subtitle">Content pool</h4>
+              <div id="tvsPoolPicker"></div>
+              <div class="tvs-grid2">
+                <div class="selectContainer">
+                  <label class="selectLabel" for="tvsPoolOrder">Play order</label>
+                  <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsPoolOrder">
+                    <option value="Shuffle">Shuffle – re-rolled every cycle</option>
+                    <option value="ShuffleEpisodesInOrder">Shuffle shows, episodes in order – each series advances one episode at a time</option>
+                    <option value="Sequential">Sequential – series in episode order, movies by name</option>
+                  </select>
+                </div>
+              </div>
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsPoolAvoid">
+                  <span>Avoid the same series back-to-back</span>
+                </label>
+                <div class="fieldDescription checkboxFieldDescription">When shuffling, episodes of the same series are spread out where possible.</div>
+              </div>
+              <div class="tvs-grid2">
+                <div class="inputContainer">
+                  <input is="emby-input" id="tvsMarathonMin" label="Marathon: fewest episodes in a row" type="number" min="1" max="50" step="1">
+                </div>
+                <div class="inputContainer">
+                  <input is="emby-input" id="tvsMarathonMax" label="Marathon: most episodes in a row" type="number" min="1" max="50" step="1">
+                </div>
+              </div>
+              <div class="fieldDescription">When shuffling, play this many episodes of one show back to back before switching to another. Leave both at 1 for no marathons. Movies always play one at a time.</div>
+              <div class="tvs-season">
+                <div class="inputLabel">Daytime rules (optional)</div>
+                <div class="fieldDescription">Limit ratings by time of day, in the station's time zone, e.g. nothing above PG between 06:00 and 20:00. Items that would overlap a window are moved to a later slot (with time blocks: skipped until they are allowed); if nothing may play, a station card shows instead. Blocks are not affected.</div>
+                <div id="tvsDaypartRows"></div>
+                <button is="emby-button" type="button" id="tvsBtnAddDaypart" class="raised emby-button"><span>Add rule</span></button>
+              </div>
+              <div id="tvsPoolCycle" class="tvs-info"></div>
+            </div>
+
+            <!-- Time blocks (Pool and Slots) -->
+            <div id="tvsPanelBlocks" class="tvs-panel">
+              <div class="tvs-toolbar" style="margin-top:1em">
+                <h4 class="tvs-subtitle sectionTitle" style="margin:0">Time blocks</h4>
+                <button is="emby-button" type="button" id="tvsBtnAddBlock" class="raised emby-button"><span>Add block</span></button>
+              </div>
+              <div class="fieldDescription" id="tvsBlocksHelp"></div>
+              <div id="tvsBlockWarnings"></div>
+              <div id="tvsBlocksEmpty" class="tvs-secondary tvs-hidden" style="margin:.6em 0">No blocks yet. Add one to schedule content at a specific time on chosen days.</div>
+              <div id="tvsBlocks"></div>
+            </div>
+
+            <!-- Slots -->
+            <div id="tvsPanelSlots" class="tvs-panel tvs-hidden">
+              <h4 class="tvs-subtitle">Filler</h4>
+              <div class="fieldDescription">Played whenever no block is active, and in the remainder of blocks that hand leftover time to filler.</div>
+              <div id="tvsFillerPicker"></div>
+              <div class="tvs-grid2">
+                <div class="selectContainer">
+                  <label class="selectLabel" for="tvsFillerOrder">Filler play order</label>
+                  <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsFillerOrder">
+                    <option value="Shuffle">Shuffle</option>
+                    <option value="ShuffleEpisodesInOrder">Shuffle shows, episodes in order</option>
+                    <option value="Sequential">Sequential</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Lineup -->
+            <div id="tvsPanelLineup" class="tvs-panel tvs-hidden">
+              <h4 class="tvs-subtitle">Add items</h4>
+              <div class="fieldDescription">Movies and episodes are added directly. Choosing a series, season, collection or playlist adds all of its items in order.</div>
+              <div id="tvsLineupPicker"></div>
+              <h4 class="tvs-subtitle">Lineup order</h4>
+              <div id="tvsLineupEmpty" class="tvs-secondary">No items in the lineup yet.</div>
+              <div id="tvsLineupList" class="paperList tvs-lineup"></div>
+              <div id="tvsLineupTotal" class="tvs-info"></div>
+            </div>
+          </div>
+
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Encoding</h3>
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsEncodingEnabled">
+                <span>Use custom encoding for this station</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">When off, the default profile from Settings is used. Changing encoding restarts this station's stream.</div>
+            </div>
+            <div id="tvsStationEncoding" class="tvs-hidden"></div>
+          </div>
+
+          <div class="verticalSection" id="tvsExcludedSection">
+            <h3 class="sectionTitle">Excluded items</h3>
+            <div id="tvsExcludedInfo" class="fieldDescription"></div>
+            <div id="tvsExcludedList" class="paperList"></div>
+          </div>
+
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Bumpers</h3>
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsBumpersEnabled">
+                <span>Fill gaps with short clips</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">Idents, trailers or bumpers play in the gaps between programs. When this is off, or no clip fits a gap, the station card is shown instead. Clips do not appear in the guide.</div>
+            </div>
+            <div id="tvsBumperOptions">
+              <div id="tvsBumperPicker"></div>
+              <div class="tvs-grid2">
+                <div class="inputContainer">
+                  <input is="emby-input" id="tvsBumperBreak" label="Break after every program (minutes)" type="number" min="0" max="30" step="1">
+                  <div class="fieldDescription">Reserved before grid padding so there is always room for a clip. 0 only fills gaps the padding grid creates.</div>
+                </div>
+                <div class="inputContainer">
+                  <input is="emby-input" id="tvsBumperMax" label="Longest clip to use (minutes)" type="number" min="1" max="60" step="1">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="verticalSection">
+            <div class="tvs-toolbar">
+              <h3 class="sectionTitle">Content</h3>
+              <button is="emby-button" type="button" id="tvsBtnContent" class="raised emby-button"><span>Show content</span></button>
+       <input is="emby-input" class="tvs-content-filter" id="tvsContentFilter" type="text" placeholder="Filter by title, genre, rating, source…">
+            </div>
+            <div class="fieldDescription">Everything the current form values expand to, with per-item exclude switches. Exclusions take effect when you save.</div>
+            <div id="tvsContentSummary" class="tvs-info"></div>
+            <div id="tvsContent" class="tvs-tablewrap"></div>
+          </div>
+
+          <div class="verticalSection">
+            <div class="tvs-toolbar">
+              <h3 class="sectionTitle">Schedule preview</h3>
+              <button is="emby-button" type="button" class="raised emby-button tvs-preview-btn" data-hours="24"><span>24 hours</span></button>
+              <button is="emby-button" type="button" class="raised emby-button tvs-preview-btn" data-hours="48"><span>48 hours</span></button>
+              <button is="emby-button" type="button" class="raised emby-button tvs-preview-btn" data-hours="168"><span>7 days</span></button>
+            </div>
+            <div class="fieldDescription">The preview uses the current, unsaved form values. Times are shown in your browser's local time; the highlighted row is on air now.</div>
+            <div id="tvsPreview" class="tvs-tablewrap"></div>
+          </div>
+
+          <div class="tvs-actions">
+            <button is="emby-button" type="button" id="tvsBtnSave" class="raised button-submit emby-button"><span>Save</span></button>
+            <button is="emby-button" type="button" id="tvsBtnSaveRefresh" class="raised emby-button"><span>Save &amp; refresh guide</span></button>
+            <button is="emby-button" type="button" id="tvsBtnRecompile" class="raised emby-button" title="Re-expand the saved station's sources against the library"><span>Recompile content</span></button>
+            <button is="emby-button" type="button" id="tvsBtnCancel" class="raised button-cancel emby-button"><span>Cancel</span></button>
+          </div>
+        </div>
+
+        <!-- ===================== Settings ===================== -->
+        <div id="tvsViewSettings" class="tvs-view tvs-hidden">
+          <div class="tvs-toolbar">
+            <h2 class="sectionTitle">Settings</h2>
+            <button is="emby-button" type="button" id="tvsBtnSettingsBack" class="raised emby-button"><span>Back to list</span></button>
+          </div>
+          <div id="tvsSettingsErrors" class="tvs-error tvs-hidden"></div>
+
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Default encoding</h3>
+            <div class="fieldDescription">Every program on every station is normalized to this profile so the stream never changes format mid-air. Stations can override it individually.</div>
+            <div id="tvsSettingsEncoding"></div>
+          </div>
+
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Streaming</h3>
+            <div class="tvs-grid2">
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsLinger" label="Linger seconds" type="number" min="0" max="600" step="1">
+                <div class="fieldDescription">How long a station keeps encoding after the last viewer leaves, so a quick channel flip back does not restart ffmpeg. 0–600.</div>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsMaxSessions" label="Max concurrent sessions" type="number" min="1" max="64" step="1">
+                <div class="fieldDescription">Maximum number of stations encoding at the same time. Each one is a live ffmpeg process. 1–64.</div>
+              </div>
+            </div>
+            <div class="inputContainer">
+              <input is="emby-input" id="tvsFfmpegPath" label="ffmpeg path override" type="text" autocomplete="off">
+              <div class="fieldDescription">Leave blank to use the ffmpeg Jellyfin is configured with. The path must exist on the server.</div>
+            </div>
+          </div>
+
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Guide</h3>
+            <div class="tvs-grid2">
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsMaxGuideDays" label="Max guide days" type="number" min="1" max="30" step="1">
+                <div class="fieldDescription">Safety cap on how far ahead schedules are enumerated for the Live TV guide. 1–30.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Content rules</h3>
+            <div class="inputContainer">
+              <input is="emby-input" id="tvsGlobalExcludedTags" label="Excluded tags (all stations)" type="text" autocomplete="off" placeholder="e.g. christmas">
+              <div class="fieldDescription">Comma-separated library tags kept off every station unless the station opts out. Hand-picked items and Tag sources for the same tag still play, so a seasonal "everything tagged christmas" station keeps working. Changing this recompiles all stations.</div>
+            </div>
+          </div>
+
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Station break slate</h3>
+            <div class="tvs-inline" style="margin:.5em 0 1em">
+              <label for="tvsSlateColor">Background color</label>
+              <input type="color" id="tvsSlateColor" class="tvs-color" value="#101010">
+              <span id="tvsSlateColorText" class="tvs-secondary"></span>
+            </div>
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsShowText">
+                <span>Show text on slate</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">Displays the station name and the upcoming program during station breaks.</div>
+            </div>
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsShowLogo">
+                <span>Show logo on slate</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">Displays the station logo (if uploaded) during station breaks.</div>
+            </div>
+          </div>
+
+          <div class="tvs-actions">
+            <button is="emby-button" type="button" id="tvsBtnSettingsSave" class="raised button-submit emby-button"><span>Save</span></button>
+            <button is="emby-button" type="button" id="tvsBtnSettingsCancel" class="raised button-cancel emby-button"><span>Cancel</span></button>
+          </div>
+        </div>
+
+        <!-- ===================== Status ===================== -->
+        <div id="tvsViewStatus" class="tvs-view tvs-hidden">
+          <div class="tvs-toolbar">
+            <h2 class="sectionTitle">Status</h2>
+            <span id="tvsStatusUpdated" class="tvs-secondary"></span>
+            <button is="emby-button" type="button" id="tvsBtnStatusRefresh" class="raised emby-button"><span>Refresh now</span></button>
+            <button is="emby-button" type="button" id="tvsBtnStatusBack" class="raised emby-button"><span>Back to list</span></button>
+          </div>
+          <div id="tvsStatusError" class="tvs-error tvs-hidden"></div>
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Server</h3>
+            <dl id="tvsStatusInfo" class="tvs-kv"></dl>
+          </div>
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Active sessions</h3>
+            <div class="fieldDescription">Refreshes automatically every 5 seconds while this view is open.</div>
+            <div id="tvsSessions" class="tvs-tablewrap"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <script src="configurationpage?name=TvStationJs"></script>
+  </div>
+</body>
+</html>

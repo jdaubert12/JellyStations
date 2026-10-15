@@ -1,0 +1,69 @@
+{
+ "Name": "Family Movies",
+ "ChannelNumber": "5",
+ "CallSign": "FAM",
+ "Enabled": true,
+ "TimeZoneId": "America/New_York",
+ "AnchorUtc": "2026-10-14T10:00:00Z",
+ "PaddingGridMinutes": 15,
+ "Mode": "Pool",
+ "Pool": {
+  "Sources": [
+   {
+    "Kind": "Genre",
+    "Genre": "Family",
+    "DisplayName": "Family",
+    "ItemKinds": [
+     "Movie"
+    ],
+    "Weight": 1,
+    "MaxRating": "PG"
+   },
+   {
+    "Kind": "Genre",
+    "Genre": "Animation",
+    "DisplayName": "Animation",
+    "ItemKinds": [
+     "Movie"
+    ],
+    "Weight": 1,
+    "MaxRating": "PG"
+   },
+   {
+    "Kind": "Genre",
+    "Genre": "Fantasy",
+    "DisplayName": "Fantasy",
+    "ItemKinds": [
+     "Movie"
+    ],
+    "Weight": 1,
+    "MaxRating": "PG"
+   },
+   {
+    "Kind": "Movie",
+    "ItemId": "4c99d71372391ce59afbe2bb2977993f",
+    "DisplayName": "Coco (2017)",
+    "ItemKinds": [],
+    "Weight": 1
+   }
+  ],
+  "Order": "Shuffle",
+  "AvoidSameSeriesBackToBack": true,
+  "MarathonMin": 1,
+  "MarathonMax": 1,
+  "DaypartRules": []
+ },
+ "Slots": {
+  "Blocks": [],
+  "Filler": {
+   "Sources": [],
+   "Order": "Shuffle"
+  }
+ },
+ "Lineup": {
+  "Items": []
+ },
+ "AutoRecompileNightly": true,
+ "ActiveWindows": [],
+ "ExcludedItemIds": []
+}

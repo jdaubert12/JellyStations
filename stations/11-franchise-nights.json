@@ -1,0 +1,422 @@
+{
+ "Name": "Franchise Nights",
+ "ChannelNumber": "11",
+ "CallSign": "FRNCH",
+ "Enabled": true,
+ "TimeZoneId": "America/New_York",
+ "AnchorUtc": "2026-10-14T10:00:00Z",
+ "PaddingGridMinutes": 0,
+ "Mode": "Slots",
+ "Pool": {
+  "Sources": [],
+  "Order": "Shuffle",
+  "AvoidSameSeriesBackToBack": true,
+  "MarathonMin": 1,
+  "MarathonMax": 1,
+  "DaypartRules": []
+ },
+ "Slots": {
+  "Blocks": [
+   {
+    "Name": "Potter Monday",
+    "Days": [
+     "Monday"
+    ],
+    "StartLocal": "19:00",
+    "DurationMinutes": 300,
+    "Sources": [
+     {
+      "Kind": "Movie",
+      "ItemId": "cdf413f950a2829288af382baac4e302",
+      "DisplayName": "Harry Potter and the Philosopher's Stone (2001)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "a9c34341af053c182de58e4e390035ff",
+      "DisplayName": "Harry Potter and the Chamber of Secrets (2002)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "9ffe85034616ba223f1535e1c536d64e",
+      "DisplayName": "Harry Potter and the Prisoner of Azkaban (2004)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "4379a69a1f0547f45eca0fb18e0a8ee6",
+      "DisplayName": "Harry Potter and the Goblet of Fire (2005)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "ba0c497d0a554233b9cbbbfe7f637cfd",
+      "DisplayName": "Harry Potter and the Order of the Phoenix (2007)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "62b42bcad5367731216de1914c2097fd",
+      "DisplayName": "Harry Potter and the Half-Blood Prince (2009)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "6bb44a9f485d3f60b96587e9ffbcaefa",
+      "DisplayName": "Harry Potter and the Deathly Hallows: Part 1 (2010)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "adf439754d2e09c49ceaf89e290f0f8a",
+      "DisplayName": "Harry Potter and the Deathly Hallows: Part 2 (2011)",
+      "ItemKinds": [],
+      "Weight": 1
+     }
+    ],
+    "Order": "Sequential",
+    "Overflow": "FillerRemainder"
+   },
+   {
+    "Name": "Bourne Tuesday",
+    "Days": [
+     "Tuesday"
+    ],
+    "StartLocal": "19:00",
+    "DurationMinutes": 300,
+    "Sources": [
+     {
+      "Kind": "Movie",
+      "ItemId": "c2bbdf36b2fd3732b4154c53155c500f",
+      "DisplayName": "The Bourne Identity (2002)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "bbd214c132c4579b7019e38100c66da7",
+      "DisplayName": "The Bourne Supremacy (2004)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "3744f814131eced816fe9ff085d51b9b",
+      "DisplayName": "The Bourne Ultimatum (2007)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "292edc7f67aa8bf1534bb22a1f45cfa5",
+      "DisplayName": "The Bourne Legacy (2012)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "13e38d7f329fd9ce64a2259848673599",
+      "DisplayName": "Jason Bourne (2016)",
+      "ItemKinds": [],
+      "Weight": 1
+     }
+    ],
+    "Order": "Sequential",
+    "Overflow": "FillerRemainder"
+   },
+   {
+    "Name": "Marvel Wednesday",
+    "Days": [
+     "Wednesday"
+    ],
+    "StartLocal": "19:00",
+    "DurationMinutes": 300,
+    "Sources": [
+     {
+      "Kind": "Movie",
+      "ItemId": "bce1ede3722d5111da59a471564cdc79",
+      "DisplayName": "Captain America: The First Avenger (2011)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "09e66eca4e0953a96cf381016ec10e1f",
+      "DisplayName": "The Avengers (2012)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "fcb6ecaf87c9a0aa7d8a4403d76fe8ec",
+      "DisplayName": "Captain America: The Winter Soldier (2014)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "9bf0334a2c7f300cfc4b89ca648a25f2",
+      "DisplayName": "Ant-Man (2015)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "492e4e2fbeff8bfefc9d6b96765adce3",
+      "DisplayName": "Captain America: Civil War (2016)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "cea8d98d54076fd205079cf13bc57aa2",
+      "DisplayName": "Black Panther (2018)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "958b06b13fce062ba51b51c29cb1f440",
+      "DisplayName": "Avengers: Infinity War (2018)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "0eb1d85cac0f96631cfe9b5ec6393510",
+      "DisplayName": "Captain Marvel (2019)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "8385169320e5b9fb23e3ca4d3fbd7268",
+      "DisplayName": "Avengers: Endgame (2019)",
+      "ItemKinds": [],
+      "Weight": 1
+     }
+    ],
+    "Order": "Sequential",
+    "Overflow": "FillerRemainder"
+   },
+   {
+    "Name": "Bond Thursday",
+    "Days": [
+     "Thursday"
+    ],
+    "StartLocal": "19:00",
+    "DurationMinutes": 300,
+    "Sources": [
+     {
+      "Kind": "Movie",
+      "ItemId": "ed094a21a457ee47acfecef6b0572142",
+      "DisplayName": "Casino Royale (2006)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "4209e27d7df52b295bfc233bcbf7ccdc",
+      "DisplayName": "Quantum of Solace (2008)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "5aad72119a12d2de7e830887b8144a1a",
+      "DisplayName": "Skyfall (2012)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "732079cf1df34df932f4ffd5136291a7",
+      "DisplayName": "Spectre (2015)",
+      "ItemKinds": [],
+      "Weight": 1
+     }
+    ],
+    "Order": "Sequential",
+    "Overflow": "FillerRemainder"
+   },
+   {
+    "Name": "Matrix & Riddick Friday",
+    "Days": [
+     "Friday"
+    ],
+    "StartLocal": "19:00",
+    "DurationMinutes": 300,
+    "Sources": [
+     {
+      "Kind": "Movie",
+      "ItemId": "2f8d11ad55f2bd9939cc70158de9b596",
+      "DisplayName": "The Matrix (1999)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "4f42956aced76bb3b5cc225a039868bb",
+      "DisplayName": "The Matrix Reloaded (2003)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "7fede6083224eed59c7339875700bbd0",
+      "DisplayName": "The Matrix Revolutions (2003)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "994066b0fa7f5d0274e38c8615d09fcb",
+      "DisplayName": "The Matrix Resurrections (2021)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "868eead12acf6eab4744351060036e17",
+      "DisplayName": "Pitch Black (2000)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "4a8fe443b990ee4c8452daea37f47e98",
+      "DisplayName": "The Chronicles of Riddick (2004)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "a6222cbfde8453d05273480e56fe6576",
+      "DisplayName": "Riddick (2013)",
+      "ItemKinds": [],
+      "Weight": 1
+     }
+    ],
+    "Order": "Sequential",
+    "Overflow": "FillerRemainder"
+   },
+   {
+    "Name": "Lord of the Rings Saturday",
+    "Days": [
+     "Saturday"
+    ],
+    "StartLocal": "18:00",
+    "DurationMinutes": 360,
+    "Sources": [
+     {
+      "Kind": "Movie",
+      "ItemId": "4445d09745f3f7d75c8d58d14a9edc98",
+      "DisplayName": "The Lord of the Rings: The Fellowship of the Ring (2001)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "8cbd481daabef6a19701471b11757795",
+      "DisplayName": "The Lord of the Rings: The Two Towers (2002)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "6dd06027b04e69bcd6c2156184b4f916",
+      "DisplayName": "The Lord of the Rings: The Return of the King (2003)",
+      "ItemKinds": [],
+      "Weight": 1
+     }
+    ],
+    "Order": "Sequential",
+    "Overflow": "FillerRemainder"
+   },
+   {
+    "Name": "Batman & Wick Sunday",
+    "Days": [
+     "Sunday"
+    ],
+    "StartLocal": "19:00",
+    "DurationMinutes": 300,
+    "Sources": [
+     {
+      "Kind": "Movie",
+      "ItemId": "337a34ef966bc1cb19c2b43d59861ac4",
+      "DisplayName": "Batman Begins (2005)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "0c89333be2b1c498c87ee61de0c4bb8f",
+      "DisplayName": "The Dark Knight (2008)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "e09a139da0210f8c3e6f833941e4a9cf",
+      "DisplayName": "The Dark Knight Rises (2012)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "91e0ff8c4119d809acadb5572052278f",
+      "DisplayName": "John Wick (2014)",
+      "ItemKinds": [],
+      "Weight": 1
+     },
+     {
+      "Kind": "Movie",
+      "ItemId": "9ff544fc39d517a8505e380ce309a0f3",
+      "DisplayName": "John Wick: Chapter 2 (2017)",
+      "ItemKinds": [],
+      "Weight": 1
+     }
+    ],
+    "Order": "Sequential",
+    "Overflow": "FillerRemainder"
+   }
+  ],
+  "Filler": {
+   "Sources": [
+    {
+     "Kind": "Genre",
+     "Genre": "Comedy",
+     "DisplayName": "Comedy",
+     "ItemKinds": [
+      "Movie"
+     ],
+     "Weight": 1
+    },
+    {
+     "Kind": "Genre",
+     "Genre": "Adventure",
+     "DisplayName": "Adventure",
+     "ItemKinds": [
+      "Movie"
+     ],
+     "Weight": 1
+    }
+   ],
+   "Order": "Shuffle"
+  }
+ },
+ "Lineup": {
+  "Items": []
+ },
+ "AutoRecompileNightly": true,
+ "ActiveWindows": [],
+ "ExcludedItemIds": []
+}

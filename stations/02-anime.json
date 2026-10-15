@@ -1,0 +1,116 @@
+{
+ "Name": "Anime",
+ "ChannelNumber": "2",
+ "CallSign": "ANIME",
+ "Enabled": true,
+ "TimeZoneId": "America/New_York",
+ "AnchorUtc": "2026-10-14T10:00:00Z",
+ "PaddingGridMinutes": 0,
+ "Mode": "Pool",
+ "Pool": {
+  "Sources": [
+   {
+    "Kind": "Series",
+    "ItemId": "98d7752c361f82161d8e06e7ecd75e0a",
+    "DisplayName": "Ghost in the Shell: Stand Alone Complex",
+    "ItemKinds": [],
+    "Weight": 1
+   },
+   {
+    "Kind": "Series",
+    "ItemId": "7189af44fff940a72b2a470608ae3edb",
+    "DisplayName": "Cowboy Bebop",
+    "ItemKinds": [],
+    "Weight": 1
+   },
+   {
+    "Kind": "Series",
+    "ItemId": "0887b3463da337b8110db5365384ed89",
+    "DisplayName": "Initial D",
+    "ItemKinds": [],
+    "Weight": 1
+   },
+   {
+    "Kind": "Series",
+    "ItemId": "804659ba9744294f597ea336c8f38812",
+    "DisplayName": "Gurren Lagann",
+    "ItemKinds": [],
+    "Weight": 1
+   },
+   {
+    "Kind": "Series",
+    "ItemId": "cd9fdf086dbc2993b91eb04d0f4fcc5f",
+    "DisplayName": "Nichijou: My Ordinary Life",
+    "ItemKinds": [],
+    "Weight": 1
+   },
+   {
+    "Kind": "Series",
+    "ItemId": "c23917128feca5957ce6a73d0567722d",
+    "DisplayName": "Tamako Market",
+    "ItemKinds": [],
+    "Weight": 1
+   },
+   {
+    "Kind": "Series",
+    "ItemId": "b78a5af3a64b0d55b3645b3221d2866a",
+    "DisplayName": "Excel Saga",
+    "ItemKinds": [],
+    "Weight": 1
+   },
+   {
+    "Kind": "Movie",
+    "ItemId": "65006c00daed95fb2264256852524c85",
+    "DisplayName": "Ghost in the Shell (1995)",
+    "ItemKinds": [],
+    "Weight": 1
+   },
+   {
+    "Kind": "Movie",
+    "ItemId": "509fadc1ada46d9804c308b5521ceaa9",
+    "DisplayName": "Cowboy Bebop: The Movie (2001)",
+    "ItemKinds": [],
+    "Weight": 1
+   },
+   {
+    "Kind": "Movie",
+    "ItemId": "e54d6a3893cc38861ddd9434d7c2d1a4",
+    "DisplayName": "Jin-Roh: The Wolf Brigade (1999)",
+    "ItemKinds": [],
+    "Weight": 1
+   },
+   {
+    "Kind": "Movie",
+    "ItemId": "1308237e29ebbb88fe58d0cfa67eca91",
+    "DisplayName": "Tamako Love Story (2014)",
+    "ItemKinds": [],
+    "Weight": 1
+   }
+  ],
+  "Order": "ShuffleEpisodesInOrder",
+  "AvoidSameSeriesBackToBack": true,
+  "MarathonMin": 2,
+  "MarathonMax": 4,
+  "DaypartRules": [
+   {
+    "StartLocal": "06:00",
+    "EndLocal": "21:00",
+    "MaxRating": "TV-14",
+    "AllowUnrated": false
+   }
+  ]
+ },
+ "Slots": {
+  "Blocks": [],
+  "Filler": {
+   "Sources": [],
+   "Order": "Shuffle"
+  }
+ },
+ "Lineup": {
+  "Items": []
+ },
+ "AutoRecompileNightly": true,
+ "ActiveWindows": [],
+ "ExcludedItemIds": []
+}

@@ -1,0 +1,50 @@
+{
+ "Name": "Sci-Fi & Fantasy Movies",
+ "ChannelNumber": "7",
+ "CallSign": "SFF",
+ "Enabled": true,
+ "TimeZoneId": "America/New_York",
+ "AnchorUtc": "2026-10-14T10:00:00Z",
+ "PaddingGridMinutes": 15,
+ "Mode": "Pool",
+ "Pool": {
+  "Sources": [
+   {
+    "Kind": "Genre",
+    "Genre": "Science Fiction",
+    "DisplayName": "Science Fiction",
+    "ItemKinds": [
+     "Movie"
+    ],
+    "Weight": 1
+   },
+   {
+    "Kind": "Genre",
+    "Genre": "Fantasy",
+    "DisplayName": "Fantasy",
+    "ItemKinds": [
+     "Movie"
+    ],
+    "Weight": 1
+   }
+  ],
+  "Order": "Shuffle",
+  "AvoidSameSeriesBackToBack": true,
+  "MarathonMin": 1,
+  "MarathonMax": 1,
+  "DaypartRules": []
+ },
+ "Slots": {
+  "Blocks": [],
+  "Filler": {
+   "Sources": [],
+   "Order": "Shuffle"
+  }
+ },
+ "Lineup": {
+  "Items": []
+ },
+ "AutoRecompileNightly": true,
+ "ActiveWindows": [],
+ "ExcludedItemIds": []
+}

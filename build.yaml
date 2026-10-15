@@ -1,0 +1,18 @@
+---
+name: "TvStation"
+guid: "b7f3c1d2-5e8a-4f0b-9c6d-2a1e7f4b8d31"
+version: "1.0.0.0"
+targetAbi: "12.0.0.0"
+framework: "net10.0"
+owner: "Justin"
+overview: "Curate always-on TV stations from your library. They appear as native Live TV channels with a full guide."
+description: >
+  TvStation turns your Jellyfin library into broadcast-style TV stations. Build any number of
+  stations from movies, series, collections, playlists or genres; choose a shuffled pool,
+  weekly time-slot blocks, or a hand-ordered lineup; and every client tunes in through the
+  built-in Live TV guide, joining whatever is airing right now.
+category: "LiveTV"
+artifacts:
+  - "Jellyfin.Plugin.TvStation.dll"
+changelog: >
+  Initial release.

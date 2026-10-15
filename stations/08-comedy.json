@@ -1,0 +1,50 @@
+{
+ "Name": "Comedy",
+ "ChannelNumber": "8",
+ "CallSign": "COMDY",
+ "Enabled": true,
+ "TimeZoneId": "America/New_York",
+ "AnchorUtc": "2026-10-14T10:00:00Z",
+ "PaddingGridMinutes": 15,
+ "Mode": "Pool",
+ "Pool": {
+  "Sources": [
+   {
+    "Kind": "Genre",
+    "Genre": "Comedy",
+    "DisplayName": "Comedy",
+    "ItemKinds": [
+     "Movie"
+    ],
+    "Weight": 1
+   }
+  ],
+  "Order": "Shuffle",
+  "AvoidSameSeriesBackToBack": true,
+  "MarathonMin": 1,
+  "MarathonMax": 1,
+  "DaypartRules": [
+   {
+    "StartLocal": "06:00",
+    "EndLocal": "20:00",
+    "MaxRating": "PG-13",
+    "AllowUnrated": true
+   }
+  ]
+ },
+ "Slots": {
+  "Blocks": [],
+  "Filler": {
+   "Sources": [],
+   "Order": "Shuffle"
+  }
+ },
+ "Lineup": {
+  "Items": []
+ },
+ "AutoRecompileNightly": true,
+ "ActiveWindows": [],
+ "ExcludedItemIds": [
+  "a8a7322f234baaa15fffffe328488f10"
+ ]
+}

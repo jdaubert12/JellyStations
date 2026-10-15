@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+*.user
+*.swp
+TestResults/
+dist/
+dev/config/
+dev/cache/
+dev/media/**/*.mp4
+dev/media/**/*.mkv
+dev/.token

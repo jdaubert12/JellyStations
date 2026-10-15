@@ -1,0 +1,111 @@
+namespace Jellyfin.Plugin.TvStation.Models;
+
+public sealed class PoolConfig
+{
+    public List<ContentSource> Sources { get; set; } = new();
+
+    public PlayOrder Order { get; set; } = PlayOrder.Shuffle;
+
+    public bool AvoidSameSeriesBackToBack { get; set; } = true;
+
+    /// <summary>When shuffling: fewest episodes of one show to play back to back before switching. 1 = no marathons.</summary>
+    public int MarathonMin { get; set; } = 1;
+
+    /// <summary>When shuffling: most episodes of one show to play back to back before switching. 1 = no marathons.</summary>
+    public int MarathonMax { get; set; } = 1;
+
+    /// <summary>Time-of-day rating limits (station time zone). Items that would air inside a rule's window must be at or below its rating.</summary>
+    public List<DaypartRule> DaypartRules { get; set; } = new();
+}
+
+/// <summary>"Nothing above PG between 06:00 and 20:00". The window may wrap midnight; equal times mean all day.</summary>
+public sealed class DaypartRule
+{
+    /// <summary>Local start time, "HH:mm".</summary>
+    public string StartLocal { get; set; } = "06:00";
+
+    /// <summary>Local end time, "HH:mm" (exclusive).</summary>
+    public string EndLocal { get; set; } = "20:00";
+
+    /// <summary>Highest allowed rating on the RatingLadder while the window is in effect.</summary>
+    public string MaxRating { get; set; } = "PG";
+
+    /// <summary>Whether items without a ladder rating may air inside the window.</summary>
+    public bool AllowUnrated { get; set; }
+}
+
+public sealed class SlotsConfig
+{
+    public List<SlotBlock> Blocks { get; set; } = new();
+
+    public FillerConfig Filler { get; set; } = new();
+}
+
+public sealed class SlotBlock
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>Days of week (in the station's time zone) the block occurs on.</summary>
+    public List<DayOfWeek> Days { get; set; } = new();
+
+    /// <summary>Local start time, "HH:mm".</summary>
+    public string StartLocal { get; set; } = "20:00";
+
+    public int DurationMinutes { get; set; } = 60;
+
+    public List<ContentSource> Sources { get; set; } = new();
+
+    public PlayOrder Order { get; set; } = PlayOrder.Sequential;
+
+    public SlotOverflow Overflow { get; set; } = SlotOverflow.FillerRemainder;
+}
+
+public sealed class FillerConfig
+{
+    public List<ContentSource> Sources { get; set; } = new();
+
+    public PlayOrder Order { get; set; } = PlayOrder.Shuffle;
+}
+
+/// <summary>A recurring yearly date range, inclusive on both ends, in the station's time zone.</summary>
+public sealed class SeasonWindow
+{
+    public string? Label { get; set; }
+
+    public int StartMonth { get; set; } = 12;
+
+    public int StartDay { get; set; } = 1;
+
+    public int EndMonth { get; set; } = 12;
+
+    public int EndDay { get; set; } = 31;
+}
+
+/// <summary>Short clips that fill gaps between programs. When off, or when no clip fits a gap, the station card is shown.</summary>
+public sealed class BumperConfig
+{
+    public bool Enabled { get; set; }
+
+    public List<ContentSource> Sources { get; set; } = new();
+
+    /// <summary>Minutes reserved after every program (before grid padding) so there is always room for a clip. 0 = only fill existing gaps.</summary>
+    public int BreakMinutes { get; set; }
+
+    /// <summary>Clips longer than this are ignored, so a feature film in the source list cannot become a bumper.</summary>
+    public int MaxClipMinutes { get; set; } = 5;
+}
+
+public sealed class LineupConfig
+{
+    public List<LineupItem> Items { get; set; } = new();
+}
+
+public sealed class LineupItem
+{
+    public Guid ItemId { get; set; }
+
+    /// <summary>Display name captured at pick time (for UI only).</summary>
+    public string? DisplayName { get; set; }
+}
