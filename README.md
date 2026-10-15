@@ -59,7 +59,10 @@ during those dates, in the station's time zone. Off
 season it stays in the dashboard with an "Off season until …" badge and comes back by itself.
 
 **Export** downloads every station as a JSON file; **Import** creates or updates stations from such a
-file (matched by id, then by name), which makes station sets easy to back up, share, or hand-edit.
+file (matched by id, then by name), which makes station sets easy to back up, share, or hand-edit. Hand-picked items (movies, series, seasons, episodes, collections, playlists, libraries) are
+matched by title when their ids are unknown on the importing server, so a station file from another
+server, or one of the examples under `examples/stations/`, imports cleanly; anything that cannot be
+matched is dropped and listed.
 
 Every content source can be tuned from its chip (the ✎ button): series sources take a **season range**
 and a **skip specials** switch; genre, playlist, collection and library sources can be limited to

@@ -11,8 +11,8 @@ Conventions for every step:
 - Existing stations must keep producing the same schedule after an upgrade unless the user edits
   them. New settings default to "off" and are excluded from the schedule fingerprint when they do
   not change the timeline.
-- Station JSON in `stations/` is the source of truth for the real server; changes there go in via
-  Import.
+- Station JSON in `examples/stations/` is the source of truth for the real server (and doubles as
+  shipped examples); changes there go in via Import.
 
 ## Already done (October 2026)
 
@@ -62,7 +62,7 @@ Rating ladders (used by this step and by Step 2):
 **Verification.** Unit tests for the ladder and the two filters (construct `Movie`/`Episode`
 entities as in `SourceFilterTests`). On the dev container, tag test items with ratings/years and
 preview a genre source with each filter. Then rebuild Family Movies and Retro Movies in
-`stations/` as genre sources with filters and compare item counts against the hand-picked lists.
+`examples/stations/` as genre sources with filters and compare item counts against the hand-picked lists.
 
 **Size.** Small. One day including UI.
 
@@ -155,14 +155,13 @@ the station row's excluded count rises by one.
 
 ## Phase 3 — curation help
 
-Order: import by name first (it makes `stations/` shippable as examples), then the analyzer,
-then suggestion rules and the dashboard view on top of it.
+Order: import by name first (it makes the station files shippable as examples), then the
+analyzer, then suggestion rules and the dashboard view on top of it.
 
-- **Resolve import sources by name.** Sources already carry `DisplayName` beside `ItemId`. On
-  import, when the id is unknown on this server, look the item up by kind and name (series,
-  movie, collection, playlist, library; genres and tags already match by name) and report what
-  could not be matched instead of silently dropping it. Move the real-server set to
-  `examples/stations/` with a note that hand-picked sources resolve by title. Small.
+- **Resolve import sources by name — DONE 2026-10-15.** `StationImportResolver` looks up every
+  item reference whose id is unknown here by kind and display name (year breaks ties for movies,
+  episodes fall back to series + S/E numbers, seasons to the number); unmatched references are
+  dropped and listed in the import result. Real-server set moved to `examples/stations/`.
 - **Library analysis.** One pass over the library producing the facts suggestions are built
   from: hours per genre, episodes and rating per series, titles per collection, franchises from
   shared title prefixes, counts per decade, kids content by rating, holiday content by tag.

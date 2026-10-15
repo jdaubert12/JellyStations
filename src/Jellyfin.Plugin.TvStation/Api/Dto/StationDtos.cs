@@ -64,6 +64,12 @@ public sealed class ImportResultDto
     public List<string> Updated { get; set; } = new();
 
     public List<string> Errors { get; set; } = new();
+
+    /// <summary>Item references whose id was unknown on this server and that were matched by name.</summary>
+    public List<string> Resolved { get; set; } = new();
+
+    /// <summary>Item references that could not be matched and were dropped from the imported station.</summary>
+    public List<string> Unmatched { get; set; } = new();
 }
 
 public sealed class StationSummaryDto

@@ -721,9 +721,13 @@
         if (res.Created.length) { parts.push('created ' + res.Created.length); }
         if (res.Updated.length) { parts.push('updated ' + res.Updated.length); }
         if (res.Errors.length) { parts.push(res.Errors.length + ' failed'); }
+        const resolved = res.Resolved || [];
+        const unmatched = res.Unmatched || [];
+        if (resolved.length) { parts.push(resolved.length + ' source' + (resolved.length === 1 ? '' : 's') + ' matched by name'); }
+        if (unmatched.length) { parts.push(unmatched.length + ' not found'); }
         toast('Import: ' + (parts.join(', ') || 'nothing to do') + '.');
-        if (res.Errors.length) {
-          renderErrorBox($('#tvsListError'), res.Errors);
+        if (res.Errors.length || unmatched.length) {
+          renderErrorBox($('#tvsListError'), res.Errors.concat(unmatched.map(u => 'Not found, dropped: ' + u)));
         }
         return loadStations();
       }).catch(err => alertErrors(err, 'Import failed')).then(() => loading(false));

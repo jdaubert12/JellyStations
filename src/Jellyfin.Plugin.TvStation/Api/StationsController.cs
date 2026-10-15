@@ -1,5 +1,6 @@
 using System.Net.Mime;
 using Jellyfin.Plugin.TvStation.Api.Dto;
+using Jellyfin.Plugin.TvStation.Library;
 using Jellyfin.Plugin.TvStation.Models;
 using Jellyfin.Plugin.TvStation.Scheduling;
 using Jellyfin.Plugin.TvStation.Services;
@@ -20,9 +21,11 @@ public sealed class StationsController : ControllerBase
     private readonly StationService _stations;
     private readonly IScheduleResolver _resolver;
     private readonly StreamSessionManager _sessions;
+    private readonly StationImportResolver _importResolver;
 
-    public StationsController(StationService stations, IScheduleResolver resolver, StreamSessionManager sessions)
+    public StationsController(StationService stations, IScheduleResolver resolver, StreamSessionManager sessions, StationImportResolver importResolver)
     {
+        _importResolver = importResolver;
         _stations = stations;
         _resolver = resolver;
         _sessions = sessions;
@@ -66,7 +69,8 @@ public sealed class StationsController : ControllerBase
 
     /// <summary>
     /// Imports station definitions. Each station is matched to an existing one by id, then by name, and updated;
-    /// unmatched stations are created. Logos are not part of the import.
+    /// unmatched stations are created. Item references whose ids are unknown on this server are matched by the
+    /// display name stored beside them; what cannot be matched is dropped and reported. Logos are not part of the import.
     /// </summary>
     [HttpPost("Import")]
     public ActionResult<ImportResultDto> Import([FromBody] List<Station> stations)
@@ -78,6 +82,10 @@ public sealed class StationsController : ControllerBase
             var name = draft.Name ?? "(unnamed)";
             try
             {
+                var resolution = _importResolver.Resolve(draft);
+                result.Resolved.AddRange(resolution.Resolved.Select(r => name + ": " + r));
+                result.Unmatched.AddRange(resolution.Unmatched.Select(r => name + ": " + r));
+
                 var match = existing.FirstOrDefault(s => draft.Id != Guid.Empty && s.Id == draft.Id)
                     ?? existing.FirstOrDefault(s => string.Equals(s.Name?.Trim(), draft.Name?.Trim(), StringComparison.OrdinalIgnoreCase));
                 if (match is not null)
