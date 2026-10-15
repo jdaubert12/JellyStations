@@ -142,8 +142,9 @@ the station row's excluded count rises by one.
 - **Bumpers and interstitials — DONE 2026-10-14.** Per-station toggle, clip sources, max clip
   length, optional reserved break after every program; gaps fill with seeded clips and fall back to
   the station card, whose text is now configurable per station.
-- **Logo overlay on video.** ffmpeg `overlay` filter with the station logo in a corner, per-station
-  toggle and opacity. Small; cost is encoder CPU, so default off.
+- **Logo overlay on video — DONE 2026-10-15.** ffmpeg `overlay` filter with the station logo in a
+  chosen corner, per-station toggle, opacity and size; default off. If the filter fails the stream
+  carries on without it for that session.
 - **Re-anchor from now — DONE 2026-10-14.** "Set to now" in the editor and "Start schedule from
   now" on the station row, rounded down to the padding grid. No "start with this item" pick yet.
 - **Holiday calendar presets — DONE 2026-10-14.** Preset dropdown in the season block.

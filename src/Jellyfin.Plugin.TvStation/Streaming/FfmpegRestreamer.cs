@@ -22,6 +22,7 @@ public sealed class FfmpegRestreamer : IDisposable
     private readonly GlobalSettings _settings;
     private readonly IScheduleResolver _resolver;
     private readonly Func<string?> _logoPath;
+    private readonly LogoOverlayConfig _overlay;
     private readonly string _cardText;
     private readonly BroadcastBuffer _buffer;
     private readonly ILogger _logger;
@@ -31,6 +32,7 @@ public sealed class FfmpegRestreamer : IDisposable
     private ProcessRunner? _current;
     private Task? _loop;
     private bool _slateTextSupported = true;
+    private bool _overlaySupported = true;
     private double _tsOffsetFloorSeconds;
 
     public FfmpegRestreamer(
@@ -41,6 +43,7 @@ public sealed class FfmpegRestreamer : IDisposable
         GlobalSettings settings,
         IScheduleResolver resolver,
         Func<string?> logoPath,
+        LogoOverlayConfig overlay,
         string cardText,
         BroadcastBuffer buffer,
         ILogger logger)
@@ -52,6 +55,7 @@ public sealed class FfmpegRestreamer : IDisposable
         _settings = settings;
         _resolver = resolver;
         _logoPath = logoPath;
+        _overlay = overlay;
         _cardText = string.IsNullOrWhiteSpace(cardText) ? Station.DefaultCardText : cardText;
         _buffer = buffer;
         _logger = logger;
@@ -126,7 +130,8 @@ public sealed class FfmpegRestreamer : IDisposable
                 var item = entry.Item!;
                 var seek = resolved.Offset;
                 var duration = entry.IsTruncated || entry.EndUtc < entry.StartUtc + item.Runtime ? remaining : (TimeSpan?)null;
-                var args = FfmpegArgsBuilder.ForFile(item, seek, duration, NextTsOffset(), _profile);
+                var overlay = OverlayInput();
+                var args = FfmpegArgsBuilder.ForFile(item, seek, duration, NextTsOffset(), _profile, overlay);
 
                 _logger.LogInformation(
                     "TvStation [{Station}]: playing {Title} from {Seek} ({Remaining} remaining)",
@@ -146,6 +151,15 @@ public sealed class FfmpegRestreamer : IDisposable
                 }
 
                 var endedEarly = DateTime.UtcNow < entry.EndUtc - MinSegment;
+                if (exitCode != 0 && ran < TimeSpan.FromSeconds(5) && overlay is not null)
+                {
+                    // The overlay filter (or the logo file) is the likely culprit: drop the overlay for this session and replay.
+                    _overlaySupported = false;
+                    _logger.LogWarning("TvStation [{Station}]: ffmpeg exited with {Code} with the logo overlay; continuing without it", _stationName, exitCode);
+                    Note("Logo overlay failed (exit " + exitCode + "); disabled until the stream restarts");
+                    continue;
+                }
+
                 if (exitCode != 0 && ran < TimeSpan.FromSeconds(5))
                 {
                     consecutiveFailures++;
@@ -191,6 +205,23 @@ public sealed class FfmpegRestreamer : IDisposable
                 }
             }
         }
+    }
+
+    /// <summary>The logo bug to draw over programs, or null when off, unsupported, or the logo file is missing.</summary>
+    private FfmpegArgsBuilder.LogoOverlayInput? OverlayInput()
+    {
+        if (!_overlay.Enabled || !_overlaySupported)
+        {
+            return null;
+        }
+
+        var path = _logoPath();
+        if (string.IsNullOrEmpty(path) || !File.Exists(path))
+        {
+            return null;
+        }
+
+        return new FfmpegArgsBuilder.LogoOverlayInput(path, _overlay.Corner, _overlay.Opacity, _overlay.HeightPercent);
     }
 
     private async Task RunSlateAsync(TimeSpan duration, string text, CancellationToken ct, DateTime? hardEnd = null)

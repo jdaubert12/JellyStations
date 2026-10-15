@@ -15,6 +15,9 @@ public sealed class Station
 
     public string? LogoFileName { get; set; }
 
+    /// <summary>Optional logo bug drawn over programs. Off by default.</summary>
+    public LogoOverlayConfig LogoOverlay { get; set; } = new();
+
     /// <summary>IANA or Windows time zone id used for slot times.</summary>
     public string TimeZoneId { get; set; } = "UTC";
 

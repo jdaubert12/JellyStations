@@ -878,6 +878,7 @@
       CallSign: null,
       Enabled: true,
       LogoFileName: null,
+      LogoOverlay: { Enabled: false, Corner: 'TopRight', Opacity: 70, HeightPercent: 8 },
       TimeZoneId: guessTimeZone(),
       AnchorUtc: null,
       Revision: 1,
@@ -943,6 +944,11 @@
     s.Bumpers.BreakMinutes = Math.max(0, parseInt(s.Bumpers.BreakMinutes, 10) || 0);
     s.Bumpers.MaxClipMinutes = Math.max(1, parseInt(s.Bumpers.MaxClipMinutes, 10) || 5);
     s.CardText = s.CardText || null;
+    s.LogoOverlay = s.LogoOverlay || {};
+    s.LogoOverlay.Enabled = !!s.LogoOverlay.Enabled;
+    s.LogoOverlay.Corner = s.LogoOverlay.Corner || 'TopRight';
+    s.LogoOverlay.Opacity = Math.min(100, Math.max(10, parseInt(s.LogoOverlay.Opacity, 10) || 70));
+    s.LogoOverlay.HeightPercent = Math.min(25, Math.max(3, parseInt(s.LogoOverlay.HeightPercent, 10) || 8));
     return s;
   }
 
@@ -1081,6 +1087,11 @@
 
     // Logo
     renderLogo();
+    setChecked('#tvsOverlayEnabled', !!d.LogoOverlay.Enabled);
+    setVal('#tvsOverlayCorner', d.LogoOverlay.Corner);
+    setVal('#tvsOverlayOpacity', d.LogoOverlay.Opacity);
+    setVal('#tvsOverlaySize', d.LogoOverlay.HeightPercent);
+    show($('#tvsOverlayOptions'), !!d.LogoOverlay.Enabled);
 
     // Mode panels
     setVal('#tvsPoolOrder', d.Pool.Order);
@@ -1231,6 +1242,10 @@
     d.PaddingGridMinutes = paddingGridMinutes();
     d.AutoRecompileNightly = checked('#tvsNightly');
     d.CardText = val('#tvsCardText').trim() || null;
+    d.LogoOverlay.Enabled = checked('#tvsOverlayEnabled');
+    d.LogoOverlay.Corner = val('#tvsOverlayCorner') || 'TopRight';
+    d.LogoOverlay.Opacity = Math.min(100, Math.max(10, parseInt(val('#tvsOverlayOpacity'), 10) || 70));
+    d.LogoOverlay.HeightPercent = Math.min(25, Math.max(3, parseInt(val('#tvsOverlaySize'), 10) || 8));
     d.ExcludedTags = parseTagList(val('#tvsExcludedTags'));
     d.UseGlobalExcludedTags = checked('#tvsUseGlobalTags');
     d.Bumpers.Enabled = checked('#tvsBumpersEnabled');
@@ -2670,6 +2685,7 @@
       }
     });
     on('#tvsEncodingEnabled', 'change', () => show($('#tvsStationEncoding'), checked('#tvsEncodingEnabled')));
+    on('#tvsOverlayEnabled', 'change', () => show($('#tvsOverlayOptions'), checked('#tvsOverlayEnabled')));
     on('#tvsBtnAddBlock', 'click', () => {
       const block = newBlock();
       state.draft.Slots.Blocks.push(block);

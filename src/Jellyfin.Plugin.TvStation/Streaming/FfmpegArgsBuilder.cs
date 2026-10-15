@@ -10,8 +10,11 @@ namespace Jellyfin.Plugin.TvStation.Streaming;
 /// </summary>
 public static class FfmpegArgsBuilder
 {
+    /// <summary>A logo to draw over the video: image path plus placement.</summary>
+    public sealed record LogoOverlayInput(string Path, LogoCorner Corner, int Opacity, int HeightPercent);
+
     /// <summary>Arguments to play a file from an offset, normalized to the profile, as real-time MPEG-TS on stdout.</summary>
-    public static List<string> ForFile(PlayableItem item, TimeSpan seek, TimeSpan? duration, TimeSpan tsOffset, EncodingProfile p)
+    public static List<string> ForFile(PlayableItem item, TimeSpan seek, TimeSpan? duration, TimeSpan tsOffset, EncodingProfile p, LogoOverlayInput? overlay = null)
     {
         var args = new List<string>();
         Common(args);
@@ -35,6 +38,15 @@ public static class FfmpegArgsBuilder
             args.Add("anullsrc=r=48000:cl=stereo");
         }
 
+        var logoIndex = -1;
+        if (overlay is not null)
+        {
+            // A single-frame image; the overlay filter repeats its last frame for the whole program.
+            logoIndex = needSilence ? 2 : 1;
+            args.Add("-i");
+            args.Add(overlay.Path);
+        }
+
         if (duration.HasValue && duration.Value > TimeSpan.Zero)
         {
             args.Add("-t");
@@ -46,16 +58,49 @@ public static class FfmpegArgsBuilder
             args.Add("-shortest");
         }
 
-        args.Add("-map");
-        args.Add("0:v:0");
-        args.Add("-map");
-        args.Add(needSilence ? "1:a:0" : "0:a:" + (item.AudioStreamIndex ?? 0).ToString(CultureInfo.InvariantCulture) + "?");
-
-        args.Add("-vf");
-        args.Add(VideoFilter(p));
+        var audioMap = needSilence ? "1:a:0" : "0:a:" + (item.AudioStreamIndex ?? 0).ToString(CultureInfo.InvariantCulture) + "?";
+        if (overlay is null)
+        {
+            args.Add("-map");
+            args.Add("0:v:0");
+            args.Add("-map");
+            args.Add(audioMap);
+            args.Add("-vf");
+            args.Add(VideoFilter(p));
+        }
+        else
+        {
+            args.Add("-filter_complex");
+            args.Add(OverlayFilter(p, overlay, logoIndex));
+            args.Add("-map");
+            args.Add("[v]");
+            args.Add("-map");
+            args.Add(audioMap);
+            args.Add("-pix_fmt");
+            args.Add("yuv420p");
+        }
 
         Output(args, p, tsOffset);
         return args;
+    }
+
+    /// <summary>Normalized video with the logo scaled, faded and pinned to a corner with a small margin.</summary>
+    public static string OverlayFilter(EncodingProfile p, LogoOverlayInput overlay, int logoIndex)
+    {
+        var height = Math.Max(8, p.Height * Math.Clamp(overlay.HeightPercent, 3, 25) / 100);
+        var margin = Math.Max(4, p.Height / 36);
+        var alpha = (Math.Clamp(overlay.Opacity, 10, 100) / 100.0).ToString("0.00", CultureInfo.InvariantCulture);
+        var position = overlay.Corner switch
+        {
+            LogoCorner.TopLeft => $"{margin}:{margin}",
+            LogoCorner.BottomLeft => $"{margin}:H-h-{margin}",
+            LogoCorner.BottomRight => $"W-w-{margin}:H-h-{margin}",
+            _ => $"W-w-{margin}:{margin}"
+        };
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"[0:v]{VideoFilter(p)}[base];[{logoIndex}:v]scale=-1:{height},format=rgba,colorchannelmixer=aa={alpha}[logo];[base][logo]overlay={position}:format=yuv420[v]");
     }
 
     /// <summary>Arguments for a generated slate (colour card with optional text and logo).</summary>

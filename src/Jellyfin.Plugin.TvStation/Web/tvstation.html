@@ -244,6 +244,30 @@
               <input type="file" id="tvsLogoFile" accept="image/png,image/jpeg,image/webp,image/gif">
             </div>
             <div class="fieldDescription" id="tvsLogoHint">PNG, JPEG, WebP or GIF up to 5 MB. Shown in the guide and on station-break slates.</div>
+            <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:1em">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsOverlayEnabled">
+                <span>Show the logo over the video</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">Draws the logo in a corner of every program, like a broadcast channel bug. Costs some encoder CPU; changing it restarts this station's stream.</div>
+            </div>
+            <div id="tvsOverlayOptions" class="tvs-grid2 tvs-hidden">
+              <div class="selectContainer">
+                <label class="selectLabel" for="tvsOverlayCorner">Corner</label>
+                <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsOverlayCorner">
+                  <option value="TopLeft">Top left</option>
+                  <option value="TopRight">Top right</option>
+                  <option value="BottomLeft">Bottom left</option>
+                  <option value="BottomRight">Bottom right</option>
+                </select>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsOverlayOpacity" label="Opacity (%)" type="number" min="10" max="100" step="5">
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsOverlaySize" label="Logo height (% of picture)" type="number" min="3" max="25" step="1">
+              </div>
+            </div>
           </div>
 
           <div class="verticalSection">

@@ -144,6 +144,7 @@ public sealed class StreamSessionManager : IDisposable
                 settings,
                 _resolver,
                 () => string.IsNullOrEmpty(station.LogoFileName) ? null : _paths.LogoFile(station.LogoFileName),
+                station.LogoOverlay ?? new LogoOverlayConfig(),
                 station.EffectiveCardText,
                 buffer,
                 logger),

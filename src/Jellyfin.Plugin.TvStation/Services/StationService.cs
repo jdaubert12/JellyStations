@@ -123,7 +123,8 @@ public sealed class StationService
             _stations.Save(draft);
             _resolver.Invalidate(id);
 
-            var encodingChanged = JsonFileStore.Serialize(existing.Encoding) != JsonFileStore.Serialize(draft.Encoding);
+            var encodingChanged = JsonFileStore.Serialize(existing.Encoding) != JsonFileStore.Serialize(draft.Encoding)
+                || JsonFileStore.Serialize(existing.LogoOverlay) != JsonFileStore.Serialize(draft.LogoOverlay);
             var windowsChanged = JsonFileStore.Serialize(existing.ActiveWindows) != JsonFileStore.Serialize(draft.ActiveWindows);
             if (encodingChanged || !draft.Enabled || (windowsChanged && !Scheduling.SeasonWindows.IsActive(draft, DateTime.UtcNow)))
             {
@@ -430,6 +431,8 @@ public sealed class StationService
             s.CardText = s.CardText[..80];
         }
 
+        s.LogoOverlay ??= new LogoOverlayConfig();
+        s.LogoOverlay.Normalize();
         s.ActiveWindows ??= new List<SeasonWindow>();
         s.ExcludedItemIds = (s.ExcludedItemIds ?? new List<Guid>()).Where(g => g != Guid.Empty).Distinct().ToList();
         s.ExcludedTags = NormalizeTags(s.ExcludedTags);

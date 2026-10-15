@@ -30,6 +30,10 @@ there is always room for one. When bumpers are off, or no clip fits a gap, the *
 instead; its text is configurable per station and defaults to "We'll be right back". Clips never appear
 in the guide.
 
+A station **logo** appears in the guide and on station cards. It can also be drawn over the video as a
+corner bug, with a choice of corner, size and opacity. That is off by default because the overlay
+filter costs encoder CPU.
+
 The editor's **Content** section lists everything a station expands to, with a text filter, totals,
 and an **Exclude** switch per item for the one episode or film that does not belong. Exclusions are
 saved with the station and survive recompiles.
