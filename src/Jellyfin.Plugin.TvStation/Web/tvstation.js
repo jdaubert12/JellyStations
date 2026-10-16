@@ -853,6 +853,27 @@
       .then(() => loading(false));
   }
 
+  function recompileAll() {
+    loading(true);
+    api('POST', 'Stations/RecompileAll').then(result => {
+      const rows = result && Array.isArray(result.Stations) ? result.Stations : [];
+      const changed = rows.filter(r => r.ContentChanged && !r.Error);
+      const failed = rows.filter(r => r.Error);
+      const name = r => (r.ChannelNumber ? r.ChannelNumber + ' ' : '') + r.Name;
+      const lines = ['Recompiled ' + rows.length + ' station' + (rows.length === 1 ? '' : 's') + '.'];
+      if (changed.length) {
+        lines.push(changed.length + ' changed content and the guide is refreshing: ' + changed.map(name).join(', ') + '.');
+      } else {
+        lines.push('No station changed content.');
+      }
+      if (failed.length) {
+        lines.push(failed.length + ' failed: ' + failed.map(r => name(r) + ' (' + r.Error + ')').join('; ') + '.');
+      }
+      toast({ title: 'Recompile all', message: lines.join('\n') });
+      return loadStations();
+    }).catch(err => alertErrors(err, 'Recompile all failed')).then(() => loading(false));
+  }
+
   // ------------------------------------------------------------------------------------------
   // Station editor
   // ------------------------------------------------------------------------------------------
@@ -2871,6 +2892,7 @@
     on('#tvsBtnExport', 'click', exportStations);
     on('#tvsBtnImport', 'click', () => { $('#tvsImportFile').value = ''; $('#tvsImportFile').click(); });
     on('#tvsImportFile', 'change', importStationsFromFile);
+    on('#tvsBtnRecompileAll', 'click', recompileAll);
     on('#tvsBtnRefreshGuide', 'click', refreshGuide);
     on('#tvsBtnSettings', 'click', openSettings);
     on('#tvsBtnStatus', 'click', openStatus);

@@ -93,16 +93,16 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.4.0.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.4.0.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.4.0.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.4.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.4.0.0\`
+2. Copy it into a folder named `TvStation_1.4.1.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.4.1.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.4.1.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.4.1.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.4.1.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.4.0.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.4.0.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.4.1.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.4.1.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 
@@ -117,7 +117,9 @@ followed by `docker restart <container>` is enough. Station data lives in
 Edits that change the schedule (content, mode, anchor, padding, time zone) bump the station's
 *revision*, which re-rolls the future schedule deterministically and refreshes the guide. Cosmetic
 edits (name, number, logo) do not. A nightly task re-scans the library for stations with
-*nightly refresh* enabled so new episodes join the rotation.
+*nightly refresh* enabled so new episodes join the rotation. Added a batch of films and don't want to
+wait for the night? **Recompile all** on the dashboard re-scans every station at once and refreshes
+the guide if anything changed; **Recompile content** in a station's editor does the same for one.
 
 Films split across files (Blu-ray `part1` / `part2`, which Jellyfin stacks into one movie) are
 scheduled at their full combined length and play straight through, one guide entry. Items without a

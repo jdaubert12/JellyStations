@@ -197,20 +197,48 @@ public sealed class StationService
         }
     }
 
-    /// <summary>Re-expands every station (used after a settings change that affects content, e.g. excluded tags).</summary>
-    public void RecompileAll()
+    /// <summary>
+    /// Re-expands every station against the library, then refreshes the guide once if any station's content
+    /// changed. Used by the dashboard's "Recompile all" and after a settings change that affects content
+    /// (e.g. excluded tags). A station that fails to compile is reported and does not stop the others.
+    /// </summary>
+    public RecompileAllResultDto RecompileAll()
     {
-        foreach (var station in _stations.GetAll())
+        var result = new RecompileAllResultDto();
+        var all = _stations.GetAll()
+            .OrderBy(s => double.TryParse(s.ChannelNumber, NumberStyles.Float, CultureInfo.InvariantCulture, out var n) ? n : double.MaxValue)
+            .ThenBy(s => s.ChannelNumber, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        foreach (var station in all)
         {
+            var row = new StationCompileResultDto { Id = station.Id, Name = station.Name, ChannelNumber = station.ChannelNumber };
             try
             {
-                Recompile(station.Id);
+                var compiled = Recompile(station.Id, triggerGuide: false);
+                row.ItemCount = compiled.ItemCount;
+                row.ExcludedCount = compiled.Excluded.Count;
+                row.ContentChanged = compiled.ContentChanged;
+                if (compiled.ContentChanged)
+                {
+                    result.ChangedCount++;
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "TvStation: failed to recompile station {Name}", station.Name);
+                row.Error = ex.Message;
+                result.FailedCount++;
             }
+
+            result.Stations.Add(row);
         }
+
+        if (result.ChangedCount > 0)
+        {
+            _guide.Trigger();
+        }
+
+        return result;
     }
 
     /// <summary>Compiles any station whose snapshot is missing (e.g. first start after a data restore).</summary>

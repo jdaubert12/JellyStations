@@ -169,6 +169,10 @@ public sealed class StationsController : ControllerBase
         return _stations.Delete(id) ? NoContent() : NotFound();
     }
 
+    /// <summary>Re-expands every station against the library (e.g. after adding a batch of films) and refreshes the guide if anything changed.</summary>
+    [HttpPost("RecompileAll")]
+    public ActionResult<RecompileAllResultDto> RecompileAll() => Ok(_stations.RecompileAll());
+
     [HttpPost("{id}/Recompile")]
     public ActionResult<CompileResultDto> Recompile([FromRoute] Guid id)
     {

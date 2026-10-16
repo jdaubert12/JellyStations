@@ -150,6 +150,34 @@ public sealed class CompileResultDto
     public bool ContentChanged { get; set; }
 }
 
+/// <summary>Outcome of recompiling every station at once.</summary>
+public sealed class RecompileAllResultDto
+{
+    public int ChangedCount { get; set; }
+
+    public int FailedCount { get; set; }
+
+    public List<StationCompileResultDto> Stations { get; set; } = new();
+}
+
+public sealed class StationCompileResultDto
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string ChannelNumber { get; set; } = string.Empty;
+
+    public int ItemCount { get; set; }
+
+    public int ExcludedCount { get; set; }
+
+    public bool ContentChanged { get; set; }
+
+    /// <summary>Set when this station failed to compile; the others were still processed.</summary>
+    public string? Error { get; set; }
+}
+
 public sealed class StationDetailDto
 {
     public Station Station { get; set; } = new();
