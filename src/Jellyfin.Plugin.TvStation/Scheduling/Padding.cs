@@ -34,6 +34,9 @@ internal static class Padding
         return new DateTime(utc.Ticks / grid.Ticks * grid.Ticks, DateTimeKind.Utc);
     }
 
+    /// <summary>Non-negative remainder of <paramref name="a"/> modulo <paramref name="b"/> (b &gt; 0).</summary>
+    public static long FloorMod(long a, long b) => a - (FloorDiv(a, b) * b);
+
     public static long FloorDiv(long a, long b)
     {
         var q = a / b;

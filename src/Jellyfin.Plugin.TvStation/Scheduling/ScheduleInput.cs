@@ -72,6 +72,11 @@ public sealed class ScheduleInput
                 Overflow = b.Overflow,
                 RemainderMayOverrun = b.RemainderMayOverrun,
                 MaxStartDelay = TimeSpan.FromMinutes(Math.Clamp(b.MaxStartDelayMinutes, 0, 240)),
+                Recurrence = b.Recurrence,
+                IntervalWeeks = Math.Clamp(b.IntervalWeeks, 1, 52),
+                RecurrenceStart = RecurrenceRule.ParseDate(b.RecurrenceStart) ?? RecurrenceRule.MondayOf(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(station.AnchorUtc, DateTimeKind.Utc), WeeklySlotScheduler.ResolveTimeZone(station.TimeZoneId ?? "UTC")).Date),
+                WeeksOfMonth = (b.WeeksOfMonth ?? new List<int>()).Where(w => w is >= 1 and <= 5).Distinct().ToList(),
+                Dates = (b.Dates ?? new List<string>()).Select(RecurrenceRule.ParseDate).Where(d => d.HasValue).Select(d => d!.Value).ToHashSet(),
                 Items = compiled.Blocks.TryGetValue(b.Id, out var items) ? items : new List<PlayableItem>()
             })
             .ToList();
@@ -159,6 +164,22 @@ public sealed class SlotBlockInput
 
     /// <summary>How late the block may start so the previous program can finish. Zero = start on time.</summary>
     public TimeSpan MaxStartDelay { get; init; }
+
+    public BlockRecurrence Recurrence { get; init; } = BlockRecurrence.Weekly;
+
+    public int IntervalWeeks { get; init; } = 1;
+
+    /// <summary>A local date in a week the block occurs (EveryNWeeks); any date in that week means the same.</summary>
+    public DateTime RecurrenceStart { get; init; }
+
+    /// <summary>1-4, or 5 = last (WeeksOfMonth).</summary>
+    public IReadOnlyList<int> WeeksOfMonth { get; init; } = Array.Empty<int>();
+
+    /// <summary>Local dates (Dates).</summary>
+    public IReadOnlySet<DateTime> Dates { get; init; } = new HashSet<DateTime>();
+
+    /// <summary>True when the block has an occurrence on this local date.</summary>
+    public bool OccursOn(DateTime localDate) => RecurrenceRule.Occurs(this, localDate);
 
     public IReadOnlyList<PlayableItem> Items { get; init; } = Array.Empty<PlayableItem>();
 }

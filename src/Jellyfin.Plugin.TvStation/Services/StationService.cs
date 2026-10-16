@@ -510,7 +510,24 @@ public sealed class StationService
             b.Sources ??= new List<ContentSource>();
             b.MaxStartDelayMinutes = Math.Clamp(b.MaxStartDelayMinutes, 0, 240);
             NormalizeSources(b.Sources);
+            NormalizeRecurrence(b, s);
         }
+    }
+
+    /// <summary>Clamps the recurrence fields and gives "every N weeks" a start date (today, station local) when it has none.</summary>
+    private static void NormalizeRecurrence(SlotBlock b, Station s)
+    {
+        b.IntervalWeeks = Math.Clamp(b.IntervalWeeks, 1, 52);
+        b.WeeksOfMonth = (b.WeeksOfMonth ?? new List<int>()).Where(w => w is >= 1 and <= 5).Distinct().OrderBy(w => w).ToList();
+        b.Dates = (b.Dates ?? new List<string>()).Select(RecurrenceRule.ParseDate).Where(d => d.HasValue).Select(d => RecurrenceRule.Format(d!.Value)).Distinct().OrderBy(d => d, StringComparer.Ordinal).ToList();
+        var start = RecurrenceRule.ParseDate(b.RecurrenceStart);
+        if (start is null && b.Recurrence == BlockRecurrence.EveryNWeeks)
+        {
+            var tz = WeeklySlotScheduler.ResolveTimeZone(s.TimeZoneId ?? "UTC");
+            start = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz).Date;
+        }
+
+        b.RecurrenceStart = start is null ? null : RecurrenceRule.Format(start.Value);
     }
 
     /// <summary>Trims, drops blanks and de-duplicates a tag list (case-insensitive, first spelling wins).</summary>
@@ -627,9 +644,19 @@ public sealed class StationService
             {
                 var b = s.Slots.Blocks[i];
                 var label = string.IsNullOrWhiteSpace(b.Name) ? $"Block {i + 1}" : b.Name;
-                if (b.Days.Count == 0)
+                if (b.Days.Count == 0 && b.Recurrence != BlockRecurrence.Dates)
                 {
                     errors.Add($"{label}: choose at least one day.");
+                }
+
+                if (b.Recurrence == BlockRecurrence.WeeksOfMonth && b.WeeksOfMonth.Count == 0)
+                {
+                    errors.Add($"{label}: choose at least one week of the month.");
+                }
+
+                if (b.Recurrence == BlockRecurrence.Dates && b.Dates.Count == 0)
+                {
+                    errors.Add($"{label}: add at least one date.");
                 }
 
                 if (b.DurationMinutes < 5 || b.DurationMinutes > 1440)

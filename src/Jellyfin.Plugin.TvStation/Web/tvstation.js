@@ -26,6 +26,8 @@
   const ZERO_GUID = '00000000000000000000000000000000';
   const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const DAY_SHORT = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun' };
+  const WEEK_LABELS = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th', 5: 'Last' };
+  const RECURRENCES = ['Weekly', 'EveryNWeeks', 'WeeksOfMonth', 'Dates'];
   const KIND_LABEL = {
     Movie: 'Movie', Series: 'Series', Season: 'Season', Episode: 'Episode', BoxSet: 'Collection',
     Playlist: 'Playlist', Genre: 'Genre', Tag: 'Tag', Library: 'Library', Video: 'Video'
@@ -954,6 +956,7 @@
       b.Overflow = b.Overflow || 'FillerRemainder';
       b.RemainderMayOverrun = !!b.RemainderMayOverrun;
       b.MaxStartDelayMinutes = Math.min(240, Math.max(0, parseInt(b.MaxStartDelayMinutes, 10) || 0));
+      normalizeRecurrence(b);
       b.StartLocal = b.StartLocal || '20:00';
       if (b.DurationMinutes === undefined || b.DurationMinutes === null) {
         b.DurationMinutes = 60;
@@ -1651,14 +1654,68 @@
       Order: 'Sequential',
       Overflow: 'FillerRemainder',
       RemainderMayOverrun: true,
-      MaxStartDelayMinutes: 30
+      MaxStartDelayMinutes: 30,
+      Recurrence: 'Weekly',
+      IntervalWeeks: 2,
+      RecurrenceStart: '',
+      WeeksOfMonth: [],
+      Dates: []
     };
+  }
+
+  /** Clamps the recurrence fields of a block or template in place. */
+  function normalizeRecurrence(b) {
+    b.Recurrence = RECURRENCES.indexOf(b.Recurrence) >= 0 ? b.Recurrence : 'Weekly';
+    b.IntervalWeeks = Math.min(52, Math.max(1, parseInt(b.IntervalWeeks, 10) || 2));
+    b.RecurrenceStart = isIsoDate(b.RecurrenceStart) ? b.RecurrenceStart : '';
+    b.WeeksOfMonth = (Array.isArray(b.WeeksOfMonth) ? b.WeeksOfMonth : []).map(w => parseInt(w, 10)).filter(w => w >= 1 && w <= 5).filter((w, i, a) => a.indexOf(w) === i).sort();
+    b.Dates = (Array.isArray(b.Dates) ? b.Dates : []).filter(isIsoDate).filter((d, i, a) => a.indexOf(d) === i).sort();
+    return b;
+  }
+
+  function isIsoDate(text) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(text || '')) && !isNaN(new Date(text + 'T00:00:00').getTime());
+  }
+
+  /** "Nov 14, 2026" from "2026-11-14", read as a plain calendar date. */
+  function fmtIsoDate(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+    if (!m) {
+      return iso || '';
+    }
+    return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function todayIso() {
+    const d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  /** The repeat rule of a block in a few words, or '' for plain weekly. */
+  function recurrenceText(b) {
+    switch (b.Recurrence) {
+      case 'EveryNWeeks':
+        return b.IntervalWeeks === 1 ? '' : 'every ' + b.IntervalWeeks + ' weeks';
+      case 'WeeksOfMonth':
+        return (b.WeeksOfMonth || []).length ? (b.WeeksOfMonth || []).map(w => WEEK_LABELS[w] || w).join(', ') + ' week of the month' : 'no weeks chosen';
+      case 'Dates': {
+        const dates = b.Dates || [];
+        if (!dates.length) {
+          return 'no dates';
+        }
+        return dates.length <= 3 ? dates.map(fmtIsoDate).join(', ') : dates.length + ' dates, ' + fmtIsoDate(dates[0]) + ' to ' + fmtIsoDate(dates[dates.length - 1]);
+      }
+      default:
+        return '';
+    }
   }
 
   function blockSummary(b) {
     const days = DAYS.filter(d => (b.Days || []).indexOf(d) >= 0);
     let dayText;
-    if (days.length === 7) {
+    if (b.Recurrence === 'Dates') {
+      dayText = recurrenceText(b);
+    } else if (days.length === 7) {
       dayText = 'Every day';
     } else if (days.length === 5 && days.indexOf('Saturday') < 0 && days.indexOf('Sunday') < 0) {
       dayText = 'Weekdays';
@@ -1668,6 +1725,9 @@
       dayText = 'No days';
     } else {
       dayText = days.map(d => DAY_SHORT[d]).join(', ');
+    }
+    if (b.Recurrence !== 'Dates' && recurrenceText(b)) {
+      dayText += ', ' + recurrenceText(b);
     }
     const startMin = parseHm(b.StartLocal);
     const dur = parseInt(b.DurationMinutes, 10) || 0;
@@ -1745,9 +1805,31 @@
         inputHtml(p + 'delay', 'Start up to this many minutes late so the previous program can finish', 'number', { min: 0, max: 240, step: 5 }, '0 = start on time and cut the program. When the block starts late it keeps its full duration, unless another block follows.') +
       '</div>' +
       '<label class="emby-checkbox-label tvs-block-overrun"><input type="checkbox" id="' + p + 'overrun"><span>When ' + betweenBlocksName() + ' takes the remainder, let its last program finish past the block end instead of cutting it (unless another block starts right then)</span></label>' +
-      '<div class="tvs-days-label">Days</div>' +
-      '<div class="tvs-days">' +
-        DAYS.map(d => '<label class="tvs-day"><input type="checkbox" data-day="' + d + '"><span>' + DAY_SHORT[d] + '</span></label>').join('') +
+      '<div class="tvs-grid2">' +
+        selectHtml(p + 'rec', 'Repeats', [['Weekly', 'Every week'], ['EveryNWeeks', 'Every N weeks'], ['WeeksOfMonth', 'Certain weeks of the month'], ['Dates', 'Only on specific dates']], 'Weeks run Monday to Sunday, so a Saturday-Sunday weekend stays together. An earlier block in the list wins when two blocks coincide.') +
+      '</div>' +
+      '<div class="tvs-grid2" data-rec="EveryNWeeks">' +
+        inputHtml(p + 'interval', 'Every N weeks', 'number', { min: 1, max: 52, step: 1 }) +
+        inputHtml(p + 'recstart', 'In the week of', 'date', {}, 'Any date in a week the block occurs; the pattern repeats both ways from it.') +
+      '</div>' +
+      '<div data-rec="WeeksOfMonth">' +
+        '<div class="tvs-days-label">Weeks of the month (a week belongs to the month of its Monday)</div>' +
+        '<div class="tvs-days">' +
+          [1, 2, 3, 4, 5].map(w => '<label class="tvs-day"><input type="checkbox" data-week="' + w + '"><span>' + WEEK_LABELS[w] + '</span></label>').join('') +
+        '</div>' +
+      '</div>' +
+      '<div data-rec="Dates">' +
+        '<div class="tvs-grid2">' +
+          inputHtml(p + 'date', 'Add a date', 'date', {}, 'The block runs at the start time on each listed date. The day picker is ignored.') +
+          '<div class="inputContainer"><button is="emby-button" type="button" id="' + p + 'addDate" class="raised emby-button"><span>Add date</span></button></div>' +
+        '</div>' +
+        '<div class="tvs-chips" id="' + p + 'dates"></div>' +
+      '</div>' +
+      '<div data-rec-days>' +
+        '<div class="tvs-days-label">Days</div>' +
+        '<div class="tvs-days">' +
+          DAYS.map(d => '<label class="tvs-day"><input type="checkbox" data-day="' + d + '"><span>' + DAY_SHORT[d] + '</span></label>').join('') +
+        '</div>' +
       '</div>' +
       '<div class="tvs-days-label">Content</div>' +
       '<div class="tvs-block-picker"></div>';
@@ -1760,12 +1842,87 @@
     q('overflow').value = b.Overflow || 'FillerRemainder';
     q('overrun').checked = !!b.RemainderMayOverrun;
     q('delay').value = b.MaxStartDelayMinutes || 0;
+    normalizeRecurrence(b);
+    q('rec').value = b.Recurrence;
+    q('interval').value = b.IntervalWeeks;
+    q('recstart').value = b.RecurrenceStart;
 
     const refreshHead = () => {
       titleBox.firstChild.textContent = b.Name || 'Untitled block';
       titleBox.lastChild.textContent = blockSummary(b);
       renderBlockWarnings();
     };
+    const showRecurrencePanels = () => {
+      $all('[data-rec]', body).forEach(panel => show(panel, panel.getAttribute('data-rec') === b.Recurrence));
+      show(body.querySelector('[data-rec-days]'), b.Recurrence !== 'Dates');
+    };
+    const renderDates = () => {
+      const box = clear(q('dates'));
+      if (!b.Dates.length) {
+        box.appendChild(el('span', { className: 'tvs-secondary', text: 'No dates yet.' }));
+        return;
+      }
+      b.Dates.forEach(d => {
+        const chip = el('span', { className: 'tvs-chip' }, [el('span', { className: 'label', text: fmtIsoDate(d) })]);
+        const remove = el('button', { type: 'button', title: 'Remove date', 'aria-label': 'Remove ' + fmtIsoDate(d), text: '×' });
+        remove.addEventListener('click', () => {
+          b.Dates = b.Dates.filter(x => x !== d);
+          renderDates();
+          refreshHead();
+        });
+        chip.appendChild(remove);
+        box.appendChild(chip);
+      });
+    };
+    showRecurrencePanels();
+    renderDates();
+    q('rec').addEventListener('change', () => {
+      b.Recurrence = q('rec').value;
+      if (b.Recurrence === 'EveryNWeeks' && !b.RecurrenceStart) {
+        b.RecurrenceStart = todayIso();
+        q('recstart').value = b.RecurrenceStart;
+      }
+      showRecurrencePanels();
+      refreshHead();
+    });
+    q('interval').addEventListener('input', () => { b.IntervalWeeks = Math.min(52, Math.max(1, parseInt(q('interval').value, 10) || 1)); refreshHead(); });
+    q('recstart').addEventListener('change', () => { b.RecurrenceStart = isIsoDate(q('recstart').value) ? q('recstart').value : ''; refreshHead(); });
+    const addDate = () => {
+      const d = q('date').value;
+      if (!isIsoDate(d)) {
+        toast('Pick a date first.');
+        return;
+      }
+      if (b.Dates.indexOf(d) < 0) {
+        b.Dates = b.Dates.concat([d]).sort();
+      }
+      q('date').value = '';
+      renderDates();
+      refreshHead();
+    };
+    q('addDate').addEventListener('click', addDate);
+    q('date').addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') {
+        ev.preventDefault();
+        addDate();
+      }
+    });
+    $all('input[data-week]', body).forEach(cb => {
+      const week = parseInt(cb.getAttribute('data-week'), 10);
+      cb.checked = b.WeeksOfMonth.indexOf(week) >= 0;
+      cb.parentNode.classList.toggle('active', cb.checked);
+      cb.addEventListener('change', () => {
+        const set = new Set(b.WeeksOfMonth);
+        if (cb.checked) {
+          set.add(week);
+        } else {
+          set.delete(week);
+        }
+        b.WeeksOfMonth = [1, 2, 3, 4, 5].filter(w => set.has(w));
+        cb.parentNode.classList.toggle('active', cb.checked);
+        refreshHead();
+      });
+    });
     q('name').addEventListener('input', () => { b.Name = q('name').value; refreshHead(); });
     q('start').addEventListener('change', () => { b.StartLocal = q('start').value; refreshHead(); });
     q('dur').addEventListener('input', () => { b.DurationMinutes = parseInt(q('dur').value, 10) || 0; refreshHead(); });
@@ -1813,7 +1970,10 @@
       if (start === null || dur <= 0) {
         return;
       }
-      (b.Days || []).forEach(day => {
+      const days = b.Recurrence === 'Dates'
+        ? (b.Dates || []).map(d => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d); return m ? DAYS[(new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)).getDay() + 6) % 7] : null; }).filter((d, i, a) => d && a.indexOf(d) === i)
+        : (b.Days || []);
+      days.forEach(day => {
         const di = DAYS.indexOf(day);
         if (di >= 0) {
           occurrences.push({ bi: bi, day: day, start: di * 1440 + start, end: di * 1440 + start + dur });
@@ -1843,7 +2003,8 @@
         seen[key] = true;
         const nameA = blocks[a.bi].Name || 'Block ' + (a.bi + 1);
         const nameC = blocks[c.bi].Name || 'Block ' + (c.bi + 1);
-        warnings.push('“' + nameA + '” and “' + nameC + '” overlap on ' + a.day + '. The earlier block in the list wins; the other is cut.');
+        const sparse = (blocks[a.bi].Recurrence || 'Weekly') !== 'Weekly' || (blocks[c.bi].Recurrence || 'Weekly') !== 'Weekly';
+        warnings.push('“' + nameA + '” and “' + nameC + '” overlap on ' + a.day + (sparse ? ' when both occur' : '') + '. The earlier block in the list wins; the other is cut.');
       }
     }
     return warnings;
@@ -1855,8 +2016,15 @@
     const warnings = computeBlockOverlaps(blocks);
     blocks.forEach((b, i) => {
       const label = b.Name ? '“' + b.Name + '”' : 'Block ' + (i + 1);
-      if (!(b.Days || []).length) {
+      if (b.Recurrence === 'Dates') {
+        if (!(b.Dates || []).length) {
+          warnings.push(label + ' has no dates and will never air.');
+        }
+      } else if (!(b.Days || []).length) {
         warnings.push(label + ' has no days selected and will never air.');
+      }
+      if (b.Recurrence === 'WeeksOfMonth' && !(b.WeeksOfMonth || []).length) {
+        warnings.push(label + ' has no week of the month chosen and will never air.');
       }
       if (!(b.Sources || []).length) {
         warnings.push(label + ' has no content and will play ' + betweenBlocksName() + ' instead.');
@@ -1902,8 +2070,14 @@
       Order: t.Order || 'Sequential',
       Overflow: t.Overflow || 'FillerRemainder',
       RemainderMayOverrun: !!t.RemainderMayOverrun,
-      MaxStartDelayMinutes: Math.min(240, Math.max(0, parseInt(t.MaxStartDelayMinutes, 10) || 0))
+      MaxStartDelayMinutes: Math.min(240, Math.max(0, parseInt(t.MaxStartDelayMinutes, 10) || 0)),
+      Recurrence: t.Recurrence,
+      IntervalWeeks: t.IntervalWeeks,
+      RecurrenceStart: t.RecurrenceStart,
+      WeeksOfMonth: (t.WeeksOfMonth || []).slice(),
+      Dates: (t.Dates || []).slice()
     };
+    normalizeRecurrence(block);
     block.Sources.forEach(normalizeSource);
     return block;
   }

@@ -74,6 +74,37 @@ public sealed class SlotBlock
     /// program. The editor sets 30 for new blocks.
     /// </summary>
     public int MaxStartDelayMinutes { get; set; }
+
+    /// <summary>How often the block's days recur. Weekly (the default) keeps the pre-1.5 behaviour.</summary>
+    public BlockRecurrence Recurrence { get; set; } = BlockRecurrence.Weekly;
+
+    /// <summary>For <see cref="BlockRecurrence.EveryNWeeks"/>: the interval, 1-52.</summary>
+    public int IntervalWeeks { get; set; } = 2;
+
+    /// <summary>For <see cref="BlockRecurrence.EveryNWeeks"/>: a local date ("yyyy-MM-dd") in a week the block occurs; the pattern extends both ways from it.</summary>
+    public string? RecurrenceStart { get; set; }
+
+    /// <summary>For <see cref="BlockRecurrence.WeeksOfMonth"/>: 1-4, or 5 for the last week. Weeks run Monday-Sunday and belong to the month of their Monday.</summary>
+    public List<int> WeeksOfMonth { get; set; } = new();
+
+    /// <summary>For <see cref="BlockRecurrence.Dates"/>: local dates ("yyyy-MM-dd") the block occurs on; <see cref="Days"/> is ignored.</summary>
+    public List<string> Dates { get; set; } = new();
+}
+
+/// <summary>How often a block's listed days recur.</summary>
+public enum BlockRecurrence
+{
+    /// <summary>Every week.</summary>
+    Weekly,
+
+    /// <summary>Every N weeks, counted from the week of a start date.</summary>
+    EveryNWeeks,
+
+    /// <summary>Only in chosen weeks of the month (1st-4th, last).</summary>
+    WeeksOfMonth,
+
+    /// <summary>Only on listed dates.</summary>
+    Dates
 }
 
 public sealed class FillerConfig

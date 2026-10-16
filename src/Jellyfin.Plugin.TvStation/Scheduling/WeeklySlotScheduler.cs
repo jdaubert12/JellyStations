@@ -156,7 +156,7 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
             for (var b = 0; b < _input.Blocks.Count; b++)
             {
                 var block = _input.Blocks[b];
-                if (!block.Days.Contains(date.DayOfWeek))
+                if (!block.OccursOn(date))
                 {
                     continue;
                 }

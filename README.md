@@ -21,7 +21,7 @@ joining whatever is airing right now, exactly like broadcast television.
 | Mode | What it does |
 |---|---|
 | **Pool** | Pick shows, movies, genres, collections or playlists. The station plays through the pool in shuffled or sequential cycles, or shuffled with each series' episodes kept in order (a random show comes up, but it is always that show's next episode). Shuffle avoids the same series back to back. Optional **time blocks** take over at fixed local times, say a movie every evening from 18:00 to 21:00 on a cartoon station, and the pool carries on where it left off afterwards. When the block's content ends early, the pool fills the rest and its last program may finish past the block end rather than being cut, and a block can start up to N minutes late so the program already playing finishes first, keeping its full duration (both per-block options, on for new blocks). |
-| **Slots** | Weekly recurring blocks in the station's time zone, e.g. weekdays 20:00-21:00 = Seinfeld, Saturday 08:00-12:00 = cartoons. A filler pool plays between blocks. Sequential blocks pick up where they left off each day. |
+| **Slots** | Recurring blocks in the station's time zone, e.g. weekdays 20:00-21:00 = Seinfeld, Saturday 08:00-12:00 = cartoons. A filler pool plays between blocks. Sequential blocks pick up where they left off each day. |
 | **Lineup** | A hand-ordered list that loops forever from the station's anchor time. |
 
 **Bumpers** are optional short clips (idents, trailers) that fill the gaps between programs. Pick any
@@ -93,16 +93,16 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.4.1.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.4.1.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.4.1.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.4.1.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.4.1.0\`
+2. Copy it into a folder named `TvStation_1.5.0.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.5.0.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.5.0.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.5.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.5.0.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.4.1.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.4.1.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.5.0.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.5.0.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 
@@ -131,6 +131,14 @@ series with enough hours, a kids channel and family movies by rating, franchise 
 "Franchise Nights" slots station from titles that share a prefix, collections, decades, and seasonal
 channels from holiday tags. Tick the ones you want and they are created with the next free channel
 numbers, editable like any other station.
+
+A block repeats every week unless its **Repeats** setting says otherwise: every N weeks counted from a
+chosen date, certain weeks of the month (1st to 4th, or last; weeks run Monday to Sunday and belong to
+the month of their Monday, so a weekend stays together), or only on listed dates. A "Harry Potter
+weekend" is a Saturday and Sunday block with the collection as its source, set to the first week of the
+month or to the dates you want; list it above any regular block it should take over from, since the
+earlier block in the list wins when two coincide. Sequential blocks continue where the previous
+occurrence stopped, however far apart the occurrences are.
 
 A time block can be saved as a **template** (bookmark button on the block) and added to any station
 from the dropdown next to "Add block". Templates are managed in Settings. A station can also **skip

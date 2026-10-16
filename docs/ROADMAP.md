@@ -175,6 +175,11 @@ analyzer, then suggestion rules and the dashboard view on top of it.
   view on the dashboard; `GET /TvStation/Suggestions`, `POST /TvStation/Suggestions/Create`.
 - **Franchise detection — DONE 2026-10-15** as part of the analyzer (`FranchiseDetector`). A
   "pick a franchise" source type can build on it later.
+- **Block recurrence — DONE 2026-10-16.** `SlotBlock.Recurrence`: weekly (default), every N
+  weeks from a start date, chosen weeks of the month (Monday-based weeks, 5 = last), or listed
+  dates. `RecurrenceRule` decides per local date; the weekly scheduler asks it when listing a
+  week's occurrences, so cursors still carry across sparse occurrences. Built for "a Harry
+  Potter weekend on some weekends". Still open: a custom guide title per block.
 - **Block templates — DONE 2026-10-15.** Bookmark button on a block saves it under its name
   (`/TvStation/BlockTemplates`, stored in settings); the dropdown next to "Add block" starts a new
   block from a template; Settings lists and deletes them.
@@ -229,7 +234,7 @@ Jellyfin tune in.
    the same schedule as XMLTV, so VLC, Kodi, Tivimate, Plex or Emby can tune in. Document the
    token in Settings. Medium.
 
-Considered and parked: off-air hours (a daypart rule approximates it), date ranges on blocks,
+Considered and parked: off-air hours (a daypart rule approximates it),
 custom guide titles per block, studio and people sources, smart (search) collections, multi-part
 episode grouping, rerun blocks, channel redirects, on-demand channels (contradicts the always-on
 clock), DVR (files are already in the library), music videos, AI lineup builder (the rule-based
