@@ -208,10 +208,13 @@ seasonal channels, watermark, suggestions, native guide). These are the gaps wor
 order; the first three together turn a station into a broadcast, the fourth lets clients outside
 Jellyfin tune in.
 
-1. **Pre-roll and post-roll bumpers.** Per station: an ident before every program and/or a clip
-   after it, chosen from the bumper sources (optionally separate pre/post lists), on top of the
-   existing gap fill. Pre/post time comes out of the reserved break so the grid still holds.
-   Small; builds on `BumperFill`.
+1. **Pre-roll and post-roll bumpers — DONE 2026-10-16.** `BumperConfig.PreRoll` / `PostRoll`
+   (enabled flag plus optional own sources; empty = the main bumper sources). `BumperFill.Plan`
+   opens each break with the post-roll clip and closes it with the pre-roll ident, so programs
+   stay on the grid; the shuffled gap fill runs between them and a position is skipped when no
+   clip fits or no program is adjacent (gated slots, filler-only slates). Clips carry a
+   "Pre-roll" / "Post-roll" label in the preview and content view. Verified on the dev
+   container (schedule API and stream).
 2. **Mid-roll breaks at chapters.** Per station: break every N minutes or at Jellyfin chapter
    marks (whichever the user picks), minimum break length, bumpers fill the break. The
    restreamer plays the program as segments (seek to the chapter, same clock), the schedule

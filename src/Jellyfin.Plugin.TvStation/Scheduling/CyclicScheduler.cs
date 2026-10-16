@@ -18,6 +18,7 @@ internal sealed class CyclicScheduler : IStationScheduler
     private readonly int _marathonMin;
     private readonly int _marathonMax;
     private readonly long[] _padded;
+    private readonly BumperFill.Clips _clips;
     private readonly long _cycleTicks;
     private readonly TimeZoneInfo _tz;
     private readonly IReadOnlyList<DaypartRuleInput> _rules;
@@ -42,6 +43,7 @@ internal sealed class CyclicScheduler : IStationScheduler
         }
 
         _padded = _items.Select(i => Padding.Pad(i.Runtime + input.Break, input.PaddingGrid, input.PaddingByLength).Ticks).ToArray();
+        _clips = BumperFill.Clips.From(input);
         _cycleTicks = _padded.Sum();
         _tz = WeeklySlotScheduler.ResolveTimeZone(input.TimeZoneId);
         _rules = input.DaypartRules;
@@ -119,23 +121,36 @@ internal sealed class CyclicScheduler : IStationScheduler
             return new ScheduleEntry(_input.StationId, _input.Revision, EntryKind.Program, item, Utc(itemStart), Utc(itemEnd), false, null);
         }
 
-        if (_input.Bumpers.Count > 0 && slotEnd > itemEnd)
+        if (_input.HasBumpers && slotEnd > itemEnd)
         {
-            // The gap after the program: clips first, card for whatever is left.
+            // The gap after the program: post-roll, fill clips, card for whatever is left, pre-roll for what follows.
             var offset = inCycle - (cycle.Starts[i] + item.RuntimeTicks);
-            var pieces = BumperFill.Plan(slotEnd - itemEnd, _input.Bumpers, StableHash.Seed(_input.StationId, _input.Revision, "bumper:" + i, k));
+            var gap = new ScheduleEntry(_input.StationId, _input.Revision, EntryKind.Slate, null, Utc(itemEnd), Utc(slotEnd), false, null);
+            var pieces = BumperFill.Plan(slotEnd - itemEnd, _clips, StableHash.Seed(_input.StationId, _input.Revision, "bumper:" + i, k), programBefore: true, programAfter: !NextIsGated(cycle, k, i));
             foreach (var p in pieces)
             {
                 if (offset >= p.StartOffset && offset < p.EndOffset)
                 {
-                    return p.Clip is null
-                        ? new ScheduleEntry(_input.StationId, _input.Revision, EntryKind.Slate, null, Utc(itemEnd + p.StartOffset), Utc(itemEnd + p.EndOffset), false, null)
-                        : new ScheduleEntry(_input.StationId, _input.Revision, EntryKind.Bumper, p.Clip, Utc(itemEnd + p.StartOffset), Utc(itemEnd + p.EndOffset), false, null);
+                    return BumperFill.ToEntry(gap, p);
                 }
             }
         }
 
         return new ScheduleEntry(_input.StationId, _input.Revision, EntryKind.Slate, null, Utc(itemEnd), Utc(slotEnd), false, null);
+    }
+
+    /// <summary>True when the slot after position i (wrapping into the next cycle) is dead air, so no pre-roll should lead into it.</summary>
+    private bool NextIsGated(Cycle cycle, long k, int i)
+    {
+        if (_rules.Count == 0)
+        {
+            return false;
+        }
+
+        var wrap = i + 1 >= cycle.Order.Length;
+        var next = wrap ? GetCycle(k + 1) : cycle;
+        var j = wrap ? 0 : i + 1;
+        return next.Gated is not null && j < next.Gated.Length && next.Gated[j];
     }
 
     private ScheduleEntry SlateHour(DateTime utc)

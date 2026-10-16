@@ -69,6 +69,13 @@ public sealed class StationCompiler
                 .ToList();
         }
 
+        if (station.Bumpers?.Enabled == true)
+        {
+            var maxTicks = TimeSpan.FromMinutes(Math.Max(1, station.Bumpers.MaxClipMinutes)).Ticks;
+            compiled.PreRoll = CompileRoll(station.Bumpers.PreRoll, compiled.Bumpers, maxTicks, Expand, excludedIds, compiled);
+            compiled.PostRoll = CompileRoll(station.Bumpers.PostRoll, compiled.Bumpers, maxTicks, Expand, excludedIds, compiled);
+        }
+
         // Same item may be excluded via several sources; report once.
         compiled.Excluded = compiled.Excluded
             .GroupBy(e => e.ItemId)
@@ -83,6 +90,24 @@ public sealed class StationCompiler
             compiled.Excluded.Count);
 
         return compiled;
+    }
+
+    /// <summary>The clips for a pre/post-roll position: its own sources when it has any, otherwise the main bumper list.</summary>
+    private static List<PlayableItem> CompileRoll(BumperRollConfig? roll, List<PlayableItem> bumpers, long maxTicks, Func<List<ContentSource>, List<PlayableItem>> expand, HashSet<Guid> excludedIds, CompiledStation compiled)
+    {
+        if (roll?.Enabled != true)
+        {
+            return new List<PlayableItem>();
+        }
+
+        if (roll.Sources.Count == 0)
+        {
+            return bumpers.ToList();
+        }
+
+        return ApplyExclusions(expand(roll.Sources), excludedIds, compiled)
+            .Where(i => i.RuntimeTicks > 0 && i.RuntimeTicks <= maxTicks)
+            .ToList();
     }
 
     /// <summary>The station's own excluded tags plus the global list when the station has not opted out.</summary>
@@ -157,7 +182,7 @@ public sealed class StationCompiler
     {
         static IEnumerable<Guid> Ids(IEnumerable<PlayableItem> items) => items.Select(i => i.ItemId);
 
-        if (!Ids(a.Pool).SequenceEqual(Ids(b.Pool)) || !Ids(a.Lineup).SequenceEqual(Ids(b.Lineup)) || !Ids(a.Filler).SequenceEqual(Ids(b.Filler)) || !Ids(a.Bumpers).SequenceEqual(Ids(b.Bumpers)))
+        if (!Ids(a.Pool).SequenceEqual(Ids(b.Pool)) || !Ids(a.Lineup).SequenceEqual(Ids(b.Lineup)) || !Ids(a.Filler).SequenceEqual(Ids(b.Filler)) || !Ids(a.Bumpers).SequenceEqual(Ids(b.Bumpers)) || !Ids(a.PreRoll).SequenceEqual(Ids(b.PreRoll)) || !Ids(a.PostRoll).SequenceEqual(Ids(b.PostRoll)))
         {
             return false;
         }

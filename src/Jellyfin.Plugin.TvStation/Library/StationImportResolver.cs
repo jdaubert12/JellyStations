@@ -44,6 +44,8 @@ public sealed class StationImportResolver
         }
 
         FixSources(draft.Bumpers?.Sources, "bumpers", result);
+        FixSources(draft.Bumpers?.PreRoll?.Sources, "pre-roll", result);
+        FixSources(draft.Bumpers?.PostRoll?.Sources, "post-roll", result);
         FixLineup(draft.Lineup?.Items, result);
 
         if (draft.ExcludedItemIds is { Count: > 0 })

@@ -28,7 +28,10 @@ joining whatever is airing right now, exactly like broadcast television.
 sources, cap the clip length, and optionally reserve a break of a few minutes after every program so
 there is always room for one. When bumpers are off, or no clip fits a gap, the **station card** is shown
 instead; its text is configurable per station and defaults to "We'll be right back". Clips never appear
-in the guide.
+in the guide. Two fixed positions can be switched on as well: a **pre-roll** ident that ends every break
+right before the next program, and a **post-roll** clip that opens the break after one. Each picks from
+its own sources, or from the bumper sources when it has none; both come out of the existing break, so
+programs still start on the grid, and a position is skipped quietly when no clip fits.
 
 A station **logo** appears in the guide and on station cards. It can also be drawn over the video as a
 corner bug, with a choice of corner, size and opacity. That is off by default because the overlay
@@ -90,16 +93,16 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.3.1.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.3.1.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.3.1.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.3.1.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.3.1.0\`
+2. Copy it into a folder named `TvStation_1.4.0.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.4.0.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.4.0.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.4.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.4.0.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.3.1.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.3.1.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.4.0.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.4.0.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 

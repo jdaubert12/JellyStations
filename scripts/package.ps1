@@ -2,7 +2,7 @@
 param([string]$Configuration = "Release")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.3.1.0"
+$version = "1.4.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.TvStation\bin\$Configuration\net10.0\Jellyfin.Plugin.TvStation.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -21,7 +21,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Blocks: new per-block option to let the pool or filler finish its last program past the block end instead of cutting it (on for new blocks). Settings page gets a header and sectioned cards; the plugin page now has a title in the dashboard."
+    changelog = "Bumpers: pre-roll idents and post-roll clips. A pre-roll ends every break right before the next program (which still starts on the grid); a post-roll opens the break after one. Each picks from its own sources or the main bumper sources, and is skipped when no clip fits."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

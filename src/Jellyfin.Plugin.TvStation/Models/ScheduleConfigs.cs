@@ -109,6 +109,25 @@ public sealed class BumperConfig
 
     /// <summary>Clips longer than this are ignored, so a feature film in the source list cannot become a bumper.</summary>
     public int MaxClipMinutes { get; set; } = 5;
+
+    /// <summary>An ident played right before every program, at the tail of the break that precedes it.</summary>
+    public BumperRollConfig PreRoll { get; set; } = new();
+
+    /// <summary>A clip played right after every program, at the head of the break that follows it.</summary>
+    public BumperRollConfig PostRoll { get; set; } = new();
+}
+
+/// <summary>
+/// A fixed position in every break (pre-roll or post-roll). The clip comes from its own sources, or from the
+/// main bumper sources when none are given. Its time comes out of the existing break, so the grid holds; when
+/// no clip fits the break it is skipped quietly.
+/// </summary>
+public sealed class BumperRollConfig
+{
+    public bool Enabled { get; set; }
+
+    /// <summary>Clips to pick from; empty = the main bumper sources.</summary>
+    public List<ContentSource> Sources { get; set; } = new();
 }
 
 public sealed class LineupConfig

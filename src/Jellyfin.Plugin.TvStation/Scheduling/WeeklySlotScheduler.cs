@@ -323,7 +323,7 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
             _stateOut[w] = state;
         }
 
-        return BumperFill.Expand(entries, _input.Bumpers, e => StableHash.Seed(_input.StationId, _input.Revision, "bumper", e.StartUtc.Ticks));
+        return BumperFill.Expand(entries, BumperFill.Clips.From(_input), e => StableHash.Seed(_input.StationId, _input.Revision, "bumper", e.StartUtc.Ticks));
     }
 
     /// <summary>Fills a block occurrence; returns the instant covered, which exceeds <paramref name="end"/> only when the remainder stream overran.</summary>

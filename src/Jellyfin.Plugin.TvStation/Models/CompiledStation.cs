@@ -31,6 +31,12 @@ public sealed class CompiledStation
     /// <summary>Clips available to fill gaps (empty when bumpers are off).</summary>
     public List<PlayableItem> Bumpers { get; set; } = new();
 
+    /// <summary>Idents for the pre-roll position (empty when off; a copy of <see cref="Bumpers"/> when it has no sources of its own).</summary>
+    public List<PlayableItem> PreRoll { get; set; } = new();
+
+    /// <summary>Clips for the post-roll position (empty when off; a copy of <see cref="Bumpers"/> when it has no sources of its own).</summary>
+    public List<PlayableItem> PostRoll { get; set; } = new();
+
     public int TotalItemCount => Pool.Count + Lineup.Count + Filler.Count + Blocks.Values.Sum(b => b.Count);
 }
 

@@ -324,6 +324,15 @@ public sealed class StationService
 
         Add(compiled.Filler, "Filler", false);
         Add(compiled.Bumpers, "Bumpers", false);
+        if (station.Bumpers?.PreRoll?.Sources is { Count: > 0 })
+        {
+            Add(compiled.PreRoll, "Pre-roll", false);
+        }
+
+        if (station.Bumpers?.PostRoll?.Sources is { Count: > 0 })
+        {
+            Add(compiled.PostRoll, "Post-roll", false);
+        }
         Add(compiled.UserExcluded, "Excluded", true);
         Add(compiled.TagExcluded, "Excluded by tag", true, byRule: true);
 
@@ -425,6 +434,12 @@ public sealed class StationService
         NormalizeSources(s.Bumpers.Sources);
         s.Bumpers.BreakMinutes = Math.Clamp(s.Bumpers.BreakMinutes, 0, 30);
         s.Bumpers.MaxClipMinutes = Math.Clamp(s.Bumpers.MaxClipMinutes, 1, 60);
+        s.Bumpers.PreRoll ??= new BumperRollConfig();
+        s.Bumpers.PreRoll.Sources ??= new List<ContentSource>();
+        NormalizeSources(s.Bumpers.PreRoll.Sources);
+        s.Bumpers.PostRoll ??= new BumperRollConfig();
+        s.Bumpers.PostRoll.Sources ??= new List<ContentSource>();
+        NormalizeSources(s.Bumpers.PostRoll.Sources);
         s.CardText = string.IsNullOrWhiteSpace(s.CardText) ? null : s.CardText.Trim();
         if (s.CardText is { Length: > 80 })
         {

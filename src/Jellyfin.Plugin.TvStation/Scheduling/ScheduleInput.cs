@@ -38,6 +38,15 @@ public sealed class ScheduleInput
     /// <summary>Reserved break after every program (zero when bumpers are off).</summary>
     public TimeSpan Break { get; init; }
 
+    /// <summary>Idents, one of which ends every break right before the next program; empty = no pre-roll.</summary>
+    public IReadOnlyList<PlayableItem> PreRoll { get; init; } = Array.Empty<PlayableItem>();
+
+    /// <summary>Clips, one of which opens every break right after a program; empty = no post-roll.</summary>
+    public IReadOnlyList<PlayableItem> PostRoll { get; init; } = Array.Empty<PlayableItem>();
+
+    /// <summary>True when any clip can be placed in a break.</summary>
+    public bool HasBumpers => Bumpers.Count > 0 || PreRoll.Count > 0 || PostRoll.Count > 0;
+
     public IReadOnlyList<PlayableItem> Lineup { get; init; } = Array.Empty<PlayableItem>();
 
     public IReadOnlyList<SlotBlockInput> Blocks { get; init; } = Array.Empty<SlotBlockInput>();
@@ -96,6 +105,8 @@ public sealed class ScheduleInput
             Filler = compiled.Filler,
             FillerOrder = station.Slots.Filler.Order,
             Bumpers = station.Bumpers?.Enabled == true ? compiled.Bumpers : Array.Empty<PlayableItem>(),
+            PreRoll = station.Bumpers?.Enabled == true && station.Bumpers.PreRoll?.Enabled == true ? compiled.PreRoll : Array.Empty<PlayableItem>(),
+            PostRoll = station.Bumpers?.Enabled == true && station.Bumpers.PostRoll?.Enabled == true ? compiled.PostRoll : Array.Empty<PlayableItem>(),
             Break = station.Bumpers?.Enabled == true ? TimeSpan.FromMinutes(Math.Clamp(station.Bumpers.BreakMinutes, 0, 30)) : TimeSpan.Zero
         };
     }

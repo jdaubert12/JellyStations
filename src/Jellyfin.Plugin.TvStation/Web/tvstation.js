@@ -372,7 +372,8 @@
       return entry.Title || 'Station Break';
     }
     if (entry.Kind === 'Bumper') {
-      return 'Bumper · ' + (entry.Title || '');
+      const role = entry.SourceLabel === 'Pre-roll' || entry.SourceLabel === 'Post-roll' ? entry.SourceLabel : 'Bumper';
+      return role + ' · ' + (entry.Title || '');
     }
     const parts = [entry.Title || ''];
     if (entry.IsSeries) {
@@ -905,7 +906,7 @@
       ExcludedTags: [],
       UseGlobalExcludedTags: true,
       MinRuntimeMinutes: 0,
-      Bumpers: { Enabled: false, Sources: [], BreakMinutes: 0, MaxClipMinutes: 5 },
+      Bumpers: { Enabled: false, Sources: [], BreakMinutes: 0, MaxClipMinutes: 5, PreRoll: { Enabled: false, Sources: [] }, PostRoll: { Enabled: false, Sources: [] } },
       CardText: null
     };
   }
@@ -957,6 +958,12 @@
     s.Bumpers.Sources.forEach(normalizeSource);
     s.Bumpers.BreakMinutes = Math.max(0, parseInt(s.Bumpers.BreakMinutes, 10) || 0);
     s.Bumpers.MaxClipMinutes = Math.max(1, parseInt(s.Bumpers.MaxClipMinutes, 10) || 5);
+    ['PreRoll', 'PostRoll'].forEach(key => {
+      const roll = s.Bumpers[key] = s.Bumpers[key] || {};
+      roll.Enabled = !!roll.Enabled;
+      roll.Sources = Array.isArray(roll.Sources) ? roll.Sources : [];
+      roll.Sources.forEach(normalizeSource);
+    });
     s.CardText = s.CardText || null;
     s.LogoOverlay = s.LogoOverlay || {};
     s.LogoOverlay.Enabled = !!s.LogoOverlay.Enabled;
@@ -1076,6 +1083,24 @@
       getSources: () => state.draft.Bumpers.Sources,
       onAdd: source => state.draft.Bumpers.Sources.push(source),
       onRemove: index => state.draft.Bumpers.Sources.splice(index, 1)
+    });
+    setChecked('#tvsPreRollEnabled', !!d.Bumpers.PreRoll.Enabled);
+    setChecked('#tvsPostRollEnabled', !!d.Bumpers.PostRoll.Enabled);
+    show($('#tvsPreRollPicker'), !!d.Bumpers.PreRoll.Enabled);
+    show($('#tvsPostRollPicker'), !!d.Bumpers.PostRoll.Enabled);
+    createPicker({
+      container: $('#tvsPreRollPicker'),
+      mode: 'sources',
+      getSources: () => state.draft.Bumpers.PreRoll.Sources,
+      onAdd: source => state.draft.Bumpers.PreRoll.Sources.push(source),
+      onRemove: index => state.draft.Bumpers.PreRoll.Sources.splice(index, 1)
+    });
+    createPicker({
+      container: $('#tvsPostRollPicker'),
+      mode: 'sources',
+      getSources: () => state.draft.Bumpers.PostRoll.Sources,
+      onAdd: source => state.draft.Bumpers.PostRoll.Sources.push(source),
+      onRemove: index => state.draft.Bumpers.PostRoll.Sources.splice(index, 1)
     });
     renderSeasonRows();
     state.content = null;
@@ -1268,6 +1293,8 @@
     d.Bumpers.Enabled = checked('#tvsBumpersEnabled');
     d.Bumpers.BreakMinutes = Math.max(0, parseInt(val('#tvsBumperBreak'), 10) || 0);
     d.Bumpers.MaxClipMinutes = Math.max(1, parseInt(val('#tvsBumperMax'), 10) || 5);
+    d.Bumpers.PreRoll.Enabled = checked('#tvsPreRollEnabled');
+    d.Bumpers.PostRoll.Enabled = checked('#tvsPostRollEnabled');
     d.Mode = val('#tvsMode') || 'Pool';
     d.Pool.Order = val('#tvsPoolOrder') || 'Shuffle';
     d.Pool.AvoidSameSeriesBackToBack = checked('#tvsPoolAvoid');
@@ -2817,6 +2844,8 @@
     // List
     on('#tvsBtnNew', 'click', () => openEditor(null));
     on('#tvsBumpersEnabled', 'change', () => show($('#tvsBumperOptions'), checked('#tvsBumpersEnabled')));
+    on('#tvsPreRollEnabled', 'change', () => show($('#tvsPreRollPicker'), checked('#tvsPreRollEnabled')));
+    on('#tvsPostRollEnabled', 'change', () => show($('#tvsPostRollPicker'), checked('#tvsPostRollEnabled')));
     on('#tvsBtnContent', 'click', loadContent);
     on('#tvsContentFilter', 'input', () => renderContent());
     on('#tvsBtnAddDaypart', 'click', () => {

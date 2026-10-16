@@ -433,6 +433,22 @@
                   <input is="emby-input" id="tvsBumperMax" label="Longest clip to use (minutes)" type="number" min="1" max="60" step="1">
                 </div>
               </div>
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsPreRollEnabled">
+                  <span>Pre-roll: play an ident right before every program</span>
+                </label>
+                <div class="fieldDescription checkboxFieldDescription">Ends every break so the program starts on time. Pick sources below, or leave them empty to use the bumper sources above. Skipped when no clip fits the break.</div>
+              </div>
+              <div id="tvsPreRollPicker"></div>
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsPostRollEnabled">
+                  <span>Post-roll: play a clip right after every program</span>
+                </label>
+                <div class="fieldDescription checkboxFieldDescription">Opens every break. Pick sources below, or leave them empty to use the bumper sources above.</div>
+              </div>
+              <div id="tvsPostRollPicker"></div>
             </div>
           </div>
 

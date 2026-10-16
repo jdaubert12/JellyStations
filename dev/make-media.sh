@@ -31,3 +31,9 @@ cut() {
 }
 cut "movies/Movie Gamma (2022)/Movie Gamma (2022) - part1.mp4" 0 60
 cut "movies/Movie Gamma (2022)/Movie Gamma (2022) - part2.mp4" 60 45
+
+# Short clips for bumpers / pre-roll / post-roll tests, filed as movies so the library picks them up.
+mkdir -p "$M/movies/Ident A (2024)" "$M/movies/Ident B (2024)" "$M/movies/Outro A (2024)"
+gen "movies/Ident A (2024)/Ident A (2024).mp4" 10 640x360 880
+gen "movies/Ident B (2024)/Ident B (2024).mp4" 15 640x360 988
+gen "movies/Outro A (2024)/Outro A (2024).mp4" 20 640x360 1047
