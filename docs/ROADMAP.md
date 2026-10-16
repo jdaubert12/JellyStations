@@ -192,8 +192,10 @@ analyzer, then suggestion rules and the dashboard view on top of it.
 - **Health report.** Nightly summary on the dashboard: sources that expanded to zero items,
   stations under one day of unique content, excluded counts by reason. Small.
 - **Now and next on the station row.** Next two programs and time to switch. Small.
-- **Richer guide entries.** Confirm thumbnails, season/episode numbers, year, rating flow into the
-  guide; add a "New" tag for recently added items. Small.
+- **Richer guide entries.** Thumbnails, season/episode numbers, year and rating confirmed flowing
+  into the guide on the dev server 2026-10-16 (movie poster, episode thumb, series-poster fallback
+  all served; channel logo too). Image paths are captured at compile time, so artwork added later
+  shows after the nightly recompile. Still open: a "New" tag for recently added items. Small.
 - **Filler gate and block-level dayparting.** Extend Step 2 to slots mode if needed.
 
 ---

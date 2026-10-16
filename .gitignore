@@ -10,3 +10,4 @@ dev/cache/
 dev/media/**/*.mp4
 dev/media/**/*.mkv
 dev/.token
+dev/media/**/*.png
