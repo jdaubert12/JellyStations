@@ -138,6 +138,12 @@
       #TvStationPage .tvs-health-actions { display: flex; flex-wrap: wrap; gap: .4em; margin-top: .4em; }
       #TvStationPage .tvs-badge.tvs-clickable { cursor: pointer; }
       #TvStationPage .tvs-step-hidden { display: none !important; }
+      #TvStationPage .tvs-coverage-summary { margin: .2em 0 .6em; }
+      #TvStationPage .tvs-coverage-target { margin: 0; min-width: 12em; }
+      #TvStationPage .tvs-coverage-filter { max-width: 28em; margin-bottom: .6em; }
+      #TvStationPage .tvs-coverage-head { display: flex; align-items: baseline; gap: .8em; margin-top: 1em; }
+      #TvStationPage .tvs-coverage-head .sectionTitle { margin: 0; }
+      #TvStationPage .tvs-table th.pick, #TvStationPage .tvs-table td.pick { width: 1.6em; padding-right: 0; }
       #TvStationPage .tvs-week { margin: .6em 0 1em; user-select: none; -webkit-user-select: none; overflow-x: auto; }
       #TvStationPage .tvs-week-grid { display: grid; grid-template-columns: 3.4em repeat(7, minmax(5.5em, 1fr)); position: relative; min-width: 44em; }
       #TvStationPage .tvs-week-day { text-align: center; font-size: .85em; opacity: .8; padding: .2em 0 .35em; border-bottom: 1px solid rgba(255,255,255,.15); }
@@ -186,6 +192,7 @@
             <h2 class="sectionTitle">TV Stations</h2>
             <button is="emby-button" type="button" id="tvsBtnNew" class="raised button-submit emby-button"><span>New station</span></button>
             <button is="emby-button" type="button" id="tvsBtnSuggest" class="raised emby-button" title="Stations the library could support, ready to create"><span>Suggest stations</span></button>
+            <button is="emby-button" type="button" id="tvsBtnCoverage" class="raised emby-button" title="Movies and shows in the library that no channel plays"><span>Not on a channel</span></button>
             <button is="emby-button" type="button" id="tvsBtnRecompileAll" class="raised emby-button" title="Re-scan the library for every station so newly added movies and episodes join their channels; refreshes the guide if anything changed"><span>Refresh content</span></button>
             <button is="emby-button" type="button" id="tvsBtnRefreshGuide" class="raised emby-button" title="Ask Jellyfin to refresh the Live TV guide now"><span>Refresh guide</span></button>
             <button is="emby-button" type="button" id="tvsBtnSettings" class="raised emby-button"><span>Settings</span></button>
@@ -223,6 +230,30 @@
           <div id="tvsSuggestError" class="tvs-error tvs-hidden"></div>
           <div id="tvsSuggestEmpty" class="tvs-empty tvs-hidden">Nothing to suggest yet. Add more movies or shows, or lower your expectations.</div>
           <div id="tvsSuggestList" class="paperList"></div>
+        </div>
+
+        <!-- ===================== Not on a channel ===================== -->
+        <div id="tvsViewCoverage" class="tvs-view tvs-hidden">
+          <div class="tvs-toolbar">
+            <h2 class="sectionTitle">Not on a channel</h2>
+            <span id="tvsCoverageCount" class="tvs-secondary"></span>
+            <button is="emby-button" type="button" id="tvsBtnCoverageNew" class="raised button-submit emby-button" title="Open a new station with the ticked titles already added"><span>New channel with selected</span></button>
+            <div class="selectContainer tvs-coverage-target">
+              <select is="emby-select" id="tvsCoverageTarget" class="emby-select" aria-label="Channel to add to"></select>
+            </div>
+            <button is="emby-button" type="button" id="tvsBtnCoverageAdd" class="raised emby-button" title="Add the ticked titles to that channel's content"><span>Add selected to channel</span></button>
+            <label class="emby-checkbox-label" style="width:auto;margin:0 .5em"><input is="emby-checkbox" type="checkbox" id="tvsCoverageDisabled"><span>Count channels that are turned off</span></label>
+            <button is="emby-button" type="button" id="tvsBtnCoverageRefresh" class="raised emby-button" title="Re-read the library"><span>Re-scan library</span></button>
+            <button is="emby-button" type="button" id="tvsBtnCoverageBack" class="raised emby-button"><span>Back to list</span></button>
+          </div>
+          <div class="fieldDescription">Movies and shows in your library that no channel plays. Tick some and start a new channel with them, or add them to a channel you already have. Clips a channel uses as bumpers or idents count as on that channel. A channel counts once its content has been compiled; if a channel you just made is missing, press <strong>Refresh content</strong> on the list first.</div>
+          <div id="tvsCoverageError" class="tvs-error tvs-hidden"></div>
+          <div id="tvsCoverageSummary" class="tvs-coverage-summary"></div>
+          <div class="inputContainer tvs-coverage-filter">
+            <input is="emby-input" type="text" id="tvsCoverageFilter" class="emby-input" placeholder="Filter by title, genre, rating or library" autocomplete="off" aria-label="Filter">
+          </div>
+          <div id="tvsCoverageEmpty" class="tvs-empty tvs-hidden">Everything in the library is on a channel.</div>
+          <div id="tvsCoverageList"></div>
         </div>
 
         <!-- ===================== New station: presets ===================== -->

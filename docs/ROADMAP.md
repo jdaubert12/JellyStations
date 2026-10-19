@@ -287,7 +287,14 @@ From a 2026-10-19 review of the dashboard: the base is solid but speaks engineer
    (a click gives an hour, a drag the rows and days covered, the template select applies),
    clicking a block expands its card. Cards stay the editing surface; moving or resizing on the
    grid is not supported.
-5. **Smaller wins.** Duplicate station, "Pause" instead of a Disabled badge, generated logos, a
+5. **Not on a channel — DONE 2026-10-19.** `GET /TvStation/Library/Coverage` compares the library
+   facts behind the analysis (now cached with it) against the compiled content of every enabled
+   station (`includeDisabled=true` counts paused ones; bumper and ident clips count) and returns the movies
+   and series left out, series with only some episodes covered carrying the covered count
+   (`LibraryCoverage`, pure). The dashboard page lists both with a filter and tick boxes; "New
+   channel with selected" opens the editor with the titles as pool sources, "Add selected to
+   channel" appends them to an existing station's pool, filler or lineup by mode.
+6. **Smaller wins.** Duplicate station, "Pause" instead of a Disabled badge, generated logos, a
    one-line plain summary per row, a read-only "What's on" page for non-admins.
 
 ---

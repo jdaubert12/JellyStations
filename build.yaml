@@ -1,7 +1,7 @@
 ---
 name: "TvStation"
 guid: "b7f3c1d2-5e8a-4f0b-9c6d-2a1e7f4b8d31"
-version: "1.9.0.0"
+version: "1.10.0.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "Justin"
@@ -15,6 +15,7 @@ category: "LiveTV"
 artifacts:
   - "Jellyfin.Plugin.TvStation.dll"
 changelog: >
+  1.10.0.0: Not on a channel: a dashboard page listing the movies and shows no channel plays (GET /TvStation/Library/Coverage). Tick titles to start a new channel with them or add them to an existing channel's pool, filler or list; shows with only some episodes on a channel are marked; paused channels count only when asked; bumper and ident clips count as on their channel.
   1.9.0.0: Paint the week: the time blocks section shows a seven-day grid. Click or drag on it to add a block (drag sideways to cover several days), click a block to edit it; blocks that cross midnight continue in the next column and non-weekly ones are outlined.
   1.8.0.0: Three-step editor: Name and look (with a logo made from the name), What plays, When; All settings keeps the full form. The editor opens on step 1, remembers when you prefer the full form, and jumps to the step a problem is on when a save is refused.
   1.7.0.0: Cooldown: a pool can rest a show or film for N hours before it plays again (0 = off, Movie night preset uses 8). A gentle rule on the timeline: it holds films apart across the seam between two rounds and spaces out weighted repeats, and gives way when nothing rested is available. Stations with time blocks are not covered yet.

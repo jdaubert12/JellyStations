@@ -90,6 +90,7 @@
     stationEncoding: null,
     settingsEncoding: null,
     statusTimer: null,
+    coverage: null,       // CoverageDto for the "Not on a channel" page
     openLogs: {},         // session UniqueId -> bool
     deleteTimer: null,
     listTimer: null,
@@ -602,7 +603,7 @@
   // Views
   // ------------------------------------------------------------------------------------------
 
-  const VIEW_IDS = { list: '#tvsViewList', editor: '#tvsViewEditor', settings: '#tvsViewSettings', status: '#tvsViewStatus', suggest: '#tvsViewSuggest', presets: '#tvsViewPresets' };
+  const VIEW_IDS = { list: '#tvsViewList', editor: '#tvsViewEditor', settings: '#tvsViewSettings', status: '#tvsViewStatus', suggest: '#tvsViewSuggest', presets: '#tvsViewPresets', coverage: '#tvsViewCoverage' };
 
   function showView(name) {
     if (state.view === 'status' && name !== 'status') {
@@ -2746,6 +2747,200 @@
   }
 
   // ------------------------------------------------------------------------------------------
+  // Not on a channel: library titles no station plays
+  // ------------------------------------------------------------------------------------------
+
+  function openCoverage(refresh) {
+    loading(true);
+    const q = { includeDisabled: checked('#tvsCoverageDisabled') };
+    if (refresh) {
+      q.refresh = true;
+    }
+    api('GET', 'Library/Coverage', null, q).then(c => {
+      state.coverage = c;
+      renderCoverage();
+      showView('coverage');
+    }).catch(err => alertErrors(err, 'Could not compare the library with the channels')).then(() => loading(false));
+  }
+
+  function plural(n, word) {
+    return n + ' ' + word + (n === 1 ? '' : 's');
+  }
+
+  function renderCoverage() {
+    const c = state.coverage;
+    const box = clear($('#tvsCoverageList'));
+    renderErrorBox($('#tvsCoverageError'), null);
+    if (!c) {
+      return;
+    }
+    const t = c.Totals || {};
+    const summary = clear($('#tvsCoverageSummary'));
+    const moviesOff = (t.Movies || 0) - (t.MoviesOnChannels || 0);
+    const seriesOff = (c.Series || []).length;
+    summary.appendChild(el('span', { text: plural(c.Channels || 0, 'channel') + ' counted. ' }));
+    summary.appendChild(el('strong', { text: moviesOff + ' of ' + plural(t.Movies || 0, 'movie') }));
+    summary.appendChild(el('span', { text: ' and ' }));
+    summary.appendChild(el('strong', { text: seriesOff + ' of ' + plural(t.Series || 0, 'show') }));
+    summary.appendChild(el('span', { text: ' are not on a channel' + (t.SeriesPartly ? ' (' + plural(t.SeriesPartly, 'show') + ' only partly)' : '') + ': ' + fmtHours(t.HoursNotOnChannels) + ' of ' + fmtHours(t.HoursTotal) + '.' }));
+
+    const filter = val('#tvsCoverageFilter').trim().toLowerCase();
+    const matches = parts => !filter || parts.join(' ').toLowerCase().indexOf(filter) >= 0;
+    const series = (c.Series || []).filter(s => matches([s.Name, s.Year, s.Rating, (s.Genres || []).join(' '), s.LibraryName]));
+    const movies = (c.Movies || []).filter(m => matches([m.Title, m.Year, m.Rating, (m.Genres || []).join(' '), m.LibraryName]));
+    show($('#tvsCoverageEmpty'), (c.Movies || []).length === 0 && (c.Series || []).length === 0);
+    if (series.length) {
+      box.appendChild(coverageSection('Shows', series.length, series, true));
+    }
+    if (movies.length) {
+      box.appendChild(coverageSection('Movies', movies.length, movies, false));
+    }
+    if (filter && !series.length && !movies.length && ((c.Movies || []).length || (c.Series || []).length)) {
+      box.appendChild(el('div', { className: 'tvs-secondary', text: 'Nothing matches the filter.' }));
+    }
+    renderCoverageTargets();
+    updateCoverageCount();
+  }
+
+  /** One table of movies or shows with a tick box per row and one in the header for the whole table. */
+  function coverageSection(title, count, rows, isSeries) {
+    const wrap = el('div', { className: 'tvs-tablewrap' });
+    const all = el('input', { type: 'checkbox', title: 'Tick every ' + (isSeries ? 'show' : 'movie') + ' shown', 'aria-label': 'Select all' });
+    const boxes = [];
+    all.addEventListener('change', () => {
+      boxes.forEach(b => { b.checked = all.checked; });
+      updateCoverageCount();
+    });
+    wrap.appendChild(el('div', { className: 'tvs-coverage-head' }, [
+      el('h3', { className: 'sectionTitle', text: title }),
+      el('span', { className: 'tvs-secondary', text: plural(count, isSeries ? 'show' : 'movie') })
+    ]));
+    const table = el('table', { className: 'tvs-table' });
+    table.appendChild(el('thead', null, el('tr', null, [
+      el('th', { className: 'pick' }, all),
+      el('th', { text: 'Title' }),
+      el('th', { text: 'Year' }),
+      el('th', { text: 'Rating' }),
+      el('th', { text: isSeries ? 'Episodes' : 'Length' }),
+      el('th', { text: 'Genres' }),
+      el('th', { text: 'Library' })
+    ])));
+    const tbody = el('tbody');
+    rows.forEach(r => {
+      const name = isSeries ? r.Name : r.Title;
+      const cb = el('input', { type: 'checkbox', 'data-kind': isSeries ? 'Series' : 'Movie', 'data-id': r.Id, 'data-name': name, 'aria-label': name });
+      cb.addEventListener('change', () => {
+        if (!cb.checked) {
+          all.checked = false;
+        }
+        updateCoverageCount();
+      });
+      boxes.push(cb);
+      const amount = isSeries
+        ? [el('span', { text: plural(r.Episodes, 'episode') + ' · ' + fmtHours(r.Hours) }),
+          r.EpisodesOnChannels ? badge(r.EpisodesOnChannels + ' already on a channel', 'warn', 'Some episodes of this show are on a channel; the rest are not. Adding the show again gives the channel every episode.') : null]
+        : [el('span', { text: r.Minutes + ' min' })];
+      tbody.appendChild(el('tr', null, [
+        el('td', { className: 'pick' }, el('label', null, cb)),
+        el('td', { text: name }),
+        el('td', { className: 'nowrap', text: r.Year || '' }),
+        el('td', { className: 'nowrap', text: r.Rating || '' }),
+        el('td', { className: 'nowrap' }, amount),
+        el('td', { text: (r.Genres || []).slice(0, 3).join(', ') }),
+        el('td', { className: 'nowrap', text: r.LibraryName || '' })
+      ]));
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  function renderCoverageTargets() {
+    const select = $('#tvsCoverageTarget');
+    const current = select.value;
+    clear(select);
+    select.appendChild(el('option', { value: '', text: state.stations.length ? 'Choose a channel…' : 'No channels yet' }));
+    state.stations.forEach(s => select.appendChild(el('option', { value: s.Id, text: (s.ChannelNumber ? s.ChannelNumber + ' ' : '') + s.Name })));
+    select.value = current;
+    updateCoverageCount();
+  }
+
+  /** The ticked rows as content sources, in the shape the source picker produces. */
+  function selectedCoverage() {
+    return $all('#tvsCoverageList input[type=checkbox][data-id]:checked').map(cb => ({
+      Kind: cb.getAttribute('data-kind'),
+      ItemId: cb.getAttribute('data-id'),
+      ItemKinds: [],
+      Weight: 1,
+      DisplayName: cb.getAttribute('data-name')
+    }));
+  }
+
+  function updateCoverageCount() {
+    const n = selectedCoverage().length;
+    $('#tvsCoverageCount').textContent = n ? n + ' selected' : '';
+    $('#tvsBtnCoverageNew').disabled = n === 0;
+    $('#tvsBtnCoverageAdd').disabled = n === 0 || !val('#tvsCoverageTarget');
+  }
+
+  function newChannelFromCoverage() {
+    const sources = selectedCoverage();
+    if (!sources.length) {
+      return;
+    }
+    openEditor(null, {
+      name: null,
+      apply: d => {
+        d.Pool.Sources = sources;
+        d.PaddingByLength = true;
+        d.PaddingGridMinutes = 0;
+      }
+    });
+    toast(plural(sources.length, 'title') + ' added; name the channel and save.');
+  }
+
+  /** Appends the ticked titles to an existing station: its pool, its filler (Slots) or its lineup (Lineup). */
+  function addCoverageToStation() {
+    const sources = selectedCoverage();
+    const id = val('#tvsCoverageTarget');
+    if (!sources.length || !id) {
+      return;
+    }
+    loading(true);
+    api('GET', 'Stations/' + id).then(detail => {
+      const s = detail.Station;
+      let added = 0;
+      if (s.Mode === 'Lineup') {
+        s.Lineup = s.Lineup || { Items: [] };
+        s.Lineup.Items = s.Lineup.Items || [];
+        sources.forEach(src => {
+          if (!s.Lineup.Items.some(i => i.ItemId === src.ItemId)) {
+            s.Lineup.Items.push({ ItemId: src.ItemId, DisplayName: src.DisplayName });
+            added++;
+          }
+        });
+      } else {
+        const list = s.Mode === 'Slots' ? (s.Slots.Filler.Sources = s.Slots.Filler.Sources || []) : (s.Pool.Sources = s.Pool.Sources || []);
+        const keys = list.map(sourceKey);
+        sources.forEach(src => {
+          if (keys.indexOf(sourceKey(src)) < 0) {
+            list.push(src);
+            added++;
+          }
+        });
+      }
+      if (!added) {
+        toast('That channel already has every ticked title.');
+        return null;
+      }
+      return api('PUT', 'Stations/' + id, s).then(() => {
+        toast(plural(added, 'title') + ' added to ' + s.Name + '.');
+        return loadStations().then(() => openCoverage(false));
+      });
+    }).catch(err => alertErrors(err, 'Could not add to the channel')).then(() => loading(false));
+  }
+
+  // ------------------------------------------------------------------------------------------
   // Lineup
   // ------------------------------------------------------------------------------------------
 
@@ -3718,6 +3913,14 @@
       renderBlocks();
     });
     on('#tvsBtnSuggest', 'click', () => openSuggestions(false));
+    on('#tvsBtnCoverage', 'click', () => openCoverage(false));
+    on('#tvsBtnCoverageRefresh', 'click', () => openCoverage(true));
+    on('#tvsCoverageDisabled', 'change', () => openCoverage(false));
+    on('#tvsBtnCoverageBack', 'click', () => showView('list'));
+    on('#tvsBtnCoverageNew', 'click', newChannelFromCoverage);
+    on('#tvsBtnCoverageAdd', 'click', addCoverageToStation);
+    on('#tvsCoverageTarget', 'change', updateCoverageCount);
+    on('#tvsCoverageFilter', 'input', renderCoverage);
     on('#tvsBtnSuggestRefresh', 'click', () => openSuggestions(true));
     on('#tvsSuggestSmall', 'change', () => openSuggestions(false));
     on('#tvsBtnSuggestBack', 'click', () => showView('list'));

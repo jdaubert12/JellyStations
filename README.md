@@ -93,16 +93,16 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.9.0.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.9.0.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.9.0.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.9.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.9.0.0\`
+2. Copy it into a folder named `TvStation_1.10.0.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.10.0.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.10.0.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.10.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.10.0.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.9.0.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.9.0.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.10.0.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.10.0.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 
@@ -150,6 +150,13 @@ series with enough hours, a kids channel and family movies by rating, franchise 
 "Franchise Nights" slots station from titles that share a prefix, collections, decades, and seasonal
 channels from holiday tags. Tick the ones you want and they are created with the next free channel
 numbers, editable like any other station.
+
+**Not on a channel** on the dashboard lists the movies and shows no channel plays, from the compiled
+content of every enabled station (clips used as bumpers or idents count as on it). Tick titles and either start a new
+channel with them or add them to a channel you already have: its pool, its filler for a weekly
+schedule, or its list for a fixed list. A show with only some episodes on a channel is listed with a
+badge; adding it again gives the channel every episode. A filter box narrows the list by title, genre,
+rating or library.
 
 A block repeats every week unless its **Repeats** setting says otherwise: every N weeks counted from a
 chosen date, certain weeks of the month (1st to 4th, or last; weeks run Monday to Sunday and belong to

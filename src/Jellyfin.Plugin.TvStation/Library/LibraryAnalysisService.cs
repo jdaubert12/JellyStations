@@ -19,6 +19,7 @@ public sealed class LibraryAnalysisService
     private readonly ILogger<LibraryAnalysisService> _logger;
     private readonly object _lock = new();
     private LibraryAnalysisDto? _cached;
+    private IReadOnlyList<LibraryFact>? _facts;
 
     public LibraryAnalysisService(ILibraryManager libraryManager, LibraryContentResolver resolver, ILogger<LibraryAnalysisService> logger)
     {
@@ -39,6 +40,7 @@ public sealed class LibraryAnalysisService
             var started = DateTime.UtcNow;
             var facts = CollectFacts();
             var collections = CollectCollections();
+            _facts = facts;
             _cached = LibraryAnalyzer.Analyze(facts, collections, DateTime.UtcNow);
             _logger.LogInformation(
                 "TvStation: analyzed library: {Movies} movie(s), {Episodes} episode(s) in {Series} series, {Collections} collection(s) in {Ms} ms",
@@ -51,11 +53,26 @@ public sealed class LibraryAnalysisService
         }
     }
 
+    /// <summary>The movies and episodes behind the analysis, collected with it and cached for as long.</summary>
+    public IReadOnlyList<LibraryFact> Facts(bool refresh = false)
+    {
+        lock (_lock)
+        {
+            if (refresh || _facts is null || _cached is null || DateTime.UtcNow - _cached.ComputedUtc >= CacheFor)
+            {
+                Get(true);
+            }
+
+            return _facts!;
+        }
+    }
+
     public void Invalidate()
     {
         lock (_lock)
         {
             _cached = null;
+            _facts = null;
         }
     }
 
