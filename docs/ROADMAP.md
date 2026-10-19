@@ -281,7 +281,12 @@ From a 2026-10-19 review of the dashboard: the base is solid but speaks engineer
    order, bumpers, content list), When (family hours, time blocks, season, preview). Sections carry
    `data-steps`; "All settings" is the whole form and is remembered per browser. A refused save
    lands on the step with the problem.
-4. **Paint the week.** A seven-day grid for blocks on top of the existing block data. Large.
+4. **Paint the week — DONE 2026-10-19.** `renderWeekGrid` draws seven day columns of 30-minute rows
+   above the block cards (blocks crossing midnight continue in the next column, non-weekly ones
+   are outlined); pointer events paint a selection and `addBlockFromPaint` turns it into a block
+   (a click gives an hour, a drag the rows and days covered, the template select applies),
+   clicking a block expands its card. Cards stay the editing surface; moving or resizing on the
+   grid is not supported.
 5. **Smaller wins.** Duplicate station, "Pause" instead of a Disabled badge, generated logos, a
    one-line plain summary per row, a read-only "What's on" page for non-admins.
 

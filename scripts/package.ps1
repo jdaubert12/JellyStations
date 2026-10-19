@@ -2,7 +2,7 @@
 param([string]$Configuration = "Release")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.8.0.0"
+$version = "1.9.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.TvStation\bin\$Configuration\net10.0\Jellyfin.Plugin.TvStation.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -21,7 +21,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Three-step editor: Name and look (with a logo made from the name), What plays, When; All settings keeps the full form. The editor opens on step 1, remembers when you prefer the full form, and jumps to the step a problem is on when a save is refused."
+    changelog = "Paint the week: the time blocks section shows a seven-day grid. Click or drag on it to add a block (drag sideways to cover several days), click a block to edit it; blocks that cross midnight continue in the next column and non-weekly ones are outlined."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

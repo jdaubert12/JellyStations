@@ -2089,6 +2089,203 @@
     show($('#tvsBlocksEmpty'), blocks.length === 0);
     blocks.forEach((b, i) => wrap.appendChild(blockCard(b, i)));
     renderBlockWarnings();
+    renderWeekGrid();
+  }
+
+  // ---- Week grid: paint blocks onto seven days ----------------------------------------------
+
+  const GRID_ROW_PX = 12; // one 30-minute row
+  const GRID_ROWS = 48;
+  const BLOCK_COLORS = ['#2f80ed', '#eb5757', '#27ae60', '#f2994a', '#9b51e0', '#1abc9c', '#e84393', '#c0a000'];
+
+  /** Days a Dates-recurrence block falls on, for drawing. */
+  function blockDays(b) {
+    if (b.Recurrence !== 'Dates') {
+      return b.Days || [];
+    }
+    return (b.Dates || []).map(d => {
+      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+      return m ? DAYS[(new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)).getDay() + 6) % 7] : null;
+    }).filter((d, i, a) => d && a.indexOf(d) === i);
+  }
+
+  function renderWeekGrid() {
+    const host = $('#tvsWeekGrid');
+    if (!host || !state.draft) {
+      return;
+    }
+    clear(host);
+    const blocks = state.draft.Slots.Blocks;
+    const grid = el('div', { className: 'tvs-week-grid' });
+    grid.appendChild(el('div', { className: 'tvs-week-corner' }));
+    DAYS.forEach(d => grid.appendChild(el('div', { className: 'tvs-week-day', text: DAY_SHORT[d] })));
+    const times = el('div', { className: 'tvs-week-times' });
+    for (let h = 0; h < 24; h += 2) {
+      times.appendChild(el('div', { className: 'tvs-week-time', style: { top: (h * 2 * GRID_ROW_PX) + 'px' }, text: pad2(h) + ':00' }));
+    }
+    grid.appendChild(times);
+    const cols = DAYS.map((d, di) => {
+      const col = el('div', { className: 'tvs-week-col', 'data-day': String(di), style: { height: (GRID_ROWS * GRID_ROW_PX) + 'px' }, title: DAYS[di] });
+      for (let r = 2; r < GRID_ROWS; r += 2) {
+        col.appendChild(el('div', { className: 'tvs-week-hour' + (r % 12 === 0 ? ' major' : ''), style: { top: (r * GRID_ROW_PX) + 'px' } }));
+      }
+      grid.appendChild(col);
+      return col;
+    });
+
+    blocks.forEach((b, bi) => {
+      const start = parseHm(b.StartLocal);
+      const dur = parseInt(b.DurationMinutes, 10) || 0;
+      if (start === null || dur <= 0) {
+        return;
+      }
+      blockDays(b).forEach(day => {
+        const di = DAYS.indexOf(day);
+        if (di < 0) {
+          return;
+        }
+        placeBlockRect(cols[di], start, Math.min(dur, 1440 - start), b, bi, false);
+        if (start + dur > 1440) {
+          placeBlockRect(cols[(di + 1) % 7], 0, Math.min(start + dur - 1440, 1440), b, bi, true);
+        }
+      });
+    });
+
+    host.appendChild(grid);
+    wireWeekPainting(grid, cols);
+  }
+
+  function placeBlockRect(col, startMin, durMin, b, bi, continuation) {
+    const color = BLOCK_COLORS[bi % BLOCK_COLORS.length];
+    const top = startMin / 30 * GRID_ROW_PX;
+    const height = Math.max(GRID_ROW_PX, durMin / 30 * GRID_ROW_PX) - 1;
+    const rect = el('div', {
+      className: 'tvs-week-block' + (b.Recurrence !== 'Weekly' ? ' sometimes' : '') + (continuation ? ' cont' : ''),
+      style: { top: top + 'px', height: height + 'px', background: color + '66', borderLeftColor: color },
+      title: (b.Name || 'Untitled block') + '\n' + blockSummary(b),
+      text: height >= 20 ? (b.Name || 'Untitled block') : ''
+    });
+    rect.addEventListener('click', ev => {
+      ev.stopPropagation();
+      openBlockCard(bi);
+    });
+    col.appendChild(rect);
+  }
+
+  /** Expands a block's card and scrolls it into view. */
+  function openBlockCard(index) {
+    const b = state.draft.Slots.Blocks[index];
+    if (!b) {
+      return;
+    }
+    state.expandedBlocks[b._key] = true;
+    renderBlocks();
+    const card = $('#tvsBlocks').children[index];
+    if (card && typeof card.scrollIntoView === 'function') {
+      card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }
+
+  function wireWeekPainting(grid, cols) {
+    let paint = null;
+    const rowAt = (col, clientY) => {
+      const top = col.getBoundingClientRect().top;
+      return Math.min(GRID_ROWS - 1, Math.max(0, Math.floor((clientY - top) / GRID_ROW_PX)));
+    };
+    const colAt = clientX => {
+      let best = 0;
+      cols.forEach((c, i) => {
+        const r = c.getBoundingClientRect();
+        if (clientX >= r.left) {
+          best = i;
+        }
+      });
+      return best;
+    };
+    const updateSelection = () => {
+      const c0 = Math.min(paint.c0, paint.c1);
+      const c1 = Math.max(paint.c0, paint.c1);
+      const r0 = Math.min(paint.r0, paint.r1);
+      const r1 = Math.max(paint.r0, paint.r1);
+      const g = grid.getBoundingClientRect();
+      const a = cols[c0].getBoundingClientRect();
+      const z = cols[c1].getBoundingClientRect();
+      Object.assign(paint.sel.style, {
+        left: (a.left - g.left) + 'px',
+        width: (z.right - a.left) + 'px',
+        top: (a.top - g.top + r0 * GRID_ROW_PX) + 'px',
+        height: ((r1 - r0 + 1) * GRID_ROW_PX) + 'px'
+      });
+    };
+    grid.addEventListener('pointerdown', ev => {
+      const col = ev.target.closest ? ev.target.closest('.tvs-week-col') : null;
+      if (!col || (ev.target.closest && ev.target.closest('.tvs-week-block')) || ev.button) {
+        return;
+      }
+      const c = parseInt(col.getAttribute('data-day'), 10);
+      const r = rowAt(col, ev.clientY);
+      paint = { c0: c, r0: r, c1: c, r1: r, moved: false, sel: el('div', { className: 'tvs-week-select' }) };
+      grid.appendChild(paint.sel);
+      if (grid.setPointerCapture && ev.pointerId !== undefined) {
+        try { grid.setPointerCapture(ev.pointerId); } catch (e) { /* not a pointer event */ }
+      }
+      updateSelection();
+      ev.preventDefault();
+    });
+    grid.addEventListener('pointermove', ev => {
+      if (!paint) {
+        return;
+      }
+      const c = colAt(ev.clientX);
+      const r = rowAt(cols[c], ev.clientY);
+      if (c !== paint.c1 || r !== paint.r1) {
+        paint.moved = true;
+      }
+      paint.c1 = c;
+      paint.r1 = r;
+      updateSelection();
+    });
+    const finish = () => {
+      if (!paint) {
+        return;
+      }
+      const p = paint;
+      paint = null;
+      p.sel.remove();
+      addBlockFromPaint(p);
+    };
+    grid.addEventListener('pointerup', finish);
+    grid.addEventListener('pointercancel', () => {
+      if (paint) {
+        paint.sel.remove();
+        paint = null;
+      }
+    });
+  }
+
+  /** A painted range becomes a block: a plain click gives one hour, a drag gives the rows and days covered. */
+  function addBlockFromPaint(p) {
+    const c0 = Math.min(p.c0, p.c1);
+    const c1 = Math.max(p.c0, p.c1);
+    const r0 = Math.min(p.r0, p.r1);
+    let rows = Math.abs(p.r1 - p.r0) + 1;
+    if (!p.moved) {
+      rows = Math.min(2, GRID_ROWS - r0);
+    }
+    const templateId = val('#tvsBlockTemplateSelect');
+    const template = state.blockTemplates.find(t => t.Id === templateId);
+    const block = template ? blockFromTemplate(template) : newBlock();
+    block.Days = DAYS.slice(c0, c1 + 1);
+    block.StartLocal = pad2(Math.floor(r0 / 2)) + ':' + (r0 % 2 ? '30' : '00');
+    block.DurationMinutes = rows * 30;
+    if (block.Recurrence === 'Dates') {
+      block.Recurrence = 'Weekly';
+    }
+    state.draft.Slots.Blocks.push(block);
+    state.expandedBlocks[block._key] = true;
+    setVal('#tvsBlockTemplateSelect', '');
+    renderBlocks();
+    openBlockCard(state.draft.Slots.Blocks.length - 1);
   }
 
   function blockCard(b, index) {
@@ -2194,6 +2391,7 @@
       titleBox.firstChild.textContent = b.Name || 'Untitled block';
       titleBox.lastChild.textContent = blockSummary(b);
       renderBlockWarnings();
+      renderWeekGrid();
     };
     const showRecurrencePanels = () => {
       $all('[data-rec]', body).forEach(panel => show(panel, panel.getAttribute('data-rec') === b.Recurrence));

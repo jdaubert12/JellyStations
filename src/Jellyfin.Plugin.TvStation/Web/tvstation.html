@@ -138,6 +138,20 @@
       #TvStationPage .tvs-health-actions { display: flex; flex-wrap: wrap; gap: .4em; margin-top: .4em; }
       #TvStationPage .tvs-badge.tvs-clickable { cursor: pointer; }
       #TvStationPage .tvs-step-hidden { display: none !important; }
+      #TvStationPage .tvs-week { margin: .6em 0 1em; user-select: none; -webkit-user-select: none; overflow-x: auto; }
+      #TvStationPage .tvs-week-grid { display: grid; grid-template-columns: 3.4em repeat(7, minmax(5.5em, 1fr)); position: relative; min-width: 44em; }
+      #TvStationPage .tvs-week-day { text-align: center; font-size: .85em; opacity: .8; padding: .2em 0 .35em; border-bottom: 1px solid rgba(255,255,255,.15); }
+      #TvStationPage .tvs-week-times { position: relative; }
+      #TvStationPage .tvs-week-time { position: absolute; right: .5em; transform: translateY(-50%); font-size: .72em; opacity: .6; }
+      #TvStationPage .tvs-week-col { position: relative; border-left: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.02); touch-action: none; cursor: crosshair; }
+      #TvStationPage .tvs-week-col:last-child { border-right: 1px solid rgba(255,255,255,.08); }
+      #TvStationPage .tvs-week-hour { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid rgba(255,255,255,.07); pointer-events: none; }
+      #TvStationPage .tvs-week-hour.major { border-top-color: rgba(255,255,255,.14); }
+      #TvStationPage .tvs-week-block { position: absolute; left: 2px; right: 2px; box-sizing: border-box; border-radius: 3px; border-left: 3px solid; padding: 1px 4px; font-size: .72em; line-height: 1.25; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; color: #fff; text-shadow: 0 1px 1px rgba(0,0,0,.6); }
+      #TvStationPage .tvs-week-block:hover { filter: brightness(1.2); }
+      #TvStationPage .tvs-week-block.sometimes { outline: 1px dashed rgba(255,255,255,.55); outline-offset: -2px; }
+      #TvStationPage .tvs-week-block.cont { border-top: 1px dashed rgba(255,255,255,.6); border-radius: 0 0 3px 3px; }
+      #TvStationPage .tvs-week-select { position: absolute; background: rgba(0,164,220,.3); border: 1px dashed rgba(0,164,220,.9); border-radius: 3px; pointer-events: none; z-index: 2; }
       #TvStationPage .tvs-steps { display: flex; flex-wrap: wrap; gap: .4em; margin: .4em 0 1.2em; }
       #TvStationPage .tvs-step { display: inline-flex; align-items: center; gap: .5em; padding: .45em .9em .45em .6em; border: 1px solid rgba(255,255,255,.2); border-radius: 2em; background: rgba(255,255,255,.05); color: inherit; font: inherit; cursor: pointer; }
       #TvStationPage .tvs-step:hover { background: rgba(255,255,255,.1); }
@@ -376,6 +390,8 @@
                 <button is="emby-button" type="button" id="tvsBtnAddBlock" class="raised emby-button"><span>Add block</span></button>
               </div>
               <div class="fieldDescription" id="tvsBlocksHelp"></div>
+              <div class="fieldDescription">Click or drag on the week below to add a block (drag sideways to cover several days); click a block to edit it underneath. Times are the station's local time.</div>
+              <div id="tvsWeekGrid" class="tvs-week"></div>
               <div id="tvsBlockWarnings"></div>
               <div id="tvsBlocksEmpty" class="tvs-secondary tvs-hidden" style="margin:.6em 0">No blocks yet. Add one to schedule content at a specific time on chosen days.</div>
               <div id="tvsBlocks"></div>
