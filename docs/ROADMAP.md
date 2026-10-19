@@ -192,24 +192,24 @@ analyzer, then suggestion rules and the dashboard view on top of it.
 
 ## Phase 4 — operations and polish
 
-- **Clearer failure diagnostics â€” DONE 2026-10-19.** `FileProbe` tells permission denied, file
+- **Clearer failure diagnostics — DONE 2026-10-19.** `FileProbe` tells permission denied, file
   not found and folder not found (unmounted share) apart before a program is skipped. Every
   streaming fault (unopenable file, early ffmpeg exit with its last stderr line, overlay or slate
   failure, ffmpeg not starting) is kept per station in `StreamSessionManager` after the session
   ends and shown on the station row until dismissed (`POST Stations/{id}/Stream/ClearError`).
-- **Health report â€” DONE 2026-10-19.** The compiler records what every source found and kept
+- **Health report — DONE 2026-10-19.** The compiler records what every source found and kept
   (`CompiledStation.Sources`); `StationHealth` (pure, tested) turns the last compile into
   warnings: sources that matched nothing or contributed nothing, under a day of unique content,
   items skipped for no runtime / path / file. `GET /TvStation/Health` feeds a Health section on
   the Status view; the station row carries "empty source" and "N h unique" badges and a
   by-reason tooltip on the excluded count. It reflects the nightly recompile; no extra task.
-- **Same movie twice in a row â€” FIXED 2026-10-19.** The back-to-back rule only compared series ids,
+- **Same movie twice in a row — FIXED 2026-10-19.** The back-to-back rule only compared series ids,
   so a film could follow itself across the seam between two shuffle cycles (seen with Dogma on
   Comedy). `PoolOrdering.KeyOf` now keys the rule on the series, or the movie's title and year
   (two library entries of one film count as one); the cyclic scheduler re-checks the seam after
   the daypart gate against the last program the previous cycle actually airs. Stations whose
   shuffle never produced a repeat keep their timeline; the rest change only at those seams.
-- **Now and next on the station row â€” DONE 2026-10-19.** Time left in the current program and
+- **Now and next on the station row — DONE 2026-10-19.** Time left in the current program and
   the next two programs with start times (bumper clips skipped; a slate only when nothing else
   follows); the list refreshes itself every minute while it is on screen.
 - **Richer guide entries.** Thumbnails, season/episode numbers, year and rating confirmed flowing
@@ -225,8 +225,7 @@ analyzer, then suggestion rules and the dashboard view on top of it.
 From a 2026-10-15 survey of ErsatzTV, Tunarr, dizqueTV, PseudoTV Live and Airwave. We already
 match their core (shuffle with episodes in order, marathons, time blocks, filler, dayparts,
 seasonal channels, watermark, suggestions, native guide). These are the gaps worth closing, in
-order; the first three together turn a station into a broadcast, the fourth lets clients outside
-Jellyfin tune in.
+order; together they turn a station into a broadcast.
 
 1. **Pre-roll and post-roll bumpers — DONE 2026-10-16.** `BumperConfig.PreRoll` / `PostRoll`
    (enabled flag plus optional own sources; empty = the main bumper sources). `BumperFill.Plan`
@@ -240,14 +239,15 @@ Jellyfin tune in.
    restreamer plays the program as segments (seek to the chapter, same clock), the schedule
    entry stays one guide item. Medium; the risky part is the segment handover in
    `FfmpegRestreamer`, verify on the dev container with the stream test.
-3. **Cooldown.** Per pool: a movie or series may not repeat within N hours. Implemented in
-   `PoolOrdering` as a soft rule after series spacing (swap forward until the gap is met, give up
-   quietly like the other soft rules). Matters most on small movie stations (Ghibli, Holiday).
-   Small.
-4. **M3U and XMLTV export.** `GET /TvStation/Channels.m3u` and `GET /TvStation/Guide.xml` with a
-   per-plugin access token in the URL, serving the same MPEG-TS stream the Live TV path uses and
-   the same schedule as XMLTV, so VLC, Kodi, Tivimate, Plex or Emby can tune in. Document the
-   token in Settings. Medium.
+3. **Cooldown — DONE 2026-10-19.** `PoolConfig.CooldownHours` (0 = off, clamped to a week). The
+   cyclic scheduler applies it on the timeline after the daypart gate (`ApplyCooldown`): with a
+   cooldown each round is built from the one before as it actually aired (a chain from the anchor,
+   cached), a series or movie that airs too soon is swapped with a later or earlier run when that
+   leaves fewer violations, keeps neighbours distinct and puts nothing new behind the gate; keys
+   that cannot possibly rest enough in one round are left alone, and the search has a budget.
+   Covers the seam between rounds and weighted repeats. Not applied by the weekly scheduler
+   (stations with time blocks); the Movie night preset sets 8 h. Dashboard field under the pool
+   options.
 
 Considered and parked: off-air hours (a daypart rule approximates it),
 custom guide titles per block, studio and people sources, smart (search) collections, multi-part
@@ -257,17 +257,17 @@ suggester covers it). Revisit when someone asks.
 
 ---
 
-## Phase 6 â€” easy for non-technical people
+## Phase 6 — easy for non-technical people
 
 From a 2026-10-19 review of the dashboard: the base is solid but speaks engineer. In payoff order.
 
-1. **Guided start and presets â€” DONE 2026-10-19.** With no stations, the list sends the person to
+1. **Guided start and presets — DONE 2026-10-19.** With no stations, the list sends the person to
    the suggestions with a welcome banner ("Create selected" or "Start from a preset"). "New
    station" opens a preset page (Shuffle a collection, Kids channel, Movie night, Comfort reruns,
    Holiday channel, One show start to finish, Weekly schedule, Play a fixed list); a preset fills
    in mode, order, marathons, padding, family hours, season window and tag behaviour, and can cap
    the rating or item kind of every source added afterwards (`PRESETS` in tvstation.js).
-2. **Plain words â€” DONE 2026-10-19.** Modes read "Shuffle a collection" / "Weekly schedule" /
+2. **Plain words — DONE 2026-10-19.** Modes read "Shuffle a collection" / "Weekly schedule" /
    "Play a fixed list" with examples; "Recompile" is "Refresh content" everywhere; daytime rules
    are "Family hours"; the revision is no longer shown. Call sign, padding grid, anchor, card
    text, excluded tags, minimum length and encoding sit under an **Advanced** fold. Health
@@ -280,6 +280,17 @@ From a 2026-10-19 review of the dashboard: the base is solid but speaks engineer
 4. **Paint the week.** A seven-day grid for blocks on top of the existing block data. Large.
 5. **Smaller wins.** Duplicate station, "Pause" instead of a Disabled badge, generated logos, a
    one-line plain summary per row, a read-only "What's on" page for non-admins.
+
+---
+
+## Backlog
+
+Dropped from the plan on 2026-10-19; here in case it is ever wanted again.
+
+- **M3U and XMLTV export.** `GET /TvStation/Channels.m3u` and `GET /TvStation/Guide.xml` with a
+  per-plugin access token in the URL, serving the same MPEG-TS stream the Live TV path uses and
+  the same schedule as XMLTV, so VLC, Kodi, Tivimate, Plex or Emby could tune in. Not needed
+  while every viewer uses a Jellyfin client. Medium.
 
 ---
 

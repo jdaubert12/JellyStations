@@ -494,6 +494,7 @@ public sealed class StationService
             r.MaxRating = Library.RatingLadder.Normalize(r.MaxRating) ?? string.Empty;
         }
 
+        s.Pool.CooldownHours = Math.Clamp(s.Pool.CooldownHours, 0, 168);
         s.Pool.MarathonMin = Math.Clamp(s.Pool.MarathonMin, 1, 50);
         s.Pool.MarathonMax = Math.Clamp(s.Pool.MarathonMax, s.Pool.MarathonMin, 50);
         s.Slots.Filler.Sources ??= new List<ContentSource>();

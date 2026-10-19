@@ -26,6 +26,9 @@ public sealed class ScheduleInput
 
     public bool AvoidSameSeriesBackToBack { get; init; }
 
+    /// <summary>Hours a series or movie rests before it may air again (0 = off).</summary>
+    public int CooldownHours { get; init; }
+
     public int MarathonMin { get; init; } = 1;
 
     public int MarathonMax { get; init; } = 1;
@@ -93,6 +96,7 @@ public sealed class ScheduleInput
             Pool = compiled.Pool,
             PoolOrder = station.Pool.Order,
             AvoidSameSeriesBackToBack = station.Pool.AvoidSameSeriesBackToBack,
+            CooldownHours = Math.Clamp(station.Pool.CooldownHours, 0, 168),
             MarathonMin = station.Pool.MarathonMin,
             MarathonMax = station.Pool.MarathonMax,
             DaypartRules = (station.Pool.DaypartRules ?? new List<DaypartRule>())

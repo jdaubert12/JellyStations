@@ -43,8 +43,8 @@
     { key: 'shuffle', icon: 'shuffle', name: 'Shuffle a collection', desc: 'Pick any shows and movies; they play around the clock, reshuffled each round, never the same show or film twice in a row.', next: 'Next: add shows and movies.', apply: () => {} },
     { key: 'kids', icon: 'child_care', name: 'Kids channel', desc: 'Cartoons and family shows all day, rated G or below. Each show plays two or three episodes in order before switching.', next: 'Next: add the shows. Whatever you add is limited to G unless you change it.', sourceDefaults: { MaxRating: 'G', AllowUnrated: false },
       apply: d => { d.Pool.Order = 'ShuffleEpisodesInOrder'; d.Pool.MarathonMin = 2; d.Pool.MarathonMax = 3; d.PaddingByLength = true; d.PaddingGridMinutes = 0; } },
-    { key: 'movies', icon: 'movie', name: 'Movie night', desc: 'Films in two-hour slots, shuffled, never the same one twice in a row. Nothing above PG-13 before 8 pm.', next: 'Next: add a genre, a collection or single films.', sourceDefaults: { ItemKinds: ['Movie'] },
-      apply: d => { d.PaddingByLength = true; d.PaddingGridMinutes = 0; d.Pool.DaypartRules = [{ StartLocal: '06:00', EndLocal: '20:00', MaxRating: 'PG-13', AllowUnrated: true }]; } },
+    { key: 'movies', icon: 'movie', name: 'Movie night', desc: 'Films in two-hour slots, shuffled, and a film rests at least eight hours before it plays again. Nothing above PG-13 before 8 pm.', next: 'Next: add a genre, a collection or single films.', sourceDefaults: { ItemKinds: ['Movie'] },
+      apply: d => { d.PaddingByLength = true; d.PaddingGridMinutes = 0; d.Pool.CooldownHours = 8; d.Pool.DaypartRules = [{ StartLocal: '06:00', EndLocal: '20:00', MaxRating: 'PG-13', AllowUnrated: true }]; } },
     { key: 'reruns', icon: 'tv', name: 'Comfort reruns', desc: 'A few favourite shows in half-hour and hour slots. A random show comes up, always on its next episode.', next: 'Next: add the shows.', sourceDefaults: { ItemKinds: ['Episode'] },
       apply: d => { d.Pool.Order = 'ShuffleEpisodesInOrder'; d.PaddingByLength = true; d.PaddingGridMinutes = 0; } },
     { key: 'holiday', icon: 'ac_unit', name: 'Holiday channel', desc: 'Seasonal films and specials. The channel only appears in the guide from late November to early January.', next: 'Next: add the holiday titles. The excluded tags from Settings are off here so holiday-tagged items stay in.',
@@ -1036,7 +1036,7 @@
       PaddingGridMinutes: 0,
       PaddingByLength: false,
       Mode: 'Pool',
-      Pool: { Sources: [], Order: 'Shuffle', AvoidSameSeriesBackToBack: true, MarathonMin: 1, MarathonMax: 1, DaypartRules: [] },
+      Pool: { Sources: [], Order: 'Shuffle', AvoidSameSeriesBackToBack: true, CooldownHours: 0, MarathonMin: 1, MarathonMax: 1, DaypartRules: [] },
       Slots: { Blocks: [], Filler: { Sources: [], Order: 'Shuffle' } },
       Lineup: { Items: [] },
       Encoding: null,
@@ -1059,6 +1059,7 @@
     if (s.Pool.AvoidSameSeriesBackToBack === undefined) {
       s.Pool.AvoidSameSeriesBackToBack = true;
     }
+    s.Pool.CooldownHours = Math.min(168, Math.max(0, parseInt(s.Pool.CooldownHours, 10) || 0));
     s.Pool.MarathonMin = Math.max(1, parseInt(s.Pool.MarathonMin, 10) || 1);
     s.Pool.MarathonMax = Math.max(s.Pool.MarathonMin, parseInt(s.Pool.MarathonMax, 10) || 1);
     s.Pool.DaypartRules = Array.isArray(s.Pool.DaypartRules) ? s.Pool.DaypartRules : [];
@@ -1313,6 +1314,7 @@
     // Mode panels
     setVal('#tvsPoolOrder', d.Pool.Order);
     setChecked('#tvsPoolAvoid', d.Pool.AvoidSameSeriesBackToBack !== false);
+    setVal('#tvsPoolCooldown', d.Pool.CooldownHours || 0);
     setVal('#tvsMarathonMin', d.Pool.MarathonMin || 1);
     setVal('#tvsMarathonMax', d.Pool.MarathonMax || 1);
     renderDaypartRows();
@@ -1474,6 +1476,7 @@
     d.Mode = val('#tvsMode') || 'Pool';
     d.Pool.Order = val('#tvsPoolOrder') || 'Shuffle';
     d.Pool.AvoidSameSeriesBackToBack = checked('#tvsPoolAvoid');
+    d.Pool.CooldownHours = Math.min(168, Math.max(0, parseInt(val('#tvsPoolCooldown'), 10) || 0));
     d.Pool.MarathonMin = Math.max(1, parseInt(val('#tvsMarathonMin'), 10) || 1);
     d.Pool.MarathonMax = Math.max(d.Pool.MarathonMin, parseInt(val('#tvsMarathonMax'), 10) || 1);
     d.Slots.Filler.Order = val('#tvsFillerOrder') || 'Shuffle';

@@ -8,6 +8,13 @@ public sealed class PoolConfig
 
     public bool AvoidSameSeriesBackToBack { get; set; } = true;
 
+    /// <summary>
+    /// Hours a series or movie must rest after airing before it may come back (0 = off). A soft rule applied on the
+    /// timeline; it matters at the seam between two rounds and for weighted repeats. Stations with time blocks run
+    /// on the weekly scheduler, where it is not applied.
+    /// </summary>
+    public int CooldownHours { get; set; }
+
     /// <summary>When shuffling: fewest episodes of one show to play back to back before switching. 1 = no marathons.</summary>
     public int MarathonMin { get; set; } = 1;
 
