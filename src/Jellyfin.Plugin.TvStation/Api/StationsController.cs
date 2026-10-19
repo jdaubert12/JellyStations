@@ -39,6 +39,7 @@ public sealed class StationsController : ControllerBase
         {
             var compiled = _stations.GetCompiled(s.Id);
             var resolved = _resolver.Resolve(s.Id, now);
+            var fault = _sessions.LastFault(s.Id);
             return new StationSummaryDto
             {
                 Id = s.Id,
@@ -54,10 +55,29 @@ public sealed class StationsController : ControllerBase
                 Streaming = _sessions.Get(s.Id) is { IsDisposed: false },
                 Seasonal = SeasonWindows.IsSeasonal(s),
                 InSeason = SeasonWindows.IsActive(s, now),
-                NextSeasonChange = SeasonWindows.NextChange(s, now)?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture)
+                NextSeasonChange = SeasonWindows.NextChange(s, now)?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                Next = resolved is null ? new List<ScheduleEntryDto>() : NextPrograms(s.Id, now),
+                LastError = fault?.Message,
+                LastErrorUtc = fault?.Utc,
+                Health = StationHealth.Build(s, compiled)
             };
         });
         return Ok(result.ToList());
+    }
+
+    /// <summary>The next two programs after the one airing now; bumper clips are skipped and a slate only shows when nothing else follows.</summary>
+    private List<ScheduleEntryDto> NextPrograms(Guid stationId, DateTime now)
+    {
+        var upcoming = _resolver.Enumerate(stationId, now, now.AddHours(12))
+            .Where(e => e.StartUtc > now && e.Kind != EntryKind.Bumper)
+            .ToList();
+        var programs = upcoming.Where(e => e.Kind == EntryKind.Program).Take(2).ToList();
+        if (programs.Count == 0 && upcoming.Count > 0)
+        {
+            programs.Add(upcoming[0]);
+        }
+
+        return programs.Select(e => Map.Entry(e, null)).ToList();
     }
 
     /// <summary>All station definitions as a JSON array suitable for backup or for POST Import.</summary>
@@ -283,6 +303,14 @@ public sealed class StationsController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>Forgets the last streaming fault shown on the station row.</summary>
+    [HttpPost("{id}/Stream/ClearError")]
+    public IActionResult ClearStreamError([FromRoute] Guid id)
+    {
+        _sessions.ClearFault(id);
+        return NoContent();
+    }
+
     [HttpPost("{id}/Stream/Stop")]
     public IActionResult StopStream([FromRoute] Guid id)
     {
@@ -325,7 +353,7 @@ internal static class Map
             StartUtc = DateTime.SpecifyKind(e.StartUtc, DateTimeKind.Utc),
             EndUtc = DateTime.SpecifyKind(e.EndUtc, DateTimeKind.Utc),
             Kind = e.Kind,
-            Title = e.Kind == EntryKind.Slate ? "Station Break" : e.Item?.DisplayTitle ?? string.Empty,
+            Title = e.Kind == EntryKind.Slate ? "Station Break" : e.Item?.Title ?? string.Empty,
             EpisodeTitle = e.Item?.IsSeries == true ? e.Item.EpisodeTitle : null,
             SeasonNumber = e.Item?.SeasonNumber,
             EpisodeNumber = e.Item?.EpisodeNumber,

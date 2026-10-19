@@ -192,11 +192,26 @@ analyzer, then suggestion rules and the dashboard view on top of it.
 
 ## Phase 4 — operations and polish
 
-- **Clearer failure diagnostics.** Distinguish permission denied from not found when a file
-  cannot be opened; surface the last encoder error on the station row. Small.
-- **Health report.** Nightly summary on the dashboard: sources that expanded to zero items,
-  stations under one day of unique content, excluded counts by reason. Small.
-- **Now and next on the station row.** Next two programs and time to switch. Small.
+- **Clearer failure diagnostics â€” DONE 2026-10-19.** `FileProbe` tells permission denied, file
+  not found and folder not found (unmounted share) apart before a program is skipped. Every
+  streaming fault (unopenable file, early ffmpeg exit with its last stderr line, overlay or slate
+  failure, ffmpeg not starting) is kept per station in `StreamSessionManager` after the session
+  ends and shown on the station row until dismissed (`POST Stations/{id}/Stream/ClearError`).
+- **Health report â€” DONE 2026-10-19.** The compiler records what every source found and kept
+  (`CompiledStation.Sources`); `StationHealth` (pure, tested) turns the last compile into
+  warnings: sources that matched nothing or contributed nothing, under a day of unique content,
+  items skipped for no runtime / path / file. `GET /TvStation/Health` feeds a Health section on
+  the Status view; the station row carries "empty source" and "N h unique" badges and a
+  by-reason tooltip on the excluded count. It reflects the nightly recompile; no extra task.
+- **Same movie twice in a row â€” FIXED 2026-10-19.** The back-to-back rule only compared series ids,
+  so a film could follow itself across the seam between two shuffle cycles (seen with Dogma on
+  Comedy). `PoolOrdering.KeyOf` now keys the rule on the series, or the movie's title and year
+  (two library entries of one film count as one); the cyclic scheduler re-checks the seam after
+  the daypart gate against the last program the previous cycle actually airs. Stations whose
+  shuffle never produced a repeat keep their timeline; the rest change only at those seams.
+- **Now and next on the station row â€” DONE 2026-10-19.** Time left in the current program and
+  the next two programs with start times (bumper clips skipped; a slate only when nothing else
+  follows); the list refreshes itself every minute while it is on screen.
 - **Richer guide entries.** Thumbnails, season/episode numbers, year and rating confirmed flowing
   into the guide on the dev server 2026-10-16 (movie poster, episode thumb, series-poster fallback
   all served; channel logo too). Image paths are captured at compile time, so artwork added later
@@ -239,6 +254,32 @@ custom guide titles per block, studio and people sources, smart (search) collect
 episode grouping, rerun blocks, channel redirects, on-demand channels (contradicts the always-on
 clock), DVR (files are already in the library), music videos, AI lineup builder (the rule-based
 suggester covers it). Revisit when someone asks.
+
+---
+
+## Phase 6 â€” easy for non-technical people
+
+From a 2026-10-19 review of the dashboard: the base is solid but speaks engineer. In payoff order.
+
+1. **Guided start and presets â€” DONE 2026-10-19.** With no stations, the list sends the person to
+   the suggestions with a welcome banner ("Create selected" or "Start from a preset"). "New
+   station" opens a preset page (Shuffle a collection, Kids channel, Movie night, Comfort reruns,
+   Holiday channel, One show start to finish, Weekly schedule, Play a fixed list); a preset fills
+   in mode, order, marathons, padding, family hours, season window and tag behaviour, and can cap
+   the rating or item kind of every source added afterwards (`PRESETS` in tvstation.js).
+2. **Plain words â€” DONE 2026-10-19.** Modes read "Shuffle a collection" / "Weekly schedule" /
+   "Play a fixed list" with examples; "Recompile" is "Refresh content" everywhere; daytime rules
+   are "Family hours"; the revision is no longer shown. Call sign, padding grid, anchor, card
+   text, excluded tags, minimum length and encoding sit under an **Advanced** fold. Health
+   warnings carry "Refresh content" / "Add content" buttons and the row's warning badges open the
+   station. Checked in Chrome on the dev server 2026-10-19: also fixed the schedule DTO sending the
+   combined "Series - Episode" title (rows and previews doubled the episode name), added a Save
+   button to the editor toolbar, and reworded the remaining compile / pool / slot wording.
+3. **Three-step editor.** Name and look (with a generated logo), What plays, When; the current
+   long form stays as the advanced view. Medium.
+4. **Paint the week.** A seven-day grid for blocks on top of the existing block data. Large.
+5. **Smaller wins.** Duplicate station, "Pause" instead of a Disabled badge, generated logos, a
+   one-line plain summary per row, a read-only "What's on" page for non-admins.
 
 ---
 

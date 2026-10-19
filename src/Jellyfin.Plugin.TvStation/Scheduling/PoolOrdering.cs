@@ -4,11 +4,28 @@ namespace Jellyfin.Plugin.TvStation.Scheduling;
 
 /// <summary>
 /// The order a pool plays in during one pass (cycle): a seeded shuffle, optionally cut into marathon runs, with
-/// the same series kept apart (also across the seam from the previous pass) and episodes put in order when asked.
-/// Shared by the continuous pool scheduler and the weekly scheduler, which plays the pool between blocks.
+/// the same series or movie kept apart (also across the seam from the previous pass) and episodes put in order
+/// when asked. Shared by the continuous pool scheduler and the weekly scheduler, which plays the pool between blocks.
 /// </summary>
 internal static class PoolOrdering
 {
+    /// <summary>
+    /// What "the same thing" means for back-to-back checks: the series for an episode, the title and year for a
+    /// movie (so two library entries of one film count as one), the item id for anything else.
+    /// </summary>
+    public static string KeyOf(PlayableItem item)
+    {
+        if (item.SeriesId is { } series)
+        {
+            return "s:" + series.ToString("N");
+        }
+
+        var title = item.Title?.Trim();
+        return string.IsNullOrEmpty(title)
+            ? "i:" + item.ItemId.ToString("N")
+            : "m:" + title.ToUpperInvariant() + "|" + (item.ProductionYear?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty);
+    }
+
     /// <summary>Runs for pass <paramref name="k"/>: marathon runs, or one item per run.</summary>
     public static List<int[]> BuildRuns(IReadOnlyList<PlayableItem> items, PlayOrder order, bool avoidRepeats, int marathonMin, int marathonMax, Func<long, ulong> seed, long k)
     {
@@ -30,12 +47,12 @@ internal static class PoolOrdering
         if (avoidRepeats && runs.Count > 2)
         {
             var prev = MarathonOrder.BuildRuns(items, order, marathonMin, marathonMax, avoidRepeats, seed(k - 1));
-            var prevSeries = items[prev[^1][^1]].SeriesId;
-            if (prevSeries.HasValue && MarathonOrder.SeriesOf(runs[0], items) == prevSeries)
+            var prevKey = KeyOf(items[prev[^1][^1]]);
+            if (MarathonOrder.KeyOfRun(runs[0], items) == prevKey)
             {
                 for (var j = 1; j < runs.Count; j++)
                 {
-                    if (MarathonOrder.TrySwap(runs, items, 0, j, prevSeries))
+                    if (MarathonOrder.TrySwap(runs, items, 0, j, prevKey))
                     {
                         break;
                     }
@@ -58,12 +75,12 @@ internal static class PoolOrdering
         if (avoidRepeats && shuffle && items.Count > 2)
         {
             var prevLast = BuildOrder(items, shuffle, avoidRepeats, seed, k - 1);
-            var prevSeries = items[prevLast[^1]].SeriesId;
-            if (prevSeries.HasValue && items[result[0]].SeriesId == prevSeries)
+            var prevKey = KeyOf(items[prevLast[^1]]);
+            if (KeyOf(items[result[0]]) == prevKey)
             {
                 for (var j = 1; j < result.Length; j++)
                 {
-                    if (TrySwap(result, items, 0, j, prevSeries))
+                    if (TrySwap(result, items, 0, j, prevKey))
                     {
                         break;
                     }
@@ -112,21 +129,16 @@ internal static class PoolOrdering
         return order;
     }
 
-    /// <summary>True if the item at idx has the same (non-null) series as its predecessor (or as beforeStart for idx 0).</summary>
-    private static bool Violation(int[] order, IReadOnlyList<PlayableItem> items, int idx, Guid? beforeStart)
+    /// <summary>True if the item at idx is the same series or movie as its predecessor (or as beforeStart for idx 0).</summary>
+    private static bool Violation(int[] order, IReadOnlyList<PlayableItem> items, int idx, string? beforeStart)
     {
-        var s = items[order[idx]].SeriesId;
-        if (!s.HasValue)
-        {
-            return false;
-        }
-
-        var prev = idx == 0 ? beforeStart : items[order[idx - 1]].SeriesId;
-        return prev == s;
+        var key = KeyOf(items[order[idx]]);
+        var prev = idx == 0 ? beforeStart : KeyOf(items[order[idx - 1]]);
+        return prev == key;
     }
 
     /// <summary>Swaps a and b if doing so introduces no adjacency violation around either position; reverts otherwise.</summary>
-    private static bool TrySwap(int[] order, IReadOnlyList<PlayableItem> items, int a, int b, Guid? beforeStart)
+    private static bool TrySwap(int[] order, IReadOnlyList<PlayableItem> items, int a, int b, string? beforeStart)
     {
         (order[a], order[b]) = (order[b], order[a]);
         foreach (var idx in new[] { a, a + 1, b, b + 1 })

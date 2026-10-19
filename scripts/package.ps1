@@ -2,7 +2,7 @@
 param([string]$Configuration = "Release")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.5.0.0"
+$version = "1.6.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.TvStation\bin\$Configuration\net10.0\Jellyfin.Plugin.TvStation.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -21,7 +21,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Block recurrence: a block can repeat every week (as before), every N weeks from a chosen date, in certain weeks of the month (1st-4th or last; weeks run Monday-Sunday so a weekend stays together), or only on listed dates. Sequential blocks continue across occurrences, so a marathon over two weekends picks up where it left off."
+    changelog = "Station rows show the time left in the current program and the next two programs, the last streaming error (permission denied, file not found and an unmounted folder told apart; early ffmpeg exits carry their last log line) with a dismiss button, and health badges from the last compile. The Status view gains a Health section (GET /TvStation/Health): sources that matched nothing, stations under a day of unique content, items skipped for a missing runtime, path or file. Fixes a movie playing twice in a row across the seam between two shuffle cycles: the back-to-back rule now covers movies as well as series. Easier for non-technical people: an empty dashboard opens on what the library could support, New station starts from a preset (Kids channel, Movie night, Holiday channel and more), modes have plain names, Recompile is now Refresh content, daytime rules are Family hours, rarely used settings sit under Advanced, and health warnings carry fix buttons."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

@@ -109,6 +109,35 @@
       #TvStationPage .tvs-error { margin-bottom: 1em; padding: .6em 1em; border-radius: 4px; border: 1px solid rgba(244,67,54,.7); background: rgba(244,67,54,.15); }
       #TvStationPage .tvs-error ul, #TvStationPage .tvs-warn ul { margin: .3em 0 0 1.2em; padding: 0; }
       #TvStationPage .tvs-warn { margin: .5em 0; padding: .5em 1em; border-radius: 4px; border: 1px solid rgba(255,152,0,.7); background: rgba(255,152,0,.12); }
+      #TvStationPage .tvs-fault { display: flex; align-items: center; gap: .3em; min-width: 0; color: rgba(244,67,54,1); }
+      #TvStationPage .tvs-fault .material-icons { font-size: 1.15em; flex: none; }
+      #TvStationPage .tvs-fault .tvs-ellipsis { flex: 1 1 auto; min-width: 0; }
+      #TvStationPage .tvs-fault-dismiss { flex: none; margin: -.3em 0; opacity: .7; }
+      #TvStationPage .tvs-health { margin: .6em 0; padding: .4em .8em; border-left: 3px solid rgba(255,152,0,.7); background: rgba(255,255,255,.03); border-radius: 0 4px 4px 0; }
+      #TvStationPage .tvs-health-head { display: flex; align-items: center; flex-wrap: wrap; gap: .2em; }
+      #TvStationPage .tvs-health-name { font-weight: 500; }
+      #TvStationPage .tvs-health-list { margin: .3em 0 0; padding-left: 1.4em; }
+      #TvStationPage .tvs-health-list li { margin: .15em 0; }
+      #TvStationPage .tvs-presets { display: grid; grid-template-columns: repeat(auto-fill, minmax(17em, 1fr)); gap: .8em; margin-top: 1em; }
+      #TvStationPage .tvs-preset { display: flex; flex-direction: column; gap: .35em; padding: .9em 1em; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; background: rgba(255,255,255,.04); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+      #TvStationPage .tvs-preset:hover, #TvStationPage .tvs-preset:focus { background: rgba(255,255,255,.09); border-color: rgba(255,255,255,.4); outline: none; }
+      #TvStationPage .tvs-preset .tvs-preset-head { display: flex; align-items: center; gap: .5em; font-weight: 500; font-size: 1.05em; }
+      #TvStationPage .tvs-preset .material-icons { font-size: 1.4em; opacity: .9; }
+      #TvStationPage .tvs-preset .tvs-preset-desc { opacity: .8; font-size: .92em; }
+      #TvStationPage .tvs-preset .tvs-preset-next { opacity: .6; font-size: .85em; margin-top: .2em; }
+      #TvStationPage .tvs-welcome { margin: .5em 0 1em; padding: 1em 1.2em; border-left: 3px solid rgba(0,164,220,.8); background: rgba(0,164,220,.08); border-radius: 0 6px 6px 0; }
+      #TvStationPage .tvs-welcome-title { font-size: 1.15em; font-weight: 500; margin-bottom: .3em; }
+      #TvStationPage .tvs-linkbtn { background: none; border: 0; padding: 0; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+      #TvStationPage details.tvs-advanced { margin: 1.2em 0; border: 1px solid rgba(255,255,255,.14); border-radius: 6px; }
+      #TvStationPage details.tvs-advanced > summary { cursor: pointer; padding: .6em .9em; font-weight: 500; list-style: none; display: flex; align-items: center; gap: .5em; }
+      #TvStationPage details.tvs-advanced > summary::-webkit-details-marker { display: none; }
+      #TvStationPage details.tvs-advanced > summary .material-icons { transition: transform .15s; }
+      #TvStationPage details.tvs-advanced[open] > summary .material-icons { transform: rotate(180deg); }
+      #TvStationPage details.tvs-advanced > summary .tvs-secondary { font-weight: 400; }
+      #TvStationPage details.tvs-advanced > .tvs-advanced-body { padding: .2em 1em 1em; border-top: 1px solid rgba(255,255,255,.1); }
+      #TvStationPage .tvs-health-actions { display: flex; flex-wrap: wrap; gap: .4em; margin-top: .4em; }
+      #TvStationPage .tvs-badge.tvs-clickable { cursor: pointer; }
+      #TvStationPage .tvs-badge.tvs-clickable:hover { background: rgba(255,152,0,.4); }
       #TvStationPage .tvs-ok { color: rgba(82,181,75,1); }
       #TvStationPage .tvs-bad { color: rgba(244,67,54,1); }
 
@@ -132,7 +161,7 @@
             <h2 class="sectionTitle">TV Stations</h2>
             <button is="emby-button" type="button" id="tvsBtnNew" class="raised button-submit emby-button"><span>New station</span></button>
             <button is="emby-button" type="button" id="tvsBtnSuggest" class="raised emby-button" title="Stations the library could support, ready to create"><span>Suggest stations</span></button>
-            <button is="emby-button" type="button" id="tvsBtnRecompileAll" class="raised emby-button" title="Re-scan the library for every station so newly added items join their rotations; refreshes the guide if anything changed"><span>Recompile all</span></button>
+            <button is="emby-button" type="button" id="tvsBtnRecompileAll" class="raised emby-button" title="Re-scan the library for every station so newly added movies and episodes join their channels; refreshes the guide if anything changed"><span>Refresh content</span></button>
             <button is="emby-button" type="button" id="tvsBtnRefreshGuide" class="raised emby-button" title="Ask Jellyfin to refresh the Live TV guide now"><span>Refresh guide</span></button>
             <button is="emby-button" type="button" id="tvsBtnSettings" class="raised emby-button"><span>Settings</span></button>
             <button is="emby-button" type="button" id="tvsBtnStatus" class="raised emby-button"><span>Status</span></button>
@@ -141,7 +170,13 @@
             <input type="file" id="tvsImportFile" accept=".json,application/json" class="tvs-hidden">
           </div>
           <div id="tvsListError" class="tvs-error tvs-hidden"></div>
-          <div id="tvsStationEmpty" class="tvs-empty tvs-hidden">No stations yet. Click “New station” to create your first channel.</div>
+          <div id="tvsStationEmpty" class="tvs-empty tvs-hidden">
+            <div>No channels yet.</div>
+            <div class="tvs-inline" style="margin-top:.8em;justify-content:center">
+              <button is="emby-button" type="button" id="tvsBtnEmptySuggest" class="raised button-submit emby-button"><span>See what your library could support</span></button>
+              <button is="emby-button" type="button" id="tvsBtnEmptyNew" class="raised emby-button"><span>Start from a preset</span></button>
+            </div>
+          </div>
           <div id="tvsStationList" class="paperList"></div>
         </div>
 
@@ -155,16 +190,31 @@
             <button is="emby-button" type="button" id="tvsBtnSuggestRefresh" class="raised emby-button" title="Re-scan the library"><span>Re-scan library</span></button>
             <button is="emby-button" type="button" id="tvsBtnSuggestBack" class="raised emby-button"><span>Back to list</span></button>
           </div>
+          <div id="tvsSuggestWelcome" class="tvs-welcome tvs-hidden">
+            <div class="tvs-welcome-title">Welcome to TV Stations</div>
+            <div>Here is what your library could support, ready to go. Tick the channels you like and press <strong>Create selected</strong>; each one can be changed later. Prefer to build your own? <button type="button" id="tvsBtnSuggestPreset" class="tvs-linkbtn">Start from a preset</button>.</div>
+          </div>
           <div class="fieldDescription">Built from what is in the library: genres and series with enough hours, kids and family content by rating, franchises found from titles, collections, decades and holiday tags. Tick the ones you want; they are created with the next free channel numbers and can be edited afterwards like any station.</div>
           <div id="tvsSuggestError" class="tvs-error tvs-hidden"></div>
           <div id="tvsSuggestEmpty" class="tvs-empty tvs-hidden">Nothing to suggest yet. Add more movies or shows, or lower your expectations.</div>
           <div id="tvsSuggestList" class="paperList"></div>
         </div>
 
+        <!-- ===================== New station: presets ===================== -->
+        <div id="tvsViewPresets" class="tvs-view tvs-hidden">
+          <div class="tvs-toolbar">
+            <h2 class="sectionTitle">New station</h2>
+            <button is="emby-button" type="button" id="tvsBtnPresetsBack" class="raised emby-button"><span>Back to list</span></button>
+          </div>
+          <div class="fieldDescription">Pick the kind of channel you want. The preset fills in the schedule settings; you add the shows and movies on the next page and can change anything later.</div>
+          <div id="tvsPresetList" class="tvs-presets"></div>
+        </div>
+
         <!-- ===================== Station editor ===================== -->
         <div id="tvsViewEditor" class="tvs-view tvs-hidden">
           <div class="tvs-toolbar">
             <h2 class="sectionTitle" id="tvsEditorTitle">New station</h2>
+            <button is="emby-button" type="button" id="tvsBtnSaveTop" class="raised button-submit emby-button"><span>Save</span></button>
             <button is="emby-button" type="button" id="tvsBtnEditorBack" class="raised emby-button"><span>Back to list</span></button>
           </div>
           <div id="tvsEditorErrors" class="tvs-error tvs-hidden"></div>
@@ -180,40 +230,10 @@
                 <input is="emby-input" id="tvsChannel" label="Channel number" type="text" autocomplete="off">
                 <div class="fieldDescription">A number such as 5 or 5.1. Must be unique across stations.</div>
               </div>
-              <div class="inputContainer">
-                <input is="emby-input" id="tvsCallSign" label="Call sign" type="text" autocomplete="off">
-                <div class="fieldDescription">Optional short identifier, e.g. WKRP.</div>
-              </div>
               <div class="selectContainer">
                 <label class="selectLabel" for="tvsTimeZone">Time zone</label>
                 <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsTimeZone"></select>
-                <div class="fieldDescription">Used for slot block start times and the day-of-week boundary.</div>
-              </div>
-              <div class="inputContainer">
-                <input is="emby-input" id="tvsAnchor" label="Schedule anchor" type="datetime-local">
-                <div class="fieldDescription">The schedule epoch: cycles and weeks are counted from this moment, so the schedule is reproducible. Changing it reshuffles the entire schedule.</div>
-                <div class="tvs-inline" style="margin-top:.5em">
-                  <button is="emby-button" type="button" id="tvsBtnResetAnchor" class="raised emby-button"><span>Reset anchor to now</span></button>
-                  <span id="tvsAnchorHint" class="tvs-secondary"></span>
-                  <button is="emby-button" type="button" id="tvsBtnAnchorNow" class="raised emby-button tvs-inline-btn" title="Start the schedule from now (rounded down to the padding grid)"><span>Set to now</span></button>
-                </div>
-              </div>
-              <div class="inputContainer">
-                <input is="emby-input" id="tvsCardText" label="Station card text" type="text" maxlength="80" placeholder="We'll be right back">
-                <div class="fieldDescription">Shown on the card during gaps and breaks.</div>
-              </div>
-              <div class="selectContainer">
-                <label class="selectLabel" for="tvsPadding">Padding grid</label>
-                <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsPadding">
-                  <option value="0">None – programs play back to back</option>
-                  <option value="5">5 minutes</option>
-                  <option value="10">10 minutes</option>
-                  <option value="15">15 minutes</option>
-                  <option value="30">30 minutes</option>
-                  <option value="60">60 minutes</option>
-                  <option value="length">By length – half hours up to 60 min, whole hours beyond</option>
-                </select>
-                <div class="fieldDescription">With a grid, a “Station Break” slate pads each program so the next one starts on the grid (e.g. :00 / :30), like a real channel. “By length” gives a 22-minute episode a half-hour slot and a 95-minute film a two-hour slot. Without padding, programs start as soon as the previous ends.</div>
+                <div class="fieldDescription">Used for family hours and time block start times.</div>
               </div>
             </div>
             <div class="checkboxContainer checkboxContainer-withDescription">
@@ -222,6 +242,13 @@
                 <span>Enabled</span>
               </label>
               <div class="fieldDescription checkboxFieldDescription">Disabled stations are hidden from the guide and cannot be streamed.</div>
+            </div>
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsNightly">
+                <span>Refresh content nightly</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">Re-scan the library every night so newly added movies and episodes join this channel automatically.</div>
             </div>
             <div class="tvs-season">
               <div class="inputLabel">Season (optional)</div>
@@ -244,28 +271,6 @@
                   <option value="winter">Winter (Dec 1 – Feb 28)</option>
                 </select>
               </div>
-            </div>
-            <div class="inputContainer">
-              <input is="emby-input" id="tvsExcludedTags" label="Exclude tags" type="text" autocomplete="off" placeholder="e.g. christmas, halloween">
-              <div class="fieldDescription">Comma-separated library tags. Items carrying one are kept off this station when a source expands to them. Hand-picked movies and episodes, and a Tag source for the same tag, are never affected.</div>
-            </div>
-            <div class="inputContainer">
-              <input is="emby-input" id="tvsMinRuntime" label="Skip items shorter than (minutes)" type="number" min="0" max="600" step="1">
-              <div class="fieldDescription">Drops shorts, trailers and stubs from the pool, filler and blocks. 0 = off. Lineups and bumpers are not affected.</div>
-            </div>
-            <div class="checkboxContainer checkboxContainer-withDescription">
-              <label class="emby-checkbox-label">
-                <input is="emby-checkbox" type="checkbox" id="tvsUseGlobalTags">
-                <span>Also apply the excluded tags from Settings</span>
-              </label>
-              <div class="fieldDescription checkboxFieldDescription">Turn off for a station that should play tagged items regardless of the plugin-wide list.</div>
-            </div>
-            <div class="checkboxContainer checkboxContainer-withDescription">
-              <label class="emby-checkbox-label">
-                <input is="emby-checkbox" type="checkbox" id="tvsNightly">
-                <span>Refresh content nightly</span>
-              </label>
-              <div class="fieldDescription checkboxFieldDescription">Recompile the station every night so newly added library items are picked up automatically.</div>
             </div>
           </div>
 
@@ -308,16 +313,16 @@
             <div class="selectContainer">
               <label class="selectLabel" for="tvsMode">Mode</label>
               <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsMode">
-                <option value="Pool">Pool – a content pool, with optional time blocks</option>
-                <option value="Slots">Slots – weekly time blocks with filler in between</option>
-                <option value="Lineup">Lineup – a hand-ordered list that loops forever</option>
+                <option value="Pool">Shuffle a collection – shows and movies play around the clock, reshuffled each round</option>
+                <option value="Slots">Weekly schedule – blocks at fixed times each week, with filler in between</option>
+                <option value="Lineup">Play a fixed list – your hand-ordered list, looping forever</option>
               </select>
               <div class="fieldDescription" id="tvsModeHelp"></div>
             </div>
 
             <!-- Pool -->
             <div id="tvsPanelPool" class="tvs-panel">
-              <h4 class="tvs-subtitle">Content pool</h4>
+              <h4 class="tvs-subtitle">What plays</h4>
               <div id="tvsPoolPicker"></div>
               <div class="tvs-grid2">
                 <div class="selectContainer">
@@ -332,9 +337,9 @@
               <div class="checkboxContainer checkboxContainer-withDescription">
                 <label class="emby-checkbox-label">
                   <input is="emby-checkbox" type="checkbox" id="tvsPoolAvoid">
-                  <span>Avoid the same series back-to-back</span>
+                  <span>Avoid the same series or movie back-to-back</span>
                 </label>
-                <div class="fieldDescription checkboxFieldDescription">When shuffling, episodes of the same series are spread out where possible.</div>
+                <div class="fieldDescription checkboxFieldDescription">When shuffling, episodes of the same series are spread out and a movie never follows itself, including across the seam between two cycles, where possible.</div>
               </div>
               <div class="tvs-grid2">
                 <div class="inputContainer">
@@ -346,10 +351,10 @@
               </div>
               <div class="fieldDescription">When shuffling, play this many episodes of one show back to back before switching to another. Leave both at 1 for no marathons. Movies always play one at a time.</div>
               <div class="tvs-season">
-                <div class="inputLabel">Daytime rules (optional)</div>
-                <div class="fieldDescription">Limit ratings by time of day, in the station's time zone, e.g. nothing above PG between 06:00 and 20:00. Items that would overlap a window are moved to a later slot (with time blocks: skipped until they are allowed); if nothing may play, a station card shows instead. Blocks are not affected.</div>
+                <div class="inputLabel">Family hours (optional)</div>
+                <div class="fieldDescription">Keep stronger ratings out of the daytime, for example nothing above PG between 06:00 and 20:00 (station time zone). Anything that would overlap the window moves to a later slot; if nothing may play, a station card shows instead. Time blocks are not affected.</div>
                 <div id="tvsDaypartRows"></div>
-                <button is="emby-button" type="button" id="tvsBtnAddDaypart" class="raised emby-button"><span>Add rule</span></button>
+                <button is="emby-button" type="button" id="tvsBtnAddDaypart" class="raised emby-button"><span>Add family hours</span></button>
               </div>
               <div id="tvsPoolCycle" class="tvs-info"></div>
             </div>
@@ -369,8 +374,8 @@
 
             <!-- Slots -->
             <div id="tvsPanelSlots" class="tvs-panel tvs-hidden">
-              <h4 class="tvs-subtitle">Filler</h4>
-              <div class="fieldDescription">Played whenever no block is active, and in the remainder of blocks that hand leftover time to filler.</div>
+              <h4 class="tvs-subtitle">Filler (between blocks)</h4>
+              <div class="fieldDescription">Plays whenever no block is on, and fills the rest of a block that ends early.</div>
               <div id="tvsFillerPicker"></div>
               <div class="tvs-grid2">
                 <div class="selectContainer">
@@ -396,8 +401,57 @@
             </div>
           </div>
 
-          <div class="verticalSection">
-            <h3 class="sectionTitle">Encoding</h3>
+          <details class="tvs-advanced" id="tvsAdvanced">
+            <summary><span class="material-icons expand_more" aria-hidden="true"></span>Advanced <span class="tvs-secondary">call sign, padding grid, schedule anchor, station card text, excluded tags, minimum length, encoding</span></summary>
+            <div class="tvs-advanced-body">
+              <div class="tvs-grid2">
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsCallSign" label="Call sign" type="text" autocomplete="off">
+                <div class="fieldDescription">Optional short identifier, e.g. WKRP.</div>
+              </div>
+              <div class="selectContainer">
+                <label class="selectLabel" for="tvsPadding">Padding grid</label>
+                <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsPadding">
+                  <option value="0">None – programs play back to back</option>
+                  <option value="5">5 minutes</option>
+                  <option value="10">10 minutes</option>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">60 minutes</option>
+                  <option value="length">By length – half hours up to 60 min, whole hours beyond</option>
+                </select>
+                <div class="fieldDescription">With a grid, a “Station Break” slate pads each program so the next one starts on the grid (e.g. :00 / :30), like a real channel. “By length” gives a 22-minute episode a half-hour slot and a 95-minute film a two-hour slot. Without padding, programs start as soon as the previous ends.</div>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsAnchor" label="Schedule anchor" type="datetime-local">
+                <div class="fieldDescription">The schedule epoch: cycles and weeks are counted from this moment, so the schedule is reproducible. Changing it reshuffles the entire schedule.</div>
+                <div class="tvs-inline" style="margin-top:.5em">
+                  <button is="emby-button" type="button" id="tvsBtnResetAnchor" class="raised emby-button"><span>Reset anchor to now</span></button>
+                  <span id="tvsAnchorHint" class="tvs-secondary"></span>
+                  <button is="emby-button" type="button" id="tvsBtnAnchorNow" class="raised emby-button tvs-inline-btn" title="Start the schedule from now (rounded down to the padding grid)"><span>Set to now</span></button>
+                </div>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsCardText" label="Station card text" type="text" maxlength="80" placeholder="We'll be right back">
+                <div class="fieldDescription">Shown on the card during gaps and breaks.</div>
+              </div>
+              </div>
+            <div class="inputContainer">
+              <input is="emby-input" id="tvsExcludedTags" label="Exclude tags" type="text" autocomplete="off" placeholder="e.g. christmas, halloween">
+              <div class="fieldDescription">Comma-separated library tags. Items carrying one are kept off this station when a source expands to them. Hand-picked movies and episodes, and a Tag source for the same tag, are never affected.</div>
+            </div>
+            <div class="inputContainer">
+              <input is="emby-input" id="tvsMinRuntime" label="Skip items shorter than (minutes)" type="number" min="0" max="600" step="1">
+              <div class="fieldDescription">Keeps shorts, trailers and stubs out of the channel. 0 = off. Fixed lists and bumpers are not affected.</div>
+            </div>
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsUseGlobalTags">
+                <span>Also apply the excluded tags from Settings</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">Turn off for a station that should play tagged items regardless of the plugin-wide list.</div>
+            </div>
+              <h4 class="tvs-subtitle">Encoding</h4>
             <div class="checkboxContainer checkboxContainer-withDescription">
               <label class="emby-checkbox-label">
                 <input is="emby-checkbox" type="checkbox" id="tvsEncodingEnabled">
@@ -406,7 +460,8 @@
               <div class="fieldDescription checkboxFieldDescription">When off, the default profile from Settings is used. Changing encoding restarts this station's stream.</div>
             </div>
             <div id="tvsStationEncoding" class="tvs-hidden"></div>
-          </div>
+            </div>
+          </details>
 
           <div class="verticalSection" id="tvsExcludedSection">
             <h3 class="sectionTitle">Excluded items</h3>
@@ -459,7 +514,7 @@
               <button is="emby-button" type="button" id="tvsBtnContent" class="raised emby-button"><span>Show content</span></button>
        <input is="emby-input" class="tvs-content-filter" id="tvsContentFilter" type="text" placeholder="Filter by title, genre, rating, source…">
             </div>
-            <div class="fieldDescription">Everything the current form values expand to, with per-item exclude switches. Exclusions take effect when you save.</div>
+            <div class="fieldDescription">Every show and film this station will play, with a switch to leave any of them out. Changes take effect when you save.</div>
             <div id="tvsContentSummary" class="tvs-info"></div>
             <div id="tvsContent" class="tvs-tablewrap"></div>
           </div>
@@ -471,14 +526,14 @@
               <button is="emby-button" type="button" class="raised emby-button tvs-preview-btn" data-hours="48"><span>48 hours</span></button>
               <button is="emby-button" type="button" class="raised emby-button tvs-preview-btn" data-hours="168"><span>7 days</span></button>
             </div>
-            <div class="fieldDescription">The preview uses the current, unsaved form values. Times are shown in your browser's local time; the highlighted row is on air now.</div>
+            <div class="fieldDescription">What the station would air with the settings on this page, saved or not. Times are in your browser's local time; the highlighted row is on air now.</div>
             <div id="tvsPreview" class="tvs-tablewrap"></div>
           </div>
 
           <div class="tvs-actions">
             <button is="emby-button" type="button" id="tvsBtnSave" class="raised button-submit emby-button"><span>Save</span></button>
             <button is="emby-button" type="button" id="tvsBtnSaveRefresh" class="raised emby-button"><span>Save &amp; refresh guide</span></button>
-            <button is="emby-button" type="button" id="tvsBtnRecompile" class="raised emby-button" title="Re-expand the saved station's sources against the library"><span>Recompile content</span></button>
+            <button is="emby-button" type="button" id="tvsBtnRecompile" class="raised emby-button" title="Re-scan the library for this station so newly added movies and episodes join it"><span>Refresh content</span></button>
             <button is="emby-button" type="button" id="tvsBtnCancel" class="raised button-cancel emby-button"><span>Cancel</span></button>
           </div>
         </div>
@@ -584,6 +639,11 @@
           <div class="verticalSection">
             <h3 class="sectionTitle">Server</h3>
             <dl id="tvsStatusInfo" class="tvs-kv"></dl>
+          </div>
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Health</h3>
+            <div class="fieldDescription">What the last scan of each station found (nightly, or when you press Refresh content): sources that matched nothing, stations with under a day of unique content, and items skipped for a missing runtime, path or file.</div>
+            <div id="tvsHealth"></div>
           </div>
           <div class="verticalSection">
             <h3 class="sectionTitle">Active sessions</h3>

@@ -24,6 +24,7 @@ public sealed class StreamSessionManager : IDisposable
     private readonly IServerApplicationHost _appHost;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<StreamSessionManager> _logger;
+    private readonly ConcurrentDictionary<Guid, StationFault> _faults = new();
 
     public StreamSessionManager(
         IScheduleResolver resolver,
@@ -54,6 +55,11 @@ public sealed class StreamSessionManager : IDisposable
     public IReadOnlyCollection<StationStreamSession> Sessions => _sessions.Values.ToList();
 
     public StationStreamSession? Get(Guid stationId) => _sessions.TryGetValue(stationId, out var s) ? s : null;
+
+    /// <summary>The last streaming fault recorded for a station, kept after its session ends until cleared or replaced.</summary>
+    public StationFault? LastFault(Guid stationId) => _faults.TryGetValue(stationId, out var f) ? f : null;
+
+    public void ClearFault(Guid stationId) => _faults.TryRemove(stationId, out _);
 
     /// <summary>Returns the running session for a station, starting one if needed, and counts a new consumer.</summary>
     public async Task<StationStreamSession> AcquireAsync(Station station, CancellationToken ct)
@@ -147,7 +153,8 @@ public sealed class StreamSessionManager : IDisposable
                 station.LogoOverlay ?? new LogoOverlayConfig(),
                 station.EffectiveCardText,
                 buffer,
-                logger),
+                logger,
+                message => _faults[station.Id] = new StationFault(DateTime.UtcNow, message)),
             logger);
 
         session.MediaSource.Path = _appHost.GetApiUrlForLocalAccess() + "/LiveTv/LiveStreamFiles/" + session.UniqueId + "/stream.ts";

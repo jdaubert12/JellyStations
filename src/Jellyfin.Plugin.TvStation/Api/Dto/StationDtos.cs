@@ -104,6 +104,53 @@ public sealed class StationSummaryDto
 
     /// <summary>Local date (yyyy-MM-dd) when the station next enters or leaves season, if seasonal.</summary>
     public string? NextSeasonChange { get; set; }
+
+    /// <summary>The next programs after the current one (up to two; bumper clips skipped).</summary>
+    public List<ScheduleEntryDto> Next { get; set; } = new();
+
+    /// <summary>The last streaming fault for this station (missing file, encoder exit), kept until dismissed or replaced.</summary>
+    public string? LastError { get; set; }
+
+    public DateTime? LastErrorUtc { get; set; }
+
+    public StationHealthDto? Health { get; set; }
+}
+
+/// <summary>What the last compile says about a station's content.</summary>
+public sealed class StationHealthDto
+{
+    public Guid StationId { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public string ChannelNumber { get; set; } = string.Empty;
+
+    public bool Enabled { get; set; }
+
+    public DateTime? CompiledUtc { get; set; }
+
+    /// <summary>Hours of distinct programming (each item once; bumper clips not counted).</summary>
+    public double UniqueHours { get; set; }
+
+    /// <summary>Sources that contributed no items, as "Section: Kind \"name\"".</summary>
+    public List<string> EmptySources { get; set; } = new();
+
+    /// <summary>Excluded item counts keyed by <see cref="Models.ExclusionReason"/> name.</summary>
+    public Dictionary<string, int> ExcludedByReason { get; set; } = new();
+
+    /// <summary>Human-readable problems; empty when the station is healthy.</summary>
+    public List<string> Warnings { get; set; } = new();
+
+    public bool Healthy => Warnings.Count == 0;
+}
+
+public sealed class HealthReportDto
+{
+    public string GeneratedUtc { get; set; } = string.Empty;
+
+    public List<StationHealthDto> Stations { get; set; } = new();
+
+    public int StationsWithWarnings { get; set; }
 }
 
 public sealed class ScheduleEntryDto

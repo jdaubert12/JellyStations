@@ -34,7 +34,8 @@ public sealed class LibraryContentResolver
         string audioLanguage,
         List<ExcludedItem> excluded,
         IReadOnlyCollection<string>? excludedTags = null,
-        List<PlayableItem>? tagExcluded = null)
+        List<PlayableItem>? tagExcluded = null,
+        Action<ContentSource, int, int>? onSource = null)
     {
         var result = new List<PlayableItem>();
         var seen = new HashSet<Guid>();
@@ -42,8 +43,10 @@ public sealed class LibraryContentResolver
         {
             var block = new List<PlayableItem>();
             var dropTags = EffectiveExcludedTags(source, excludedTags);
+            var found = 0;
             foreach (var item in ExpandSource(source))
             {
+                found++;
                 if (!seen.Add(item.Id))
                 {
                     continue;
@@ -68,6 +71,8 @@ public sealed class LibraryContentResolver
 
                 block.Add(playable);
             }
+
+            onSource?.Invoke(source, found, block.Count);
 
             // Weight n repeats the whole source block n times so sequential order stays intact (E1..En, E1..En).
             var weight = Math.Clamp(source.Weight, 1, 10);

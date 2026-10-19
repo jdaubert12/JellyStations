@@ -29,6 +29,8 @@ public sealed class FfmpegRestreamer : IDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly TaskCompletionSource _firstBytes = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly ConcurrentQueue<string> _recentErrors = new();
+    private readonly Action<string>? _onFault;
+    private string? _lastStderr;
     private ProcessRunner? _current;
     private Task? _loop;
     private bool _slateTextSupported = true;
@@ -46,8 +48,10 @@ public sealed class FfmpegRestreamer : IDisposable
         LogoOverlayConfig overlay,
         string cardText,
         BroadcastBuffer buffer,
-        ILogger logger)
+        ILogger logger,
+        Action<string>? onFault = null)
     {
+        _onFault = onFault;
         _stationId = stationId;
         _stationName = stationName;
         _ffmpegPath = ffmpegPath;
@@ -112,18 +116,19 @@ public sealed class FfmpegRestreamer : IDisposable
                 // A multi-part item (Blu-ray split into part1/part2) plays as consecutive segments on one clock:
                 // the part the offset falls in now, then the loop comes back here for the next part.
                 var segment = entry.Item?.SegmentAt(resolved.Offset);
+                string? openProblem = null;
                 var playable = entry.Kind != EntryKind.Slate
                     && entry.Item is not null
                     && segment is not null
                     && entry.ProgramId != lastFailedProgramId
-                    && File.Exists(segment.Part.Path);
+                    && (openProblem = FileProbe.Describe(segment.Part.Path)) is null;
 
                 if (!playable)
                 {
-                    if (entry.Kind != EntryKind.Slate && entry.Item is not null && segment is not null && entry.ProgramId != lastFailedProgramId)
+                    if (openProblem is not null && entry.Item is not null)
                     {
-                        _logger.LogWarning("TvStation [{Station}]: file missing for {Title}: {Path}", _stationName, entry.Item.DisplayTitle, segment.Part.Path);
-                        Note("File missing: " + segment.Part.Path);
+                        _logger.LogWarning("TvStation [{Station}]: cannot open {Title}: {Reason}", _stationName, entry.Item.DisplayTitle, openProblem);
+                        Fault(entry.Item.DisplayTitle + ": " + openProblem);
                     }
 
                     var text = entry.Kind == EntryKind.Slate ? _cardText : Station.DefaultCardText;
@@ -166,7 +171,7 @@ public sealed class FfmpegRestreamer : IDisposable
                     // The overlay filter (or the logo file) is the likely culprit: drop the overlay for this session and replay.
                     _overlaySupported = false;
                     _logger.LogWarning("TvStation [{Station}]: ffmpeg exited with {Code} with the logo overlay; continuing without it", _stationName, exitCode);
-                    Note("Logo overlay failed (exit " + exitCode + "); disabled until the stream restarts");
+                    Fault("Logo overlay failed (ffmpeg exit " + exitCode + "); disabled until the stream restarts");
                     continue;
                 }
 
@@ -175,9 +180,12 @@ public sealed class FfmpegRestreamer : IDisposable
                     consecutiveFailures++;
                     lastFailedProgramId = entry.ProgramId;
                     _logger.LogWarning("TvStation [{Station}]: ffmpeg exited with {Code} after {Seconds:0.0}s for {Path}", _stationName, exitCode, ran.TotalSeconds, item.Path);
+                    Fault(item.DisplayTitle + ": ffmpeg exited with code " + exitCode + " after " + ran.TotalSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
+                        + "s (" + part.Part.Path + ")" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
                     if (consecutiveFailures >= 5)
                     {
                         _logger.LogError("TvStation [{Station}]: 5 consecutive encoder failures; showing a slate for 60s", _stationName);
+                        Fault("5 consecutive encoder failures; showing a slate for 60s");
                         await RunSlateAsync(TimeSpan.FromSeconds(60), "Technical difficulties", ct).ConfigureAwait(false);
                         consecutiveFailures = 0;
                     }
@@ -212,7 +220,7 @@ public sealed class FfmpegRestreamer : IDisposable
             catch (Exception ex)
             {
                 _logger.LogError(ex, "TvStation [{Station}]: restreamer loop error", _stationName);
-                Note("Loop error: " + ex.Message);
+                Fault("Restreamer error: " + ex.Message);
                 try
                 {
                     await Task.Delay(TimeSpan.FromSeconds(3), ct).ConfigureAwait(false);
@@ -272,6 +280,7 @@ public sealed class FfmpegRestreamer : IDisposable
             if (code != 0 && !ct.IsCancellationRequested)
             {
                 _logger.LogError("TvStation [{Station}]: slate encoder failed (exit {Code}); pausing 5s", _stationName, code);
+                Fault("Slate encoder failed (ffmpeg exit " + code + ")" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
                 await Task.Delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
             }
         }
@@ -288,7 +297,7 @@ public sealed class FfmpegRestreamer : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "TvStation [{Station}]: cannot start ffmpeg at {Path}", _stationName, _ffmpegPath);
-            Note("Cannot start ffmpeg: " + ex.Message);
+            Fault("Cannot start ffmpeg at " + _ffmpegPath + ": " + ex.Message);
             await Task.Delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
             return -1;
         }
@@ -398,8 +407,16 @@ public sealed class FfmpegRestreamer : IDisposable
             return;
         }
 
+        _lastStderr = line.Trim();
         Note(line);
         _logger.LogDebug("TvStation ffmpeg [{Station}]: {Line}", _stationName, line);
+    }
+
+    /// <summary>Records a fault in the recent log and reports it to the session manager, which keeps the last one per station.</summary>
+    private void Fault(string message)
+    {
+        Note(message);
+        _onFault?.Invoke(message);
     }
 
     private void Note(string line)

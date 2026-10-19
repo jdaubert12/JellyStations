@@ -180,27 +180,19 @@ internal sealed class CyclicScheduler : IStationScheduler
 
     private Cycle BuildCycle(long k)
     {
-        var marathon = MarathonOrder.Enabled(_order, _marathonMin, _marathonMax);
-        var runs = PoolOrdering.BuildRuns(_items, _order, _avoidRepeats, _marathonMin, _marathonMax, Seed, k);
         var cycleStart = _input.AnchorUtc.Ticks + (k * _cycleTicks);
+        var runs = GatedRuns(k, cycleStart);
 
-        if (_rules.Count > 0 && _input.Mode == ScheduleMode.Pool)
+        if (_rules.Count > 0 && _input.Mode == ScheduleMode.Pool && _avoidRepeats && runs.Count > 2)
         {
-            // Hard rule: move items that may not air at their slot's time of day. Soft rules (series spacing)
-            // may be disturbed; episode order is restored afterwards.
-            DaypartGate.Place(runs, _items, cycleStart, _padded, _tz, _rules);
-            if (_order == PlayOrder.ShuffleEpisodesInOrder)
+            // The daypart gate can undo the seam check PoolOrdering made: the previous cycle may now end with the
+            // same series or movie this one starts with, possibly with gated dead air in between. Re-check
+            // against what the previous cycle actually airs last, as the gate left it.
+            var prev = GatedRuns(k - 1, cycleStart - _cycleTicks);
+            var prevLast = LastAired(prev, cycleStart - _cycleTicks);
+            if (prevLast >= 0 && FixSeamAfterGate(runs, cycleStart, MarathonOrder.KeyOfRun(prev[prevLast], _items)))
             {
-                if (marathon)
-                {
-                    MarathonOrder.KeepRunOrder(runs, _items);
-                }
-                else
-                {
-                    var flat = runs.SelectMany(r => r).ToArray();
-                    EpisodeOrder.Apply(flat, _items);
-                    runs = flat.Select(i => new[] { i }).ToList();
-                }
+                runs = RestoreEpisodeOrder(runs);
             }
         }
 
@@ -215,6 +207,97 @@ internal sealed class CyclicScheduler : IStationScheduler
 
         var gated = _rules.Count > 0 ? DaypartGate.Flags(order, _items, cycleStart, _padded, _tz, _rules) : null;
         return new Cycle(order, starts, gated);
+    }
+
+    /// <summary>Runs for cycle k after the pool ordering and, when there are daypart rules, the gate.</summary>
+    private List<int[]> GatedRuns(long k, long cycleStart)
+    {
+        var runs = PoolOrdering.BuildRuns(_items, _order, _avoidRepeats, _marathonMin, _marathonMax, Seed, k);
+        if (_rules.Count > 0 && _input.Mode == ScheduleMode.Pool)
+        {
+            // Hard rule: move items that may not air at their slot's time of day. Soft rules (series spacing)
+            // may be disturbed; episode order is restored afterwards.
+            DaypartGate.Place(runs, _items, cycleStart, _padded, _tz, _rules);
+            runs = RestoreEpisodeOrder(runs);
+        }
+
+        return runs;
+    }
+
+    private List<int[]> RestoreEpisodeOrder(List<int[]> runs)
+    {
+        if (_order != PlayOrder.ShuffleEpisodesInOrder)
+        {
+            return runs;
+        }
+
+        if (MarathonOrder.Enabled(_order, _marathonMin, _marathonMax))
+        {
+            MarathonOrder.KeepRunOrder(runs, _items);
+            return runs;
+        }
+
+        var flat = runs.SelectMany(r => r).ToArray();
+        EpisodeOrder.Apply(flat, _items);
+        return flat.Select(i => new[] { i }).ToList();
+    }
+
+    /// <summary>
+    /// Soft rule: when the first run this cycle airs is the same series or movie the previous cycle aired last,
+    /// swap it with a later run (never the last aired one, so the next cycle's check stays valid) that keeps
+    /// every neighbour distinct, airs the same last run, and leaves no more daypart violations than before.
+    /// Gives up quietly otherwise.
+    /// </summary>
+    private bool FixSeamAfterGate(List<int[]> runs, long cycleStart, string prevKey)
+    {
+        var flags = RunFlags(runs, cycleStart);
+        var first = Array.IndexOf(flags, false);
+        var last = Array.LastIndexOf(flags, false);
+        if (first < 0 || MarathonOrder.KeyOfRun(runs[first], _items) != prevKey)
+        {
+            return false;
+        }
+
+        var before = flags.Count(f => f);
+        for (var j = first + 1; j < runs.Count; j++)
+        {
+            // Gated runs behind the last aired one are fair game (a film the gate parked there may fit the
+            // first slot); the last aired run itself is not, since the next cycle checks against it.
+            if (j == last || !MarathonOrder.TrySwap(runs, _items, first, j, prevKey))
+            {
+                continue;
+            }
+
+            // Accept only when the cycle still airs the same last run (the next cycle checks against it) and the
+            // swap did not put anything new behind the gate.
+            var after = RunFlags(runs, cycleStart);
+            if (MarathonOrder.KeyOfRun(runs[first], _items) != prevKey && Array.LastIndexOf(after, false) == last && after.Count(f => f) <= before)
+            {
+                return true;
+            }
+
+            (runs[first], runs[j]) = (runs[j], runs[first]);
+        }
+
+        return false;
+    }
+
+    /// <summary>Index of the last run the cycle airs (not gated), or -1 when it airs nothing.</summary>
+    private int LastAired(List<int[]> runs, long cycleStart) => Array.LastIndexOf(RunFlags(runs, cycleStart), false);
+
+    /// <summary>Per run: true when the daypart gate keeps it off the air in its slot.</summary>
+    private bool[] RunFlags(List<int[]> runs, long cycleStart)
+    {
+        var flat = DaypartGate.Flags(runs.SelectMany(r => r).ToArray(), _items, cycleStart, _padded, _tz, _rules);
+        var result = new bool[runs.Count];
+        var pos = 0;
+        for (var r = 0; r < runs.Count; r++)
+        {
+            result[r] = flat[pos];
+            pos += runs[r].Length;
+        }
+
+        return result;
     }
 
     private ulong Seed(long k) => StableHash.Seed(_input.StationId, _input.Revision, Scope, k);

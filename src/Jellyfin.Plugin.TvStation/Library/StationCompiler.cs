@@ -27,19 +27,33 @@ public sealed class StationCompiler
         };
 
         var excludedIds = new HashSet<Guid>(station.ExcludedItemIds ?? new List<Guid>());
-        List<PlayableItem> Expand(List<ContentSource> sources) => _resolver.Expand(sources, lang, compiled.Excluded, tags, compiled.TagExcluded);
+        List<PlayableItem> Expand(List<ContentSource> sources, string section) => _resolver.Expand(
+            sources,
+            lang,
+            compiled.Excluded,
+            tags,
+            compiled.TagExcluded,
+            (source, found, kept) => compiled.Sources.Add(new SourceExpansion
+            {
+                Section = section,
+                Label = SourceExpansion.Describe(source),
+                Kind = source.Kind,
+                Found = found,
+                Kept = kept
+            }));
         void CompileBlocks()
         {
             foreach (var block in station.Slots.Blocks)
             {
-                compiled.Blocks[block.Id] = DropShort(ApplyExclusions(Expand(block.Sources), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
+                var section = string.IsNullOrWhiteSpace(block.Name) ? "Block" : block.Name;
+                compiled.Blocks[block.Id] = DropShort(ApplyExclusions(Expand(block.Sources, section), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
             }
         }
 
         switch (station.Mode)
         {
             case ScheduleMode.Pool:
-                compiled.Pool = DropShort(ApplyExclusions(Expand(station.Pool.Sources), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
+                compiled.Pool = DropShort(ApplyExclusions(Expand(station.Pool.Sources, "Pool"), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
                 CompileBlocks();
                 break;
 
@@ -57,14 +71,14 @@ public sealed class StationCompiler
 
             case ScheduleMode.Slots:
                 CompileBlocks();
-                compiled.Filler = DropShort(ApplyExclusions(Expand(station.Slots.Filler.Sources), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
+                compiled.Filler = DropShort(ApplyExclusions(Expand(station.Slots.Filler.Sources, "Filler"), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
                 break;
         }
 
         if (station.Bumpers?.Enabled == true && station.Bumpers.Sources.Count > 0)
         {
             var maxTicks = TimeSpan.FromMinutes(Math.Max(1, station.Bumpers.MaxClipMinutes)).Ticks;
-            compiled.Bumpers = ApplyExclusions(Expand(station.Bumpers.Sources), excludedIds, compiled)
+            compiled.Bumpers = ApplyExclusions(Expand(station.Bumpers.Sources, "Bumpers"), excludedIds, compiled)
                 .Where(i => i.RuntimeTicks > 0 && i.RuntimeTicks <= maxTicks)
                 .ToList();
         }
@@ -72,8 +86,8 @@ public sealed class StationCompiler
         if (station.Bumpers?.Enabled == true)
         {
             var maxTicks = TimeSpan.FromMinutes(Math.Max(1, station.Bumpers.MaxClipMinutes)).Ticks;
-            compiled.PreRoll = CompileRoll(station.Bumpers.PreRoll, compiled.Bumpers, maxTicks, Expand, excludedIds, compiled);
-            compiled.PostRoll = CompileRoll(station.Bumpers.PostRoll, compiled.Bumpers, maxTicks, Expand, excludedIds, compiled);
+            compiled.PreRoll = CompileRoll(station.Bumpers.PreRoll, compiled.Bumpers, maxTicks, s => Expand(s, "Pre-roll"), excludedIds, compiled);
+            compiled.PostRoll = CompileRoll(station.Bumpers.PostRoll, compiled.Bumpers, maxTicks, s => Expand(s, "Post-roll"), excludedIds, compiled);
         }
 
         // Same item may be excluded via several sources; report once.

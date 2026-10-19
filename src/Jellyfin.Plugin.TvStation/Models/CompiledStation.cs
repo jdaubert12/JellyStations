@@ -37,7 +37,34 @@ public sealed class CompiledStation
     /// <summary>Clips for the post-roll position (empty when off; a copy of <see cref="Bumpers"/> when it has no sources of its own).</summary>
     public List<PlayableItem> PostRoll { get; set; } = new();
 
+    /// <summary>How each content source expanded at compile time (for the health report).</summary>
+    public List<SourceExpansion> Sources { get; set; } = new();
+
     public int TotalItemCount => Pool.Count + Lineup.Count + Filler.Count + Blocks.Values.Sum(b => b.Count);
+}
+
+/// <summary>What one content source contributed when the station was compiled.</summary>
+public sealed class SourceExpansion
+{
+    /// <summary>Where the source sits: Pool, Filler, Bumpers, Pre-roll, Post-roll or a block name.</summary>
+    public string Section { get; set; } = string.Empty;
+
+    public string Label { get; set; } = string.Empty;
+
+    public SourceKind Kind { get; set; }
+
+    /// <summary>Library items the source matched before any filtering.</summary>
+    public int Found { get; set; }
+
+    /// <summary>Items it actually contributed (after tag exclusions, unusable items and de-duplication against earlier sources).</summary>
+    public int Kept { get; set; }
+
+    public static string Describe(ContentSource source)
+    {
+        var name = !string.IsNullOrWhiteSpace(source.DisplayName) ? source.DisplayName
+            : source.Genre ?? source.Tag ?? source.ItemId?.ToString("N") ?? "?";
+        return source.Kind + " \"" + name + "\"";
+    }
 }
 
 public sealed class ExcludedItem

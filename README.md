@@ -20,9 +20,9 @@ joining whatever is airing right now, exactly like broadcast television.
 
 | Mode | What it does |
 |---|---|
-| **Pool** | Pick shows, movies, genres, collections or playlists. The station plays through the pool in shuffled or sequential cycles, or shuffled with each series' episodes kept in order (a random show comes up, but it is always that show's next episode). Shuffle avoids the same series back to back. Optional **time blocks** take over at fixed local times, say a movie every evening from 18:00 to 21:00 on a cartoon station, and the pool carries on where it left off afterwards. When the block's content ends early, the pool fills the rest and its last program may finish past the block end rather than being cut, and a block can start up to N minutes late so the program already playing finishes first, keeping its full duration (both per-block options, on for new blocks). |
-| **Slots** | Recurring blocks in the station's time zone, e.g. weekdays 20:00-21:00 = Seinfeld, Saturday 08:00-12:00 = cartoons. A filler pool plays between blocks. Sequential blocks pick up where they left off each day. |
-| **Lineup** | A hand-ordered list that loops forever from the station's anchor time. |
+| **Pool** ("Shuffle a collection" in the dashboard) | Pick shows, movies, genres, collections or playlists. The station plays through the pool in shuffled or sequential cycles, or shuffled with each series' episodes kept in order (a random show comes up, but it is always that show's next episode). Shuffle avoids the same series or the same movie back to back, also across the seam between two cycles. Optional **time blocks** take over at fixed local times, say a movie every evening from 18:00 to 21:00 on a cartoon station, and the pool carries on where it left off afterwards. When the block's content ends early, the pool fills the rest and its last program may finish past the block end rather than being cut, and a block can start up to N minutes late so the program already playing finishes first, keeping its full duration (both per-block options, on for new blocks). |
+| **Slots** ("Weekly schedule" in the dashboard) | Recurring blocks in the station's time zone, e.g. weekdays 20:00-21:00 = Seinfeld, Saturday 08:00-12:00 = cartoons. A filler pool plays between blocks. Sequential blocks pick up where they left off each day. |
+| **Lineup** ("Play a fixed list" in the dashboard) | A hand-ordered list that loops forever from the station's anchor time. |
 
 **Bumpers** are optional short clips (idents, trailers) that fill the gaps between programs. Pick any
 sources, cap the clip length, and optionally reserve a break of a few minutes after every program so
@@ -49,7 +49,7 @@ Tag source for that same tag are never affected, so a seasonal holiday station k
 "christmas" stays off every regular channel all year. Items dropped by a tag rule appear in the
 Content section marked "by tag".
 
-Pools can carry **daytime rules** such as "nothing above PG between 06:00 and 20:00" (station time
+Pools can carry **family hours** (daytime rating rules) such as "nothing above PG between 06:00 and 20:00" (station time
 zone). The schedule moves items that would overlap a window to a later slot; if nothing fits, that
 slot shows a station card. Items can only be moved within their cycle, so a pool whose full cycle is
 shorter than the restricted window will show cards rather than defer; with a few hours of content this
@@ -93,20 +93,27 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.5.0.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.5.0.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.5.0.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.5.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.5.0.0\`
+2. Copy it into a folder named `TvStation_1.6.0.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.6.0.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.6.0.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.6.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.6.0.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.5.0.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.5.0.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.6.0.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.6.0.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 
 ## Using it
+
+With no stations yet, the dashboard opens on **what your library could support**: tick the suggested
+channels and press **Create selected**. **New station** starts from a preset (Kids channel, Movie night,
+Comfort reruns, Holiday channel, One show start to finish, Weekly schedule, Play a fixed list, or a plain
+shuffle); the preset fills in the schedule settings, you add the shows and movies, and everything can be
+changed later. The rarely needed settings (call sign, padding grid, schedule anchor, card text, excluded
+tags, minimum length, encoding) sit under **Advanced** in the editor.
 
 1. Open **Dashboard > TV Stations > New station**.
 2. Give it a name and channel number, pick a mode, add content with the picker, and use
@@ -118,13 +125,21 @@ Edits that change the schedule (content, mode, anchor, padding, time zone) bump 
 *revision*, which re-rolls the future schedule deterministically and refreshes the guide. Cosmetic
 edits (name, number, logo) do not. A nightly task re-scans the library for stations with
 *nightly refresh* enabled so new episodes join the rotation. Added a batch of films and don't want to
-wait for the night? **Recompile all** on the dashboard re-scans every station at once and refreshes
-the guide if anything changed; **Recompile content** in a station's editor does the same for one.
+wait for the night? **Refresh content** on the dashboard re-scans every station at once and refreshes
+the guide if anything changed; **Refresh content** in a station's editor does the same for one.
+
+Each station row shows what is on now with the time left, the next two programs, and badges for
+anything the last compile flagged: a source that matched nothing, under a day of unique content,
+or items that had to be skipped (hover the excluded count for the reasons). If streaming hit a
+problem, the row keeps the last error in red until you dismiss it: a file that could not be opened,
+with permission denied told apart from a missing file or an unmounted folder, or an encoder that
+quit early, with ffmpeg's last log line. **Status** has a Health section listing every station
+that needs attention.
 
 Films split across files (Blu-ray `part1` / `part2`, which Jellyfin stacks into one movie) are
 scheduled at their full combined length and play straight through, one guide entry. Items without a
 known runtime are skipped and listed in the editor; refresh their metadata in
-Jellyfin and press **Recompile content**.
+Jellyfin and press **Refresh content**.
 
 **Suggest stations** on the dashboard turns the library analysis into ready-made channels: genres and
 series with enough hours, a kids channel and family movies by rating, franchise marathons and a
@@ -167,7 +182,9 @@ decades, ratings, tags and libraries. It is the basis for station suggestions an
   active sessions and the last encoder log lines. Common causes are a wrong ffmpeg path, or media
   paths that are not visible from the server (e.g. missing Docker volume).
 - *Picture is a station card*: the file for the current program is missing or ffmpeg could not
-  decode it; the plugin shows a card until the next program.
+  decode it; the plugin shows a card until the next program. The station row on the dashboard
+  says which: permission denied, file not found, folder not found (share or volume not mounted),
+  or the ffmpeg exit code with its last log line.
 - Live HLS adds 10-30 s of latency behind the encoder; the position shown in the guide is the
   server's.
 

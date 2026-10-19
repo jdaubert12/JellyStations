@@ -1,6 +1,7 @@
 using System.Net.Mime;
 using System.Reflection;
 using Jellyfin.Plugin.TvStation.Api.Dto;
+using Jellyfin.Plugin.TvStation.Library;
 using Jellyfin.Plugin.TvStation.Models;
 using Jellyfin.Plugin.TvStation.Services;
 using Jellyfin.Plugin.TvStation.Storage;
@@ -102,11 +103,29 @@ public sealed class StatusController : ControllerBase
 {
     private readonly StreamSessionManager _sessions;
     private readonly TvStationPaths _paths;
+    private readonly StationService _stations;
 
-    public StatusController(StreamSessionManager sessions, TvStationPaths paths)
+    public StatusController(StreamSessionManager sessions, TvStationPaths paths, StationService stations)
     {
         _sessions = sessions;
         _paths = paths;
+        _stations = stations;
+    }
+
+    /// <summary>Per-station health from the last compile: empty sources, under a day of unique content, items skipped.</summary>
+    [HttpGet("Health")]
+    public ActionResult<HealthReportDto> Health()
+    {
+        var stations = _stations.GetAll()
+            .OrderBy(s => s.ChannelNumber, StringComparer.OrdinalIgnoreCase)
+            .Select(s => StationHealth.Build(s, _stations.GetCompiled(s.Id)))
+            .ToList();
+        return Ok(new HealthReportDto
+        {
+            GeneratedUtc = DateTime.UtcNow.ToString("O"),
+            Stations = stations,
+            StationsWithWarnings = stations.Count(s => !s.Healthy)
+        });
     }
 
     [HttpGet("Status")]

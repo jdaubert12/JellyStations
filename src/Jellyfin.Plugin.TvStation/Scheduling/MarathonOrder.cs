@@ -92,6 +92,9 @@ internal static class MarathonOrder
     /// <summary>Series of the run (null for a movie).</summary>
     public static Guid? SeriesOf(int[] run, IReadOnlyList<PlayableItem> items) => items[run[0]].SeriesId;
 
+    /// <summary>Back-to-back identity of the run: its series, or the movie itself (see <see cref="PoolOrdering.KeyOf"/>).</summary>
+    public static string KeyOfRun(int[] run, IReadOnlyList<PlayableItem> items) => PoolOrdering.KeyOf(items[run[0]]);
+
     /// <summary>
     /// Re-sorts each series' runs into episode order without changing which series plays in which position,
     /// so runs stay in order after shuffling and swapping.
@@ -135,19 +138,15 @@ internal static class MarathonOrder
         }
     }
 
-    public static bool Violation(List<int[]> runs, IReadOnlyList<PlayableItem> items, int idx, Guid? beforeStart)
+    /// <summary>True if the run at idx is the same series or movie as the run before it (or as beforeStart for idx 0).</summary>
+    public static bool Violation(List<int[]> runs, IReadOnlyList<PlayableItem> items, int idx, string? beforeStart)
     {
-        var s = SeriesOf(runs[idx], items);
-        if (!s.HasValue)
-        {
-            return false;
-        }
-
-        var prev = idx == 0 ? beforeStart : SeriesOf(runs[idx - 1], items);
-        return prev == s;
+        var key = KeyOfRun(runs[idx], items);
+        var prev = idx == 0 ? beforeStart : KeyOfRun(runs[idx - 1], items);
+        return prev == key;
     }
 
-    public static bool TrySwap(List<int[]> runs, IReadOnlyList<PlayableItem> items, int a, int b, Guid? beforeStart)
+    public static bool TrySwap(List<int[]> runs, IReadOnlyList<PlayableItem> items, int a, int b, string? beforeStart)
     {
         (runs[a], runs[b]) = (runs[b], runs[a]);
         foreach (var idx in new[] { a, a + 1, b, b + 1 })

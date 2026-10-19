@@ -32,15 +32,33 @@
     Movie: 'Movie', Series: 'Series', Season: 'Season', Episode: 'Episode', BoxSet: 'Collection',
     Playlist: 'Playlist', Genre: 'Genre', Tag: 'Tag', Library: 'Library', Video: 'Video'
   };
-  const MODE_LABEL = { Pool: 'Pool', Slots: 'Slots', Lineup: 'Lineup' };
+  const MODE_LABEL = { Pool: 'Shuffle', Slots: 'Weekly schedule', Lineup: 'Fixed list' };
   const MODE_HELP = {
-    Pool: 'The pool is expanded to every playable item, ordered, and played in continuous passes starting at the anchor; each pass is re-shuffled. Add time blocks to take over at fixed local times, for example a movie every evening from 18:00; the pool carries on where it left off when a block ends.',
-    Slots: 'Weekly recurring blocks play their own content at fixed local times. Whenever no block is active the filler pool plays.',
-    Lineup: 'The items play in exactly this order from the anchor and loop forever. Use it for a fixed marathon or a hand-built evening.'
+    Pool: 'Everything you add plays around the clock, reshuffled each time the channel has been through it all. Example: a comedy channel that never repeats a film twice in a row. Time blocks are optional and take over at fixed times, say a film every evening from 18:00; the shuffle carries on where it left off afterwards.',
+    Slots: 'Blocks play their own content at fixed times on chosen days, like cartoons on weekday mornings and a film on Friday night. Whenever no block is on, the filler plays.',
+    Lineup: 'Exactly the items you pick, in your order, looping forever. Good for a fixed marathon or a hand-built evening.'
   };
+  /** Starting points for "New station": each fills in the schedule settings; the person adds the content. */
+  const PRESETS = [
+    { key: 'shuffle', icon: 'shuffle', name: 'Shuffle a collection', desc: 'Pick any shows and movies; they play around the clock, reshuffled each round, never the same show or film twice in a row.', next: 'Next: add shows and movies.', apply: () => {} },
+    { key: 'kids', icon: 'child_care', name: 'Kids channel', desc: 'Cartoons and family shows all day, rated G or below. Each show plays two or three episodes in order before switching.', next: 'Next: add the shows. Whatever you add is limited to G unless you change it.', sourceDefaults: { MaxRating: 'G', AllowUnrated: false },
+      apply: d => { d.Pool.Order = 'ShuffleEpisodesInOrder'; d.Pool.MarathonMin = 2; d.Pool.MarathonMax = 3; d.PaddingByLength = true; d.PaddingGridMinutes = 0; } },
+    { key: 'movies', icon: 'movie', name: 'Movie night', desc: 'Films in two-hour slots, shuffled, never the same one twice in a row. Nothing above PG-13 before 8 pm.', next: 'Next: add a genre, a collection or single films.', sourceDefaults: { ItemKinds: ['Movie'] },
+      apply: d => { d.PaddingByLength = true; d.PaddingGridMinutes = 0; d.Pool.DaypartRules = [{ StartLocal: '06:00', EndLocal: '20:00', MaxRating: 'PG-13', AllowUnrated: true }]; } },
+    { key: 'reruns', icon: 'tv', name: 'Comfort reruns', desc: 'A few favourite shows in half-hour and hour slots. A random show comes up, always on its next episode.', next: 'Next: add the shows.', sourceDefaults: { ItemKinds: ['Episode'] },
+      apply: d => { d.Pool.Order = 'ShuffleEpisodesInOrder'; d.PaddingByLength = true; d.PaddingGridMinutes = 0; } },
+    { key: 'holiday', icon: 'ac_unit', name: 'Holiday channel', desc: 'Seasonal films and specials. The channel only appears in the guide from late November to early January.', next: 'Next: add the holiday titles. The excluded tags from Settings are off here so holiday-tagged items stay in.',
+      apply: d => { d.PaddingByLength = true; d.PaddingGridMinutes = 0; d.ActiveWindows = [Object.assign({}, SEASON_PRESETS.holidays)]; d.UseGlobalExcludedTags = false; } },
+    { key: 'marathon', icon: 'playlist_play', name: 'One show, start to finish', desc: 'One series from the first episode in order, around the clock, then again from the start.', next: 'Next: add the show.',
+      apply: d => { d.Pool.Order = 'Sequential'; d.Pool.AvoidSameSeriesBackToBack = false; d.PaddingByLength = true; d.PaddingGridMinutes = 0; } },
+    { key: 'weekly', icon: 'event', name: 'Weekly schedule', desc: 'Blocks at fixed times each week, say cartoons on weekday mornings and a film on Friday night, with filler in between.', next: 'Next: add blocks and the filler.',
+      apply: d => { d.Mode = 'Slots'; d.PaddingGridMinutes = 15; } },
+    { key: 'list', icon: 'format_list_numbered', name: 'Play a fixed list', desc: 'Exactly the items you pick, in your order, looping forever.', next: 'Next: add items in order.',
+      apply: d => { d.Mode = 'Lineup'; } }
+  ];
   const BLOCKS_HELP = {
-    Pool: 'Optional. A block takes over the station at a fixed local time on the selected days and plays its own content; the pool plays whenever no block is on. Blocks are evaluated in the station\'s time zone and are not subject to the daytime rules.',
-    Slots: 'Each block plays its own content at a fixed local time on the selected days. Blocks are evaluated in the station\'s time zone.'
+    Pool: 'Optional. A block takes over at a fixed time on the days you pick and plays its own content; the shuffle carries on whenever no block is on. Times are in the station\'s time zone; family hours do not apply inside a block.',
+    Slots: 'Each block plays its own content at a fixed time on the days you pick (station time zone). The filler plays whenever no block is on.'
   };
   const EXCLUSION_TEXT = {
     NoRuntime: 'No runtime in metadata',
@@ -54,6 +72,7 @@
   const RESOLUTIONS = [['1920x1080', '1920 × 1080 (1080p)'], ['1280x720', '1280 × 720 (720p)'], ['854x480', '854 × 480 (480p)'], ['custom', 'Custom']];
   const ENCODERS = [['libx264', 'libx264 (software)'], ['h264_nvenc', 'h264_nvenc (NVIDIA)'], ['h264_qsv', 'h264_qsv (Intel Quick Sync)'], ['h264_vaapi', 'h264_vaapi (VA-API)'], ['custom', 'Custom…']];
   const STATUS_INTERVAL_MS = 5000;
+  const LIST_INTERVAL_MS = 60000;
 
   // ------------------------------------------------------------------------------------------
   // State
@@ -73,6 +92,10 @@
     statusTimer: null,
     openLogs: {},         // session UniqueId -> bool
     deleteTimer: null,
+    listTimer: null,
+    guidedStart: false,   // true once an empty list has sent the person to the suggestions
+    presetName: null,     // name of the preset a new draft started from
+    sourceDefaults: null, // filters the preset applies to every source added to the pool
     settings: null,       // GlobalSettings as last loaded in the settings view
     suggestions: [],
     blockTemplates: []
@@ -197,8 +220,35 @@
     }, el('span', { text: text }));
   }
 
-  function badge(text, cls) {
-    return el('span', { className: 'tvs-badge ' + (cls || ''), text: text });
+  function badge(text, cls, title) {
+    return el('span', { className: 'tvs-badge ' + (cls || ''), text: text, title: title || null });
+  }
+
+  /** "48 min" / "2 h 05 min" for time left in a program. */
+  function fmtLeft(totalSeconds) {
+    if (totalSeconds === null || totalSeconds === undefined || !isFinite(totalSeconds)) {
+      return '';
+    }
+    const m = Math.max(0, Math.round(totalSeconds / 60));
+    if (m < 1) {
+      return 'under a minute';
+    }
+    if (m < 60) {
+      return m + ' min';
+    }
+    return Math.floor(m / 60) + ' h ' + pad2(m % 60) + ' min';
+  }
+
+  function fmtHours(hours) {
+    const n = Number(hours) || 0;
+    return (n % 1 === 0 ? String(n) : n.toFixed(1)) + ' h';
+  }
+
+  /** Tooltip for the excluded badge: one line per reason. */
+  function excludedTitle(health) {
+    const byReason = health && health.ExcludedByReason ? health.ExcludedByReason : {};
+    const lines = Object.keys(byReason).map(k => byReason[k] + ' × ' + (EXCLUSION_TEXT[k] || k));
+    return lines.length ? lines.join('\n') : null;
   }
 
   function renderErrorBox(box, messages) {
@@ -550,7 +600,7 @@
   // Views
   // ------------------------------------------------------------------------------------------
 
-  const VIEW_IDS = { list: '#tvsViewList', editor: '#tvsViewEditor', settings: '#tvsViewSettings', status: '#tvsViewStatus', suggest: '#tvsViewSuggest' };
+  const VIEW_IDS = { list: '#tvsViewList', editor: '#tvsViewEditor', settings: '#tvsViewSettings', status: '#tvsViewStatus', suggest: '#tvsViewSuggest', presets: '#tvsViewPresets' };
 
   function showView(name) {
     if (state.view === 'status' && name !== 'status') {
@@ -634,7 +684,7 @@
     const host = clear($('#tvsDaypartRows'));
     const rules = state.draft.Pool.DaypartRules;
     if (!rules.length) {
-      host.appendChild(el('div', { className: 'tvs-secondary', text: 'No time-of-day limits.' }));
+      host.appendChild(el('div', { className: 'tvs-secondary', text: 'No family hours: anything may play at any time.' }));
       return;
     }
     rules.forEach((r, index) => {
@@ -750,9 +800,39 @@
       state.stations = Array.isArray(list) ? list : [];
       renderErrorBox($('#tvsListError'), null);
       renderStationList();
+      startListTimer();
+      if (!state.stations.length && !state.guidedStart) {
+        // First visit with nothing set up: lead with what the library could support.
+        state.guidedStart = true;
+        openSuggestions(false);
+      }
     }).catch(err => {
       readErrors(err).then(messages => renderErrorBox($('#tvsListError'), messages));
     }).then(() => loading(false));
+  }
+
+  /** Keeps "Now", "Next" and the time left on the station rows current while the list is on screen. */
+  function startListTimer() {
+    if (state.listTimer) {
+      return;
+    }
+    state.listTimer = setInterval(() => {
+      if (!page.isConnected) {
+        clearInterval(state.listTimer);
+        state.listTimer = null;
+        return;
+      }
+      if (state.view !== 'list' || document.hidden) {
+        return;
+      }
+      api('GET', 'Stations').then(list => {
+        if (state.view !== 'list') {
+          return;
+        }
+        state.stations = Array.isArray(list) ? list : [];
+        renderStationList();
+      }).catch(() => { /* the next manual load reports errors */ });
+    }, LIST_INTERVAL_MS);
   }
 
   function channelSort(a, b) {
@@ -789,23 +869,60 @@
     ]);
     body.appendChild(title);
 
-    const meta = [MODE_LABEL[s.Mode] || s.Mode, s.ItemCount + (s.ItemCount === 1 ? ' item' : ' items'), 'rev ' + s.Revision];
+    const meta = [MODE_LABEL[s.Mode] || s.Mode, s.ItemCount + (s.ItemCount === 1 ? ' item' : ' items')];
     const metaLine = el('div', { className: 'listItemBodyText secondary' }, meta.join(' · '));
+    const health = s.Health || null;
+    const warn = (text, title) => {
+      const b = badge(text, 'warn tvs-clickable', (title ? title + '\n' : '') + 'Click to open the station.');
+      b.addEventListener('click', () => openEditor(s.Id));
+      return b;
+    };
     if (s.ExcludedCount > 0) {
-      metaLine.appendChild(badge(s.ExcludedCount + ' excluded', 'warn'));
+      metaLine.appendChild(warn(s.ExcludedCount + ' excluded', excludedTitle(health)));
+    }
+    if (health) {
+      if (s.ItemCount > 0 && health.UniqueHours < 24) {
+        metaLine.appendChild(warn(fmtHours(health.UniqueHours) + ' unique', 'Under a day of unique content: programs repeat within 24 hours. Add more shows or films.'));
+      }
+      const empty = Array.isArray(health.EmptySources) ? health.EmptySources : [];
+      if (empty.length) {
+        metaLine.appendChild(warn(empty.length + (empty.length === 1 ? ' empty source' : ' empty sources'), empty.join('\n')));
+      }
     }
     body.appendChild(metaLine);
 
     let nowText;
     if (s.NowPlaying) {
-      nowText = 'Now: ' + entryTitle(s.NowPlaying);
-      if (s.NowPlaying.OffsetSeconds !== null && s.NowPlaying.OffsetSeconds !== undefined) {
-        nowText += ' (' + fmtClock(s.NowPlaying.OffsetSeconds) + ' in)';
+      const np = s.NowPlaying;
+      nowText = 'Now: ' + entryTitle(np);
+      if (np.OffsetSeconds !== null && np.OffsetSeconds !== undefined) {
+        const total = (new Date(np.EndUtc) - new Date(np.StartUtc)) / 1000;
+        const left = isFinite(total) ? fmtLeft(total - np.OffsetSeconds) : '';
+        nowText += ' (' + fmtClock(np.OffsetSeconds) + ' in' + (left ? ', ' + left + ' left' : '') + ')';
       }
     } else {
       nowText = s.Enabled ? 'Now: nothing scheduled – add content or recompile' : 'Now: off air (disabled)';
     }
-    body.appendChild(el('div', { className: 'listItemBodyText secondary tvs-ellipsis', text: nowText }));
+    body.appendChild(el('div', { className: 'listItemBodyText secondary tvs-ellipsis', text: nowText, title: nowText }));
+
+    const next = s.Enabled && Array.isArray(s.Next) ? s.Next : [];
+    if (next.length) {
+      const nextText = 'Next: ' + next.map((e, i) => (i ? 'then ' : '') + entryTitle(e) + ' at ' + fmtTime(e.StartUtc)).join(' · ');
+      body.appendChild(el('div', { className: 'listItemBodyText secondary tvs-ellipsis', text: nextText, title: nextText }));
+    }
+
+    if (s.LastError) {
+      const when = s.LastErrorUtc ? fmtDateTime(s.LastErrorUtc) + ' · ' : '';
+      body.appendChild(el('div', { className: 'listItemBodyText tvs-fault' }, [
+        el('span', { className: 'material-icons warning', 'aria-hidden': 'true' }),
+        el('span', { className: 'tvs-ellipsis', text: when + s.LastError, title: s.LastError }),
+        iconButton('close', 'Dismiss this error', () => {
+          api('POST', 'Stations/' + s.Id + '/Stream/ClearError', undefined, undefined, true)
+            .then(() => loadStations())
+            .catch(err => alertErrors(err, 'Could not dismiss the error'));
+        }, 'tvs-fault-dismiss')
+      ]));
+    }
     row.appendChild(body);
 
     const actions = el('div', { className: 'tvs-station-actions' });
@@ -862,7 +979,7 @@
       const changed = rows.filter(r => r.ContentChanged && !r.Error);
       const failed = rows.filter(r => r.Error);
       const name = r => (r.ChannelNumber ? r.ChannelNumber + ' ' : '') + r.Name;
-      const lines = ['Recompiled ' + rows.length + ' station' + (rows.length === 1 ? '' : 's') + '.'];
+      const lines = ['Refreshed ' + rows.length + ' station' + (rows.length === 1 ? '' : 's') + '.'];
       if (changed.length) {
         lines.push(changed.length + ' changed content and the guide is refreshing: ' + changed.map(name).join(', ') + '.');
       } else {
@@ -871,9 +988,9 @@
       if (failed.length) {
         lines.push(failed.length + ' failed: ' + failed.map(r => name(r) + ' (' + r.Error + ')').join('; ') + '.');
       }
-      toast({ title: 'Recompile all', message: lines.join('\n') });
+      toast({ title: 'Refresh content', message: lines.join('\n') });
       return loadStations();
-    }).catch(err => alertErrors(err, 'Recompile all failed')).then(() => loading(false));
+    }).catch(err => alertErrors(err, 'Refresh content failed')).then(() => loading(false));
   }
 
   // ------------------------------------------------------------------------------------------
@@ -1062,13 +1179,48 @@
     return parts.join(' · ');
   }
 
-  function openEditor(id) {
+  /** The "New station" page: one card per preset. */
+  function openPresets() {
+    const box = clear($('#tvsPresetList'));
+    PRESETS.forEach(p => {
+      box.appendChild(el('button', { type: 'button', className: 'tvs-preset', onClick: () => openEditor(null, p) }, [
+        el('div', { className: 'tvs-preset-head' }, [el('span', { className: 'material-icons ' + p.icon, 'aria-hidden': 'true' }), el('span', { text: p.name })]),
+        el('div', { className: 'tvs-preset-desc', text: p.desc }),
+        el('div', { className: 'tvs-preset-next', text: p.next })
+      ]));
+    });
+    showView('presets');
+  }
+
+  /** Filters a preset wants on every source added to the pool (rating cap, movies or episodes only). */
+  function applySourceDefaults(source) {
+    const d = state.sourceDefaults;
+    if (!d || !hasTuningFilters(source)) {
+      return;
+    }
+    if (d.MaxRating !== undefined) {
+      source.MaxRating = d.MaxRating;
+      source.AllowUnrated = !!d.AllowUnrated;
+    }
+    if (d.ItemKinds && hasKindFilter(source)) {
+      source.ItemKinds = d.ItemKinds.slice();
+    }
+  }
+
+  function openEditor(id, preset) {
     loading(true);
     const detailPromise = id ? api('GET', 'Stations/' + id) : Promise.resolve(null);
     Promise.all([loadTimeZones(), detailPromise]).then(results => {
       const detail = results[1];
       state.detail = detail;
       state.draft = detail ? normalizeStation(detail.Station) : newDraft();
+      state.presetName = null;
+      state.sourceDefaults = null;
+      if (!detail && preset) {
+        preset.apply(state.draft);
+        state.presetName = preset.name;
+        state.sourceDefaults = preset.sourceDefaults || null;
+      }
       state.runtimes = {};
       state.expandedBlocks = {};
       renderEditor();
@@ -1084,7 +1236,7 @@
     const d = state.draft;
     const isNew = isNewDraft();
 
-    $('#tvsEditorTitle').textContent = isNew ? 'New station' : 'Edit station – ' + (d.Name || '');
+    $('#tvsEditorTitle').textContent = isNew ? 'New station' + (state.presetName ? ': ' + state.presetName : '') : 'Edit station – ' + (d.Name || '');
     renderErrorBox($('#tvsEditorErrors'), null);
 
     setVal('#tvsName', d.Name);
@@ -1171,7 +1323,7 @@
       container: $('#tvsPoolPicker'),
       mode: 'sources',
       getSources: () => state.draft.Pool.Sources,
-      onAdd: source => state.draft.Pool.Sources.push(source),
+      onAdd: source => { applySourceDefaults(source); state.draft.Pool.Sources.push(source); },
       onRemove: index => state.draft.Pool.Sources.splice(index, 1)
     });
     createPicker({
@@ -1194,7 +1346,7 @@
     // Cycle info (Pool)
     const cycleSeconds = state.detail && state.detail.CycleDuration ? parseTimeSpan(state.detail.CycleDuration) : null;
     $('#tvsPoolCycle').textContent = cycleSeconds !== null && cycleSeconds !== undefined && d.Mode === 'Pool'
-      ? 'Compiled cycle length: ' + fmtDur(cycleSeconds) + ' across ' + (state.detail.Compiled ? state.detail.Compiled.ItemCount : 0) + ' items (including padding).'
+      ? 'One full round of this channel: ' + fmtDur(cycleSeconds) + ' across ' + (state.detail.Compiled ? state.detail.Compiled.ItemCount : 0) + ' items, including padding.'
       : '';
 
     // Encoding
@@ -1439,9 +1591,9 @@
       }
       renderExcluded();
       const excluded = result && result.Excluded ? result.Excluded.length : 0;
-      toast('Recompiled: ' + (result ? result.ItemCount : 0) + ' items, ' + excluded + ' excluded.' +
+      toast('Refreshed: ' + (result ? result.ItemCount : 0) + ' items, ' + excluded + ' excluded.' +
         (result && result.ContentChanged ? ' Content changed – revision ' + result.Revision + '.' : ' Content unchanged.'));
-    }).catch(err => alertErrors(err, 'Recompile failed')).then(() => loading(false));
+    }).catch(err => alertErrors(err, 'Refresh content failed')).then(() => loading(false));
   }
 
   function renderExcluded() {
@@ -1449,11 +1601,11 @@
     const info = $('#tvsExcludedInfo');
     const compiled = state.detail && state.detail.Compiled;
     if (isNewDraft()) {
-      info.textContent = 'The station has not been compiled yet. Save it to see which items (if any) are skipped.';
+      info.textContent = 'The station has not been scanned yet. Save it to see which items (if any) are skipped.';
       return;
     }
     if (!compiled) {
-      info.textContent = 'No compiled content yet. Use “Recompile content” to expand the sources.';
+      info.textContent = 'No content scanned yet. Save the station, or press Refresh content.';
       return;
     }
     const excluded = compiled.Excluded || [];
@@ -2127,6 +2279,7 @@
     loading(true);
     api('GET', 'Suggestions', null, suggestQuery(refresh)).then(list => {
       state.suggestions = Array.isArray(list) ? list : [];
+      show($('#tvsSuggestWelcome'), state.stations.length === 0);
       renderSuggestions();
       showView('suggest');
     }).catch(err => alertErrors(err, 'Could not build suggestions')).then(() => loading(false));
@@ -2930,9 +3083,10 @@
     if (showSpinner) {
       loading(true);
     }
-    return api('GET', 'Status').then(status => {
+    return Promise.all([api('GET', 'Status'), api('GET', 'Health')]).then(results => {
       renderErrorBox($('#tvsStatusError'), null);
-      renderStatus(status || {});
+      renderStatus(results[0] || {});
+      renderHealth(results[1] || {});
       $('#tvsStatusUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
     }).catch(err => {
       readErrors(err).then(messages => renderErrorBox($('#tvsStatusError'), messages));
@@ -2941,6 +3095,51 @@
         loading(false);
       }
     });
+  }
+
+  /** The health section of the status view: one block per station with warnings, or a single all-clear line. */
+  function renderHealth(report) {
+    const box = clear($('#tvsHealth'));
+    const stations = Array.isArray(report.Stations) ? report.Stations : [];
+    if (!stations.length) {
+      box.appendChild(el('div', { className: 'tvs-empty', text: 'No stations yet.' }));
+      return;
+    }
+    const troubled = stations.filter(h => Array.isArray(h.Warnings) && h.Warnings.length);
+    const plural = stations.length === 1 ? '' : 's';
+    if (!troubled.length) {
+      box.appendChild(el('div', { className: 'tvs-ok', text: 'âœ“ All ' + stations.length + ' station' + plural + ' look healthy: every source has items, each has a day or more of unique content, and nothing was skipped.' }));
+      return;
+    }
+    box.appendChild(el('div', { className: 'tvs-secondary', text: troubled.length + ' of ' + stations.length + ' station' + plural + ' need' + (troubled.length === 1 ? 's' : '') + ' attention.' }));
+    troubled.forEach(h => {
+      const head = el('div', { className: 'tvs-health-head' }, [
+        el('span', { className: 'tvs-secondary', text: 'Ch ' + (h.ChannelNumber || '?') + '  ' }),
+        el('span', { className: 'tvs-health-name', text: h.Name || '(unnamed)' }),
+        h.Enabled ? null : badge('Disabled', 'off'),
+        el('span', { className: 'tvs-secondary', text: '  ' + fmtHours(h.UniqueHours) + ' unique' + (h.CompiledUtc ? ' · scanned ' + fmtDateTime(h.CompiledUtc) : '') })
+      ]);
+      // A fix for each kind of warning: re-scan when items were skipped or nothing was scanned yet, otherwise open the station.
+      const needsRefresh = h.Warnings.some(w => /^Not compiled|skipped:/.test(w));
+      const actions = el('div', { className: 'tvs-health-actions' }, [
+        needsRefresh ? textButton('Refresh content', () => refreshStationContent(h.StationId, h.Name)) : null,
+        textButton(needsRefresh ? 'Edit station' : 'Add content', () => openEditor(h.StationId))
+      ]);
+      box.appendChild(el('div', { className: 'tvs-health' }, [
+        head,
+        el('ul', { className: 'tvs-health-list' }, h.Warnings.map(w => el('li', { text: w }))),
+        actions
+      ]));
+    });
+  }
+
+  /** Re-scans one station from the Health section and reloads the view. */
+  function refreshStationContent(stationId, name) {
+    loading(true);
+    api('POST', 'Stations/' + stationId + '/Recompile').then(result => {
+      toast((name || 'Station') + ': ' + (result ? result.ItemCount : 0) + ' items after the scan.');
+      return loadStatus(false);
+    }).catch(err => alertErrors(err, 'Refresh content failed')).then(() => loading(false));
   }
 
   function renderStatus(s) {
@@ -3037,7 +3236,11 @@
 
   function wireHandlers() {
     // List
-    on('#tvsBtnNew', 'click', () => openEditor(null));
+    on('#tvsBtnNew', 'click', openPresets);
+    on('#tvsBtnEmptyNew', 'click', openPresets);
+    on('#tvsBtnEmptySuggest', 'click', () => openSuggestions(false));
+    on('#tvsBtnPresetsBack', 'click', () => showView('list'));
+    on('#tvsBtnSuggestPreset', 'click', openPresets);
     on('#tvsBumpersEnabled', 'change', () => show($('#tvsBumperOptions'), checked('#tvsBumpersEnabled')));
     on('#tvsPreRollEnabled', 'change', () => show($('#tvsPreRollPicker'), checked('#tvsPreRollEnabled')));
     on('#tvsPostRollEnabled', 'change', () => show($('#tvsPostRollPicker'), checked('#tvsPostRollEnabled')));
@@ -3079,6 +3282,7 @@
     on('#tvsBtnEditorBack', 'click', backToList);
     on('#tvsBtnCancel', 'click', backToList);
     on('#tvsBtnSave', 'click', () => saveStation(false));
+    on('#tvsBtnSaveTop', 'click', () => saveStation(false));
     on('#tvsBtnSaveRefresh', 'click', () => saveStation(true));
     on('#tvsBtnRecompile', 'click', recompileStation);
     on('#tvsMode', 'change', updateModePanels);
