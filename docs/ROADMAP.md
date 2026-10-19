@@ -275,8 +275,12 @@ From a 2026-10-19 review of the dashboard: the base is solid but speaks engineer
    station. Checked in Chrome on the dev server 2026-10-19: also fixed the schedule DTO sending the
    combined "Series - Episode" title (rows and previews doubled the episode name), added a Save
    button to the editor toolbar, and reworded the remaining compile / pool / slot wording.
-3. **Three-step editor.** Name and look (with a generated logo), What plays, When; the current
-   long form stays as the advanced view. Medium.
+3. **Three-step editor — DONE 2026-10-19.** A step bar on the editor: Name and look (General,
+   Logo with "Make a logo from the name": an 800x450 card drawn on a canvas, colour suggested from
+   the name, uploaded right after the first save for a new station), What plays (mode, sources,
+   order, bumpers, content list), When (family hours, time blocks, season, preview). Sections carry
+   `data-steps`; "All settings" is the whole form and is remembered per browser. A refused save
+   lands on the step with the problem.
 4. **Paint the week.** A seven-day grid for blocks on top of the existing block data. Large.
 5. **Smaller wins.** Duplicate station, "Pause" instead of a Disabled badge, generated logos, a
    one-line plain summary per row, a read-only "What's on" page for non-admins.

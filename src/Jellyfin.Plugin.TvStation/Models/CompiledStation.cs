@@ -59,11 +59,27 @@ public sealed class SourceExpansion
     /// <summary>Items it actually contributed (after tag exclusions, unusable items and de-duplication against earlier sources).</summary>
     public int Kept { get; set; }
 
+    /// <summary>'Series "Bluey"', plus the rating or year filter in brackets when the source has one, so an empty result explains itself.</summary>
     public static string Describe(ContentSource source)
     {
         var name = !string.IsNullOrWhiteSpace(source.DisplayName) ? source.DisplayName
             : source.Genre ?? source.Tag ?? source.ItemId?.ToString("N") ?? "?";
-        return source.Kind + " \"" + name + "\"";
+        var filters = new List<string>();
+        if (!string.IsNullOrWhiteSpace(source.MaxRating))
+        {
+            filters.Add(source.MaxRating + " or below" + (source.AllowUnrated ? string.Empty : ", unrated left out"));
+        }
+        else if (source.Ratings.Count > 0)
+        {
+            filters.Add("rated " + string.Join("/", source.Ratings));
+        }
+
+        if (source.YearFrom.HasValue || source.YearTo.HasValue)
+        {
+            filters.Add((source.YearFrom?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "...") + " to " + (source.YearTo?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "..."));
+        }
+
+        return source.Kind + " \"" + name + "\"" + (filters.Count > 0 ? " (" + string.Join(", ", filters) + ")" : string.Empty);
     }
 }
 

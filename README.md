@@ -93,16 +93,16 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.7.0.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.7.0.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.7.0.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.7.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.7.0.0\`
+2. Copy it into a folder named `TvStation_1.8.0.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.8.0.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.8.0.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.8.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.8.0.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.7.0.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.7.0.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.8.0.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.8.0.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 
@@ -112,8 +112,11 @@ With no stations yet, the dashboard opens on **what your library could support**
 channels and press **Create selected**. **New station** starts from a preset (Kids channel, Movie night,
 Comfort reruns, Holiday channel, One show start to finish, Weekly schedule, Play a fixed list, or a plain
 shuffle); the preset fills in the schedule settings, you add the shows and movies, and everything can be
-changed later. The rarely needed settings (call sign, padding grid, schedule anchor, card text, excluded
-tags, minimum length, encoding) sit under **Advanced** in the editor.
+changed later. The editor walks through three steps: **Name and look** (name, number, a logo made from the name in
+a colour of your choice), **What plays** (shows, films and how they play) and **When** (family hours, time
+blocks, the dates the channel is listed, and a preview). **All settings** shows the whole form on one page;
+the rarely needed settings (call sign, padding grid, schedule anchor, card text, excluded tags, minimum
+length, encoding) sit under **Advanced** there.
 
 1. Open **Dashboard > TV Stations > New station**.
 2. Give it a name and channel number, pick a mode, add content with the picker, and use

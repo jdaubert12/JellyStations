@@ -2,7 +2,7 @@
 param([string]$Configuration = "Release")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.7.0.0"
+$version = "1.8.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.TvStation\bin\$Configuration\net10.0\Jellyfin.Plugin.TvStation.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -21,7 +21,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Cooldown: a pool can rest a show or film for N hours before it plays again (0 = off, Movie night preset uses 8). A gentle rule on the timeline: it holds films apart across the seam between two rounds and spaces out weighted repeats, and gives way when nothing rested is available. Stations with time blocks are not covered yet."
+    changelog = "Three-step editor: Name and look (with a logo made from the name), What plays, When; All settings keeps the full form. The editor opens on step 1, remembers when you prefer the full form, and jumps to the step a problem is on when a save is refused."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

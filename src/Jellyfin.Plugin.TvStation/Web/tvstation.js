@@ -95,6 +95,8 @@
     listTimer: null,
     guidedStart: false,   // true once an empty list has sent the person to the suggestions
     presetName: null,     // name of the preset a new draft started from
+    editorStep: '1',      // '1' | '2' | '3' | 'all'
+    pendingLogo: null,    // generated logo (Blob) for a new station, uploaded right after the first save
     sourceDefaults: null, // filters the preset applies to every source added to the pool
     settings: null,       // GlobalSettings as last loaded in the settings view
     suggestions: [],
@@ -1224,7 +1226,9 @@
       }
       state.runtimes = {};
       state.expandedBlocks = {};
+      state.pendingLogo = null;
       renderEditor();
+      showStep(rememberedEditorView() === 'all' ? 'all' : '1');
       showView('editor');
     }).catch(err => alertErrors(err, 'Could not open station')).then(() => loading(false));
   }
@@ -1304,6 +1308,8 @@
     updateAnchorHint();
 
     // Logo
+    delete $('#tvsLogoColor').dataset.picked;
+    $('#tvsLogoColor').value = colorForName(d.Name || 'TV');
     renderLogo();
     setChecked('#tvsOverlayEnabled', !!d.LogoOverlay.Enabled);
     setVal('#tvsOverlayCorner', d.LogoOverlay.Corner);
@@ -1386,6 +1392,7 @@
     $('#tvsModeHelp').textContent = MODE_HELP[mode] || '';
     $('#tvsBlocksHelp').textContent = BLOCKS_HELP[mode] || '';
     show($('#tvsPanelPool'), mode === 'Pool');
+    show($('#tvsPanelFamily'), mode === 'Pool');
     show($('#tvsPanelBlocks'), mode === 'Pool' || mode === 'Slots');
     show($('#tvsPanelSlots'), mode === 'Slots');
     show($('#tvsPanelLineup'), mode === 'Lineup');
@@ -1409,35 +1416,208 @@
     file.disabled = isNew;
     const hasLogo = !isNew && !!state.draft.LogoFileName;
     if (hasLogo) {
-      img.src = logoUrl(state.draft.Id);
+      img.src = logoUrl(state.draft.Id) + '&v=' + Date.now();
+    } else if (state.pendingLogo) {
+      img.src = URL.createObjectURL(state.pendingLogo);
     } else {
       img.removeAttribute('src');
     }
-    show(img, hasLogo);
-    show(none, !hasLogo);
-    none.textContent = isNew ? 'Save the station first, then upload a logo.' : 'No logo uploaded.';
-    hint.textContent = 'PNG, JPEG, WebP or GIF up to 5 MB. Shown in the guide and on station-break slates.';
+    show(img, hasLogo || !!state.pendingLogo);
+    show(none, !hasLogo && !state.pendingLogo);
+    none.textContent = isNew ? 'No logo yet: make one from the name below, or save the station first to upload your own.' : 'No logo uploaded.';
+    hint.textContent = state.pendingLogo && isNew
+      ? 'The generated logo is uploaded when you save.'
+      : 'PNG, JPEG, WebP or GIF up to 5 MB. Shown in the guide and on station-break slates.';
+  }
+
+  // ---- Three steps -------------------------------------------------------------------------
+
+  const STEP_TITLES = { 1: 'Name and look', 2: 'What plays', 3: 'When' };
+
+  function rememberedEditorView() {
+    try {
+      return window.localStorage.getItem('tvsEditorView') || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function rememberEditorView(view) {
+    try {
+      window.localStorage.setItem('tvsEditorView', view);
+    } catch (e) {
+      /* private mode or blocked storage: fine */
+    }
+  }
+
+  /** Shows one step of the editor ('1', '2', '3') or everything ('all'); sections carry data-steps. */
+  function showStep(step) {
+    state.editorStep = step;
+    rememberEditorView(step === 'all' ? 'all' : 'steps');
+    $all('#tvsViewEditor [data-steps]').forEach(node => {
+      const steps = (node.getAttribute('data-steps') || '').split(' ');
+      node.classList.toggle('tvs-step-hidden', step !== 'all' && steps.indexOf(step) < 0);
+    });
+    $all('#tvsSteps .tvs-step').forEach(b => b.classList.toggle('active', b.getAttribute('data-step') === step));
+    renderStepNav();
+  }
+
+  function renderStepNav() {
+    const nav = clear($('#tvsStepNav'));
+    const step = state.editorStep;
+    if (step === 'all') {
+      nav.appendChild(el('span', { className: 'tvs-secondary', text: 'Every setting on one page.' }));
+      nav.appendChild(textButton('Back to the three steps', () => showStep('1')));
+      return;
+    }
+    const n = parseInt(step, 10);
+    const hints = {
+      1: 'Give the channel a name and number. A logo is optional and can be made from the name.',
+      2: 'Add the shows and films, and say how they play.',
+      3: 'Family hours, time blocks and the dates the channel is listed. Then save.'
+    };
+    nav.appendChild(el('span', { className: 'tvs-secondary', text: 'Step ' + n + ' of 3: ' + hints[n] }));
+    if (n > 1) {
+      nav.appendChild(textButton('Back: ' + STEP_TITLES[n - 1], () => showStep(String(n - 1))));
+    }
+    if (n < 3) {
+      nav.appendChild(textButton('Next: ' + STEP_TITLES[n + 1], () => showStep(String(n + 1)), 'button-submit'));
+    } else {
+      nav.appendChild(textButton('Save', () => saveStation(false), 'button-submit'));
+    }
+  }
+
+  /** The first step that holds a field a validation message refers to, so the person lands where the fix is. */
+  function stepForErrors(errors) {
+    const text = errors.join(' ');
+    if (/Name is required|Channel number/.test(text)) {
+      return '1';
+    }
+    if (/block/i.test(text)) {
+      return '3';
+    }
+    return '2';
+  }
+
+  // ---- Generated logo ----------------------------------------------------------------------
+
+  function colorForName(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) {
+      h = (h * 31 + name.charCodeAt(i)) >>> 0;
+    }
+    return hslToHex(h % 360, 55, 38);
+  }
+
+  function hslToHex(h, s, l) {
+    s /= 100;
+    l /= 100;
+    const k = n => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    const hex = x => Math.round(255 * x).toString(16).padStart(2, '0');
+    return '#' + hex(f(0)) + hex(f(8)) + hex(f(4));
+  }
+
+  function luminance(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
+  }
+
+  /** Draws an 800 x 450 card: the channel name (up to two lines) and number on a coloured background. Null when the browser cannot draw. */
+  function drawLogo(name, number, color) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 450;
+    const ctx = canvas.getContext && canvas.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+    const fg = luminance(color) > 0.6 ? '#111111' : '#ffffff';
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 800, 450);
+    ctx.fillStyle = fg;
+    ctx.globalAlpha = 0.08;
+    ctx.beginPath();
+    ctx.arc(640, 90, 260, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const words = (name || 'TV').trim().split(/\s+/);
+    let lines = [words.join(' ')];
+    let size = 120;
+    const fits = (text, px) => { ctx.font = 'bold ' + px + 'px sans-serif'; return ctx.measureText(text).width <= 700; };
+    while (size > 40 && !lines.every(l => fits(l, size))) {
+      if (lines.length === 1 && words.length > 1 && size < 96) {
+        const mid = Math.ceil(words.length / 2);
+        lines = [words.slice(0, mid).join(' '), words.slice(mid).join(' ')];
+        size = 110;
+      } else {
+        size -= 6;
+      }
+    }
+    ctx.font = 'bold ' + size + 'px sans-serif';
+    ctx.shadowColor = 'rgba(0,0,0,.35)';
+    ctx.shadowBlur = 12;
+    const lineHeight = size * 1.15;
+    const top = 225 - ((lines.length - 1) * lineHeight) / 2 - (number ? 16 : 0);
+    lines.forEach((l, i) => ctx.fillText(l, 400, top + i * lineHeight));
+    if (number) {
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 0.85;
+      ctx.font = '600 34px sans-serif';
+      ctx.fillText('CH ' + number, 400, 400);
+      ctx.globalAlpha = 1;
+    }
+    return canvas;
+  }
+
+  function generateLogo() {
+    const name = val('#tvsName').trim() || 'TV';
+    const canvas = drawLogo(name, val('#tvsChannel').trim(), val('#tvsLogoColor') || colorForName(name));
+    if (!canvas) {
+      toast('This browser cannot draw the logo; upload an image instead.');
+      return;
+    }
+    canvas.toBlob(blob => {
+      if (!blob) {
+        return;
+      }
+      if (isNewDraft()) {
+        state.pendingLogo = blob;
+        renderLogo();
+        return;
+      }
+      uploadLogoTo(state.draft.Id, blob, 'logo.png').then(() => {
+        state.draft.LogoFileName = 'logo.png';
+        renderLogo();
+        toast('Logo saved.');
+      }).catch(err => alertErrors(err, 'Could not save the logo'));
+    }, 'image/png');
+  }
+
+  /** POSTs an image to a station's logo endpoint. */
+  function uploadLogoTo(id, blob, name) {
+    const headers = { 'Content-Type': blob.type || 'application/octet-stream' };
+    try {
+      headers.Authorization = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
+    } catch (e) {
+      /* ignore */
+    }
+    return fetch(ApiClient.getUrl('TvStation/Stations/' + id + '/Logo'), { method: 'POST', body: blob, headers: headers })
+      .then(response => (response.ok ? name : Promise.reject(response)));
   }
 
   function uploadLogo(file) {
     if (!file || isNewDraft()) {
       return;
     }
-    const id = state.draft.Id;
     const hint = $('#tvsLogoHint');
     hint.textContent = 'Uploading…';
-    const headers = { 'Content-Type': file.type || 'application/octet-stream' };
-    try {
-      headers.Authorization = 'MediaBrowser Token="' + ApiClient.accessToken() + '"';
-    } catch (e) {
-      /* ignore */
-    }
-    fetch(ApiClient.getUrl('TvStation/Stations/' + id + '/Logo'), { method: 'POST', body: file, headers: headers })
-      .then(response => {
-        if (!response.ok) {
-          return Promise.reject(response);
-        }
-        state.draft.LogoFileName = file.name || 'logo';
+    uploadLogoTo(state.draft.Id, file, file.name || 'logo')
+      .then(name => {
+        state.draft.LogoFileName = name;
         renderLogo();
         toast('Logo uploaded.');
       })
@@ -1551,6 +1731,9 @@
     const errors = clientValidate(payload);
     const box = $('#tvsEditorErrors');
     if (errors.length) {
+      if (state.editorStep !== 'all') {
+        showStep(stepForErrors(errors));
+      }
       renderErrorBox(box, errors);
       return;
     }
@@ -1563,6 +1746,11 @@
     request.then(saved => {
       const name = (saved && saved.Name) || payload.Name;
       let after = Promise.resolve();
+      if (state.pendingLogo && saved && saved.Id) {
+        const logo = state.pendingLogo;
+        state.pendingLogo = null;
+        after = uploadLogoTo(saved.Id, logo, 'logo.png').catch(err => alertErrors(err, 'Station saved, but the logo could not be uploaded'));
+      }
       if (refreshGuideAfter) {
         after = api('POST', 'Guide/Refresh', undefined, undefined, true)
           .then(() => toast('Saved “' + name + '” and requested a guide refresh.'))
@@ -3286,6 +3474,20 @@
     on('#tvsBtnCancel', 'click', backToList);
     on('#tvsBtnSave', 'click', () => saveStation(false));
     on('#tvsBtnSaveTop', 'click', () => saveStation(false));
+    on('#tvsSteps', 'click', ev => {
+      const button = ev.target.closest ? ev.target.closest('.tvs-step') : null;
+      if (button) {
+        showStep(button.getAttribute('data-step'));
+      }
+    });
+    on('#tvsBtnGenerateLogo', 'click', generateLogo);
+    on('#tvsName', 'input', () => {
+      // A fresh colour suggestion follows the name until the person picks one.
+      if (state.draft && !$('#tvsLogoColor').dataset.picked) {
+        $('#tvsLogoColor').value = colorForName(val('#tvsName').trim() || 'TV');
+      }
+    });
+    on('#tvsLogoColor', 'input', () => { $('#tvsLogoColor').dataset.picked = '1'; });
     on('#tvsBtnSaveRefresh', 'click', () => saveStation(true));
     on('#tvsBtnRecompile', 'click', recompileStation);
     on('#tvsMode', 'change', updateModePanels);

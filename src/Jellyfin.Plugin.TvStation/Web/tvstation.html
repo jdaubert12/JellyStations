@@ -137,6 +137,17 @@
       #TvStationPage details.tvs-advanced > .tvs-advanced-body { padding: .2em 1em 1em; border-top: 1px solid rgba(255,255,255,.1); }
       #TvStationPage .tvs-health-actions { display: flex; flex-wrap: wrap; gap: .4em; margin-top: .4em; }
       #TvStationPage .tvs-badge.tvs-clickable { cursor: pointer; }
+      #TvStationPage .tvs-step-hidden { display: none !important; }
+      #TvStationPage .tvs-steps { display: flex; flex-wrap: wrap; gap: .4em; margin: .4em 0 1.2em; }
+      #TvStationPage .tvs-step { display: inline-flex; align-items: center; gap: .5em; padding: .45em .9em .45em .6em; border: 1px solid rgba(255,255,255,.2); border-radius: 2em; background: rgba(255,255,255,.05); color: inherit; font: inherit; cursor: pointer; }
+      #TvStationPage .tvs-step:hover { background: rgba(255,255,255,.1); }
+      #TvStationPage .tvs-step.active { background: rgba(0,164,220,.25); border-color: rgba(0,164,220,.8); }
+      #TvStationPage .tvs-step-num { display: inline-flex; align-items: center; justify-content: center; width: 1.6em; height: 1.6em; border-radius: 50%; background: rgba(255,255,255,.15); font-size: .85em; font-weight: 600; }
+      #TvStationPage .tvs-step.active .tvs-step-num { background: rgba(0,164,220,.9); color: #fff; }
+      #TvStationPage .tvs-step-all { margin-left: auto; opacity: .85; }
+      #TvStationPage .tvs-step-all .material-icons { font-size: 1.1em; }
+      #TvStationPage .tvs-step-nav { display: flex; align-items: center; gap: .6em; margin: 1.2em 0 .4em; }
+      #TvStationPage .tvs-step-nav .tvs-secondary { flex: 1 1 auto; }
       #TvStationPage .tvs-badge.tvs-clickable:hover { background: rgba(255,152,0,.4); }
       #TvStationPage .tvs-ok { color: rgba(82,181,75,1); }
       #TvStationPage .tvs-bad { color: rgba(244,67,54,1); }
@@ -218,8 +229,14 @@
             <button is="emby-button" type="button" id="tvsBtnEditorBack" class="raised emby-button"><span>Back to list</span></button>
           </div>
           <div id="tvsEditorErrors" class="tvs-error tvs-hidden"></div>
+          <div class="tvs-steps" id="tvsSteps" role="tablist">
+            <button type="button" class="tvs-step" data-step="1"><span class="tvs-step-num">1</span><span>Name and look</span></button>
+            <button type="button" class="tvs-step" data-step="2"><span class="tvs-step-num">2</span><span>What plays</span></button>
+            <button type="button" class="tvs-step" data-step="3"><span class="tvs-step-num">3</span><span>When</span></button>
+            <button type="button" class="tvs-step tvs-step-all" data-step="all"><span class="material-icons tune" aria-hidden="true"></span><span>All settings</span></button>
+          </div>
 
-          <div class="verticalSection">
+          <div class="verticalSection" data-steps="1">
             <h3 class="sectionTitle">General</h3>
             <div class="tvs-grid2">
               <div class="inputContainer">
@@ -250,36 +267,20 @@
               </label>
               <div class="fieldDescription checkboxFieldDescription">Re-scan the library every night so newly added movies and episodes join this channel automatically.</div>
             </div>
-            <div class="tvs-season">
-              <div class="inputLabel">Season (optional)</div>
-              <div class="fieldDescription">Leave empty to list the channel all year. Otherwise it only appears in the guide between these dates each year (station time zone, inclusive). Ranges may cross New Year, e.g. Dec 1 to Jan 6.</div>
-              <div id="tvsSeasonRows"></div>
-              <div class="tvs-season-row">
-                <button is="emby-button" type="button" id="tvsBtnAddSeason" class="raised emby-button"><span>Add date range</span></button>
-                <select is="emby-select" class="emby-select" id="tvsSeasonPreset" title="Add a common holiday range">
-                  <option value="">Add a preset…</option>
-                  <option value="halloween">Halloween (Oct 1 – Oct 31)</option>
-                  <option value="thanksgiving">Thanksgiving (Nov 15 – Nov 30)</option>
-                  <option value="christmas">Christmas (Dec 1 – Jan 6)</option>
-                  <option value="holidays">Holiday season (Nov 20 – Jan 6)</option>
-                  <option value="newyear">New Year (Dec 26 – Jan 7)</option>
-                  <option value="valentines">Valentine's (Feb 1 – Feb 14)</option>
-                  <option value="stpatricks">St. Patrick's (Mar 10 – Mar 17)</option>
-                  <option value="easter">Spring / Easter (Mar 20 – Apr 30)</option>
-                  <option value="july4">Independence Day (Jun 28 – Jul 7)</option>
-                  <option value="summer">Summer (Jun 1 – Aug 31)</option>
-                  <option value="winter">Winter (Dec 1 – Feb 28)</option>
-                </select>
-              </div>
-            </div>
           </div>
 
-          <div class="verticalSection">
+          <div class="verticalSection" data-steps="1">
             <h3 class="sectionTitle">Logo</h3>
             <div class="tvs-inline">
               <img id="tvsLogoImg" class="tvs-logo-preview tvs-hidden" alt="Station logo">
               <span id="tvsLogoNone" class="tvs-secondary">No logo uploaded.</span>
               <input type="file" id="tvsLogoFile" accept="image/png,image/jpeg,image/webp,image/gif">
+            </div>
+            <div class="tvs-inline" style="margin-top:.6em">
+              <button is="emby-button" type="button" id="tvsBtnGenerateLogo" class="raised emby-button"><span>Make a logo from the name</span></button>
+              <label for="tvsLogoColor" class="tvs-secondary">Colour</label>
+              <input type="color" id="tvsLogoColor" class="tvs-color" value="#2a5d9f">
+              <span class="tvs-secondary">A simple card with the channel name and number; upload your own image any time to replace it.</span>
             </div>
             <div class="fieldDescription" id="tvsLogoHint">PNG, JPEG, WebP or GIF up to 5 MB. Shown in the guide and on station-break slates.</div>
             <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:1em">
@@ -308,9 +309,9 @@
             </div>
           </div>
 
-          <div class="verticalSection">
+          <div class="verticalSection" data-steps="2 3">
             <h3 class="sectionTitle">Programming</h3>
-            <div class="selectContainer">
+            <div class="selectContainer" data-steps="2">
               <label class="selectLabel" for="tvsMode">Mode</label>
               <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsMode">
                 <option value="Pool">Shuffle a collection – shows and movies play around the clock, reshuffled each round</option>
@@ -321,7 +322,7 @@
             </div>
 
             <!-- Pool -->
-            <div id="tvsPanelPool" class="tvs-panel">
+            <div id="tvsPanelPool" class="tvs-panel" data-steps="2">
               <h4 class="tvs-subtitle">What plays</h4>
               <div id="tvsPoolPicker"></div>
               <div class="tvs-grid2">
@@ -354,17 +355,21 @@
                 </div>
               </div>
               <div class="fieldDescription">When shuffling, play this many episodes of one show back to back before switching to another. Leave both at 1 for no marathons. Movies always play one at a time.</div>
+              <div id="tvsPoolCycle" class="tvs-info"></div>
+            </div>
+
+            <!-- Family hours (Pool) -->
+            <div id="tvsPanelFamily" class="tvs-panel" data-steps="3">
               <div class="tvs-season">
                 <div class="inputLabel">Family hours (optional)</div>
                 <div class="fieldDescription">Keep stronger ratings out of the daytime, for example nothing above PG between 06:00 and 20:00 (station time zone). Anything that would overlap the window moves to a later slot; if nothing may play, a station card shows instead. Time blocks are not affected.</div>
                 <div id="tvsDaypartRows"></div>
                 <button is="emby-button" type="button" id="tvsBtnAddDaypart" class="raised emby-button"><span>Add family hours</span></button>
               </div>
-              <div id="tvsPoolCycle" class="tvs-info"></div>
             </div>
 
             <!-- Time blocks (Pool and Slots) -->
-            <div id="tvsPanelBlocks" class="tvs-panel">
+            <div id="tvsPanelBlocks" class="tvs-panel" data-steps="3">
               <div class="tvs-toolbar" style="margin-top:1em">
                 <h4 class="tvs-subtitle sectionTitle" style="margin:0">Time blocks</h4>
                 <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsBlockTemplateSelect" title="Start the new block from a saved template" style="width:auto;max-width:20em"><option value="">Blank block</option></select>
@@ -377,7 +382,7 @@
             </div>
 
             <!-- Slots -->
-            <div id="tvsPanelSlots" class="tvs-panel tvs-hidden">
+            <div id="tvsPanelSlots" class="tvs-panel tvs-hidden" data-steps="2">
               <h4 class="tvs-subtitle">Filler (between blocks)</h4>
               <div class="fieldDescription">Plays whenever no block is on, and fills the rest of a block that ends early.</div>
               <div id="tvsFillerPicker"></div>
@@ -394,7 +399,7 @@
             </div>
 
             <!-- Lineup -->
-            <div id="tvsPanelLineup" class="tvs-panel tvs-hidden">
+            <div id="tvsPanelLineup" class="tvs-panel tvs-hidden" data-steps="2">
               <h4 class="tvs-subtitle">Add items</h4>
               <div class="fieldDescription">Movies and episodes are added directly. Choosing a series, season, collection or playlist adds all of its items in order.</div>
               <div id="tvsLineupPicker"></div>
@@ -405,7 +410,33 @@
             </div>
           </div>
 
-          <details class="tvs-advanced" id="tvsAdvanced">
+          <div class="verticalSection" data-steps="3">
+            <h3 class="sectionTitle">Season</h3>
+            <div class="tvs-season">
+              <div class="inputLabel">Listed only between these dates (optional)</div>
+              <div class="fieldDescription">Leave empty to list the channel all year. Otherwise it only appears in the guide between these dates each year (station time zone, inclusive). Ranges may cross New Year, e.g. Dec 1 to Jan 6.</div>
+              <div id="tvsSeasonRows"></div>
+              <div class="tvs-season-row">
+                <button is="emby-button" type="button" id="tvsBtnAddSeason" class="raised emby-button"><span>Add date range</span></button>
+                <select is="emby-select" class="emby-select" id="tvsSeasonPreset" title="Add a common holiday range">
+                  <option value="">Add a preset…</option>
+                  <option value="halloween">Halloween (Oct 1 – Oct 31)</option>
+                  <option value="thanksgiving">Thanksgiving (Nov 15 – Nov 30)</option>
+                  <option value="christmas">Christmas (Dec 1 – Jan 6)</option>
+                  <option value="holidays">Holiday season (Nov 20 – Jan 6)</option>
+                  <option value="newyear">New Year (Dec 26 – Jan 7)</option>
+                  <option value="valentines">Valentine's (Feb 1 – Feb 14)</option>
+                  <option value="stpatricks">St. Patrick's (Mar 10 – Mar 17)</option>
+                  <option value="easter">Spring / Easter (Mar 20 – Apr 30)</option>
+                  <option value="july4">Independence Day (Jun 28 – Jul 7)</option>
+                  <option value="summer">Summer (Jun 1 – Aug 31)</option>
+                  <option value="winter">Winter (Dec 1 – Feb 28)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <details class="tvs-advanced" id="tvsAdvanced" data-steps="all">
             <summary><span class="material-icons expand_more" aria-hidden="true"></span>Advanced <span class="tvs-secondary">call sign, padding grid, schedule anchor, station card text, excluded tags, minimum length, encoding</span></summary>
             <div class="tvs-advanced-body">
               <div class="tvs-grid2">
@@ -467,13 +498,13 @@
             </div>
           </details>
 
-          <div class="verticalSection" id="tvsExcludedSection">
+          <div class="verticalSection" id="tvsExcludedSection" data-steps="all">
             <h3 class="sectionTitle">Excluded items</h3>
             <div id="tvsExcludedInfo" class="fieldDescription"></div>
             <div id="tvsExcludedList" class="paperList"></div>
           </div>
 
-          <div class="verticalSection">
+          <div class="verticalSection" data-steps="2">
             <h3 class="sectionTitle">Bumpers</h3>
             <div class="checkboxContainer checkboxContainer-withDescription">
               <label class="emby-checkbox-label">
@@ -512,7 +543,7 @@
             </div>
           </div>
 
-          <div class="verticalSection">
+          <div class="verticalSection" data-steps="2">
             <div class="tvs-toolbar">
               <h3 class="sectionTitle">Content</h3>
               <button is="emby-button" type="button" id="tvsBtnContent" class="raised emby-button"><span>Show content</span></button>
@@ -523,7 +554,7 @@
             <div id="tvsContent" class="tvs-tablewrap"></div>
           </div>
 
-          <div class="verticalSection">
+          <div class="verticalSection" data-steps="3">
             <div class="tvs-toolbar">
               <h3 class="sectionTitle">Schedule preview</h3>
               <button is="emby-button" type="button" class="raised emby-button tvs-preview-btn" data-hours="24"><span>24 hours</span></button>
@@ -534,6 +565,7 @@
             <div id="tvsPreview" class="tvs-tablewrap"></div>
           </div>
 
+          <div id="tvsStepNav" class="tvs-step-nav"></div>
           <div class="tvs-actions">
             <button is="emby-button" type="button" id="tvsBtnSave" class="raised button-submit emby-button"><span>Save</span></button>
             <button is="emby-button" type="button" id="tvsBtnSaveRefresh" class="raised emby-button"><span>Save &amp; refresh guide</span></button>
