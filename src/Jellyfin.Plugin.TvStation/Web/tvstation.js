@@ -98,6 +98,7 @@
     presetName: null,     // name of the preset a new draft started from
     editorStep: '1',      // '1' | '2' | '3' | 'all'
     pendingLogo: null,    // generated logo (Blob) for a new station, uploaded right after the first save
+    logoLook: 0,          // how many times "Another look" was pressed for this draft; part of the logo seed
     sourceDefaults: null, // filters the preset applies to every source added to the pool
     settings: null,       // GlobalSettings as last loaded in the settings view
     suggestions: [],
@@ -1228,6 +1229,7 @@
       state.runtimes = {};
       state.expandedBlocks = {};
       state.pendingLogo = null;
+      state.logoLook = 0;
       renderEditor();
       showStep(rememberedEditorView() === 'all' ? 'all' : '1');
       showView('editor');
@@ -1525,8 +1527,162 @@
     return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
   }
 
-  /** Draws an 800 x 450 card: the channel name (up to two lines) and number on a coloured background. Null when the browser cannot draw. */
-  function drawLogo(name, number, color) {
+  function hexToHsl(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    const r = ((n >> 16) & 255) / 255;
+    const g = ((n >> 8) & 255) / 255;
+    const b = (n & 255) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    if (max === min) {
+      return { h: 0, s: 0, l: l * 100 };
+    }
+    const d = max - min;
+    const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    let h;
+    if (max === r) {
+      h = (g - b) / d + (g < b ? 6 : 0);
+    } else if (max === g) {
+      h = (b - r) / d + 2;
+    } else {
+      h = (r - g) / d + 4;
+    }
+    return { h: h * 60, s: s * 100, l: l * 100 };
+  }
+
+  /** FNV-1a over a string: a stable 32-bit seed. */
+  function hashText(text) {
+    let h = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return h >>> 0;
+  }
+
+  /** mulberry32: a small seeded random source, so the same seed draws the same card. */
+  function seededRandom(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /** What gives a station its look: the name, number and everything it plays, plus the "Another look" counter. */
+  function logoSeedText(name, number) {
+    const parts = [name, number];
+    const d = state.draft;
+    if (d) {
+      const add = sources => (sources || []).forEach(s => parts.push(s.DisplayName || s.Genre || s.Tag || s.ItemId || s.Kind || ''));
+      add(d.Pool && d.Pool.Sources);
+      ((d.Slots && d.Slots.Blocks) || []).forEach(b => add(b.Sources));
+      add(d.Slots && d.Slots.Filler && d.Slots.Filler.Sources);
+      ((d.Lineup && d.Lineup.Items) || []).forEach(i => parts.push(i.DisplayName || i.ItemId || ''));
+    }
+    parts.push('look' + (state.logoLook || 0));
+    return parts.join('|').toLowerCase();
+  }
+
+  /**
+   * Paints the card's background from a seeded random source: one of several patterns in the base colour and a
+   * neighbouring hue. Overlays stay faint so the text reads on any of them.
+   */
+  function drawLogoBackground(ctx, color, fg, rnd) {
+    const base = hexToHsl(color);
+    const shift = (rnd() < 0.5 ? -1 : 1) * (25 + rnd() * 45);
+    const partner = hslToHex((base.h + shift + 360) % 360, Math.min(100, base.s + 10), Math.max(12, Math.min(88, base.l + (rnd() < 0.5 ? -9 : 9))));
+    const deep = hslToHex(base.h, base.s, Math.max(6, base.l - 14));
+    const angle = rnd() * Math.PI * 2;
+    const gradient = (from, to) => {
+      const g = ctx.createLinearGradient(400 - Math.cos(angle) * 450, 225 - Math.sin(angle) * 450, 400 + Math.cos(angle) * 450, 225 + Math.sin(angle) * 450);
+      g.addColorStop(0, from);
+      g.addColorStop(1, to);
+      return g;
+    };
+    const style = Math.floor(rnd() * 6);
+    ctx.fillStyle = style === 0 ? gradient(color, partner) : color;
+    ctx.fillRect(0, 0, 800, 450);
+    ctx.save();
+    if (style === 1) {
+      // Diagonal stripes.
+      const width = 30 + rnd() * 60;
+      ctx.translate(400, 225);
+      ctx.rotate(angle);
+      ctx.fillStyle = partner;
+      ctx.globalAlpha = 0.22;
+      for (let x = -700; x < 700; x += width * 2) {
+        ctx.fillRect(x, -700, width, 1400);
+      }
+    } else if (style === 2) {
+      // A grid of dots.
+      const gap = 36 + rnd() * 44;
+      const radius = gap * (0.12 + rnd() * 0.16);
+      const offsetX = rnd() * gap;
+      const offsetY = rnd() * gap;
+      ctx.fillStyle = fg;
+      ctx.globalAlpha = 0.12;
+      for (let y = offsetY - gap; y < 450 + gap; y += gap) {
+        for (let x = offsetX - gap; x < 800 + gap; x += gap) {
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    } else if (style === 3) {
+      // Rings spreading from one corner.
+      const cx = rnd() < 0.5 ? -40 : 840;
+      const cy = rnd() < 0.5 ? -40 : 490;
+      const gap = 40 + rnd() * 50;
+      ctx.strokeStyle = partner;
+      ctx.lineWidth = gap * 0.45;
+      ctx.globalAlpha = 0.2;
+      for (let r = gap; r < 1100; r += gap) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    } else if (style === 4) {
+      // Two or three big tilted slabs.
+      const count = 2 + Math.floor(rnd() * 2);
+      ctx.fillStyle = partner;
+      ctx.globalAlpha = 0.28;
+      for (let i = 0; i < count; i++) {
+        ctx.save();
+        ctx.translate(rnd() * 800, rnd() * 450);
+        ctx.rotate(angle + i * (0.5 + rnd()));
+        ctx.fillRect(-900, -(40 + rnd() * 120) / 2, 1800, 40 + rnd() * 120);
+        ctx.restore();
+      }
+    } else if (style === 5) {
+      // Colour bars along the bottom, like a test card.
+      ctx.fillStyle = gradient(color, deep);
+      ctx.fillRect(0, 0, 800, 450);
+      const bars = 6 + Math.floor(rnd() * 3);
+      const height = 22 + rnd() * 10; // stays under the channel number
+      const width = 800 / bars;
+      ctx.globalAlpha = 0.55;
+      for (let i = 0; i < bars; i++) {
+        ctx.fillStyle = hslToHex((base.h + i * (360 / bars)) % 360, 60, 48);
+        ctx.fillRect(i * width, 450 - height, width + 1, height);
+      }
+    }
+    ctx.restore();
+    // The soft disc every card has, placed by the seed.
+    ctx.fillStyle = fg;
+    ctx.globalAlpha = 0.08;
+    ctx.beginPath();
+    ctx.arc(rnd() < 0.5 ? 120 + rnd() * 80 : 600 + rnd() * 80, rnd() < 0.5 ? 60 + rnd() * 60 : 340 + rnd() * 60, 200 + rnd() * 120, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  /** Draws an 800 x 450 card: the channel name (up to two lines) and number on a patterned background seeded from the station. Null when the browser cannot draw. */
+  function drawLogo(name, number, color, seedText) {
     const canvas = document.createElement('canvas');
     canvas.width = 800;
     canvas.height = 450;
@@ -1535,14 +1691,8 @@
       return null;
     }
     const fg = luminance(color) > 0.6 ? '#111111' : '#ffffff';
-    ctx.fillStyle = color;
-    ctx.fillRect(0, 0, 800, 450);
+    drawLogoBackground(ctx, color, fg, seededRandom(hashText(seedText || name || 'TV')));
     ctx.fillStyle = fg;
-    ctx.globalAlpha = 0.08;
-    ctx.beginPath();
-    ctx.arc(640, 90, 260, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const words = (name || 'TV').trim().split(/\s+/);
@@ -1576,7 +1726,8 @@
 
   function generateLogo() {
     const name = val('#tvsName').trim() || 'TV';
-    const canvas = drawLogo(name, val('#tvsChannel').trim(), val('#tvsLogoColor') || colorForName(name));
+    const number = val('#tvsChannel').trim();
+    const canvas = drawLogo(name, number, val('#tvsLogoColor') || colorForName(name), logoSeedText(name, number));
     if (!canvas) {
       toast('This browser cannot draw the logo; upload an image instead.');
       return;
@@ -3874,6 +4025,10 @@
       }
     });
     on('#tvsBtnGenerateLogo', 'click', generateLogo);
+    on('#tvsBtnLogoAnotherLook', 'click', () => {
+      state.logoLook = (state.logoLook || 0) + 1;
+      generateLogo();
+    });
     on('#tvsName', 'input', () => {
       // A fresh colour suggestion follows the name until the person picks one.
       if (state.draft && !$('#tvsLogoColor').dataset.picked) {
