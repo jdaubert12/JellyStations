@@ -1312,7 +1312,8 @@
 
     // Logo
     delete $('#tvsLogoColor').dataset.picked;
-    $('#tvsLogoColor').value = colorForName(d.Name || 'TV');
+    setChecked('#tvsLogoAutoColor', autoLogoColor());
+    suggestLogoColor();
     renderLogo();
     setChecked('#tvsOverlayEnabled', !!d.LogoOverlay.Enabled);
     setVal('#tvsOverlayCorner', d.LogoOverlay.Corner);
@@ -1512,6 +1513,41 @@
     return hslToHex(h % 360, 55, 38);
   }
 
+  /** A color drawn from the station seed: any hue, kept mid-saturated and dark enough for white text. */
+  function colorForSeed(seedText) {
+    const rnd = seededRandom(hashText(seedText));
+    return hslToHex(Math.floor(rnd() * 360), 45 + Math.floor(rnd() * 35), 28 + Math.floor(rnd() * 20));
+  }
+
+  function autoLogoColor() {
+    try {
+      return window.localStorage.getItem('tvsLogoAutoColor') === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function rememberAutoLogoColor(on) {
+    try {
+      window.localStorage.setItem('tvsLogoAutoColor', on ? '1' : '0');
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  /** Puts the suggested color in the picker: from the whole seed when "Pick the color too" is on, else from the name until the person picks one. */
+  function suggestLogoColor() {
+    const auto = checked('#tvsLogoAutoColor');
+    const picker = $('#tvsLogoColor');
+    picker.disabled = auto;
+    const name = val('#tvsName').trim() || 'TV';
+    if (auto) {
+      picker.value = colorForSeed(logoSeedText(name, val('#tvsChannel').trim()));
+    } else if (!picker.dataset.picked) {
+      picker.value = colorForName(name);
+    }
+  }
+
   function hslToHex(h, s, l) {
     s /= 100;
     l /= 100;
@@ -1589,7 +1625,7 @@
   }
 
   /**
-   * Paints the card's background from a seeded random source: one of several patterns in the base colour and a
+   * Paints the card's background from a seeded random source: one of several patterns in the base color and a
    * neighbouring hue. Overlays stay faint so the text reads on any of them.
    */
   function drawLogoBackground(ctx, color, fg, rnd) {
@@ -1659,7 +1695,7 @@
         ctx.restore();
       }
     } else if (style === 5) {
-      // Colour bars along the bottom, like a test card.
+      // Color bars along the bottom, like a test card.
       ctx.fillStyle = gradient(color, deep);
       ctx.fillRect(0, 0, 800, 450);
       const bars = 6 + Math.floor(rnd() * 3);
@@ -1727,6 +1763,7 @@
   function generateLogo() {
     const name = val('#tvsName').trim() || 'TV';
     const number = val('#tvsChannel').trim();
+    suggestLogoColor();
     const canvas = drawLogo(name, number, val('#tvsLogoColor') || colorForName(name), logoSeedText(name, number));
     if (!canvas) {
       toast('This browser cannot draw the logo; upload an image instead.');
@@ -4029,13 +4066,14 @@
       state.logoLook = (state.logoLook || 0) + 1;
       generateLogo();
     });
-    on('#tvsName', 'input', () => {
-      // A fresh colour suggestion follows the name until the person picks one.
-      if (state.draft && !$('#tvsLogoColor').dataset.picked) {
-        $('#tvsLogoColor').value = colorForName(val('#tvsName').trim() || 'TV');
-      }
-    });
+    // A fresh color suggestion follows the name (and number, when seeded) until the person picks one.
+    on('#tvsName', 'input', () => { if (state.draft) { suggestLogoColor(); } });
+    on('#tvsChannel', 'input', () => { if (state.draft) { suggestLogoColor(); } });
     on('#tvsLogoColor', 'input', () => { $('#tvsLogoColor').dataset.picked = '1'; });
+    on('#tvsLogoAutoColor', 'change', () => {
+      rememberAutoLogoColor(checked('#tvsLogoAutoColor'));
+      suggestLogoColor();
+    });
     on('#tvsBtnSaveRefresh', 'click', () => saveStation(true));
     on('#tvsBtnRecompile', 'click', recompileStation);
     on('#tvsMode', 'change', updateModePanels);

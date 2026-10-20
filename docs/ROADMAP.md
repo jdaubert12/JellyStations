@@ -278,9 +278,9 @@ From a 2026-10-19 review of the dashboard: the base is solid but speaks engineer
    combined "Series - Episode" title (rows and previews doubled the episode name), added a Save
    button to the editor toolbar, and reworded the remaining compile / pool / slot wording.
 3. **Three-step editor — DONE 2026-10-19.** A step bar on the editor: Name and look (General,
-   Logo with "Make a logo from the name": an 800x450 card drawn on a canvas, colour suggested from
+   Logo with "Make a logo from the name": an 800x450 card drawn on a canvas, color suggested from
    the name, uploaded right after the first save for a new station; since 1.10.3.0 the background is one of six
-   patterns drawn from a seeded PRNG over the name, number, sources and an "Another look" counter), What plays (mode, sources,
+   patterns drawn from a seeded PRNG over the name, number, sources and an "Another look" counter; 1.10.4.0 added "Pick the color too", which draws the color from the same seed), What plays (mode, sources,
    order, bumpers, content list), When (family hours, time blocks, season, preview). Sections carry
    `data-steps`; "All settings" is the whole form and is remembered per browser. A refused save
    lands on the step with the problem.

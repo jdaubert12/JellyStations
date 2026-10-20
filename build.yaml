@@ -1,7 +1,7 @@
 ---
 name: "TvStation"
 guid: "b7f3c1d2-5e8a-4f0b-9c6d-2a1e7f4b8d31"
-version: "1.10.3.0"
+version: "1.10.4.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "Justin"
@@ -15,7 +15,8 @@ category: "LiveTV"
 artifacts:
   - "Jellyfin.Plugin.TvStation.dll"
 changelog: >
-  1.10.3.0: Make a logo from the name: the card now carries a pattern (gradient, stripes, dots, rings, slabs or colour bars) seeded from the name, number and what the channel plays, so each channel looks different while the same station always draws the same card. "Another look" draws the next variation.
+  1.10.4.0: Make a logo from the name: new "Pick the color too" option seeds the card color from the name, number and what the channel plays (remembered per browser); "Another look" then changes the color as well as the pattern.
+  1.10.3.0: Make a logo from the name: the card now carries a pattern (gradient, stripes, dots, rings, slabs or color bars) seeded from the name, number and what the channel plays, so each channel looks different while the same station always draws the same card. "Another look" draws the next variation.
   1.10.2.0: Editor: the station's excluded tags, the switch for the plugin-wide excluded tags, and the minimum length now sit in a "Leave out" section on step 2 (What plays), with the Excluded items list under them, instead of under Advanced in All settings.
   1.10.1.0: Fix: the filter box on the Not on a channel page made Jellyfin's page setup throw, which left buttons, inputs and checkboxes across the dashboard unstyled. Install this over 1.10.0.0.
   1.10.0.0: Not on a channel: a dashboard page listing the movies and shows no channel plays (GET /TvStation/Library/Coverage). Tick titles to start a new channel with them or add them to an existing channel's pool, filler or list; shows with only some episodes on a channel are marked; paused channels count only when asked; bumper and ident clips count as on their channel.

@@ -2,7 +2,7 @@
 param([string]$Configuration = "Release")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.10.3.0"
+$version = "1.10.4.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.TvStation\bin\$Configuration\net10.0\Jellyfin.Plugin.TvStation.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -21,7 +21,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Make a logo from the name: the card now carries a pattern (gradient, stripes, dots, rings, slabs or colour bars) seeded from the name, number and what the channel plays, so each channel looks different while the same station always draws the same card. ""Another look"" draws the next variation."
+    changelog = "Make a logo from the name: new ""Pick the color too"" option seeds the card color from the name, number and what the channel plays (remembered per browser); ""Another look"" then changes the color as well as the pattern."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

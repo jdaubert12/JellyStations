@@ -107,7 +107,7 @@ public static class FfmpegArgsBuilder
             $"[0:v]{VideoFilter(p)}[base];[{logoIndex}:v]scale=-1:{height},format=rgba,colorchannelmixer=aa={alpha}[logo];[base][logo]overlay={position}:format=yuv420[v]");
     }
 
-    /// <summary>Arguments for a generated slate (colour card with optional text and logo).</summary>
+    /// <summary>Arguments for a generated slate (color card with optional text and logo).</summary>
     public static List<string> ForSlate(TimeSpan duration, TimeSpan tsOffset, EncodingProfile p, string background, string? text, string? logoPath)
     {
         var args = new List<string>();

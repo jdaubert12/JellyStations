@@ -323,10 +323,14 @@
             </div>
             <div class="tvs-inline" style="margin-top:.6em">
               <button is="emby-button" type="button" id="tvsBtnGenerateLogo" class="raised emby-button"><span>Make a logo from the name</span></button>
-              <label for="tvsLogoColor" class="tvs-secondary">Colour</label>
+              <label for="tvsLogoColor" class="tvs-secondary">Color</label>
               <input type="color" id="tvsLogoColor" class="tvs-color" value="#2a5d9f">
+              <label class="emby-checkbox-label" style="display:inline-flex;width:auto">
+                <input is="emby-checkbox" type="checkbox" id="tvsLogoAutoColor">
+                <span class="tvs-secondary">Pick the color too</span>
+              </label>
               <button type="button" id="tvsBtnLogoAnotherLook" class="tvs-linkbtn tvs-secondary">Another look</button>
-              <span class="tvs-secondary">A card with the channel name and number. The pattern behind them comes from the name, number and what the channel plays, so each channel gets its own; upload your own image any time to replace it.</span>
+              <span class="tvs-secondary">A card with the channel name and number. The pattern behind them comes from the name, number and what the channel plays, so each channel gets its own. With "Pick the color too" the color comes from the same seed instead of the picker. Upload your own image any time to replace it.</span>
             </div>
             <div class="fieldDescription" id="tvsLogoHint">PNG, JPEG, WebP or GIF up to 5 MB. Shown in the guide and on station-break slates.</div>
             <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:1em">
