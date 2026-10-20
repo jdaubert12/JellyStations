@@ -270,7 +270,9 @@ From a 2026-10-19 review of the dashboard: the base is solid but speaks engineer
 2. **Plain words — DONE 2026-10-19.** Modes read "Shuffle a collection" / "Weekly schedule" /
    "Play a fixed list" with examples; "Recompile" is "Refresh content" everywhere; daytime rules
    are "Family hours"; the revision is no longer shown. Call sign, padding grid, anchor, card
-   text, excluded tags, minimum length and encoding sit under an **Advanced** fold. Health
+   text, excluded tags, minimum length and encoding sit under an **Advanced** fold (excluded
+   tags and minimum length moved to a "Leave out" section on step 2 on 2026-10-19: too hidden
+   for something about content). Health
    warnings carry "Refresh content" / "Add content" buttons and the row's warning badges open the
    station. Checked in Chrome on the dev server 2026-10-19: also fixed the schedule DTO sending the
    combined "Series - Episode" title (rows and previews doubled the episode name), added a Save

@@ -116,8 +116,9 @@ changed later. The editor walks through three steps: **Name and look** (name, nu
 a colour of your choice), **What plays** (shows, films and how they play) and **When** (family hours, time
 blocks, the dates the channel is listed, and a preview). Time blocks are painted onto a seven-day grid:
 click or drag to add one, drag sideways to cover several days, click a block to edit it. **All settings** shows the whole form on one page;
-the rarely needed settings (call sign, padding grid, schedule anchor, card text, excluded tags, minimum
-length, encoding) sit under **Advanced** there.
+the rarely needed settings (call sign, padding grid, schedule anchor, card text, encoding) sit under
+**Advanced** there. Step 2 also has a **Leave out** section: tags to exclude, the minimum length, and
+whether the plugin-wide excluded tags from Settings apply to this station.
 
 1. Open **Dashboard > TV Stations > New station**.
 2. Give it a name and channel number, pick a mode, add content with the picker, and use

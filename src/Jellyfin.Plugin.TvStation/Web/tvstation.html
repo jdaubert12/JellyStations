@@ -484,7 +484,7 @@
           </div>
 
           <details class="tvs-advanced" id="tvsAdvanced" data-steps="all">
-            <summary><span class="material-icons expand_more" aria-hidden="true"></span>Advanced <span class="tvs-secondary">call sign, padding grid, schedule anchor, station card text, excluded tags, minimum length, encoding</span></summary>
+            <summary><span class="material-icons expand_more" aria-hidden="true"></span>Advanced <span class="tvs-secondary">call sign, padding grid, schedule anchor, station card text, encoding</span></summary>
             <div class="tvs-advanced-body">
               <div class="tvs-grid2">
               <div class="inputContainer">
@@ -518,6 +518,21 @@
                 <div class="fieldDescription">Shown on the card during gaps and breaks.</div>
               </div>
               </div>
+              <h4 class="tvs-subtitle">Encoding</h4>
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsEncodingEnabled">
+                <span>Use custom encoding for this station</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">When off, the default profile from Settings is used. Changing encoding restarts this station's stream.</div>
+            </div>
+            <div id="tvsStationEncoding" class="tvs-hidden"></div>
+            </div>
+          </details>
+
+          <div class="verticalSection" data-steps="2">
+            <h3 class="sectionTitle">Leave out</h3>
+            <div class="fieldDescription">Keep things off this channel even when a show, genre or library above would bring them in.</div>
             <div class="inputContainer">
               <input is="emby-input" id="tvsExcludedTags" label="Exclude tags" type="text" autocomplete="off" placeholder="e.g. christmas, halloween">
               <div class="fieldDescription">Comma-separated library tags. Items carrying one are kept off this station when a source expands to them. Hand-picked movies and episodes, and a Tag source for the same tag, are never affected.</div>
@@ -533,19 +548,9 @@
               </label>
               <div class="fieldDescription checkboxFieldDescription">Turn off for a station that should play tagged items regardless of the plugin-wide list.</div>
             </div>
-              <h4 class="tvs-subtitle">Encoding</h4>
-            <div class="checkboxContainer checkboxContainer-withDescription">
-              <label class="emby-checkbox-label">
-                <input is="emby-checkbox" type="checkbox" id="tvsEncodingEnabled">
-                <span>Use custom encoding for this station</span>
-              </label>
-              <div class="fieldDescription checkboxFieldDescription">When off, the default profile from Settings is used. Changing encoding restarts this station's stream.</div>
-            </div>
-            <div id="tvsStationEncoding" class="tvs-hidden"></div>
-            </div>
-          </details>
+          </div>
 
-          <div class="verticalSection" id="tvsExcludedSection" data-steps="all">
+          <div class="verticalSection" id="tvsExcludedSection" data-steps="2">
             <h3 class="sectionTitle">Excluded items</h3>
             <div id="tvsExcludedInfo" class="fieldDescription"></div>
             <div id="tvsExcludedList" class="paperList"></div>
