@@ -294,6 +294,8 @@ From a 2026-10-19 review of the dashboard: the base is solid but speaks engineer
    (`LibraryCoverage`, pure). The dashboard page lists both with a filter and tick boxes; "New
    channel with selected" opens the editor with the titles as pool sources, "Add selected to
    channel" appends them to an existing station's pool, filler or lineup by mode.
+   1.10.1.0 fixed the page's filter box: an `is="emby-input"` element must not carry the
+   `emby-input` class itself, or Jellyfin's upgrade throws and every later element stays plain.
 6. **Smaller wins.** Duplicate station, "Pause" instead of a Disabled badge, generated logos, a
    one-line plain summary per row, a read-only "What's on" page for non-admins.
 
