@@ -28,6 +28,8 @@ public sealed class LibraryContentResolver
     /// Expands sources in order, de-duplicating by item id. Items carrying one of <paramref name="excludedTags"/> are
     /// dropped from every source except hand-picked Movie/Episode sources and a Tag source for that same tag; each is
     /// recorded once in <paramref name="excluded"/> (and snapshotted in <paramref name="tagExcluded"/> when given).
+    /// An item hand-picked anywhere in <paramref name="sources"/> is never tag-dropped by another source, whatever the
+    /// order, so adding a movie on purpose always wins over a tag that would otherwise hide it.
     /// </summary>
     public List<PlayableItem> Expand(
         IEnumerable<ContentSource> sources,
@@ -35,20 +37,24 @@ public sealed class LibraryContentResolver
         List<ExcludedItem> excluded,
         IReadOnlyCollection<string>? excludedTags = null,
         List<PlayableItem>? tagExcluded = null,
-        Action<ContentSource, int, int>? onSource = null)
+        Action<ContentSource, int, int, int>? onSource = null)
     {
         var result = new List<PlayableItem>();
         var seen = new HashSet<Guid>();
-        foreach (var source in sources)
+        var sourceList = sources as IReadOnlyCollection<ContentSource> ?? sources.ToList();
+        var pinned = HandPickedIds(sourceList);
+        foreach (var source in sourceList)
         {
             var block = new List<PlayableItem>();
             var dropTags = EffectiveExcludedTags(source, excludedTags);
             var found = 0;
+            var alreadyListed = 0;
             foreach (var item in ExpandSource(source))
             {
                 found++;
                 if (!seen.Add(item.Id))
                 {
+                    alreadyListed++;
                     continue;
                 }
 
@@ -58,7 +64,7 @@ public sealed class LibraryContentResolver
                     continue;
                 }
 
-                if (HasExcludedTag(playable, dropTags))
+                if (!pinned.Contains(playable.ItemId) && HasExcludedTag(playable, dropTags))
                 {
                     if (tagExcluded is null || tagExcluded.All(t => t.ItemId != playable.ItemId))
                     {
@@ -72,7 +78,7 @@ public sealed class LibraryContentResolver
                 block.Add(playable);
             }
 
-            onSource?.Invoke(source, found, block.Count);
+            onSource?.Invoke(source, found, block.Count, alreadyListed);
 
             // Weight n repeats the whole source block n times so sequential order stays intact (E1..En, E1..En).
             var weight = Math.Clamp(source.Weight, 1, 10);
@@ -108,6 +114,68 @@ public sealed class LibraryContentResolver
         if (source.Kind == SourceKind.Tag && !string.IsNullOrWhiteSpace(source.Tag))
         {
             set.Remove(source.Tag.Trim());
+        }
+
+        return set;
+    }
+
+    /// <summary>
+    /// For each of <paramref name="itemIds"/>, the first source in <paramref name="sources"/> that already plays it, applying
+    /// the excluded tags the way <see cref="Expand"/> does. Hand-picked Movie/Episode sources are not consulted: the point
+    /// is to tell the editor that a wider source (genre, tag, series, collection, playlist, library) already covers a hand-pick.
+    /// </summary>
+    public Dictionary<Guid, ContentSource> CoveredBy(IEnumerable<ContentSource> sources, IEnumerable<Guid> itemIds, IReadOnlyCollection<string>? excludedTags)
+    {
+        var result = new Dictionary<Guid, ContentSource>();
+        var wanted = new HashSet<Guid>(itemIds.Where(g => g != Guid.Empty));
+        if (wanted.Count == 0)
+        {
+            return result;
+        }
+
+        var scratch = new List<ExcludedItem>();
+        foreach (var source in sources)
+        {
+            if (source.Kind is SourceKind.Movie or SourceKind.Episode)
+            {
+                continue;
+            }
+
+            var dropTags = EffectiveExcludedTags(source, excludedTags);
+            foreach (var item in ExpandSource(source))
+            {
+                if (!wanted.Contains(item.Id) || result.ContainsKey(item.Id))
+                {
+                    continue;
+                }
+
+                var playable = ToPlayable(item, string.Empty, scratch);
+                if (playable is null || HasExcludedTag(playable, dropTags))
+                {
+                    continue;
+                }
+
+                result[item.Id] = source;
+                if (result.Count == wanted.Count)
+                {
+                    return result;
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>The item ids named by hand-picked Movie/Episode sources: these are never dropped by an excluded tag.</summary>
+    public static HashSet<Guid> HandPickedIds(IEnumerable<ContentSource> sources)
+    {
+        var set = new HashSet<Guid>();
+        foreach (var source in sources)
+        {
+            if (source.Kind is SourceKind.Movie or SourceKind.Episode && source.ItemId is { } id && id != Guid.Empty)
+            {
+                set.Add(id);
+            }
         }
 
         return set;

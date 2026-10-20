@@ -45,7 +45,7 @@ Library **tags** work both ways. A **Tag** source plays everything carrying a ta
 "christmas", as TMDB tags holiday films), including every episode of a tagged series. **Excluded
 tags**, per station or plugin-wide in Settings, keep tagged items off a station when a genre, library,
 playlist, collection or series source expands to them. Hand-picked movies and episodes, lineups, and a
-Tag source for that same tag are never affected, so a seasonal holiday station keeps its films while
+Tag source for that same tag are never affected, whatever order the sources are in, so a seasonal holiday station keeps its films while
 "christmas" stays off every regular channel all year. Items dropped by a tag rule appear in the
 Content section marked "by tag".
 
@@ -93,16 +93,16 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.10.4.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.10.4.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.10.4.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.10.4.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.10.4.0\`
+2. Copy it into a folder named `TvStation_1.10.5.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.10.5.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.10.5.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.10.5.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.10.5.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.10.4.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.10.4.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.10.5.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.10.5.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 

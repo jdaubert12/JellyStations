@@ -2,7 +2,7 @@
 param([string]$Configuration = "Release")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.10.4.0"
+$version = "1.10.5.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.TvStation\bin\$Configuration\net10.0\Jellyfin.Plugin.TvStation.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -21,7 +21,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Make a logo from the name: new ""Pick the color too"" option seeds the card color from the name, number and what the channel plays (remembered per browser); ""Another look"" then changes the color as well as the pattern."
+    changelog = "Fix: a movie or episode added to a station by hand is never dropped by an excluded tag, whatever order the sources are in. The station list no longer flags ""1 empty source"" for a hand-picked item that an earlier source already put on the station. Editor: search results and hand-picked chips say when a movie is already included via a genre, tag, series, collection, playlist or library source of the same section."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

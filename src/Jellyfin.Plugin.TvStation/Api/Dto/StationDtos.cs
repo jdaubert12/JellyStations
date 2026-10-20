@@ -56,6 +56,32 @@ public sealed class ContentListDto
     public Dictionary<string, int> BySource { get; set; } = new();
 }
 
+/// <summary>POST Schedule/CoveredBy: which of a section's existing sources already play the given items.</summary>
+public sealed class CoveredByRequestDto
+{
+    /// <summary>The station being edited, read only for its excluded-tag settings; may be omitted.</summary>
+    public Station? Draft { get; set; }
+
+    /// <summary>The sources of the section (pool, block, filler, bumpers) the items would be added to.</summary>
+    public List<ContentSource> Sources { get; set; } = new();
+
+    public List<Guid> ItemIds { get; set; } = new();
+}
+
+/// <summary>One item that an existing source already plays.</summary>
+public sealed class CoveredItemDto
+{
+    public Guid ItemId { get; set; }
+
+    public SourceKind Kind { get; set; }
+
+    /// <summary>The covering source's display name (genre, tag, series, collection, playlist or library name).</summary>
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>'Genre "Comedy"' style label, including any rating or year filter.</summary>
+    public string Label { get; set; } = string.Empty;
+}
+
 /// <summary>Outcome of POST Stations/Import.</summary>
 public sealed class ImportResultDto
 {

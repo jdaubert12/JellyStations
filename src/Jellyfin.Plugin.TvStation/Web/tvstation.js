@@ -3377,6 +3377,40 @@
     }
 
     let editing = -1;
+    let coverageSeq = 0;
+    const coverageCache = {};
+
+    /**
+     * Asks the server which of this section's wider sources (genre, tag, series, collection, playlist, library) already
+     * play the given movies/episodes, then calls back with { itemId: 'Genre “Comedy”' } for the covered ones.
+     * Answers are cached per (sources, ids); a stale answer is dropped when the sources change meanwhile.
+     */
+    function checkCoverage(ids, cb) {
+      if (mode !== 'sources' || !ids.length) {
+        return;
+      }
+      const wide = (opts.getSources() || []).filter(s => s.Kind !== 'Movie' && s.Kind !== 'Episode');
+      if (!wide.length) {
+        cb({});
+        return;
+      }
+      const key = JSON.stringify([wide, ids.slice().sort()]);
+      if (coverageCache[key]) {
+        cb(coverageCache[key]);
+        return;
+      }
+      const seq = ++coverageSeq;
+      api('POST', 'Schedule/CoveredBy', { Draft: readDraft(), Sources: wide, ItemIds: ids }).then(list => {
+        const map = {};
+        (list || []).forEach(c => {
+          map[c.ItemId] = (KIND_LABEL[c.Kind] || c.Kind) + ' “' + (c.Name || c.Label) + '”';
+        });
+        coverageCache[key] = map;
+        if (seq === coverageSeq) {
+          cb(map);
+        }
+      }).catch(() => { /* a note only; the picker works without it */ });
+    }
 
     function renderChips() {
       if (mode !== 'sources') {
@@ -3413,10 +3447,23 @@
           renderResults(lastResults);
         } }));
         const chip = el('span', { className: 'tvs-chip' + (editing === index ? ' editing' : '') }, children);
+        chip.dataset.itemId = source.ItemId || '';
         chips.appendChild(chip);
         if (editing === index) {
           chips.appendChild(renderSourceEditor(source));
         }
+      });
+      const picks = sources.filter(s => (s.Kind === 'Movie' || s.Kind === 'Episode') && s.ItemId).map(s => s.ItemId);
+      checkCoverage(picks, map => {
+        Array.prototype.forEach.call(chips.querySelectorAll('.tvs-chip'), chip => {
+          const via = map[chip.dataset.itemId];
+          if (!via) {
+            return;
+          }
+          const note = el('span', { className: 'badge covered', text: 'also via ' + via,
+            title: 'Already on this channel through ' + via + '. Keeping it here as well pins it: an excluded tag can never drop it.' });
+          chip.insertBefore(note, chip.querySelector('button'));
+        });
       });
     }
 
@@ -3570,7 +3617,20 @@
         const addButton = textButton(selected ? 'Added' : 'Add', () => add(item, addButton));
         addButton.disabled = selected;
         row.appendChild(addButton);
+        row.dataset.itemId = item.special ? '' : item.Id;
         results.appendChild(row);
+      });
+      const movies = list.filter(i => !i.special && (i.Kind === 'Movie' || i.Kind === 'Episode')).map(i => i.Id);
+      checkCoverage(movies, map => {
+        Array.prototype.forEach.call(results.querySelectorAll('.tvs-result'), row => {
+          const via = map[row.dataset.itemId];
+          if (!via || row.querySelector('.tvs-covered')) {
+            return;
+          }
+          row.querySelector('.body').appendChild(el('div', { className: 'tvs-secondary tvs-ellipsis tvs-covered',
+            text: 'Already included via ' + via,
+            title: 'This already plays here through ' + via + '. Adding it by itself as well pins it so an excluded tag can never drop it.' }));
+        });
       });
     }
 

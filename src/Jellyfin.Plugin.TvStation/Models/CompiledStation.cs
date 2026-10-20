@@ -59,6 +59,15 @@ public sealed class SourceExpansion
     /// <summary>Items it actually contributed (after tag exclusions, unusable items and de-duplication against earlier sources).</summary>
     public int Kept { get; set; }
 
+    /// <summary>Items an earlier source in the same section had already contributed, so this one skipped them.</summary>
+    public int AlreadyListed { get; set; }
+
+    /// <summary>
+    /// True when the source adds nothing to the station: it matched nothing, or everything it matched was unusable.
+    /// A source whose items are all already on the station through an earlier source is not empty; its content plays.
+    /// </summary>
+    public bool IsEmpty => Kept == 0 && (Found == 0 || AlreadyListed < Found);
+
     /// <summary>'Series "Bluey"', plus the rating or year filter in brackets when the source has one, so an empty result explains itself.</summary>
     public static string Describe(ContentSource source)
     {

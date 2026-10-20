@@ -41,7 +41,7 @@ public static class StationHealth
             dto.ExcludedByReason[group.Key.ToString()] = group.Count();
         }
 
-        foreach (var source in compiled.Sources.Where(s => s.Kept == 0))
+        foreach (var source in compiled.Sources.Where(s => s.IsEmpty))
         {
             dto.EmptySources.Add(source.Section + ": " + source.Label);
             dto.Warnings.Add(source.Found == 0

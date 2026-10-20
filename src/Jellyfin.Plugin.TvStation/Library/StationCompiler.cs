@@ -33,13 +33,14 @@ public sealed class StationCompiler
             compiled.Excluded,
             tags,
             compiled.TagExcluded,
-            (source, found, kept) => compiled.Sources.Add(new SourceExpansion
+            (source, found, kept, alreadyListed) => compiled.Sources.Add(new SourceExpansion
             {
                 Section = section,
                 Label = SourceExpansion.Describe(source),
                 Kind = source.Kind,
                 Found = found,
-                Kept = kept
+                Kept = kept,
+                AlreadyListed = alreadyListed
             }));
         void CompileBlocks()
         {

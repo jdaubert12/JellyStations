@@ -1,7 +1,9 @@
 using System.Net.Mime;
 using Jellyfin.Plugin.TvStation.Api.Dto;
+using Jellyfin.Plugin.TvStation.Library;
 using Jellyfin.Plugin.TvStation.Models;
 using Jellyfin.Plugin.TvStation.Services;
+using Jellyfin.Plugin.TvStation.Storage;
 using MediaBrowser.Common.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,10 +17,39 @@ namespace Jellyfin.Plugin.TvStation.Api;
 public sealed class ScheduleController : ControllerBase
 {
     private readonly StationService _stations;
+    private readonly LibraryContentResolver _resolver;
+    private readonly SettingsRepository _settings;
 
-    public ScheduleController(StationService stations)
+    public ScheduleController(StationService stations, LibraryContentResolver resolver, SettingsRepository settings)
     {
         _stations = stations;
+        _resolver = resolver;
+        _settings = settings;
+    }
+
+    /// <summary>
+    /// Which existing source of a section already plays each item, so the editor can say "already included via Genre
+    /// "Comedy"" next to a movie before (or after) it is hand-picked. Items nothing covers are left out of the answer.
+    /// </summary>
+    [HttpPost("CoveredBy")]
+    public ActionResult<List<CoveredItemDto>> CoveredBy([FromBody] CoveredByRequestDto request)
+    {
+        try
+        {
+            var tags = StationCompiler.EffectiveExcludedTags(request.Draft ?? new Station(), _settings.Get().ExcludedTags);
+            var covered = _resolver.CoveredBy(request.Sources ?? new List<ContentSource>(), request.ItemIds ?? new List<Guid>(), tags);
+            return Ok(covered.Select(kv => new CoveredItemDto
+            {
+                ItemId = kv.Key,
+                Kind = kv.Value.Kind,
+                Name = kv.Value.DisplayName ?? kv.Value.Genre ?? kv.Value.Tag ?? string.Empty,
+                Label = SourceExpansion.Describe(kv.Value)
+            }).ToList());
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new ValidationErrorDto { Errors = { ex.Message } });
+        }
     }
 
     /// <summary>Compiles an unsaved station draft in memory and lists what it would play.</summary>

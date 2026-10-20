@@ -123,6 +123,28 @@ public class SourceFilterTests
     }
 
     [Fact]
+    public void HandPickedIds_CollectsMovieAndEpisodePicks_IgnoresOtherKinds()
+    {
+        var movie = Guid.NewGuid();
+        var episode = Guid.NewGuid();
+        var boxSet = Guid.NewGuid();
+        var sources = new[]
+        {
+            new ContentSource { Kind = SourceKind.Genre, Genre = "Family" },
+            new ContentSource { Kind = SourceKind.Movie, ItemId = movie },
+            new ContentSource { Kind = SourceKind.Episode, ItemId = episode },
+            new ContentSource { Kind = SourceKind.BoxSet, ItemId = boxSet },
+            new ContentSource { Kind = SourceKind.Movie, ItemId = Guid.Empty },
+            new ContentSource { Kind = SourceKind.Movie, ItemId = null }
+        };
+
+        var pinned = LibraryContentResolver.HandPickedIds(sources);
+        Assert.Equal(new[] { movie, episode }.OrderBy(g => g), pinned.OrderBy(g => g));
+        Assert.DoesNotContain(boxSet, pinned);
+        Assert.Empty(LibraryContentResolver.HandPickedIds(Array.Empty<ContentSource>()));
+    }
+
+    [Fact]
     public void HasExcludedTag_IsCaseInsensitive_AndFalseWhenNothingExcluded()
     {
         var item = Tagged("A", "Christmas", "snow");

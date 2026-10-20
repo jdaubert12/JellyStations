@@ -49,13 +49,18 @@ public class StationHealthTests
         compiled.Sources.Add(new SourceExpansion { Section = "Pool", Label = "Genre \"Western\"", Kind = SourceKind.Genre, Found = 0, Kept = 0 });
         compiled.Sources.Add(new SourceExpansion { Section = "Movie Night", Label = "BoxSet \"Trilogy\"", Kind = SourceKind.BoxSet, Found = 3, Kept = 0 });
         compiled.Sources.Add(new SourceExpansion { Section = "Pool", Label = "Series \"Show\"", Kind = SourceKind.Series, Found = 30, Kept = 30 });
+        // A hand-picked movie that an earlier source already contributed is on the station, so it is not "empty".
+        compiled.Sources.Add(new SourceExpansion { Section = "Pool", Label = "Movie \"Elf\"", Kind = SourceKind.Movie, Found = 1, Kept = 0, AlreadyListed = 1 });
+        // But a box set where one item was already listed and the other two were unusable still is.
+        compiled.Sources.Add(new SourceExpansion { Section = "Pool", Label = "BoxSet \"Mixed\"", Kind = SourceKind.BoxSet, Found = 3, Kept = 0, AlreadyListed = 1 });
 
         var h = StationHealth.Build(Station(), compiled);
 
-        Assert.Equal(new[] { "Pool: Genre \"Western\"", "Movie Night: BoxSet \"Trilogy\"" }, h.EmptySources);
-        Assert.Equal(2, h.Warnings.Count);
+        Assert.Equal(new[] { "Pool: Genre \"Western\"", "Movie Night: BoxSet \"Trilogy\"", "Pool: BoxSet \"Mixed\"" }, h.EmptySources);
+        Assert.Equal(3, h.Warnings.Count);
         Assert.Contains("matched nothing", h.Warnings[0]);
         Assert.Contains("found 3 item(s) but none were usable", h.Warnings[1]);
+        Assert.DoesNotContain(h.Warnings, w => w.Contains("Elf"));
     }
 
     [Fact]
