@@ -241,14 +241,22 @@ public sealed class StationService
         return result;
     }
 
-    /// <summary>Compiles any station whose snapshot is missing (e.g. first start after a data restore).</summary>
+    /// <summary>
+    /// Compiles any station whose snapshot is missing (e.g. first start after a data restore) or was written by a
+    /// plugin version that did not record everything the restreamer now needs (see <see cref="CompiledStation.CurrentFormat"/>).
+    /// </summary>
     public void EnsureCompiled()
     {
         foreach (var station in _stations.GetAll())
         {
             var compiled = _compiled.Get(station.Id);
-            if (compiled is null)
+            if (compiled is null || compiled.Format != CompiledStation.CurrentFormat)
             {
+                if (compiled is not null)
+                {
+                    _logger.LogInformation("TvStation: recompiling {Name} (snapshot format {Old} -> {New})", station.Name, compiled.Format, CompiledStation.CurrentFormat);
+                }
+
                 try
                 {
                     Recompile(station.Id, triggerGuide: false);
@@ -711,6 +719,12 @@ public sealed class StationService
         if (string.IsNullOrWhiteSpace(p.VideoEncoder))
         {
             errors.Add("video encoder is required.");
+        }
+
+        var hw = (p.HardwareDecode ?? string.Empty).Trim().ToLowerInvariant();
+        if (hw.Length > 0 && hw != EncodingProfile.HardwareDecodeAuto && !EncodingProfile.HardwareDecodeKinds.Contains(hw, StringComparer.Ordinal))
+        {
+            errors.Add("hardware decoding must be auto, none, " + string.Join(", ", EncodingProfile.HardwareDecodeKinds) + ".");
         }
 
         return errors;

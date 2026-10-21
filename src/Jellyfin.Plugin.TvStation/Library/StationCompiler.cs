@@ -23,7 +23,8 @@ public sealed class StationCompiler
         {
             StationId = station.Id,
             Revision = station.Revision,
-            CompiledUtc = DateTime.UtcNow
+            CompiledUtc = DateTime.UtcNow,
+            Format = CompiledStation.CurrentFormat
         };
 
         var excludedIds = new HashSet<Guid>(station.ExcludedItemIds ?? new List<Guid>());

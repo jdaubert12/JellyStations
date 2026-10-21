@@ -2,7 +2,7 @@
 param([string]$Configuration = "Release")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.10.5.0"
+$version = "1.11.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.TvStation\bin\$Configuration\net10.0\Jellyfin.Plugin.TvStation.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -21,7 +21,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Fix: a movie or episode added to a station by hand is never dropped by an excluded tag, whatever order the sources are in. The station list no longer flags ""1 empty source"" for a hand-picked item that an earlier source already put on the station. Editor: search results and hand-picked chips say when a movie is already included via a genre, tag, series, collection, playlist or library source of the same section."
+    changelog = "HDR sources (PQ or HLG) are tone mapped to SDR BT.709 and stripped of HDR side data, and every segment is tagged BT.709, so clients no longer re-encode a channel because of ""video range type""; stations recompile once at startup to record which items are HDR. New ""Hardware decoding"" and ""Hardware device"" fields on the encoding profile (default ""Follow Jellyfin"": qsv, vaapi, cuda, videotoolbox or d3d11va), falling back to software for the session if the device fails. h264_vaapi now gets its device and frame upload. Frame rate and bitrate hints: 24 fps for film stations, 3500 kbps for 720p, 8000 for 1080p."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

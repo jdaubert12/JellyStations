@@ -24,6 +24,19 @@ public sealed class EncodingProfile
 
     public int GopSeconds { get; set; } = 2;
 
+    /// <summary>
+    /// Hardware decoder for the source files: <see cref="HardwareDecodeAuto"/> follows Jellyfin's transcoding
+    /// settings, empty means software, or one of <see cref="HardwareDecodeKinds"/>. Decoded frames come back to
+    /// system memory so the scale, tonemap and logo filters still run in software; the encoder is chosen separately.
+    /// </summary>
+    public string HardwareDecode { get; set; } = HardwareDecodeAuto;
+
+    /// <summary>
+    /// Device for hardware decoding and VA-API encoding: a DRM render node (/dev/dri/renderD128), a CUDA or
+    /// D3D11 adapter index, or empty for Jellyfin's configured device (or the driver default).
+    /// </summary>
+    public string HardwareDevice { get; set; } = string.Empty;
+
     /// <summary>Extra args inserted before the input (e.g. hwaccel flags).</summary>
     public string ExtraInputArgs { get; set; } = string.Empty;
 
@@ -32,6 +45,14 @@ public sealed class EncodingProfile
 
     /// <summary>Preferred audio language (ISO 639-2), used when compiling items.</summary>
     public string AudioLanguagePreference { get; set; } = "eng";
+
+    public const string HardwareDecodeAuto = "auto";
+
+    /// <summary>ffmpeg -hwaccel names the plugin knows how to set up.</summary>
+    public static readonly string[] HardwareDecodeKinds = { "qsv", "vaapi", "cuda", "videotoolbox", "d3d11va" };
+
+    /// <summary>True when the encoder is a VA-API encoder, which only accepts frames already uploaded to the GPU.</summary>
+    public bool IsVaapiEncoder => VideoEncoder.EndsWith("_vaapi", StringComparison.OrdinalIgnoreCase);
 
     public EncodingProfile Clone() => (EncodingProfile)MemberwiseClone();
 }

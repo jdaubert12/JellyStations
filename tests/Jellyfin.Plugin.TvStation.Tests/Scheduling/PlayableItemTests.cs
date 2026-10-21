@@ -77,7 +77,7 @@ public class PlayableItemTests
     {
         var item = Split();
         var segment = item.SegmentAt(TimeSpan.FromMinutes(120));
-        var args = FfmpegArgsBuilder.ForSource(segment.Part.Path, segment.Part.HasAudio, segment.Part.AudioStreamIndex, segment.Seek, null, TimeSpan.Zero, new EncodingProfile());
+        var args = FfmpegArgsBuilder.ForSource(segment.Part.Path, segment.Part.HasAudio, segment.Part.AudioStreamIndex, segment.Part.HdrTransfer, segment.Seek, null, TimeSpan.Zero, new EncodingProfile());
 
         Assert.Equal("/m/fellowship-part2.mkv", args[args.IndexOf("-i") + 1]);
         Assert.Equal("1200.000", args[args.IndexOf("-ss") + 1]);

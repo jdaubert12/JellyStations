@@ -7,21 +7,28 @@ namespace Jellyfin.Plugin.TvStation.Streaming;
 /// <summary>
 /// Builds ffmpeg argument lists for program and slate segments. Output is not paced by ffmpeg (-re);
 /// the restreamer paces it from the TS PCR clock and back-pressures ffmpeg through the pipe.
+/// Every segment is tagged BT.709 SDR; HDR sources are tone mapped so no PQ/HLG pixels or HDR
+/// side data reach the stream (an HDR tag is what makes clients re-encode the channel).
 /// </summary>
 public static class FfmpegArgsBuilder
 {
+    /// <summary>The default DRM render node when a VA-API or QSV device is not configured anywhere.</summary>
+    public const string DefaultDrmDevice = "/dev/dri/renderD128";
+
     /// <summary>A logo to draw over the video: image path plus placement.</summary>
     public sealed record LogoOverlayInput(string Path, LogoCorner Corner, int Opacity, int HeightPercent);
 
     /// <summary>Arguments to play an item's (first) file from an offset, normalized to the profile, as real-time MPEG-TS on stdout.</summary>
     public static List<string> ForFile(PlayableItem item, TimeSpan seek, TimeSpan? duration, TimeSpan tsOffset, EncodingProfile p, LogoOverlayInput? overlay = null)
-        => ForSource(item.Path, item.HasAudio, item.AudioStreamIndex, seek, duration, tsOffset, p, overlay);
+        => ForSource(item.Path, item.HasAudio, item.AudioStreamIndex, item.HdrTransfer, seek, duration, tsOffset, p, overlay);
 
     /// <summary>Arguments to play one file (an item, or one part of a multi-part item) from an offset.</summary>
-    public static List<string> ForSource(string path, bool hasAudio, int? audioStreamIndex, TimeSpan seek, TimeSpan? duration, TimeSpan tsOffset, EncodingProfile p, LogoOverlayInput? overlay = null)
+    /// <param name="hdrTransfer">The source's HDR transfer ("smpte2084" or "arib-std-b67") to tone map from; null or empty for SDR.</param>
+    public static List<string> ForSource(string path, bool hasAudio, int? audioStreamIndex, string? hdrTransfer, TimeSpan seek, TimeSpan? duration, TimeSpan tsOffset, EncodingProfile p, LogoOverlayInput? overlay = null)
     {
         var args = new List<string>();
         Common(args);
+        HardwareInputArgs(args, p, decode: true);
         AddSplit(args, p.ExtraInputArgs);
 
         if (seek > TimeSpan.FromMilliseconds(500))
@@ -70,18 +77,21 @@ public static class FfmpegArgsBuilder
             args.Add("-map");
             args.Add(audioMap);
             args.Add("-vf");
-            args.Add(VideoFilter(p));
+            args.Add(VideoFilter(p, hdrTransfer) + EncoderUploadSuffix(p));
         }
         else
         {
             args.Add("-filter_complex");
-            args.Add(OverlayFilter(p, overlay, logoIndex));
+            args.Add(OverlayFilter(p, overlay, logoIndex, hdrTransfer));
             args.Add("-map");
             args.Add("[v]");
             args.Add("-map");
             args.Add(audioMap);
-            args.Add("-pix_fmt");
-            args.Add("yuv420p");
+            if (!p.IsVaapiEncoder)
+            {
+                args.Add("-pix_fmt");
+                args.Add("yuv420p");
+            }
         }
 
         Output(args, p, tsOffset);
@@ -89,7 +99,7 @@ public static class FfmpegArgsBuilder
     }
 
     /// <summary>Normalized video with the logo scaled, faded and pinned to a corner with a small margin.</summary>
-    public static string OverlayFilter(EncodingProfile p, LogoOverlayInput overlay, int logoIndex)
+    public static string OverlayFilter(EncodingProfile p, LogoOverlayInput overlay, int logoIndex, string? hdrTransfer = null)
     {
         var height = Math.Max(8, p.Height * Math.Clamp(overlay.HeightPercent, 3, 25) / 100);
         var margin = Math.Max(4, p.Height / 36);
@@ -102,9 +112,12 @@ public static class FfmpegArgsBuilder
             _ => $"W-w-{margin}:{margin}"
         };
 
-        return string.Create(
+        var graph = string.Create(
             CultureInfo.InvariantCulture,
-            $"[0:v]{VideoFilter(p)}[base];[{logoIndex}:v]scale=-1:{height},format=rgba,colorchannelmixer=aa={alpha}[logo];[base][logo]overlay={position}:format=yuv420[v]");
+            $"[0:v]{VideoFilter(p, hdrTransfer)}[base];[{logoIndex}:v]scale=-1:{height},format=rgba,colorchannelmixer=aa={alpha}[logo];[base][logo]overlay={position}:format=yuv420");
+
+        // A VA-API encoder needs the composed frame on the GPU; everyone else takes it as is.
+        return p.IsVaapiEncoder ? graph + "[ov];[ov]" + EncoderUploadSuffix(p).TrimStart(',') + "[v]" : graph + "[v]";
     }
 
     /// <summary>Arguments for a generated slate (color card with optional text and logo).</summary>
@@ -112,6 +125,7 @@ public static class FfmpegArgsBuilder
     {
         var args = new List<string>();
         Common(args);
+        HardwareInputArgs(args, p, decode: false);
 
         args.Add("-f");
         args.Add("lavfi");
@@ -156,6 +170,12 @@ public static class FfmpegArgsBuilder
 
         if (filter.Length > 0)
         {
+            filter.Append(CultureInfo.InvariantCulture, $";[{videoLabel}]format=yuv420p,{SdrTags}{EncoderUploadSuffix(p)}[v2]");
+            videoLabel = "v2";
+        }
+
+        if (filter.Length > 0)
+        {
             args.Add("-filter_complex");
             args.Add(filter.ToString());
             args.Add("-map");
@@ -173,9 +193,9 @@ public static class FfmpegArgsBuilder
         if (filter.Length == 0)
         {
             args.Add("-vf");
-            args.Add("format=yuv420p");
+            args.Add("format=yuv420p," + SdrTags + EncoderUploadSuffix(p));
         }
-        else
+        else if (!p.IsVaapiEncoder)
         {
             args.Add("-pix_fmt");
             args.Add("yuv420p");
@@ -185,15 +205,91 @@ public static class FfmpegArgsBuilder
         return args;
     }
 
+    /// <summary>
+    /// Hardware setup before the input: the decoder (<see cref="EncodingProfile.HardwareDecode"/>, already resolved
+    /// from "auto") and, for a VA-API encoder, the device its frames are uploaded to. Decoded frames stay in system
+    /// memory (no -hwaccel_output_format) so the software filter chain applies unchanged; ffmpeg itself falls back to
+    /// software decoding when the accelerator cannot handle a file.
+    /// </summary>
+    public static void HardwareInputArgs(List<string> args, EncodingProfile p, bool decode)
+    {
+        var kind = decode ? (p.HardwareDecode ?? string.Empty).Trim().ToLowerInvariant() : string.Empty;
+        var device = (p.HardwareDevice ?? string.Empty).Trim();
+        var drm = device.Length > 0 ? device : DefaultDrmDevice;
+
+        switch (kind)
+        {
+            case "qsv":
+                if (device.Length > 0)
+                {
+                    args.Add("-qsv_device");
+                    args.Add(device);
+                }
+
+                args.Add("-hwaccel");
+                args.Add("qsv");
+                break;
+            case "vaapi":
+                args.Add("-vaapi_device");
+                args.Add(drm);
+                args.Add("-hwaccel");
+                args.Add("vaapi");
+                break;
+            case "cuda":
+            case "d3d11va":
+                args.Add("-hwaccel");
+                args.Add(kind);
+                if (device.Length > 0)
+                {
+                    args.Add("-hwaccel_device");
+                    args.Add(device);
+                }
+
+                break;
+            case "videotoolbox":
+                args.Add("-hwaccel");
+                args.Add("videotoolbox");
+                break;
+            default:
+                break;
+        }
+
+        if (p.IsVaapiEncoder && kind != "vaapi")
+        {
+            args.Add("-vaapi_device");
+            args.Add(drm);
+        }
+    }
+
     private static void Common(List<string> args)
     {
         args.AddRange(new[] { "-hide_banner", "-loglevel", "warning", "-nostdin", "-nostats" });
     }
 
-    private static string VideoFilter(EncodingProfile p)
+    /// <summary>Frame tags every segment leaves the graph with. ffmpeg 7+ encoders take color metadata from the frames, not from -color_* options.</summary>
+    public const string SdrTags = "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709:range=tv";
+
+    /// <summary>
+    /// Scale (letterboxed) to the profile, constant frame rate, 8-bit 4:2:0, tagged BT.709. An HDR source is first
+    /// tone mapped to BT.709 (the zscale/tonemap chain Jellyfin uses for software tone mapping) and stripped of its
+    /// HDR side data. The HDR input properties are stated outright so zscale does not depend on the file's tags.
+    /// </summary>
+    public static string VideoFilter(EncodingProfile p, string? hdrTransfer = null)
     {
-        return $"scale={p.Width}:{p.Height}:force_original_aspect_ratio=decrease:flags=bicubic,pad={p.Width}:{p.Height}:(ow-iw)/2:(oh-ih)/2,fps={p.Fps},format=yuv420p";
+        var sb = new StringBuilder();
+        sb.Append(CultureInfo.InvariantCulture, $"scale={p.Width}:{p.Height}:force_original_aspect_ratio=decrease:flags=bicubic");
+        if (!string.IsNullOrEmpty(hdrTransfer))
+        {
+            sb.Append(CultureInfo.InvariantCulture, $",setparams=color_primaries=bt2020:color_trc={hdrTransfer}:colorspace=bt2020nc");
+            sb.Append(",format=yuv420p10le,zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0:peak=100,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,sidedata=mode=delete");
+        }
+
+        sb.Append(CultureInfo.InvariantCulture, $",pad={p.Width}:{p.Height}:(ow-iw)/2:(oh-ih)/2,fps={p.Fps},format=yuv420p,{SdrTags}");
+        return sb.ToString();
     }
+
+    /// <summary>Filters that hand the finished frame to the encoder: VA-API encoders only take frames already on the GPU.</summary>
+    private static string EncoderUploadSuffix(EncodingProfile p) => p.IsVaapiEncoder ? ",format=nv12,hwupload" : string.Empty;
 
     private static void Output(List<string> args, EncodingProfile p, TimeSpan tsOffset)
     {
@@ -211,6 +307,16 @@ public static class FfmpegArgsBuilder
             args.Add("-x264-params");
             args.Add("scenecut=0:open-gop=0");
         }
+
+        // Always declare SDR BT.709: the filter chain delivers that, and a leaked BT.2020/PQ tag makes clients transcode.
+        args.Add("-color_primaries");
+        args.Add("bt709");
+        args.Add("-color_trc");
+        args.Add("bt709");
+        args.Add("-colorspace");
+        args.Add("bt709");
+        args.Add("-color_range");
+        args.Add("tv");
 
         args.Add("-b:v");
         args.Add(p.VideoBitrateKbps + "k");

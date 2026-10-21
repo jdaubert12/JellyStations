@@ -12,6 +12,12 @@ public sealed class PlayablePart
 
     public bool HasAudio { get; set; } = true;
 
+    /// <summary>The HDR transfer characteristic ("smpte2084" for PQ, "arib-std-b67" for HLG), or null for SDR video.</summary>
+    public string? HdrTransfer { get; set; }
+
+    /// <summary>True when the video is HDR and must be tone mapped to SDR for the stream.</summary>
+    public bool IsHdr => !string.IsNullOrEmpty(HdrTransfer);
+
     public TimeSpan Runtime => TimeSpan.FromTicks(RuntimeTicks);
 }
 
@@ -68,6 +74,12 @@ public sealed class PlayableItem
     /// <summary>False when the file is known to have no audio track (silence is generated instead).</summary>
     public bool HasAudio { get; set; } = true;
 
+    /// <summary>The HDR transfer characteristic ("smpte2084" for PQ, "arib-std-b67" for HLG), or null for SDR video.</summary>
+    public string? HdrTransfer { get; set; }
+
+    /// <summary>True when the video is HDR and must be tone mapped to SDR for the stream.</summary>
+    public bool IsHdr => !string.IsNullOrEmpty(HdrTransfer);
+
     /// <summary>Files in play order for a multi-part item. Empty for a single file, whose Path and RuntimeTicks apply.</summary>
     public List<PlayablePart> Parts { get; set; } = new();
 
@@ -90,7 +102,7 @@ public sealed class PlayableItem
 
         if (Parts.Count == 0)
         {
-            var single = new PlayablePart { Path = Path, RuntimeTicks = RuntimeTicks, AudioStreamIndex = AudioStreamIndex, HasAudio = HasAudio };
+            var single = new PlayablePart { Path = Path, RuntimeTicks = RuntimeTicks, AudioStreamIndex = AudioStreamIndex, HasAudio = HasAudio, HdrTransfer = HdrTransfer };
             var seek = offset < single.Runtime ? offset : single.Runtime;
             return new PlayableSegment(single, 0, seek, single.Runtime - seek) { IsLast = true };
         }

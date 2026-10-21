@@ -1,7 +1,7 @@
 ---
 name: "TvStation"
 guid: "b7f3c1d2-5e8a-4f0b-9c6d-2a1e7f4b8d31"
-version: "1.10.5.0"
+version: "1.11.0.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "Justin"
@@ -15,6 +15,7 @@ category: "LiveTV"
 artifacts:
   - "Jellyfin.Plugin.TvStation.dll"
 changelog: >
+  1.11.0.0: Stream fixes from a stuttering-playback diagnosis. HDR sources (PQ or HLG) are tone mapped to SDR BT.709 and stripped of HDR side data, and every segment is tagged BT.709, so clients no longer re-encode a channel because of "video range type"; stations are recompiled once at startup to record which items are HDR. Hardware decoding: new "Hardware decoding" and "Hardware device" fields on the encoding profile (default "Follow Jellyfin", which mirrors Dashboard > Playback > Transcoding: qsv, vaapi, cuda, videotoolbox or d3d11va), with the frames handed back to the software filters; a device that fails drops to software decoding for the session. VA-API encoders now get their device and frame upload, so h264_vaapi works. Reported media source carries the BT.709 SDR color tags. Frame rate and bitrate hints: 24 fps for film stations, 3500 kbps for 720p and 8000 for 1080p.
   1.10.5.0: Fix: a movie or episode added to a station by hand is never dropped by an excluded tag, even when a genre, library, collection or playlist source earlier in the same section lists it first. The station list no longer flags "1 empty source" for a hand-picked item that an earlier source already put on the station; a source only counts as empty when it adds nothing that is not already playing. Editor: when a movie already plays through a wider source of the same section (genre, tag, series, collection, playlist or library), search results say "Already included via Genre \"Comedy\"" and the chip of a hand-picked movie shows "also via" that source.
   1.10.4.0: Make a logo from the name: new "Pick the color too" option seeds the card color from the name, number and what the channel plays (remembered per browser); "Another look" then changes the color as well as the pattern.
   1.10.3.0: Make a logo from the name: the card now carries a pattern (gradient, stripes, dots, rings, slabs or color bars) seeded from the name, number and what the channel plays, so each channel looks different while the same station always draws the same card. "Another look" draws the next variation.

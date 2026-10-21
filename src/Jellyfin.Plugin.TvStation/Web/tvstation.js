@@ -71,6 +71,7 @@
   };
   const RESOLUTIONS = [['1920x1080', '1920 × 1080 (1080p)'], ['1280x720', '1280 × 720 (720p)'], ['854x480', '854 × 480 (480p)'], ['custom', 'Custom']];
   const ENCODERS = [['libx264', 'libx264 (software)'], ['h264_nvenc', 'h264_nvenc (NVIDIA)'], ['h264_qsv', 'h264_qsv (Intel Quick Sync)'], ['h264_vaapi', 'h264_vaapi (VA-API)'], ['custom', 'Custom…']];
+  const HW_DECODERS = [['auto', 'Follow Jellyfin'], ['', 'None (software)'], ['qsv', 'Intel Quick Sync (qsv)'], ['vaapi', 'VA-API'], ['cuda', 'NVIDIA (cuda)'], ['videotoolbox', 'Apple VideoToolbox'], ['d3d11va', 'Windows (d3d11va)']];
   const STATUS_INTERVAL_MS = 5000;
   const LIST_INTERVAL_MS = 60000;
 
@@ -3712,6 +3713,7 @@
     return {
       Width: 1280, Height: 720, Fps: 30, VideoBitrateKbps: 3500, AudioBitrateKbps: 160,
       VideoEncoder: 'libx264', Preset: 'veryfast', H264Profile: 'high', H264Level: '4.1', GopSeconds: 2,
+      HardwareDecode: 'auto', HardwareDevice: '',
       ExtraInputArgs: '', ExtraOutputArgs: '', AudioLanguagePreference: 'eng'
     };
   }
@@ -3725,9 +3727,9 @@
           inputHtml(p + 'width', 'Width', 'number', { min: 16, max: 7680, step: 2 }) +
           inputHtml(p + 'height', 'Height', 'number', { min: 16, max: 4320, step: 2 }) +
         '</div>' +
-        inputHtml(p + 'fps', 'Frame rate (fps)', 'number', { min: 1, max: 120, step: 1 }, 'Constant output frame rate, typically 30 or 60.') +
+        inputHtml(p + 'fps', 'Frame rate (fps)', 'number', { min: 1, max: 120, step: 1 }, 'Constant output frame rate. 24 suits a film station (most movies are 23.976 fps and judder when converted to 30); 30 suits series; 60 only for 60 fps sources.') +
         inputHtml(p + 'gop', 'Keyframe interval (seconds)', 'number', { min: 1, max: 30, step: 1 }, 'GOP length. Shorter makes channel changes faster at a small bitrate cost.') +
-        inputHtml(p + 'vbr', 'Video bitrate (kbps)', 'number', { min: 100, max: 100000, step: 50 }, 'Target bitrate for the video stream.') +
+        inputHtml(p + 'vbr', 'Video bitrate (kbps)', 'number', { min: 100, max: 100000, step: 50 }, 'Target bitrate for the video stream. 3500 is plenty for 720p and 8000 for 1080p; more only inflates every client\'s download and Jellyfin\'s transcodes.') +
         inputHtml(p + 'abr', 'Audio bitrate (kbps)', 'number', { min: 32, max: 1024, step: 8 }, 'AAC audio bitrate.') +
         selectHtml(p + 'enc', 'Video encoder', ENCODERS, 'Hardware encoders need the matching drivers and may need extra input arguments (e.g. -hwaccel).') +
         inputHtml(p + 'encCustom', 'Custom encoder name', 'text', {}, 'Exact ffmpeg encoder name, e.g. h264_amf or libx265.') +
@@ -3735,6 +3737,8 @@
         inputHtml(p + 'profile', 'H.264 profile', 'text', {}, 'baseline, main or high.') +
         inputHtml(p + 'level', 'H.264 level', 'text', {}, 'For example 4.1.') +
         inputHtml(p + 'lang', 'Preferred audio language', 'text', { maxlength: 3 }, 'ISO 639-2 code (eng, spa, jpn…) used to pick the audio track when compiling.') +
+        selectHtml(p + 'hwdec', 'Hardware decoding', HW_DECODERS, 'Decodes the source on the GPU (the heavy part for 4K HEVC); scaling, HDR tone mapping and the logo still run in software. "Follow Jellyfin" uses Dashboard > Playback > Transcoding. ffmpeg falls back to software when the device cannot be used.') +
+        inputHtml(p + 'hwdev', 'Hardware device', 'text', {}, 'Render node or adapter for decoding and VA-API encoding, e.g. /dev/dri/renderD128. Empty uses the device Jellyfin is configured with.') +
       '</div>' +
       inputHtml(p + 'inArgs', 'Extra input arguments', 'text', {}, 'Inserted before the input, e.g. -hwaccel cuda -hwaccel_output_format cuda.') +
       inputHtml(p + 'outArgs', 'Extra output arguments', 'text', {}, 'Appended after the output options.');
@@ -3785,6 +3789,9 @@
         q('profile').value = e.H264Profile || '';
         q('level').value = e.H264Level || '';
         q('lang').value = e.AudioLanguagePreference || '';
+        const hw = e.HardwareDecode == null ? 'auto' : String(e.HardwareDecode).trim().toLowerCase();
+        q('hwdec').value = HW_DECODERS.some(o => o[0] === hw) ? hw : 'auto';
+        q('hwdev').value = e.HardwareDevice || '';
         q('inArgs').value = e.ExtraInputArgs || '';
         q('outArgs').value = e.ExtraOutputArgs || '';
       },
@@ -3801,6 +3808,8 @@
           H264Profile: q('profile').value.trim(),
           H264Level: q('level').value.trim(),
           GopSeconds: parseInt(q('gop').value, 10) || 0,
+          HardwareDecode: q('hwdec').value,
+          HardwareDevice: q('hwdev').value.trim(),
           ExtraInputArgs: q('inArgs').value.trim(),
           ExtraOutputArgs: q('outArgs').value.trim(),
           AudioLanguagePreference: q('lang').value.trim()

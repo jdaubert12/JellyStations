@@ -88,21 +88,26 @@ saved station has a **Start schedule from now** button on its row.
 - ffmpeg reachable by the server. The official Docker image and standard installers bundle
   `jellyfin-ffmpeg`; the plugin uses the server's configured encoder path by default.
 - CPU budget: roughly one core per *actively watched* station at the default 720p profile.
-  Hardware encoders (`h264_nvenc`, `h264_qsv`, `h264_vaapi`) can be configured in Settings.
+  Hardware encoders (`h264_nvenc`, `h264_qsv`, `h264_vaapi`) can be configured in Settings, and
+  hardware decoding follows Jellyfin's own transcoding setting by default (4K HEVC sources are
+  the heavy part; decoding them on the GPU is what keeps a 4K movie station real time).
+- HDR sources (HDR10, HDR10+, Dolby Vision on an HDR10 base, HLG) are tone mapped to SDR
+  BT.709 by the plugin, so every channel is a plain 8-bit SDR H.264 stream that clients play
+  without re-encoding. This needs `zscale` in ffmpeg (`jellyfin-ffmpeg` has it).
 
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.10.5.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.10.5.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.10.5.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.10.5.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.10.5.0\`
+2. Copy it into a folder named `TvStation_1.11.0.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.11.0.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.11.0.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.11.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.11.0.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.10.5.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.10.5.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.11.0.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.11.0.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 
@@ -177,10 +182,22 @@ decades, ratings, tags and libraries. It is the basis for station suggestions an
 
 ## Settings
 
-- **Default encoding**: resolution, frame rate, bitrates, encoder, preset, GOP. All programs on a
-  station are normalized to one profile so clients never need to re-initialize at a program
-  boundary. H.264 High 4.1 + AAC direct-streams on nearly every client, so Jellyfin usually
-  only remuxes.
+- **Default encoding**: resolution, frame rate, bitrates, encoder, preset, GOP, hardware
+  decoding. All programs on a station are normalized to one profile so clients never need to
+  re-initialize at a program boundary. H.264 High 4.1 + AAC, tagged SDR BT.709, direct-streams
+  on nearly every client, so Jellyfin only remuxes. A station can override the profile, which is
+  the place for per-channel choices:
+  - *Frame rate*: 24 for a film station (most movies are 23.976 fps and judder when converted
+    to 30), 30 for series, 60 only for 60 fps sources. Keep one rate per station; the profile
+    must not change between programs.
+  - *Bitrate*: 3500 kbps is plenty for 720p and 8000 for 1080p. Higher only inflates every
+    client's download and any transcode Jellyfin still has to do.
+  - *Hardware decoding*: "Follow Jellyfin" (default) mirrors Dashboard > Playback > Transcoding
+    (QSV, VA-API, NVDEC/CUDA, VideoToolbox or D3D11VA) and its device; or pick one and give the
+    render node or adapter. Decoding is where 4K HEVC costs its CPU; scaling, tone mapping and
+    the logo stay in software. ffmpeg falls back to software decoding when the device cannot
+    handle a file, and the plugin drops to software for the session if the device will not open.
+  - *VA-API encoding* (`h264_vaapi`) uses the same device and uploads frames itself.
 - **Linger**: seconds the encoder keeps running after the last viewer leaves (quick re-tunes
   reuse it).
 - **Max concurrent sessions**: cap on simultaneously encoded stations.
@@ -197,6 +214,12 @@ decades, ratings, tags and libraries. It is the basis for station suggestions an
   decode it; the plugin shows a card until the next program. The station row on the dashboard
   says which: permission denied, file not found, folder not found (share or volume not mounted),
   or the ffmpeg exit code with its last log line.
+- *Playback Info says "Transcoding" with reason "video range type"*: the stream carried HDR tags.
+  Since 1.11.0 every segment is tone mapped and tagged BT.709; if a station was compiled by an
+  older version, **Recompile all** (or a restart) records which items are HDR. `ffprobe` on the
+  stream URL should show `yuv420p(tv, bt709)` with no mastering-display side data.
+- *Stutter on a 4K HEVC source*: the plugin's own ffmpeg is probably decoding in software and
+  cannot keep real time. Turn on hardware decoding (Settings > Default encoding) or on the station.
 - Live HLS adds 10-30 s of latency behind the encoder; the position shown in the guide is the
   server's.
 

@@ -3,7 +3,9 @@ using Jellyfin.Plugin.TvStation.Models;
 using Jellyfin.Plugin.TvStation.Scheduling;
 using Jellyfin.Plugin.TvStation.Storage;
 using MediaBrowser.Controller;
+using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Controller.MediaEncoding;
+using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.MediaInfo;
@@ -22,6 +24,7 @@ public sealed class StreamSessionManager : IDisposable
     private readonly TvStationPaths _paths;
     private readonly IMediaEncoder _mediaEncoder;
     private readonly IServerApplicationHost _appHost;
+    private readonly IServerConfigurationManager _configuration;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<StreamSessionManager> _logger;
     private readonly ConcurrentDictionary<Guid, StationFault> _faults = new();
@@ -32,6 +35,7 @@ public sealed class StreamSessionManager : IDisposable
         TvStationPaths paths,
         IMediaEncoder mediaEncoder,
         IServerApplicationHost appHost,
+        IServerConfigurationManager configuration,
         ILoggerFactory loggerFactory)
     {
         _resolver = resolver;
@@ -39,6 +43,7 @@ public sealed class StreamSessionManager : IDisposable
         _paths = paths;
         _mediaEncoder = mediaEncoder;
         _appHost = appHost;
+        _configuration = configuration;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<StreamSessionManager>();
     }
@@ -132,7 +137,7 @@ public sealed class StreamSessionManager : IDisposable
 
     private StationStreamSession CreateSession(Station station, GlobalSettings settings)
     {
-        var profile = station.Encoding ?? settings.DefaultEncoding;
+        var profile = ResolveHardware(station.Encoding ?? settings.DefaultEncoding);
         var ffmpeg = FfmpegPath;
         var mediaSource = BuildMediaSource(station, profile);
         var logger = _loggerFactory.CreateLogger("Jellyfin.Plugin.TvStation.Stream." + station.Name);
@@ -161,6 +166,29 @@ public sealed class StreamSessionManager : IDisposable
         session.Released += (_, _) => OnReleased(session);
         _logger.LogInformation("TvStation [{Station}]: stream session {Id} created", station.Name, session.UniqueId);
         return session;
+    }
+
+    /// <summary>"auto" hardware decoding and an empty device follow Jellyfin's Dashboard > Playback > Transcoding settings.</summary>
+    public EncodingProfile ResolveHardware(EncodingProfile profile)
+    {
+        var type = HardwareAccelerationType.none;
+        string? qsv = null;
+        string? vaapi = null;
+        try
+        {
+            if (_configuration.GetConfiguration("encoding") is EncodingOptions options)
+            {
+                type = options.HardwareAccelerationType;
+                qsv = options.QsvDevice;
+                vaapi = options.VaapiDevice;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "TvStation: could not read Jellyfin's encoding options; hardware decoding stays off for 'auto'");
+        }
+
+        return HardwareDecodeResolver.Resolve(profile, type, qsv, vaapi, OperatingSystem.IsWindows());
     }
 
     private void OnReleased(StationStreamSession session)
@@ -249,7 +277,12 @@ public sealed class StreamSessionManager : IDisposable
                     BitRate = profile.VideoBitrateKbps * 1000,
                     IsInterlaced = false,
                     Profile = profile.H264Profile,
-                    PixelFormat = "yuv420p"
+                    PixelFormat = "yuv420p",
+                    BitDepth = 8,
+                    ColorPrimaries = "bt709",
+                    ColorTransfer = "bt709",
+                    ColorSpace = "bt709",
+                    ColorRange = "tv"
                 },
                 new()
                 {

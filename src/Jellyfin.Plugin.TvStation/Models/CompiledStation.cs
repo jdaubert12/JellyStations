@@ -5,7 +5,16 @@ namespace Jellyfin.Plugin.TvStation.Models;
 /// </summary>
 public sealed class CompiledStation
 {
+    /// <summary>
+    /// Bump when a compile starts recording something the restreamer depends on (snapshots saved by an older
+    /// plugin are recompiled at startup). 1: items carry <see cref="PlayableItem.IsHdr"/>.
+    /// </summary>
+    public const int CurrentFormat = 1;
+
     public Guid StationId { get; set; }
+
+    /// <summary>The <see cref="CurrentFormat"/> this snapshot was compiled with; 0 for snapshots older than the field.</summary>
+    public int Format { get; set; }
 
     public int Revision { get; set; }
 

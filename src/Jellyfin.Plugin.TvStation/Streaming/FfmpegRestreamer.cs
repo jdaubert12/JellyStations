@@ -35,6 +35,8 @@ public sealed class FfmpegRestreamer : IDisposable
     private Task? _loop;
     private bool _slateTextSupported = true;
     private bool _overlaySupported = true;
+    private bool _hardwareDecodeSupported = true;
+    private bool _tonemapSupported = true;
     private double _tsOffsetFloorSeconds;
 
     public FfmpegRestreamer(
@@ -144,15 +146,20 @@ public sealed class FfmpegRestreamer : IDisposable
                 var duration = cut ? remaining : (TimeSpan?)null;
                 var segmentEnd = now + (cut ? remaining : part.Remaining);
                 var overlay = OverlayInput();
-                var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, seek, duration, NextTsOffset(), _profile, overlay);
+                var profile = EffectiveProfile();
+                var hardwareDecode = profile.HardwareDecode.Length > 0;
+                var tonemap = part.Part.IsHdr && _tonemapSupported;
+                var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, tonemap ? part.Part.HdrTransfer : null, seek, duration, NextTsOffset(), profile, overlay);
 
                 _logger.LogInformation(
-                    "TvStation [{Station}]: playing {Title}{Part} from {Seek} ({Remaining} remaining)",
+                    "TvStation [{Station}]: playing {Title}{Part} from {Seek} ({Remaining} remaining){Hdr}{Hw}",
                     _stationName,
                     item.DisplayTitle,
                     item.IsMultiPart ? " part " + (part.Index + 1) + "/" + item.Parts.Count : string.Empty,
                     seek.ToString(@"hh\:mm\:ss"),
-                    remaining.ToString(@"hh\:mm\:ss"));
+                    remaining.ToString(@"hh\:mm\:ss"),
+                    tonemap ? ", tone mapping HDR to SDR" : string.Empty,
+                    hardwareDecode ? ", " + profile.HardwareDecode + " decoding" : string.Empty);
                 _logger.LogDebug("TvStation ffmpeg {Args}", FfmpegArgsBuilder.ToLogString(args));
 
                 var started = DateTime.UtcNow;
@@ -166,6 +173,25 @@ public sealed class FfmpegRestreamer : IDisposable
 
                 // Early means before this segment's planned end: a part finishing on time is not a failure.
                 var endedEarly = DateTime.UtcNow < segmentEnd - MinSegment;
+                if (exitCode != 0 && ran < TimeSpan.FromSeconds(5) && hardwareDecode)
+                {
+                    // ffmpeg normally falls back to software decoding by itself; a fast exit means the device could
+                    // not even be set up (missing driver, wrong node). Decode in software for the rest of this session.
+                    _hardwareDecodeSupported = false;
+                    _logger.LogWarning("TvStation [{Station}]: ffmpeg exited with {Code} with {Kind} decoding; continuing with software decoding", _stationName, exitCode, profile.HardwareDecode);
+                    Fault(profile.HardwareDecode + " hardware decoding failed (ffmpeg exit " + exitCode + "); software decoding until the stream restarts" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
+                    continue;
+                }
+
+                if (exitCode != 0 && ran < TimeSpan.FromSeconds(5) && tonemap)
+                {
+                    // zscale/tonemap missing from this ffmpeg build: play the HDR file untouched (tagged SDR) rather than show a card.
+                    _tonemapSupported = false;
+                    _logger.LogWarning("TvStation [{Station}]: ffmpeg exited with {Code} while tone mapping; continuing without tone mapping", _stationName, exitCode);
+                    Fault("HDR tone mapping failed (ffmpeg exit " + exitCode + "); HDR programs play without it until the stream restarts" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
+                    continue;
+                }
+
                 if (exitCode != 0 && ran < TimeSpan.FromSeconds(5) && overlay is not null)
                 {
                     // The overlay filter (or the logo file) is the likely culprit: drop the overlay for this session and replay.
@@ -231,6 +257,19 @@ public sealed class FfmpegRestreamer : IDisposable
                 }
             }
         }
+    }
+
+    /// <summary>The station's profile, minus hardware decoding once it has failed in this session.</summary>
+    private EncodingProfile EffectiveProfile()
+    {
+        if (_hardwareDecodeSupported || _profile.HardwareDecode.Length == 0)
+        {
+            return _profile;
+        }
+
+        var software = _profile.Clone();
+        software.HardwareDecode = string.Empty;
+        return software;
     }
 
     /// <summary>The logo bug to draw over programs, or null when off, unsupported, or the logo file is missing.</summary>

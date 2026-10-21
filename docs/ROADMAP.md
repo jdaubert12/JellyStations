@@ -20,6 +20,7 @@ Pool / slots / lineup modes, shuffle with episodes-in-order, marathons, per-sour
 range and specials toggle, movies/shows filter on container sources, seasonal windows, import and
 export, station logos, Jellyfin 12.2 / .NET 10. Multi-part (stacked) movies play at full length as
 consecutive segments on one clock (2026-10-15), which is also the groundwork for mid-roll breaks.
+Stream output is SDR BT.709 end to end since 1.11.0.0 (2026-10-20): HDR sources are tone mapped and stripped of HDR side data at the plugin, hardware decoding follows Jellyfin's setting, h264_vaapi works.
 
 ---
 

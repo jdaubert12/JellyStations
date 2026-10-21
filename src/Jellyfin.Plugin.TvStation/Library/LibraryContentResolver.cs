@@ -550,13 +550,14 @@ public sealed class LibraryContentResolver
             CommunityRating = video.CommunityRating,
             PrimaryImagePath = video.PrimaryImagePath,
             AudioStreamIndex = PickAudioStream(video, audioLanguage),
-            HasAudio = HasAudioTrack(video)
+            HasAudio = HasAudioTrack(video),
+            HdrTransfer = HdrTransferOf(video)
         };
 
         if (parts.Count > 1)
         {
             playable.Parts = parts
-                .Select(v => new PlayablePart { Path = v.Path, RuntimeTicks = v.RunTimeTicks!.Value, AudioStreamIndex = PickAudioStream(v, audioLanguage), HasAudio = HasAudioTrack(v) })
+                .Select(v => new PlayablePart { Path = v.Path, RuntimeTicks = v.RunTimeTicks!.Value, AudioStreamIndex = PickAudioStream(v, audioLanguage), HasAudio = HasAudioTrack(v), HdrTransfer = HdrTransferOf(v) })
                 .ToList();
         }
 
@@ -631,6 +632,41 @@ public sealed class LibraryContentResolver
     }
 
     private static string DisplayName(Video v) => v is Episode e ? $"{e.SeriesName} - {e.Name}" : v.Name ?? v.Id.ToString();
+
+    private static string? HdrTransferOf(Video video)
+    {
+        try
+        {
+            var stream = video.GetMediaStreams().FirstOrDefault(s => s.Type == MediaStreamType.Video);
+            return stream is null ? null : HdrTransferOf(stream);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The transfer characteristic the restreamer must tone map from: "smpte2084" (PQ: HDR10, HDR10+, Dolby Vision on
+    /// an HDR10 base) or "arib-std-b67" (HLG); null for SDR. Jellyfin's range classification decides, the raw transfer
+    /// tag names the curve (a stream Jellyfin calls HDR without a recognizable transfer is treated as PQ).
+    /// </summary>
+    public static string? HdrTransferOf(MediaStream stream)
+    {
+        var transfer = stream.ColorTransfer?.Trim().ToLowerInvariant();
+        var tagged = transfer is "smpte2084" or "arib-std-b67";
+        if (stream.VideoRange == VideoRange.SDR)
+        {
+            return null;
+        }
+
+        if (tagged)
+        {
+            return transfer;
+        }
+
+        return stream.VideoRange == VideoRange.HDR ? "smpte2084" : null;
+    }
 
     private static bool HasAudioTrack(Video video)
     {
