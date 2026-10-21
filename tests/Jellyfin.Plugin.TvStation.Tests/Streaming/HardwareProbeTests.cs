@@ -85,13 +85,55 @@ public class HardwareProbeTests
     }
 
     [Fact]
-    public void Interpret_NoSelfReport_IsSoftware()
+    public void Interpret_QsvDecoderInTheStreamMapping_IsHardware()
+    {
+        // The explicit *_qsv decoder never says "hwaccel"; the stream mapping names it.
+        var log = new[]
+        {
+            "  Stream #0:0: Video: hevc (Main), 1 reference frame, yuv420p(tv, smpte170m, left), 720x476 [SAR 32:27 DAR 640:357], 29.97 fps",
+            "Stream mapping:",
+            "  Stream #0:0 -> #0:0 (hevc (hevc_qsv) -> h264 (h264_qsv))",
+            "[hevc_qsv @ 0x70] Decoder: output is system memory surface",
+            "frame=  150 fps=120 q=-0.0 Lsize=N/A time=00:00:05.00 bitrate=N/A speed=4.1x"
+        };
+        var r = HardwareProbe.Interpret("qsv", new EncodingProfile { HardwareDecode = "qsv", VideoEncoder = "h264_qsv" }, "/media/film.mkv", Args, log, 0, 1.3);
+        Assert.Equal("hardware", r.Decoder);
+        Assert.Equal("qsv", r.DecoderInUse);
+        Assert.Empty(r.Problems);
+    }
+
+    [Fact]
+    public void Interpret_GpuNodeOpenWithSoftwareEncoder_IsHardware()
+    {
+        // An explicit hwaccel on a native decoder prints nothing on success; the open device node is the evidence.
+        var log = new[] { "  Stream #0:0 -> #0:0 (hevc (native) -> h264 (libx264))", "frame=  120 fps= 50 q=-0.0 Lsize=N/A time=00:00:05.00 bitrate=N/A speed=2.2x" };
+        var r = HardwareProbe.Interpret("vaapi", new EncodingProfile { HardwareDecode = "vaapi" }, "/media/film.mkv", Args, log, 0, 4.0, "/dev/dri/renderD128", canInspect: true);
+        Assert.Equal("hardware", r.Decoder);
+        Assert.Contains("/dev/dri/renderD128", r.DecoderInUse, StringComparison.Ordinal);
+        Assert.Empty(r.Problems);
+    }
+
+    [Fact]
+    public void Interpret_NoGpuNodeWithSoftwareEncoder_IsSoftware()
     {
         var log = new[] { "Stream mapping:", "frame=  120 fps= 50 q=-0.0 Lsize=N/A time=00:00:05.00 bitrate=N/A speed=1.2x" };
-        var r = HardwareProbe.Interpret("vaapi", new EncodingProfile { HardwareDecode = "vaapi" }, "/media/film.mkv", Args, log, 0, 4.0);
+        var r = HardwareProbe.Interpret("vaapi", new EncodingProfile { HardwareDecode = "vaapi" }, "/media/film.mkv", Args, log, 0, 4.0, null, canInspect: true);
         Assert.Equal("software", r.Decoder);
-        Assert.Contains(r.Problems, p => p.Contains("never reported attaching", StringComparison.Ordinal));
+        Assert.Contains(r.Problems, p => p.Contains("held no GPU device open", StringComparison.Ordinal));
         Assert.Contains(r.Problems, p => p.Contains("little headroom", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("libx264", false)]
+    [InlineData("h264_vaapi", true)]
+    public void Interpret_NoEvidenceEitherWay_IsUnverified(string encoder, bool canInspect)
+    {
+        // Windows cannot look at device nodes; a hardware encoder holds the node whether or not the decoder does.
+        var log = new[] { "Stream mapping:", "frame=  120 fps= 50 q=-0.0 Lsize=N/A time=00:00:05.00 bitrate=N/A speed=3.2x" };
+        var r = HardwareProbe.Interpret("vaapi", new EncodingProfile { HardwareDecode = "vaapi", VideoEncoder = encoder }, "/media/film.mkv", Args, log, 0, 4.0, canInspect ? "/dev/dri/renderD128" : null, canInspect);
+        Assert.Equal("unverified", r.Decoder);
+        Assert.Null(r.DecoderInUse);
+        Assert.Empty(r.Problems);
     }
 
     [Fact]

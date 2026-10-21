@@ -165,15 +165,15 @@ public static class HardwareProbe
     }
 
     /// <summary>Transcodes a few seconds of the file the way a program segment would be, and reads ffmpeg's account of it.</summary>
-    public static async Task<HardwareTestResult> TestAsync(string ffmpegPath, EncodingProfile profile, string path, string? hdrTransfer, TimeSpan seek, int seconds, CancellationToken ct)
+    public static async Task<HardwareTestResult> TestAsync(string ffmpegPath, EncodingProfile profile, string path, string? hdrTransfer, string? videoCodec, TimeSpan seek, int seconds, CancellationToken ct)
     {
-        var args = FfmpegArgsBuilder.ForProbe(path, hdrTransfer, profile, seconds, seek);
+        var args = FfmpegArgsBuilder.ForProbe(path, hdrTransfer, profile, seconds, seek, videoCodec);
         var requested = profile.HardwareDecode ?? string.Empty;
         var sw = Stopwatch.StartNew();
         RunResult run;
         try
         {
-            run = await RunAsync(ffmpegPath, args, TimeSpan.FromSeconds(120), ct).ConfigureAwait(false);
+            run = await RunAsync(ffmpegPath, args, TimeSpan.FromSeconds(120), ct, watchGpu: requested.Length > 0).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -192,11 +192,20 @@ public static class HardwareProbe
             };
         }
 
-        return Interpret(requested, profile, path, args, run.Output, run.ExitCode, sw.Elapsed.TotalSeconds);
+        return Interpret(requested, profile, path, args, run.Output, run.ExitCode, sw.Elapsed.TotalSeconds, run.GpuDevice, ProcessInspector.CanInspect);
     }
 
-    /// <summary>Pure: turns ffmpeg's verbose log and exit code into a verdict.</summary>
-    public static HardwareTestResult Interpret(string requested, EncodingProfile profile, string path, IReadOnlyList<string> args, IReadOnlyList<string> log, int exitCode, double elapsedSeconds)
+    /// <summary>
+    /// Pure: turns ffmpeg's verbose log and exit code into a verdict. The decoder counts as in use when ffmpeg named
+    /// it (a <c>*_qsv</c> or <c>*_cuvid</c> decoder in the stream mapping, or "-hwaccel auto" saying so), or when the
+    /// process held a GPU device node open while it ran and the encoder is software, so nothing else could have
+    /// opened it. An explicit hwaccel on a native decoder reports nothing on success and logs a fallback line on
+    /// failure, so with no such line, a hardware encoder masking the device, or a host that cannot look, the verdict
+    /// is "unverified" rather than a problem.
+    /// </summary>
+    /// <param name="gpuDevice">The GPU device node ffmpeg had open while it ran, when the host could look.</param>
+    /// <param name="canInspect">True when the host can see which device nodes a process holds (Linux).</param>
+    public static HardwareTestResult Interpret(string requested, EncodingProfile profile, string path, IReadOnlyList<string> args, IReadOnlyList<string> log, int exitCode, double elapsedSeconds, string? gpuDevice = null, bool canInspect = false)
     {
         string? inUse = null;
         string? fallback = null;
@@ -227,12 +236,13 @@ public static class HardwareProbe
         }
 
         var problems = new List<string>();
+        var softwareEncoder = profile.IsSoftwareEncoder;
         string decoder;
         if (requested.Length == 0)
         {
             decoder = "not-requested";
         }
-        else if (exitCode != 0 && inUse is null)
+        else if (exitCode != 0 && inUse is null && gpuDevice is null)
         {
             decoder = "failed";
             problems.Add(requested + " decoding could not be set up (ffmpeg exit " + exitCode + ")" + (fallback is not null ? ": " + fallback : LastInteresting(log)));
@@ -246,10 +256,19 @@ public static class HardwareProbe
         {
             decoder = "hardware";
         }
-        else
+        else if (gpuDevice is not null && softwareEncoder)
+        {
+            decoder = "hardware";
+            inUse = requested + " (ffmpeg held " + gpuDevice + " open)";
+        }
+        else if (canInspect && softwareEncoder)
         {
             decoder = "software";
-            problems.Add("ffmpeg never reported attaching the " + requested + " decoder; the file was decoded in software.");
+            problems.Add("ffmpeg held no GPU device open while it ran, so the " + requested + " decoder was not in use; the file was decoded in software.");
+        }
+        else
+        {
+            decoder = "unverified";
         }
 
         var encoder = exitCode == 0 ? "ok" : "failed";
@@ -301,9 +320,10 @@ public static class HardwareProbe
         return string.Empty;
     }
 
-    private sealed record RunResult(int ExitCode, IReadOnlyList<string> Output);
+    private sealed record RunResult(int ExitCode, IReadOnlyList<string> Output, string? GpuDevice = null);
 
-    private static async Task<RunResult> RunAsync(string ffmpegPath, IReadOnlyList<string> args, TimeSpan timeout, CancellationToken ct)
+    /// <param name="watchGpu">Sample which GPU device node the process holds open while it runs (Linux only).</param>
+    private static async Task<RunResult> RunAsync(string ffmpegPath, IReadOnlyList<string> args, TimeSpan timeout, CancellationToken ct, bool watchGpu = false)
     {
         var lines = new ConcurrentQueue<string>();
         using var proc = ProcessRunner.Start(ffmpegPath, args, line =>
@@ -313,6 +333,23 @@ public static class HardwareProbe
             {
             }
         });
+
+        string? gpuDevice = null;
+        using var watchCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var watcher = watchGpu && ProcessInspector.CanInspect
+            ? Task.Run(async () =>
+            {
+                // A hardware decoder or encoder opens its device as soon as it initialises and keeps it until exit.
+                while (!watchCts.IsCancellationRequested && gpuDevice is null)
+                {
+                    gpuDevice = ProcessInspector.OpenGpuDevice(proc.Pid);
+                    if (gpuDevice is null)
+                    {
+                        await Task.Delay(200, watchCts.Token).ConfigureAwait(false);
+                    }
+                }
+            }, watchCts.Token)
+            : Task.CompletedTask;
 
         // Capability listings print to stdout, the transcode's account to stderr; read both.
         var stdout = Task.Run(async () =>
@@ -342,6 +379,16 @@ public static class HardwareProbe
             lines.Enqueue("TvStation: ffmpeg did not finish within " + timeout.TotalSeconds.ToString("0", CultureInfo.InvariantCulture) + " s and was stopped.");
         }
 
+        watchCts.Cancel();
+        try
+        {
+            await watcher.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Stopped with the process.
+        }
+
         try
         {
             await stdout.WaitAsync(TimeSpan.FromSeconds(2), CancellationToken.None).ConfigureAwait(false);
@@ -351,6 +398,6 @@ public static class HardwareProbe
             // Pipe closed with the process.
         }
 
-        return new RunResult(proc.ExitCode, lines.ToList());
+        return new RunResult(proc.ExitCode, lines.ToList(), gpuDevice);
     }
 }

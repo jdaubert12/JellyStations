@@ -37,6 +37,18 @@ A station **logo** appears in the guide and on station cards. It can also be dra
 corner bug, with a choice of corner, size and opacity. That is off by default because the overlay
 filter costs encoder CPU.
 
+An **"Up next" card** can be drawn over the last seconds of every program: a translucent panel in a
+corner with the next program's title, its poster or episode thumbnail, the season and episode or the
+year, and the time it starts and ends in the station's time zone (12 or 24-hour clock). Pick the
+corner, the times before the end it appears (one or more, e.g. 1h, 30m, 5m, 30s), how long it stays, its height and opacity,
+whether to show the artwork and the times, and how it arrives and leaves: a fade (the default), a slide in
+from the nearest side, both, or neither. The card is burned into the stream by the plugin's own
+ffmpeg, so every viewer sees it, it stays in step with the picture whatever the client's HLS delay,
+and no client support is needed; it cannot be dismissed. Bumper clips and station breaks are skipped
+when choosing what to announce, programs too short to carry the card do without it, and a card that
+ffmpeg cannot draw is dropped for the session with a note on the station row. Off by default: like
+the logo it costs encoder CPU for the whole program, and the two should sit in different corners.
+
 The editor's **Content** section lists everything a station expands to, with a text filter, totals,
 and an **Exclude** switch per item for the one episode or film that does not belong. Exclusions are
 saved with the station and survive recompiles.
@@ -98,16 +110,16 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.12.0.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.12.0.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.12.0.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.12.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.12.0.0\`
+2. Copy it into a folder named `TvStation_1.13.0.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.13.0.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.13.0.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.13.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.13.0.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.12.0.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.12.0.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.13.0.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.13.0.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 
@@ -216,7 +228,15 @@ decades, ratings, tags and libraries. It is the basis for station suggestions an
     GPU are exactly those Jellyfin's "Enable hardware decoding for" checkboxes (and its 10-bit
     HEVC, VP9 and RExt toggles) allow; a hand-picked decoder takes everything GPUs can decode.
     10-bit H.264, DivX/Xvid and the like always play in software, and the Status page says so.
+    QSV is set up as the `*_qsv` decoder for the file's codec (`hevc_qsv`, `h264_qsv`, ...)
+    decoding to system memory, not as `-hwaccel qsv`, which in ffmpeg 7 leaves frames on GPU
+    surfaces the software filters cannot read; a file whose codec was never recorded stays in
+    software until the station's content is refreshed.
   - *VA-API encoding* (`h264_vaapi`) uses the same device and uploads frames itself.
+  - *Key frames*: every GOP (2 s by default) starts with an IDR frame and its headers, which is
+    where a client tuning in mid-program starts. libx264 and VA-API get forced key frames; QSV,
+    NVENC and AMF set them by GOP alone, since their forced key frames are plain I frames that no
+    demuxer treats as a key frame (a client would get audio and no video until the next program).
 - **Linger**: seconds the encoder keeps running after the last viewer leaves (quick re-tunes
   reuse it).
 - **Max concurrent sessions**: cap on simultaneously encoded stations.
@@ -242,8 +262,12 @@ decades, ratings, tags and libraries. It is the basis for station suggestions an
 - *Is the GPU really being used?* **Status** answers it: the session's Encoder column says
   "qsv decode ✓" only when ffmpeg holds the GPU device open, and turns red when ffmpeg fell back
   to software or the device failed. Press **Test** in the Hardware section to run a station's
-  current file through the chain and read which decoder ffmpeg attached and how many times real
-  time it managed; under 1.0x means that file cannot play smoothly with that profile. Outside the
+  current file through the chain and read which decoder ffmpeg used and how many times real
+  time it managed; under 1.0x means that file cannot play smoothly with that profile. The test
+  confirms a QSV or CUVID decoder from ffmpeg's own stream mapping, and any other decoder from
+  the GPU device node ffmpeg holds open while it runs (Linux, with a software encoder); when
+  neither can tell, for example VA-API decode with `h264_vaapi` encode, it says "unverified"
+  rather than flagging a problem, since ffmpeg logs a fallback whenever a hwaccel fails. Outside the
   plugin, `intel_gpu_top` (Intel) or `nvidia-smi` (NVIDIA) on the server shows the decoder busy
   while a station plays.
 - Live HLS adds 10-30 s of latency behind the encoder; the position shown in the guide is the

@@ -71,8 +71,9 @@ public sealed class HardwareDecodePolicy
         var c = NormalizeCodec(codec);
         if (c.Length == 0)
         {
-            // Unknown codec (compiled before this was recorded, or no probe): let ffmpeg try.
-            return null;
+            // Unknown codec (compiled before this was recorded, or no probe). The hwaccels let ffmpeg try; a QSV
+            // decoder is named per codec, so there is nothing to name.
+            return Kind == "qsv" ? "the file's video codec is not recorded, and the QSV decoder is chosen per codec (Refresh content)" : null;
         }
 
         var depth = bitDepth ?? DepthFromPixelFormat(pixelFormat) ?? 8;

@@ -250,6 +250,23 @@ order; together they turn a station into a broadcast.
    Covers the seam between rounds and weighted repeats. Not applied by the weekly scheduler
    (stations with time blocks); the Movie night preset sets 8 h. Dashboard field under the pool
    options.
+4. **"Up next" card — DONE 2026-10-21.** `Station.UpNextCard` (enabled, corner, lead times before
+   the end (a list, e.g. 1h/30m/5m), show seconds, height %, opacity, thumbnail, times, 24-hour clock, animation
+   (none/fade/slide/both, default fade); off by default). Slide is the overlay's x expression in `t`; fade turns
+   the still into a frame-per-tick stream inside the graph (`loop` + `setpts`, `trim`med at the last window so
+   it never outlives the program) and drives a `colorchannelmixer@fade` alpha with `sendcmd` `[expr]` commands
+   (`TI`, `1-TI`), one pair per window. Looping the PNG as a second demuxed input (`-loop 1 -framerate`) drew
+   the card ~8 s late on the live stream (never in a standalone run of the same command line), so the card
+   stream is generated in-graph; the still-image overlay (none/slide) was always on time.
+   Burned into the picture, since Jellyfin clients give a plugin no way to raise a toast during
+   playback, which also keeps it in step with the picture under HLS latency. Per program the
+   restreamer finds the next `Program` entry (bumpers and slates skipped, 6 h lookahead), has
+   ffmpeg render a PNG card (`FfmpegArgsBuilder.ForUpNextCard`: translucent `color` panel, the
+   artwork scaled into a left box, `drawtext` lines, no image library) into `data/TvStation/cards`,
+   and overlays it with `enable='between(t,from,to)'` on the segment that ends the program
+   (`UpNextCard.Window`; multi-part items only on the last part or when cut). Falls back to a card
+   without artwork, then disables the card for the session, each with a station fault. Unit tests
+   cover the lookup, window, times, layout and both ffmpeg argument lists.
 
 Considered and parked: off-air hours (a daypart rule approximates it),
 custom guide titles per block, studio and people sources, smart (search) collections, multi-part

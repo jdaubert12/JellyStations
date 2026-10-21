@@ -18,6 +18,9 @@ public sealed class Station
     /// <summary>Optional logo bug drawn over programs. Off by default.</summary>
     public LogoOverlayConfig LogoOverlay { get; set; } = new();
 
+    /// <summary>Optional "Up next" card drawn over the end of each program. Off by default.</summary>
+    public UpNextCardConfig UpNextCard { get; set; } = new();
+
     /// <summary>IANA or Windows time zone id used for slot times.</summary>
     public string TimeZoneId { get; set; } = "UTC";
 

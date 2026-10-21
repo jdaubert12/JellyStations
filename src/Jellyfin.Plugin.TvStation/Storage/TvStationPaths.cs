@@ -11,8 +11,12 @@ public sealed class TvStationPaths
         StationsDir = Path.Combine(Root, "stations");
         CompiledDir = Path.Combine(Root, "compiled");
         LogosDir = Path.Combine(Root, "logos");
+        CardsDir = Path.Combine(Root, "cards");
         SettingsFile = Path.Combine(Root, "settings.json");
     }
+
+    /// <summary>Rendered "Up next" cards, one file per program as it is about to play; rewritten constantly.</summary>
+    public string CardsDir { get; }
 
     public string Root { get; }
 
@@ -36,5 +40,6 @@ public sealed class TvStationPaths
         Directory.CreateDirectory(StationsDir);
         Directory.CreateDirectory(CompiledDir);
         Directory.CreateDirectory(LogosDir);
+        Directory.CreateDirectory(CardsDir);
     }
 }

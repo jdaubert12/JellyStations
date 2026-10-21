@@ -23,6 +23,9 @@ public sealed class FfmpegRestreamer : IDisposable
     private readonly IScheduleResolver _resolver;
     private readonly Func<string?> _logoPath;
     private readonly LogoOverlayConfig _overlay;
+    private readonly UpNextCardConfig _upNext;
+    private readonly string _cardsDir;
+    private readonly TimeZoneInfo _zone;
     private readonly string _cardText;
     private readonly BroadcastBuffer _buffer;
     private readonly ILogger _logger;
@@ -44,6 +47,7 @@ public sealed class FfmpegRestreamer : IDisposable
     private Task? _loop;
     private bool _slateTextSupported = true;
     private bool _overlaySupported = true;
+    private bool _upNextSupported = true;
     private bool _hardwareDecodeSupported = true;
     private bool _tonemapSupported = true;
     private double _tsOffsetFloorSeconds;
@@ -61,8 +65,14 @@ public sealed class FfmpegRestreamer : IDisposable
         BroadcastBuffer buffer,
         ILogger logger,
         Action<string>? onFault = null,
-        HardwareDecodePolicy? policy = null)
+        HardwareDecodePolicy? policy = null,
+        UpNextCardConfig? upNext = null,
+        string? cardsDir = null,
+        string? timeZoneId = null)
     {
+        _upNext = upNext ?? new UpNextCardConfig();
+        _cardsDir = cardsDir ?? Path.Combine(Path.GetTempPath(), "TvStation", "cards");
+        _zone = UpNextCard.Zone(timeZoneId);
         _onFault = onFault;
         _policy = policy ?? (string.IsNullOrEmpty(profile.HardwareDecode) ? HardwareDecodePolicy.Software : HardwareDecodePolicy.Permissive(profile.HardwareDecode));
         _stationId = stationId;
@@ -229,6 +239,7 @@ public sealed class FfmpegRestreamer : IDisposable
                 var segmentEnd = now + (cut ? remaining : part.Remaining);
                 var overlay = OverlayInput();
                 var profile = EffectiveProfile();
+                var upNext = await UpNextInputAsync(entry, cut ? remaining : part.Remaining, part.IsLast || cut, profile, ct).ConfigureAwait(false);
                 string? softwareReason = null;
                 var softwareAfterFailure = false;
                 if (profile.HardwareDecode.Length > 0)
@@ -252,17 +263,18 @@ public sealed class FfmpegRestreamer : IDisposable
 
                 var hardwareDecode = profile.HardwareDecode.Length > 0;
                 var tonemap = part.Part.IsHdr && _tonemapSupported;
-                var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, tonemap ? part.Part.HdrTransfer : null, seek, duration, NextTsOffset(), profile, overlay);
+                var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, tonemap ? part.Part.HdrTransfer : null, seek, duration, NextTsOffset(), profile, overlay, part.Part.VideoCodec, upNext);
 
                 _logger.LogInformation(
-                    "TvStation [{Station}]: playing {Title}{Part} from {Seek} ({Remaining} remaining){Hdr}{Hw}",
+                    "TvStation [{Station}]: playing {Title}{Part} from {Seek} ({Remaining} remaining){Hdr}{Hw}{Card}",
                     _stationName,
                     item.DisplayTitle,
                     item.IsMultiPart ? " part " + (part.Index + 1) + "/" + item.Parts.Count : string.Empty,
                     seek.ToString(@"hh\:mm\:ss"),
                     remaining.ToString(@"hh\:mm\:ss"),
                     tonemap ? ", tone mapping HDR to SDR" : string.Empty,
-                    hardwareDecode ? ", " + profile.HardwareDecode + " decoding" : softwareReason is null ? string.Empty : ", software decoding (" + softwareReason + ")");
+                    hardwareDecode ? ", " + profile.HardwareDecode + " decoding" : softwareReason is null ? string.Empty : ", software decoding (" + softwareReason + ")",
+                    upNext is null ? string.Empty : ", up next card at " + string.Join(", ", upNext.Windows.Select(w => w.From.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "s")));
                 _logger.LogDebug("TvStation ffmpeg {Args}", FfmpegArgsBuilder.ToLogString(args));
                 _telemetry = new SegmentTelemetry(item.DisplayTitle, isSlate: false, profile.HardwareDecode, profile.VideoEncoder, tonemap, part.Part.IsHdr, overlay is not null)
                 {
@@ -311,6 +323,15 @@ public sealed class FfmpegRestreamer : IDisposable
                     _tonemapSupported = false;
                     _logger.LogWarning("TvStation [{Station}]: ffmpeg exited with {Code} while tone mapping; continuing without tone mapping", _stationName, exitCode);
                     Fault("HDR tone mapping failed (ffmpeg exit " + exitCode + "); HDR programs play without it until the stream restarts" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
+                    continue;
+                }
+
+                if (exitCode != 0 && ran < TimeSpan.FromSeconds(5) && upNext is not null)
+                {
+                    // The card overlay is the newest thing in the graph: drop it for this session and replay.
+                    _upNextSupported = false;
+                    _logger.LogWarning("TvStation [{Station}]: ffmpeg exited with {Code} with the up next card; continuing without it", _stationName, exitCode);
+                    Fault("Up next card failed (ffmpeg exit " + exitCode + "); disabled until the stream restarts" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
                     continue;
                 }
 
@@ -409,6 +430,108 @@ public sealed class FfmpegRestreamer : IDisposable
         }
 
         return new FfmpegArgsBuilder.LogoOverlayInput(path, _overlay.Corner, _overlay.Opacity, _overlay.HeightPercent);
+    }
+
+    /// <summary>
+    /// The "Up next" card for the segment about to play, rendered to a PNG, or null when the card is off, the
+    /// segment does not end the program, the program is too short, nothing playable follows, or rendering failed.
+    /// </summary>
+    private async Task<FfmpegArgsBuilder.UpNextCardInput?> UpNextInputAsync(ScheduleEntry entry, TimeSpan segmentLength, bool endsProgram, EncodingProfile profile, CancellationToken ct)
+    {
+        if (!_upNext.Enabled || !_upNextSupported || !endsProgram || entry.Kind != EntryKind.Program)
+        {
+            return null;
+        }
+
+        var windows = UpNextCard.Windows(segmentLength, _upNext);
+        if (windows.Count == 0)
+        {
+            return null;
+        }
+
+        var next = UpNextCard.NextProgram(_resolver.Enumerate(_stationId, entry.EndUtc, entry.EndUtc + UpNextCard.Lookahead), entry.EndUtc);
+        if (next is null)
+        {
+            return null;
+        }
+
+        var spec = UpNextCard.Spec(next, _upNext, _zone, profile);
+        var prefix = _stationId.ToString("N") + "-";
+        var path = Path.Combine(_cardsDir, prefix + new DateTimeOffset(entry.StartUtc, TimeSpan.Zero).ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture) + ".png");
+        try
+        {
+            Directory.CreateDirectory(_cardsDir);
+            // The previous program's ffmpeg has exited, so its card is no longer being read.
+            foreach (var old in Directory.EnumerateFiles(_cardsDir, prefix + "*.png"))
+            {
+                if (!string.Equals(old, path, StringComparison.Ordinal))
+                {
+                    File.Delete(old);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "TvStation [{Station}]: could not tidy the cards folder", _stationName);
+        }
+
+        if (await RenderCardAsync(spec, path, ct).ConfigureAwait(false))
+        {
+            return new FfmpegArgsBuilder.UpNextCardInput(path, _upNext.Corner, windows) { Animation = _upNext.Animation };
+        }
+
+        if (spec.ThumbnailPath is not null && await RenderCardAsync(spec with { ThumbnailPath = null }, path, ct).ConfigureAwait(false))
+        {
+            _logger.LogWarning("TvStation [{Station}]: the artwork for {Title} could not be drawn on the up next card; card drawn without it", _stationName, next.Item!.DisplayTitle);
+            return new FfmpegArgsBuilder.UpNextCardInput(path, _upNext.Corner, windows) { Animation = _upNext.Animation };
+        }
+
+        _upNextSupported = false;
+        _logger.LogWarning("TvStation [{Station}]: ffmpeg could not render the up next card; disabled until the stream restarts: {Error}", _stationName, _lastCardError);
+        Fault("Up next card could not be rendered; disabled until the stream restarts" + (_lastCardError is null ? string.Empty : ": " + _lastCardError));
+        return null;
+    }
+
+    private string? _lastCardError;
+
+    /// <summary>Runs ffmpeg to write the card image; true when it exits cleanly and the file is there.</summary>
+    private async Task<bool> RenderCardAsync(UpNextCardSpec spec, string path, CancellationToken ct)
+    {
+        var args = FfmpegArgsBuilder.ForUpNextCard(spec, path);
+        _logger.LogDebug("TvStation ffmpeg {Args}", FfmpegArgsBuilder.ToLogString(args));
+        try
+        {
+            File.Delete(path);
+            using var proc = ProcessRunner.Start(_ffmpegPath, args, line => _lastCardError = line.Trim());
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(20));
+            try
+            {
+                await proc.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                proc.Kill();
+                if (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+
+                _lastCardError = "ffmpeg did not finish within 20 s";
+                return false;
+            }
+
+            return proc.ExitCode == 0 && File.Exists(path);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _lastCardError = ex.Message;
+            return false;
+        }
     }
 
     private async Task RunSlateAsync(TimeSpan duration, string text, CancellationToken ct, DateTime? hardEnd = null)

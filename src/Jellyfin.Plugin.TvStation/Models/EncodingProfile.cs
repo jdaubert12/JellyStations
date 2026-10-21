@@ -54,5 +54,8 @@ public sealed class EncodingProfile
     /// <summary>True when the encoder is a VA-API encoder, which only accepts frames already uploaded to the GPU.</summary>
     public bool IsVaapiEncoder => VideoEncoder.EndsWith("_vaapi", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>True for libx264 and the other lib* encoders, which never touch a GPU device.</summary>
+    public bool IsSoftwareEncoder => VideoEncoder.StartsWith("lib", StringComparison.OrdinalIgnoreCase);
+
     public EncodingProfile Clone() => (EncodingProfile)MemberwiseClone();
 }

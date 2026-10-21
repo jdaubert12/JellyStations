@@ -123,26 +123,48 @@ public static class FfmpegStderr
         return false;
     }
 
+    private static readonly System.Text.RegularExpressions.Regex StreamMapping = new(@"\(\w+ \(([A-Za-z0-9_]+)\) -> \w+ \([A-Za-z0-9_]+\)\)", System.Text.RegularExpressions.RegexOptions.Compiled);
+
     /// <summary>
-    /// At verbose level ffmpeg announces the decoder it attached ("Using auto hwaccel type qsv with new default device").
-    /// Returns the hwaccel kind named in the line, or null.
+    /// Lines in which ffmpeg names the hardware decoder it uses. With "-hwaccel auto" it says so outright ("Using auto
+    /// hwaccel type qsv with new default device"); an explicit hwaccel on a native decoder prints nothing on success.
+    /// A full GPU decoder shows in the stream mapping ("(hevc (hevc_qsv) -> h264 (libx264))", at info level and up).
+    /// Returns the hwaccel kind, or null.
     /// </summary>
     public static string? HardwareDecodeInUse(string line)
     {
         const string marker = "hwaccel type ";
         var i = line.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-        if (i < 0)
+        if (i >= 0)
         {
-            return null;
+            var start = i + marker.Length;
+            var end = start;
+            while (end < line.Length && (char.IsLetterOrDigit(line[end]) || line[end] == '_'))
+            {
+                end++;
+            }
+
+            return end > start ? line[start..end].ToLowerInvariant() : null;
         }
 
-        var start = i + marker.Length;
-        var end = start;
-        while (end < line.Length && (char.IsLetterOrDigit(line[end]) || line[end] == '_'))
+        var m = StreamMapping.Match(line);
+        return m.Success ? KindOfDecoder(m.Groups[1].Value) : null;
+    }
+
+    /// <summary>"hevc_qsv" is the qsv kind, "h264_cuvid" the cuda kind; a native or software decoder is no kind.</summary>
+    public static string? KindOfDecoder(string decoder)
+    {
+        var d = decoder.ToLowerInvariant();
+        if (d.EndsWith("_qsv", StringComparison.Ordinal))
         {
-            end++;
+            return "qsv";
         }
 
-        return end > start ? line[start..end].ToLowerInvariant() : null;
+        if (d.EndsWith("_cuvid", StringComparison.Ordinal))
+        {
+            return "cuda";
+        }
+
+        return null;
     }
 }

@@ -368,6 +368,67 @@
                 <input is="emby-input" id="tvsOverlaySize" label="Logo height (% of picture)" type="number" min="3" max="25" step="1">
               </div>
             </div>
+            <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:1em">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsUpNextEnabled">
+                <span>Show an "Up next" card before each program ends</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">A small panel in a corner of the picture with the next program's title, artwork and start and end time, drawn into the stream for every viewer. Pick a different corner from the logo. Costs some encoder CPU for the whole program; changing it restarts this station's stream.</div>
+            </div>
+            <div id="tvsUpNextOptions" class="tvs-hidden">
+              <div class="tvs-grid2">
+                <div class="selectContainer">
+                  <label class="selectLabel" for="tvsUpNextCorner">Corner</label>
+                  <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsUpNextCorner">
+                    <option value="TopLeft">Top left</option>
+                    <option value="TopRight">Top right</option>
+                    <option value="BottomLeft">Bottom left</option>
+                    <option value="BottomRight">Bottom right</option>
+                  </select>
+                </div>
+                <div class="selectContainer">
+                  <label class="selectLabel" for="tvsUpNextAnimation">Animation</label>
+                  <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsUpNextAnimation">
+                    <option value="None">None</option>
+                    <option value="Fade">Fade</option>
+                    <option value="Slide">Slide in from the side</option>
+                    <option value="FadeAndSlide">Fade and slide</option>
+                  </select>
+                  <div class="fieldDescription">How the card arrives and leaves, over about half a second.</div>
+                </div>
+                <div class="inputContainer">
+                  <input is="emby-input" id="tvsUpNextBefore" label="Appears before the end at" type="text" placeholder="30s">
+                  <div class="fieldDescription">One or more times, e.g. "1h, 30m, 5m, 30s". The card shows once at each, for the seconds below. Up to eight.</div>
+                </div>
+                <div class="inputContainer">
+                  <input is="emby-input" id="tvsUpNextShow" label="Stays for (seconds)" type="number" min="3" max="60" step="1">
+                </div>
+                <div class="inputContainer">
+                  <input is="emby-input" id="tvsUpNextSize" label="Card height (% of picture)" type="number" min="8" max="30" step="1">
+                </div>
+                <div class="inputContainer">
+                  <input is="emby-input" id="tvsUpNextOpacity" label="Background opacity (%)" type="number" min="30" max="100" step="5">
+                </div>
+              </div>
+              <div class="checkboxContainer">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsUpNextThumb">
+                  <span>Show the poster or episode thumbnail</span>
+                </label>
+              </div>
+              <div class="checkboxContainer">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsUpNextTimes">
+                  <span>Show the start and end time</span>
+                </label>
+              </div>
+              <div class="checkboxContainer">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsUpNextClock24">
+                  <span>24-hour clock (20:00 instead of 8:00 PM)</span>
+                </label>
+              </div>
+            </div>
           </div>
 
           <div class="verticalSection" data-steps="2 3">

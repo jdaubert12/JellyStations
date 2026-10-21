@@ -124,7 +124,8 @@ public sealed class StationService
             _resolver.Invalidate(id);
 
             var encodingChanged = JsonFileStore.Serialize(existing.Encoding) != JsonFileStore.Serialize(draft.Encoding)
-                || JsonFileStore.Serialize(existing.LogoOverlay) != JsonFileStore.Serialize(draft.LogoOverlay);
+                || JsonFileStore.Serialize(existing.LogoOverlay) != JsonFileStore.Serialize(draft.LogoOverlay)
+                || JsonFileStore.Serialize(existing.UpNextCard) != JsonFileStore.Serialize(draft.UpNextCard);
             var windowsChanged = JsonFileStore.Serialize(existing.ActiveWindows) != JsonFileStore.Serialize(draft.ActiveWindows);
             if (encodingChanged || !draft.Enabled || (windowsChanged && !Scheduling.SeasonWindows.IsActive(draft, DateTime.UtcNow)))
             {
@@ -484,6 +485,8 @@ public sealed class StationService
 
         s.LogoOverlay ??= new LogoOverlayConfig();
         s.LogoOverlay.Normalize();
+        s.UpNextCard ??= new UpNextCardConfig();
+        s.UpNextCard.Normalize();
         s.MinRuntimeMinutes = Math.Clamp(s.MinRuntimeMinutes, 0, 600);
         s.ActiveWindows ??= new List<SeasonWindow>();
         s.ExcludedItemIds = (s.ExcludedItemIds ?? new List<Guid>()).Where(g => g != Guid.Empty).Distinct().ToList();

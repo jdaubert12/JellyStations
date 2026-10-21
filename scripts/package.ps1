@@ -2,7 +2,7 @@
 param([string]$Configuration = "Release")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.12.0.0"
+$version = "1.13.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.TvStation\bin\$Configuration\net10.0\Jellyfin.Plugin.TvStation.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -21,7 +21,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Stream health on the Status page: each active session shows whether the hardware decoder is really in use (confirmed by the GPU device ffmpeg holds open, or flagged when it fell back to software), the encoder, HDR tone mapping, CPU cores and how far ahead of real time the encoder runs, with problem lines for stutter or stalls. New Hardware section: Jellyfin's transcoding setting, what the default profile resolves to, visible /dev/dri nodes, this ffmpeg build's hwaccels and encoders, and a Test button that runs a few seconds of a station's program through the real chain and reports the decoder attached and the speed. Fix: files a GPU cannot decode (10-bit H.264, DivX/Xvid, codecs unticked in Jellyfin) no longer crash ffmpeg and switch the session to software; the plugin decides per file from the codec recorded at compile time, following Jellyfin's hardware decoding checkboxes, and a file the decoder still refuses is replayed in software on its own."
+    changelog = "Up next card: a station can draw a panel over the last seconds of every program with the next program's title, artwork and start and end time, in a chosen corner at one or more times before the end, fading or sliding in and out, burned into the stream so every viewer sees it in step with the picture. Off by default. Fix: QSV (Intel Quick Sync) decoding failed on every file with ""Impossible to convert between the formats"", so stations and the hardware test never got Intel hardware decoding. The plugin now names the QSV decoder for the file's codec (h264_qsv, hevc_qsv, ...) on a QSV device created up front, which decodes to system memory; a file whose codec was never recorded stays in software. The hardware test confirms the decoder from ffmpeg's stream mapping or from the GPU device node ffmpeg holds open while it runs, and reports an unconfirmable hwaccel as unverified rather than as a problem. Fix: with the h264_qsv, h264_nvenc or h264_amf encoder a client tuning in mid-program got audio but no video until the next program started, because those encoders turn a forced key frame into a plain I frame without headers; they now set key frames by GOP alone, as Jellyfin does, so every GOP starts with an IDR frame and its SPS/PPS."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

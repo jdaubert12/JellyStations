@@ -50,10 +50,14 @@ public class HardwareDecodePolicyTests
     }
 
     [Fact]
-    public void UnknownCodec_IsLeftToFfmpeg()
+    public void UnknownCodec_IsLeftToTheHwaccels_ButNotToQsv()
     {
-        Assert.Null(Qsv.WhyNot(null, null, null, null));
-        Assert.Null(Qsv.WhyNot(string.Empty, null, null, null));
+        // A hwaccel on the native decoder falls back by itself; a QSV decoder has to be named for a codec.
+        var vaapi = HardwareDecodePolicy.Permissive("vaapi");
+        Assert.Null(vaapi.WhyNot(null, null, null, null));
+        Assert.Null(vaapi.WhyNot(string.Empty, null, null, null));
+        Assert.Contains("not recorded", Qsv.WhyNot(null, null, null, null), StringComparison.Ordinal);
+        Assert.Contains("not recorded", Qsv.WhyNot(string.Empty, null, null, null), StringComparison.Ordinal);
     }
 
     [Fact]

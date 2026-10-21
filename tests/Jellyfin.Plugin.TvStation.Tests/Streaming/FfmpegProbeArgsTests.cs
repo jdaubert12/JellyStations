@@ -17,16 +17,17 @@ public class FfmpegProbeArgsTests
     public void Probe_IsVerboseFastAndSilent()
     {
         var p = new EncodingProfile { HardwareDecode = "qsv", HardwareDevice = "/dev/dri/renderD128" };
-        var args = FfmpegArgsBuilder.ForProbe("/media/film.mkv", null, p, 5, TimeSpan.FromSeconds(60));
+        var args = FfmpegArgsBuilder.ForProbe("/media/film.mkv", null, p, 5, TimeSpan.FromSeconds(60), "hevc");
 
         Assert.Equal("verbose", ValueAfter(args, "-loglevel"));
-        Assert.Equal("qsv", ValueAfter(args, "-hwaccel"));
-        Assert.Equal("/dev/dri/renderD128", ValueAfter(args, "-qsv_device"));
-        Assert.True(args.IndexOf("-hwaccel") < args.IndexOf("-i"));
+        var input = args.Take(args.IndexOf("-i")).ToList();
+        Assert.Equal("hevc_qsv", ValueAfter(input, "-c:v"));
+        Assert.Equal("/dev/dri/renderD128", ValueAfter(input, "-qsv_device"));
+        Assert.DoesNotContain("-hwaccel", args);
         Assert.Equal("60.000", ValueAfter(args, "-ss"));
         Assert.Equal("5", ValueAfter(args, "-t"));
         Assert.Contains("-an", args);
-        Assert.Equal("libx264", ValueAfter(args, "-c:v"));
+        Assert.Equal("libx264", ValueAfter(args.Skip(args.IndexOf("-i")).ToList(), "-c:v"));
         Assert.Equal("null", ValueAfter(args, "-f"));
         Assert.Equal("-", args[^1]);
         Assert.DoesNotContain("mpegts", args);

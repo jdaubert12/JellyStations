@@ -32,6 +32,10 @@ public class EncoderTelemetryTests
     [InlineData("Using auto hwaccel type vaapi with new default device.", "vaapi")]
     [InlineData("[h264 @ 0x3] Using auto hwaccel type cuda with existing device cuda0.", "cuda")]
     [InlineData("[hevc @ 0x1] Stream #0:0 -> #0:0 (hevc (native) -> h264 (libx264))", null)]
+    [InlineData("  Stream #0:0 -> #0:0 (hevc (hevc_qsv) -> h264 (h264_qsv))", "qsv")]
+    [InlineData("  Stream #0:0 -> #0:0 (h264 (h264_qsv) -> h264 (libx264))", "qsv")]
+    [InlineData("  Stream #0:0 -> #0:0 (h264 (h264_cuvid) -> h264 (h264_nvenc))", "cuda")]
+    [InlineData("  Stream #0:0 -> #0:0 (h264 (native) -> h264 (h264_qsv))", null)]
     public void HardwareDecodeInUse_NamesTheKind(string line, string? expected)
     {
         Assert.Equal(expected, FfmpegStderr.HardwareDecodeInUse(line));

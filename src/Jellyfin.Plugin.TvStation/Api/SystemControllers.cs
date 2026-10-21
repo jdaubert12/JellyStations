@@ -346,7 +346,7 @@ public sealed class HardwareController : ControllerBase
             }
         }
 
-        var result = await HardwareProbe.TestAsync(ffmpegPath, profile, part.Path, part.HdrTransfer, seek, seconds, ct).ConfigureAwait(false);
+        var result = await HardwareProbe.TestAsync(ffmpegPath, profile, part.Path, part.HdrTransfer, part.VideoCodec, seek, seconds, ct).ConfigureAwait(false);
         if (skipReason is not null)
         {
             result = result.WithDecoderSkipped(request.HardwareDecode ?? (station.Encoding ?? _settings.Get().DefaultEncoding).HardwareDecode, skipReason);

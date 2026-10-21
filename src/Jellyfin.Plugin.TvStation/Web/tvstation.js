@@ -1035,6 +1035,7 @@
       Enabled: true,
       LogoFileName: null,
       LogoOverlay: { Enabled: false, Corner: 'TopRight', Opacity: 70, HeightPercent: 8 },
+      UpNextCard: { Enabled: false, Corner: 'BottomRight', Animation: 'Fade', LeadTimesSeconds: [30], ShowSeconds: 10, HeightPercent: 14, Opacity: 85, ShowThumbnail: true, ShowTimes: true, TwentyFourHourClock: false },
       TimeZoneId: guessTimeZone(),
       AnchorUtc: null,
       Revision: 1,
@@ -1117,7 +1118,63 @@
     s.LogoOverlay.Corner = s.LogoOverlay.Corner || 'TopRight';
     s.LogoOverlay.Opacity = Math.min(100, Math.max(10, parseInt(s.LogoOverlay.Opacity, 10) || 70));
     s.LogoOverlay.HeightPercent = Math.min(25, Math.max(3, parseInt(s.LogoOverlay.HeightPercent, 10) || 8));
+    const card = s.UpNextCard = s.UpNextCard || {};
+    card.Enabled = !!card.Enabled;
+    card.Corner = card.Corner || 'BottomRight';
+    card.Animation = ['None', 'Fade', 'Slide', 'FadeAndSlide'].indexOf(card.Animation) >= 0 ? card.Animation : 'Fade';
+    card.LeadTimesSeconds = normalizeLeadTimes(card.LeadTimesSeconds);
+    card.ShowSeconds = Math.min(Math.min(60, Math.min.apply(null, card.LeadTimesSeconds)), Math.max(3, parseInt(card.ShowSeconds, 10) || 10));
+    card.HeightPercent = Math.min(30, Math.max(8, parseInt(card.HeightPercent, 10) || 14));
+    card.Opacity = Math.min(100, Math.max(30, parseInt(card.Opacity, 10) || 85));
+    card.ShowThumbnail = card.ShowThumbnail !== false;
+    card.ShowTimes = card.ShowTimes !== false;
+    card.TwentyFourHourClock = !!card.TwentyFourHourClock;
     return s;
+  }
+
+  // Up next lead times: 5 s to 6 h each, distinct, largest first, at most eight; never empty.
+  function normalizeLeadTimes(list) {
+    const seen = {};
+    const out = (Array.isArray(list) ? list : [])
+      .map(v => parseInt(v, 10))
+      .filter(v => !isNaN(v))
+      .map(v => Math.min(21600, Math.max(5, v)))
+      .filter(v => (seen[v] ? false : (seen[v] = true)))
+      .sort((a, b) => b - a)
+      .slice(0, 8);
+    return out.length ? out : [30];
+  }
+
+  // "1h, 30m, 5m, 30s" or "1h30m" or plain seconds -> seconds.
+  function parseLeadTimes(text) {
+    const out = [];
+    String(text || '').split(/[,;\n]+/).forEach(part => {
+      const p = part.trim().toLowerCase();
+      if (!p) { return; }
+      if (/^\d+$/.test(p)) { out.push(parseInt(p, 10)); return; }
+      let total = 0, matched = false;
+      p.replace(/(\d+(?:\.\d+)?)\s*(h|hr|hrs|hour|hours|m|min|mins|minute|minutes|s|sec|secs|second|seconds)\b/g, (m, n, u) => {
+        matched = true;
+        const v = parseFloat(n);
+        total += u[0] === 'h' ? v * 3600 : u[0] === 'm' ? v * 60 : v;
+        return '';
+      });
+      if (matched) { out.push(Math.round(total)); }
+    });
+    return normalizeLeadTimes(out);
+  }
+
+  function formatLeadTime(seconds) {
+    const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = seconds % 60;
+    const parts = [];
+    if (h) { parts.push(h + 'h'); }
+    if (m) { parts.push(m + 'm'); }
+    if (s || !parts.length) { parts.push(s + 's'); }
+    return parts.join(' ');
+  }
+
+  function formatLeadTimes(list) {
+    return normalizeLeadTimes(list).map(formatLeadTime).join(', ');
   }
 
   function normalizeSource(src) {
@@ -1321,6 +1378,17 @@
     setVal('#tvsOverlayOpacity', d.LogoOverlay.Opacity);
     setVal('#tvsOverlaySize', d.LogoOverlay.HeightPercent);
     show($('#tvsOverlayOptions'), !!d.LogoOverlay.Enabled);
+    setChecked('#tvsUpNextEnabled', !!d.UpNextCard.Enabled);
+    setVal('#tvsUpNextCorner', d.UpNextCard.Corner);
+    setVal('#tvsUpNextAnimation', d.UpNextCard.Animation || 'Fade');
+    setVal('#tvsUpNextBefore', formatLeadTimes(d.UpNextCard.LeadTimesSeconds));
+    setVal('#tvsUpNextShow', d.UpNextCard.ShowSeconds);
+    setVal('#tvsUpNextSize', d.UpNextCard.HeightPercent);
+    setVal('#tvsUpNextOpacity', d.UpNextCard.Opacity);
+    setChecked('#tvsUpNextThumb', d.UpNextCard.ShowThumbnail);
+    setChecked('#tvsUpNextTimes', d.UpNextCard.ShowTimes);
+    setChecked('#tvsUpNextClock24', d.UpNextCard.TwentyFourHourClock);
+    show($('#tvsUpNextOptions'), !!d.UpNextCard.Enabled);
 
     // Mode panels
     setVal('#tvsPoolOrder', d.Pool.Order);
@@ -1835,6 +1903,16 @@
     d.LogoOverlay.Corner = val('#tvsOverlayCorner') || 'TopRight';
     d.LogoOverlay.Opacity = Math.min(100, Math.max(10, parseInt(val('#tvsOverlayOpacity'), 10) || 70));
     d.LogoOverlay.HeightPercent = Math.min(25, Math.max(3, parseInt(val('#tvsOverlaySize'), 10) || 8));
+    d.UpNextCard.Enabled = checked('#tvsUpNextEnabled');
+    d.UpNextCard.Corner = val('#tvsUpNextCorner') || 'BottomRight';
+    d.UpNextCard.Animation = val('#tvsUpNextAnimation') || 'Fade';
+    d.UpNextCard.LeadTimesSeconds = parseLeadTimes(val('#tvsUpNextBefore'));
+    d.UpNextCard.ShowSeconds = Math.min(Math.min(60, Math.min.apply(null, d.UpNextCard.LeadTimesSeconds)), Math.max(3, parseInt(val('#tvsUpNextShow'), 10) || 10));
+    d.UpNextCard.HeightPercent = Math.min(30, Math.max(8, parseInt(val('#tvsUpNextSize'), 10) || 14));
+    d.UpNextCard.Opacity = Math.min(100, Math.max(30, parseInt(val('#tvsUpNextOpacity'), 10) || 85));
+    d.UpNextCard.ShowThumbnail = checked('#tvsUpNextThumb');
+    d.UpNextCard.ShowTimes = checked('#tvsUpNextTimes');
+    d.UpNextCard.TwentyFourHourClock = checked('#tvsUpNextClock24');
     d.ExcludedTags = parseTagList(val('#tvsExcludedTags'));
     d.UseGlobalExcludedTags = checked('#tvsUseGlobalTags');
     d.MinRuntimeMinutes = Math.max(0, parseInt(val('#tvsMinRuntime'), 10) || 0);
@@ -4003,8 +4081,9 @@
   function renderHardwareTest(r) {
     const box = clear($('#tvsHwTestResult'));
     const decoderText = {
-      'hardware': 'Hardware decoding confirmed: ffmpeg attached ' + (r.DecoderInUse || r.RequestedDecoder) + '.',
-      'software': 'Software decoding: ' + r.RequestedDecoder + ' was requested but ffmpeg never attached it.',
+      'hardware': 'Hardware decoding confirmed: ffmpeg used ' + (r.DecoderInUse || r.RequestedDecoder) + '.',
+      'software': 'Software decoding: ' + r.RequestedDecoder + ' was requested but ffmpeg did not use it.',
+      'unverified': r.RequestedDecoder + ' decoding was set up and ffmpeg reported no fallback, but this host cannot confirm the decoder itself used the GPU' + (r.VideoEncoder && r.VideoEncoder.indexOf('lib') !== 0 ? ' (the ' + r.VideoEncoder + ' encoder holds the device too)' : '') + '.',
       'fallback': 'Software decoding: ffmpeg set ' + r.RequestedDecoder + ' up but could not use it for this file.',
       'failed': (r.RequestedDecoder || 'Hardware') + ' decoding could not be set up at all.',
       'not-requested': 'Software decoding (no hardware decoder requested).',
@@ -4350,6 +4429,7 @@
     });
     on('#tvsEncodingEnabled', 'change', () => show($('#tvsStationEncoding'), checked('#tvsEncodingEnabled')));
     on('#tvsOverlayEnabled', 'change', () => show($('#tvsOverlayOptions'), checked('#tvsOverlayEnabled')));
+    on('#tvsUpNextEnabled', 'change', () => show($('#tvsUpNextOptions'), checked('#tvsUpNextEnabled')));
     on('#tvsBtnAddBlock', 'click', () => {
       const templateId = val('#tvsBlockTemplateSelect');
       const template = state.blockTemplates.find(t => t.Id === templateId);

@@ -161,7 +161,10 @@ public sealed class StreamSessionManager : IDisposable
                 buffer,
                 logger,
                 message => _faults[station.Id] = new StationFault(DateTime.UtcNow, message),
-                policy),
+                policy,
+                station.UpNextCard ?? new UpNextCardConfig(),
+                _paths.CardsDir,
+                station.TimeZoneId),
             logger);
 
         session.MediaSource.Path = _appHost.GetApiUrlForLocalAccess() + "/LiveTv/LiveStreamFiles/" + session.UniqueId + "/stream.ts";
