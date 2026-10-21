@@ -50,6 +50,22 @@ public sealed class ProcessRunner : IDisposable
 
     public int Pid => _process.Id;
 
+    /// <summary>CPU time the process has consumed so far, or null once it is gone.</summary>
+    public TimeSpan? ProcessorTime
+    {
+        get
+        {
+            try
+            {
+                return HasExited ? null : _process.TotalProcessorTime;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+    }
+
     public static ProcessRunner Start(string executable, IReadOnlyList<string> args, Action<string> onStderrLine)
     {
         var psi = new ProcessStartInfo

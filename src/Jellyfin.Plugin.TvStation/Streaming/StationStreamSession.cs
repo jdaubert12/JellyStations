@@ -62,6 +62,9 @@ public sealed class StationStreamSession : ILiveStream
 
     public IReadOnlyList<string> RecentErrors => _restreamer?.RecentErrors ?? Array.Empty<string>();
 
+    /// <summary>What the encoder is doing right now (decoder, CPU, real-time margin), or null before it started.</summary>
+    public EncoderSnapshot? Encoder => _restreamer?.Snapshot();
+
     public int ReaderCount => _buffer.ConsumerCount;
 
     public long BytesStreamed => _buffer.TotalBytes;

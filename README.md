@@ -98,16 +98,16 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.11.0.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.11.0.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.11.0.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.11.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.11.0.0\`
+2. Copy it into a folder named `TvStation_1.12.0.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.12.0.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.12.0.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.12.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.12.0.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.11.0.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.11.0.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.12.0.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.12.0.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 
@@ -145,6 +145,20 @@ problem, the row keeps the last error in red until you dismiss it: a file that c
 with permission denied told apart from a missing file or an unmounted folder, or an encoder that
 quit early, with ffmpeg's last log line. **Status** has a Health section listing every station
 that needs attention.
+
+**Status** also shows what each active encoder is really doing, refreshed every five seconds:
+whether the hardware decoder is in use (on Linux the plugin checks that ffmpeg holds a GPU device
+such as `/dev/dri/renderD128` open; a fallback to software, or a device that failed when the
+stream started, is flagged in red with ffmpeg's own line), the encoder, HDR tone mapping, the CPU
+cores the ffmpeg process is using, and how far ahead of real time it runs (about +1.5 s when it
+keeps up; a negative number is what viewers see as stutter). Problems are spelled out under the
+row. The Hardware section lists Jellyfin's transcoding setting, what the default profile resolves
+to, the `/dev/dri` nodes the server can see, and the hwaccels, H.264 encoders and tone mapping
+filters in this ffmpeg build, with notes on anything that does not line up. **Test** runs a few
+seconds of a station's current program through the real decode, filter and encode chain at full
+speed and reports which decoder ffmpeg attached and the speed relative to real time, so you can
+try a decoder before putting it on a profile (`GET /TvStation/Hardware`,
+`POST /TvStation/Hardware/Test`).
 
 Films split across files (Blu-ray `part1` / `part2`, which Jellyfin stacks into one movie) are
 scheduled at their full combined length and play straight through, one guide entry. Items without a
@@ -197,6 +211,11 @@ decades, ratings, tags and libraries. It is the basis for station suggestions an
     render node or adapter. Decoding is where 4K HEVC costs its CPU; scaling, tone mapping and
     the logo stay in software. ffmpeg falls back to software decoding when the device cannot
     handle a file, and the plugin drops to software for the session if the device will not open.
+    The GPU decoders themselves never fall back, so the plugin decides per file from the codec,
+    profile and bit depth recorded at compile time: with "Follow Jellyfin" the files that go to the
+    GPU are exactly those Jellyfin's "Enable hardware decoding for" checkboxes (and its 10-bit
+    HEVC, VP9 and RExt toggles) allow; a hand-picked decoder takes everything GPUs can decode.
+    10-bit H.264, DivX/Xvid and the like always play in software, and the Status page says so.
   - *VA-API encoding* (`h264_vaapi`) uses the same device and uploads frames itself.
 - **Linger**: seconds the encoder keeps running after the last viewer leaves (quick re-tunes
   reuse it).
@@ -220,6 +239,13 @@ decades, ratings, tags and libraries. It is the basis for station suggestions an
   stream URL should show `yuv420p(tv, bt709)` with no mastering-display side data.
 - *Stutter on a 4K HEVC source*: the plugin's own ffmpeg is probably decoding in software and
   cannot keep real time. Turn on hardware decoding (Settings > Default encoding) or on the station.
+- *Is the GPU really being used?* **Status** answers it: the session's Encoder column says
+  "qsv decode ✓" only when ffmpeg holds the GPU device open, and turns red when ffmpeg fell back
+  to software or the device failed. Press **Test** in the Hardware section to run a station's
+  current file through the chain and read which decoder ffmpeg attached and how many times real
+  time it managed; under 1.0x means that file cannot play smoothly with that profile. Outside the
+  plugin, `intel_gpu_top` (Intel) or `nvidia-smi` (NVIDIA) on the server shows the decoder busy
+  while a station plays.
 - Live HLS adds 10-30 s of latency behind the encoder; the position shown in the guide is the
   server's.
 

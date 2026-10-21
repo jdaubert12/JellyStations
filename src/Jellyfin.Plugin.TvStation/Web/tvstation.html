@@ -178,6 +178,15 @@
       #TvStationPage .tvs-kv { display: grid; grid-template-columns: max-content 1fr; gap: .3em 1.2em; margin-bottom: 1em; }
       #TvStationPage .tvs-kv dt { opacity: .7; }
       #TvStationPage .tvs-kv dd { margin: 0; word-break: break-all; }
+      #TvStationPage .tvs-hwtest { align-items: flex-end; flex-wrap: wrap; gap: .6em; margin: .6em 0; }
+      #TvStationPage .tvs-hwtest select { min-width: 14em; }
+      #TvStationPage .tvs-enc { display: flex; flex-wrap: wrap; gap: .25em .3em; align-items: center; }
+      #TvStationPage .tvs-enc .tvs-badge { margin-left: 0; }
+      #TvStationPage .tvs-badge.bad { background: rgba(244,67,54,.22); border-color: rgba(244,67,54,.7); }
+      #TvStationPage .tvs-problem { margin: .3em 0 0; padding: .35em .8em; border-radius: 4px; font-size: .9em; }
+      #TvStationPage .tvs-problem.warn { border: 1px solid rgba(255,152,0,.7); background: rgba(255,152,0,.12); }
+      #TvStationPage .tvs-problem.bad { border: 1px solid rgba(244,67,54,.7); background: rgba(244,67,54,.12); }
+      #TvStationPage .tvs-problem.ok { border: 1px solid rgba(82,181,75,.6); background: rgba(82,181,75,.12); }
       #TvStationPage .tvs-lineup .listItem { padding-top: .25em; padding-bottom: .25em; }
       #TvStationPage .tvs-index { flex: none; width: 2.2em; opacity: .6; text-align: right; margin-right: .8em; }
       #TvStationPage input[type="color"].tvs-color { width: 4em; height: 2.2em; padding: 0; border: 1px solid rgba(255,255,255,.2); background: transparent; vertical-align: middle; }
@@ -734,6 +743,19 @@
           <div class="verticalSection">
             <h3 class="sectionTitle">Server</h3>
             <dl id="tvsStatusInfo" class="tvs-kv"></dl>
+          </div>
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Hardware</h3>
+            <div class="fieldDescription">Jellyfin's transcoding setting, what the default encoding profile comes out as, the GPU nodes the server can see, and what this ffmpeg build offers. <strong>Test</strong> runs a few seconds of a station's current program through the real decode, filter and encode chain as fast as the machine can, and reports which decoder ffmpeg attached and how far from real time it ran.</div>
+            <dl id="tvsHardwareInfo" class="tvs-kv"></dl>
+            <div id="tvsHardwareNotes"></div>
+            <div class="tvs-toolbar tvs-hwtest">
+              <select is="emby-select" id="tvsHwTestStation" class="emby-select-withcolor emby-select" label="Station"></select>
+              <select is="emby-select" id="tvsHwTestDecoder" class="emby-select-withcolor emby-select" label="Decoder"></select>
+              <button is="emby-button" type="button" id="tvsBtnHwTest" class="raised emby-button button-submit"><span>Test</span></button>
+              <button is="emby-button" type="button" id="tvsBtnHwRefresh" class="raised emby-button"><span>Re-read ffmpeg</span></button>
+            </div>
+            <div id="tvsHwTestResult"></div>
           </div>
           <div class="verticalSection">
             <h3 class="sectionTitle">Health</h3>

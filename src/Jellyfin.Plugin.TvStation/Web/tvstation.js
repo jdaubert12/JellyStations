@@ -3896,7 +3896,142 @@
   function openStatus() {
     showView('status');
     loadStatus(true);
+    loadHardware(false);
     startStatusTimer();
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // Hardware: capabilities and the decode/encode test
+  // ------------------------------------------------------------------------------------------
+
+  const HW_TEST_DECODERS = [['profile', "The station's own setting"]].concat(HW_DECODERS);
+
+  function loadHardware(refresh) {
+    const info = $('#tvsHardwareInfo');
+    if (!info) {
+      return Promise.resolve();
+    }
+    const stationsReady = state.stations.length ? Promise.resolve(state.stations) : api('GET', 'Stations').then(list => {
+      state.stations = Array.isArray(list) ? list : [];
+      return state.stations;
+    });
+    return Promise.all([api('GET', 'Hardware', undefined, refresh ? { refresh: true } : undefined), stationsReady]).then(results => {
+      renderHardware(results[0] || {});
+      fillHardwareTestSelects();
+    }).catch(err => {
+      clear(info);
+      readErrors(err).then(messages => {
+        const notes = clear($('#tvsHardwareNotes'));
+        notes.appendChild(el('div', { className: 'tvs-problem bad', text: 'Could not read the hardware picture: ' + messages.join(' ') }));
+      });
+    });
+  }
+
+  function renderHardware(h) {
+    const info = clear($('#tvsHardwareInfo'));
+    const kv = (label, valueNode) => {
+      info.appendChild(el('dt', { text: label }));
+      info.appendChild(el('dd', null, valueNode));
+    };
+    const decoderLabel = kind => {
+      const found = HW_DECODERS.find(o => o[0] === kind);
+      return found ? found[1] : kind;
+    };
+    const jfDevice = h.JellyfinQsvDevice || h.JellyfinVaapiDevice;
+    kv('Jellyfin transcoding', (h.JellyfinAcceleration || 'none') + (jfDevice ? ' on ' + jfDevice : ''));
+    kv('Default profile decodes with', h.DefaultDecoder
+      ? el('span', null, [el('span', { className: 'tvs-ok', text: decoderLabel(h.DefaultDecoder) }), el('span', { className: 'tvs-secondary', text: h.DefaultDevice ? ' on ' + h.DefaultDevice : ' (driver default device)' })])
+      : el('span', { className: 'tvs-secondary', text: 'software' }));
+    kv('Default profile encodes with', h.DefaultEncoder || '');
+    kv('Server', (h.Os || '') + ', ' + (h.CpuCores || '?') + ' CPU cores' + (h.CanInspectProcesses ? '' : ' (cannot inspect which device a process holds open on this OS)'));
+    if (h.Os === 'linux') {
+      kv('GPU nodes', (h.DrmNodes || []).length ? (h.DrmNodes || []).join(', ') : el('span', { className: 'tvs-bad', text: 'none visible (/dev/dri is empty or absent)' }));
+    }
+    kv('ffmpeg', h.FfmpegError ? el('span', { className: 'tvs-bad', text: h.FfmpegError }) : (h.FfmpegVersion || h.FfmpegPath || ''));
+    if (!h.FfmpegError) {
+      kv('Hardware decoders in ffmpeg', (h.Hwaccels || []).length ? (h.Hwaccels || []).join(', ') : el('span', { className: 'tvs-bad', text: 'none' }));
+      kv('H.264 encoders in ffmpeg', (h.H264Encoders || []).join(', '));
+      kv('HDR tone mapping filters', h.HasTonemap ? el('span', { className: 'tvs-ok', text: 'zscale + tonemap present' }) : el('span', { className: 'tvs-bad', text: 'missing' }));
+    }
+    const notes = clear($('#tvsHardwareNotes'));
+    (h.Notes || []).forEach(note => notes.appendChild(el('div', { className: 'tvs-problem warn', text: note })));
+  }
+
+  function fillHardwareTestSelects() {
+    const stationSelect = $('#tvsHwTestStation');
+    const decoderSelect = $('#tvsHwTestDecoder');
+    if (!stationSelect || !decoderSelect) {
+      return;
+    }
+    const keepStation = stationSelect.value;
+    clear(stationSelect);
+    stationSelect.appendChild(el('option', { value: '', text: 'Any station with a playable file' }));
+    state.stations.slice().sort(channelSort).forEach(s => {
+      stationSelect.appendChild(el('option', { value: s.Id, text: (s.ChannelNumber ? s.ChannelNumber + ' ' : '') + s.Name }));
+    });
+    if (keepStation && state.stations.some(s => s.Id === keepStation)) {
+      stationSelect.value = keepStation;
+    }
+    if (!decoderSelect.options.length) {
+      HW_TEST_DECODERS.forEach(o => decoderSelect.appendChild(el('option', { value: o[0], text: o[1] })));
+    }
+  }
+
+  function runHardwareTest() {
+    const button = $('#tvsBtnHwTest');
+    const box = clear($('#tvsHwTestResult'));
+    const body = { Seconds: 5 };
+    const stationId = val('#tvsHwTestStation');
+    if (stationId) {
+      body.StationId = stationId;
+    }
+    const decoder = val('#tvsHwTestDecoder');
+    if (decoder !== 'profile') {
+      body.HardwareDecode = decoder;
+    }
+    box.appendChild(el('div', { className: 'tvs-info', text: 'Running ffmpeg for a few seconds…' }));
+    button.disabled = true;
+    api('POST', 'Hardware/Test', body).then(result => {
+      renderHardwareTest(result || {});
+    }).catch(err => {
+      readErrors(err).then(messages => {
+        clear(box).appendChild(el('div', { className: 'tvs-problem bad', text: messages.join(' ') }));
+      });
+    }).then(() => { button.disabled = false; });
+  }
+
+  function renderHardwareTest(r) {
+    const box = clear($('#tvsHwTestResult'));
+    const decoderText = {
+      'hardware': 'Hardware decoding confirmed: ffmpeg attached ' + (r.DecoderInUse || r.RequestedDecoder) + '.',
+      'software': 'Software decoding: ' + r.RequestedDecoder + ' was requested but ffmpeg never attached it.',
+      'fallback': 'Software decoding: ffmpeg set ' + r.RequestedDecoder + ' up but could not use it for this file.',
+      'failed': (r.RequestedDecoder || 'Hardware') + ' decoding could not be set up at all.',
+      'not-requested': 'Software decoding (no hardware decoder requested).',
+      'skipped': 'Software decoding by choice: ' + (r.DecoderSkipReason || 'this file is not given to ' + r.RequestedDecoder) + '. The plugin does the same when the station plays it.'
+    }[r.Decoder] || r.Decoder;
+    const ok = r.Problems && r.Problems.length === 0;
+    box.appendChild(el('div', { className: 'tvs-problem ' + (ok ? 'ok' : (r.Decoder === 'failed' || r.Encoder === 'failed' || r.Decoder === 'fallback' ? 'bad' : 'warn')), text: decoderText + ' ' +
+      (r.Encoder === 'ok' ? 'Encoding with ' + r.VideoEncoder + ' worked.' : r.Decoder === 'failed' ? '' : 'Encoding with ' + r.VideoEncoder + ' failed (exit ' + r.ExitCode + ').') +
+      (r.Speed !== null && r.Speed !== undefined ? ' Ran at ' + Number(r.Speed).toFixed(2) + 'x real time.' : '') }));
+    (r.Problems || []).forEach(problem => box.appendChild(el('div', { className: 'tvs-problem warn', text: problem })));
+    const kv = el('dl', { className: 'tvs-kv' });
+    const add = (label, value) => {
+      kv.appendChild(el('dt', { text: label }));
+      kv.appendChild(el('dd', { text: value }));
+    };
+    add('File', r.File || '');
+    if (r.SourceVideo) {
+      add('Source video', r.SourceVideo);
+    }
+    add('Decoder', (r.RequestedDecoder || 'software') + (r.Device ? ' on ' + r.Device : ''));
+    add('Encoder', r.VideoEncoder || '');
+    add('Took', Number(r.Seconds || 0).toFixed(1) + ' s');
+    box.appendChild(kv);
+    const details = el('details');
+    details.appendChild(el('summary', { text: 'ffmpeg log (' + (r.Log || []).length + ' lines)' }));
+    details.appendChild(el('pre', { className: 'tvs-log', text: (r.Command || '') + '\n\n' + (r.Log || []).join('\n') }));
+    box.appendChild(details);
   }
 
   function startStatusTimer() {
@@ -4009,7 +4144,7 @@
     const table = el('table', { className: 'tvs-table' });
     table.appendChild(el('thead', null, el('tr', null, [
       el('th', { text: 'Station' }), el('th', { text: 'Viewers' }), el('th', { text: 'Readers' }), el('th', { text: 'Started' }),
-      el('th', { text: 'Streamed' }), el('th', { text: 'PID' }), el('th', { text: 'Now playing' }), el('th', { text: '' })
+      el('th', { text: 'Streamed' }), el('th', { text: 'PID' }), el('th', { text: 'Now playing' }), el('th', { text: 'Encoder' }), el('th', { text: '' })
     ])));
     const tbody = el('tbody');
     sessions.forEach(session => {
@@ -4052,16 +4187,66 @@
         el('td', { className: 'nowrap', text: fmtBytes(session.BytesStreamed) }),
         el('td', { text: session.EncoderPid !== null && session.EncoderPid !== undefined ? String(session.EncoderPid) : '–' }),
         nowCell,
+        encoderCell(session.Encoder),
         actions
       ]));
 
+      const problems = session.Encoder && Array.isArray(session.Encoder.Problems) ? session.Encoder.Problems : [];
+      if (problems.length) {
+        tbody.appendChild(el('tr', { className: 'logrow' }, el('td', { colspan: 9 }, problems.map(problem =>
+          el('div', { className: 'tvs-problem ' + (session.Encoder.State === 'bad' ? 'bad' : 'warn'), text: problem })))));
+      }
+
       if (logOpen) {
         const logText = logCount ? (session.RecentLog || []).join('\n') : '(no recent log lines)';
-        tbody.appendChild(el('tr', { className: 'logrow' }, el('td', { colspan: 8 }, el('pre', { className: 'tvs-log', text: logText }))));
+        tbody.appendChild(el('tr', { className: 'logrow' }, el('td', { colspan: 9 }, el('pre', { className: 'tvs-log', text: logText }))));
       }
     });
     table.appendChild(tbody);
     wrap.appendChild(table);
+  }
+
+  /** Badges for what the encoder is doing: the decoder it really uses, the encoder, tone mapping, CPU and real-time margin. */
+  function encoderCell(e) {
+    const cell = el('td');
+    if (!e) {
+      cell.appendChild(el('span', { className: 'tvs-secondary', text: 'starting…' }));
+      return cell;
+    }
+    const badges = el('div', { className: 'tvs-enc' });
+    const badge = (text, cls, title) => badges.appendChild(el('span', { className: 'tvs-badge kind ' + (cls || ''), text: text, title: title || '' }));
+    if (e.IsSlate) {
+      badge('slate', 'off', 'A generated card, not a program file');
+    } else if (!e.RequestedDecoder) {
+      badge('software decode', 'off', 'No hardware decoder on this station\'s profile');
+    } else {
+      const decoderBadge = {
+        'hardware': [e.RequestedDecoder + ' decode ✓', 'on', 'Confirmed: ffmpeg holds ' + (e.GpuDevice || 'the GPU device') + ' open'],
+        'unverified': [e.RequestedDecoder + ' decode', '', 'Requested; this host cannot confirm the device is in use'],
+        'fallback': [e.RequestedDecoder + ' fell back', 'bad', e.DecoderDetail || 'ffmpeg is decoding this file in software'],
+        'disabled': [e.RequestedDecoder + ' failed', 'bad', 'The device failed when the stream started; software decoding until restart'],
+        'skipped': ['software (' + (e.DecoderDetail || 'this file') + ')', e.DecoderDetail && e.DecoderDetail.indexOf('failed on this program') >= 0 ? 'warn' : 'off', 'The plugin decodes this program in software: ' + (e.DecoderDetail || '')],
+        'software': ['software decode', 'off', '']
+      }[e.Decoder] || [e.Decoder, '', ''];
+      badge(decoderBadge[0], decoderBadge[1], decoderBadge[2]);
+    }
+    badge(e.VideoEncoder || '', e.EncoderIsHardware ? 'on' : '', e.EncoderIsHardware ? 'Hardware encoder' : 'Software encoder');
+    if (e.ToneMapping) {
+      badge('HDR → SDR', 'live', 'Tone mapping this HDR program to BT.709 in software');
+    } else if (e.SourceIsHdr) {
+      badge('HDR untouched', 'warn', 'HDR source playing without tone mapping');
+    }
+    if (e.CpuCores !== null && e.CpuCores !== undefined) {
+      badge(Number(e.CpuCores).toFixed(1) + ' cores', Number(e.CpuCores) > 3 ? 'warn' : '', 'CPU cores the ffmpeg process is using');
+    }
+    if (e.ProcessRunning && e.AheadSeconds !== null && e.AheadSeconds !== undefined) {
+      const ahead = Number(e.AheadSeconds);
+      badge((ahead >= 0 ? '+' : '') + ahead.toFixed(1) + ' s', ahead < 0 ? 'bad' : ahead < 0.4 ? 'warn' : 'on', 'How far the encoder is ahead of real time (about +1.5 s when it keeps up)');
+    } else if (!e.ProcessRunning) {
+      badge('between programs', 'off', '');
+    }
+    cell.appendChild(badges);
+    return cell;
   }
 
   // ------------------------------------------------------------------------------------------
@@ -4209,6 +4394,8 @@
     // Status
     on('#tvsBtnStatusBack', 'click', backToList);
     on('#tvsBtnStatusRefresh', 'click', () => loadStatus(true));
+    on('#tvsBtnHwTest', 'click', runHardwareTest);
+    on('#tvsBtnHwRefresh', 'click', () => loadHardware(true));
   }
 
   if (!page.tvsInitialized) {

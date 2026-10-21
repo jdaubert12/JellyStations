@@ -18,6 +18,17 @@ public sealed class PlayablePart
     /// <summary>True when the video is HDR and must be tone mapped to SDR for the stream.</summary>
     public bool IsHdr => !string.IsNullOrEmpty(HdrTransfer);
 
+    /// <summary>Source video codec as ffmpeg names it (h264, hevc, mpeg2video, vc1, vp9, av1, mpeg4...), from the library probe.</summary>
+    public string? VideoCodec { get; set; }
+
+    /// <summary>Codec profile as probed ("High", "High 10", "Main 10", "Rext"...).</summary>
+    public string? VideoProfile { get; set; }
+
+    public int? VideoBitDepth { get; set; }
+
+    /// <summary>ffmpeg pixel format as probed (yuv420p, yuv420p10le, yuv422p10le...).</summary>
+    public string? PixelFormat { get; set; }
+
     public TimeSpan Runtime => TimeSpan.FromTicks(RuntimeTicks);
 }
 
@@ -80,6 +91,17 @@ public sealed class PlayableItem
     /// <summary>True when the video is HDR and must be tone mapped to SDR for the stream.</summary>
     public bool IsHdr => !string.IsNullOrEmpty(HdrTransfer);
 
+    /// <summary>Source video codec as ffmpeg names it (h264, hevc, mpeg2video, vc1, vp9, av1, mpeg4...), from the library probe.</summary>
+    public string? VideoCodec { get; set; }
+
+    /// <summary>Codec profile as probed ("High", "High 10", "Main 10", "Rext"...).</summary>
+    public string? VideoProfile { get; set; }
+
+    public int? VideoBitDepth { get; set; }
+
+    /// <summary>ffmpeg pixel format as probed (yuv420p, yuv420p10le, yuv422p10le...).</summary>
+    public string? PixelFormat { get; set; }
+
     /// <summary>Files in play order for a multi-part item. Empty for a single file, whose Path and RuntimeTicks apply.</summary>
     public List<PlayablePart> Parts { get; set; } = new();
 
@@ -102,7 +124,7 @@ public sealed class PlayableItem
 
         if (Parts.Count == 0)
         {
-            var single = new PlayablePart { Path = Path, RuntimeTicks = RuntimeTicks, AudioStreamIndex = AudioStreamIndex, HasAudio = HasAudio, HdrTransfer = HdrTransfer };
+            var single = new PlayablePart { Path = Path, RuntimeTicks = RuntimeTicks, AudioStreamIndex = AudioStreamIndex, HasAudio = HasAudio, HdrTransfer = HdrTransfer, VideoCodec = VideoCodec, VideoProfile = VideoProfile, VideoBitDepth = VideoBitDepth, PixelFormat = PixelFormat };
             var seek = offset < single.Runtime ? offset : single.Runtime;
             return new PlayableSegment(single, 0, seek, single.Runtime - seek) { IsLast = true };
         }

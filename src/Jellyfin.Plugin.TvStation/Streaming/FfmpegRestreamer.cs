@@ -30,8 +30,17 @@ public sealed class FfmpegRestreamer : IDisposable
     private readonly TaskCompletionSource _firstBytes = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly ConcurrentQueue<string> _recentErrors = new();
     private readonly Action<string>? _onFault;
+    private readonly HardwareDecodePolicy _policy;
+    private readonly HashSet<string> _softwarePrograms = new(StringComparer.Ordinal);
     private string? _lastStderr;
     private ProcessRunner? _current;
+    private TsPacer? _pacer;
+    private SegmentTelemetry? _telemetry;
+    private long _lastOutputTicks;
+    private int _cpuPid;
+    private TimeSpan? _cpuTime;
+    private DateTime _cpuSampledUtc;
+    private double? _cpuCores;
     private Task? _loop;
     private bool _slateTextSupported = true;
     private bool _overlaySupported = true;
@@ -51,9 +60,11 @@ public sealed class FfmpegRestreamer : IDisposable
         string cardText,
         BroadcastBuffer buffer,
         ILogger logger,
-        Action<string>? onFault = null)
+        Action<string>? onFault = null,
+        HardwareDecodePolicy? policy = null)
     {
         _onFault = onFault;
+        _policy = policy ?? (string.IsNullOrEmpty(profile.HardwareDecode) ? HardwareDecodePolicy.Software : HardwareDecodePolicy.Permissive(profile.HardwareDecode));
         _stationId = stationId;
         _stationName = stationName;
         _ffmpegPath = ffmpegPath;
@@ -76,6 +87,77 @@ public sealed class FfmpegRestreamer : IDisposable
     public Task FirstBytes => _firstBytes.Task;
 
     public IReadOnlyList<string> RecentErrors => _recentErrors.ToArray();
+
+    /// <summary>What the encoder is doing right now, for the dashboard. Sampling CPU needs two calls a little apart.</summary>
+    public EncoderSnapshot Snapshot()
+    {
+        var proc = _current;
+        var running = proc is { HasExited: false };
+        var telemetry = _telemetry;
+        var pacer = _pacer;
+        var lastOutput = Volatile.Read(ref _lastOutputTicks);
+        var requested = _profile.HardwareDecode ?? string.Empty;
+        return new EncoderSnapshot
+        {
+            ProcessRunning = running,
+            Title = telemetry?.Title,
+            IsSlate = telemetry?.IsSlate ?? false,
+            SegmentStartedUtc = telemetry?.StartedUtc,
+            RequestedDecoder = requested,
+            ActiveDecoder = telemetry?.HardwareDecode ?? (_hardwareDecodeSupported ? requested : string.Empty),
+            DecoderDisabled = !_hardwareDecodeSupported && requested.Length > 0,
+            DecoderFallback = telemetry?.DecoderFallback,
+            DecoderSkipReason = telemetry?.DecoderSkipReason,
+            DecoderSkipAfterFailure = telemetry?.DecoderSkipAfterFailure ?? false,
+            GpuDevice = running ? ProcessInspector.OpenGpuDevice(proc!.Pid) : null,
+            CanInspectDevices = ProcessInspector.CanInspect,
+            VideoEncoder = _profile.VideoEncoder,
+            ToneMapping = telemetry?.ToneMapping ?? false,
+            SourceIsHdr = telemetry?.SourceIsHdr ?? false,
+            Overlay = telemetry?.Overlay ?? false,
+            CpuCores = SampleCpu(running ? proc : null),
+            AheadSeconds = pacer?.Margin?.TotalSeconds,
+            MinAheadSeconds = pacer?.MinMargin?.TotalSeconds,
+            SecondsSinceOutput = running && lastOutput > 0 ? (DateTime.UtcNow - new DateTime(lastOutput, DateTimeKind.Utc)).TotalSeconds : null,
+            Warnings = telemetry?.Warnings ?? 0,
+            LastWarning = telemetry?.LastWarning
+        };
+    }
+
+    /// <summary>CPU cores the current ffmpeg has used since the previous sample of the same process; the first sample has no answer.</summary>
+    private double? SampleCpu(ProcessRunner? proc)
+    {
+        if (proc is null)
+        {
+            _cpuPid = 0;
+            _cpuTime = null;
+            _cpuCores = null;
+            return null;
+        }
+
+        var now = DateTime.UtcNow;
+        var time = proc.ProcessorTime;
+        var pid = proc.Pid;
+        if (time.HasValue && _cpuTime.HasValue && _cpuPid == pid)
+        {
+            var wall = (now - _cpuSampledUtc).TotalSeconds;
+            if (wall < 0.5)
+            {
+                return _cpuCores;
+            }
+
+            _cpuCores = Math.Max(0, (time.Value - _cpuTime.Value).TotalSeconds / wall);
+        }
+        else
+        {
+            _cpuCores = null;
+        }
+
+        _cpuPid = pid;
+        _cpuTime = time;
+        _cpuSampledUtc = now;
+        return _cpuCores;
+    }
 
     public void Start()
     {
@@ -147,6 +229,27 @@ public sealed class FfmpegRestreamer : IDisposable
                 var segmentEnd = now + (cut ? remaining : part.Remaining);
                 var overlay = OverlayInput();
                 var profile = EffectiveProfile();
+                string? softwareReason = null;
+                var softwareAfterFailure = false;
+                if (profile.HardwareDecode.Length > 0)
+                {
+                    if (_softwarePrograms.Contains(entry.ProgramId))
+                    {
+                        softwareReason = profile.HardwareDecode + " failed on this program";
+                        softwareAfterFailure = true;
+                    }
+                    else
+                    {
+                        softwareReason = _policy.WhyNot(part.Part);
+                    }
+
+                    if (softwareReason is not null)
+                    {
+                        profile = profile.Clone();
+                        profile.HardwareDecode = string.Empty;
+                    }
+                }
+
                 var hardwareDecode = profile.HardwareDecode.Length > 0;
                 var tonemap = part.Part.IsHdr && _tonemapSupported;
                 var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, tonemap ? part.Part.HdrTransfer : null, seek, duration, NextTsOffset(), profile, overlay);
@@ -159,8 +262,13 @@ public sealed class FfmpegRestreamer : IDisposable
                     seek.ToString(@"hh\:mm\:ss"),
                     remaining.ToString(@"hh\:mm\:ss"),
                     tonemap ? ", tone mapping HDR to SDR" : string.Empty,
-                    hardwareDecode ? ", " + profile.HardwareDecode + " decoding" : string.Empty);
+                    hardwareDecode ? ", " + profile.HardwareDecode + " decoding" : softwareReason is null ? string.Empty : ", software decoding (" + softwareReason + ")");
                 _logger.LogDebug("TvStation ffmpeg {Args}", FfmpegArgsBuilder.ToLogString(args));
+                _telemetry = new SegmentTelemetry(item.DisplayTitle, isSlate: false, profile.HardwareDecode, profile.VideoEncoder, tonemap, part.Part.IsHdr, overlay is not null)
+                {
+                    DecoderSkipReason = softwareReason,
+                    DecoderSkipAfterFailure = softwareAfterFailure
+                };
 
                 var started = DateTime.UtcNow;
                 var exitCode = await RunProcessAsync(args, entry.EndUtc + HardKillGrace, ct).ConfigureAwait(false);
@@ -175,11 +283,25 @@ public sealed class FfmpegRestreamer : IDisposable
                 var endedEarly = DateTime.UtcNow < segmentEnd - MinSegment;
                 if (exitCode != 0 && ran < TimeSpan.FromSeconds(5) && hardwareDecode)
                 {
-                    // ffmpeg normally falls back to software decoding by itself; a fast exit means the device could
-                    // not even be set up (missing driver, wrong node). Decode in software for the rest of this session.
-                    _hardwareDecodeSupported = false;
-                    _logger.LogWarning("TvStation [{Station}]: ffmpeg exited with {Code} with {Kind} decoding; continuing with software decoding", _stationName, exitCode, profile.HardwareDecode);
-                    Fault(profile.HardwareDecode + " hardware decoding failed (ffmpeg exit " + exitCode + "); software decoding until the stream restarts" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
+                    // The GPU decoders do not fall back to software by themselves. A device that cannot be opened
+                    // (missing driver, wrong node) fails every file, so that disables hardware decoding for the
+                    // session; anything else is taken as this file being beyond the decoder and only this program
+                    // is replayed in software.
+                    var detail = _telemetry?.FirstError ?? _lastStderr;
+                    var deviceProblem = _telemetry?.DecoderFallback is not null || _softwarePrograms.Count > 0;
+                    if (deviceProblem)
+                    {
+                        _hardwareDecodeSupported = false;
+                        _logger.LogWarning("TvStation [{Station}]: ffmpeg exited with {Code} with {Kind} decoding; continuing with software decoding", _stationName, exitCode, profile.HardwareDecode);
+                        Fault(profile.HardwareDecode + " hardware decoding failed on " + item.DisplayTitle + " (ffmpeg exit " + exitCode + "); software decoding until the stream restarts" + (detail is null ? string.Empty : ": " + detail));
+                    }
+                    else
+                    {
+                        _softwarePrograms.Add(entry.ProgramId);
+                        _logger.LogWarning("TvStation [{Station}]: ffmpeg exited with {Code} with {Kind} decoding on {Title}; replaying it with software decoding", _stationName, exitCode, profile.HardwareDecode, item.DisplayTitle);
+                        Fault(profile.HardwareDecode + " could not decode " + item.DisplayTitle + " (ffmpeg exit " + exitCode + "); this program plays with software decoding" + (detail is null ? string.Empty : ": " + detail));
+                    }
+
                     continue;
                 }
 
@@ -302,6 +424,7 @@ public sealed class FfmpegRestreamer : IDisposable
         var logo = _settings.ShowLogoOnSlate ? _logoPath() : null;
         var args = FfmpegArgsBuilder.ForSlate(duration, NextTsOffset(), _profile, _settings.SlateBackgroundColor, showText ? text : null, logo);
         _logger.LogInformation("TvStation [{Station}]: slate for {Duration}", _stationName, duration.ToString(@"hh\:mm\:ss"));
+        _telemetry = new SegmentTelemetry(text, isSlate: true, string.Empty, _profile.VideoEncoder, toneMapping: false, sourceIsHdr: false, overlay: logo is not null);
 
         var started = DateTime.UtcNow;
         var code = await RunProcessAsync(args, (hardEnd ?? now + duration) + HardKillGrace, ct).ConfigureAwait(false);
@@ -345,6 +468,8 @@ public sealed class FfmpegRestreamer : IDisposable
         using (proc)
         {
             var pacer = new TsPacer();
+            _pacer = pacer;
+            Volatile.Write(ref _lastOutputTicks, DateTime.UtcNow.Ticks);
             var pump = PumpAsync(proc.Stdout, pacer, ct);
 
             // The deadline is evaluated against the wall clock in short steps rather than one long timer,
@@ -430,6 +555,7 @@ public sealed class FfmpegRestreamer : IDisposable
 
                 await pacer.PaceAsync(chunk, ct).ConfigureAwait(false);
                 _buffer.Write(chunk.Span);
+                Volatile.Write(ref _lastOutputTicks, DateTime.UtcNow.Ticks);
                 _firstBytes.TrySetResult();
             }
         }
@@ -447,6 +573,7 @@ public sealed class FfmpegRestreamer : IDisposable
         }
 
         _lastStderr = line.Trim();
+        _telemetry?.Observe(line);
         Note(line);
         _logger.LogDebug("TvStation ffmpeg [{Station}]: {Line}", _stationName, line);
     }

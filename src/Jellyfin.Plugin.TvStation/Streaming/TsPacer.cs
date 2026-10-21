@@ -16,6 +16,8 @@ public sealed class TsPacer
     private long _firstPcr = -1;
     private long _lastPcr = -1;
     private long _unwrapped;
+    private long _marginTicks;
+    private long _minMarginTicks = long.MaxValue;
 
     /// <summary>How far ahead of real time the stream may run.</summary>
     public TimeSpan Lead { get; init; } = TimeSpan.FromSeconds(1.5);
@@ -25,6 +27,16 @@ public sealed class TsPacer
 
     /// <summary>Absolute PCR (seconds) of the newest released packet, or null before the first PCR.</summary>
     public double? LastPcrSeconds => _firstPcr < 0 ? null : (_firstPcr + _unwrapped) / (double)PcrHz;
+
+    /// <summary>
+    /// How far the encoder is ahead of the wall clock, measured when the newest chunk arrived (before any pacing
+    /// delay): about <see cref="Lead"/> when ffmpeg keeps up, shrinking towards zero when it only just manages, and
+    /// negative when it cannot produce real time, which is what viewers experience as stutter. Null before the first PCR.
+    /// </summary>
+    public TimeSpan? Margin => _firstPcr < 0 ? null : TimeSpan.FromTicks(_marginTicks);
+
+    /// <summary>The smallest <see cref="Margin"/> seen since the clock (re)started.</summary>
+    public TimeSpan? MinMargin => _firstPcr < 0 || _minMarginTicks == long.MaxValue ? null : TimeSpan.FromTicks(_minMarginTicks);
 
     /// <summary>
     /// Waits, if needed, until the newest PCR in the chunk is no more than <see cref="Lead"/> ahead of the wall clock.
@@ -44,6 +56,8 @@ public sealed class TsPacer
             _lastPcr = pcr;
             _unwrapped = 0;
             _wallStart = DateTime.UtcNow;
+            _marginTicks = 0;
+            _minMarginTicks = long.MaxValue;
             return;
         }
 
@@ -64,6 +78,8 @@ public sealed class TsPacer
             _lastPcr = pcr;
             _unwrapped = 0;
             _wallStart = DateTime.UtcNow;
+            _marginTicks = 0;
+            _minMarginTicks = long.MaxValue;
             return;
         }
 
@@ -73,6 +89,11 @@ public sealed class TsPacer
         // Wall-clock based (same clock the schedule uses). Re-checked after every delay so an inaccurate
         // timer (e.g. a VM whose monotonic clock drifts) cannot make the stream run fast or slow.
         var streamTime = TimeSpan.FromSeconds(_unwrapped / (double)PcrHz);
+        _marginTicks = (streamTime - (DateTime.UtcNow - _wallStart)).Ticks;
+        if (_marginTicks < _minMarginTicks)
+        {
+            _minMarginTicks = _marginTicks;
+        }
         while (true)
         {
             var ahead = streamTime - (DateTime.UtcNow - _wallStart) - Lead;

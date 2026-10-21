@@ -296,6 +296,110 @@ public sealed class SessionStatusDto
     public ScheduleEntryDto? Current { get; set; }
 
     public List<string> RecentLog { get; set; } = new();
+
+    public EncoderStatusDto? Encoder { get; set; }
+}
+
+/// <summary>How a station's encoder is doing right now: the decoder it really uses, its CPU, and whether it keeps real time.</summary>
+public sealed class EncoderStatusDto
+{
+    public bool ProcessRunning { get; set; }
+
+    public bool IsSlate { get; set; }
+
+    public DateTime? SegmentStartedUtc { get; set; }
+
+    /// <summary>Hardware decoder the profile asks for after "Follow Jellyfin" is resolved; empty for software.</summary>
+    public string RequestedDecoder { get; set; } = string.Empty;
+
+    /// <summary>hardware, software, unverified, fallback or disabled.</summary>
+    public string Decoder { get; set; } = string.Empty;
+
+    public string? DecoderDetail { get; set; }
+
+    public string? GpuDevice { get; set; }
+
+    public string VideoEncoder { get; set; } = string.Empty;
+
+    public bool EncoderIsHardware { get; set; }
+
+    public bool ToneMapping { get; set; }
+
+    public bool SourceIsHdr { get; set; }
+
+    public bool Overlay { get; set; }
+
+    public double? CpuCores { get; set; }
+
+    public double? AheadSeconds { get; set; }
+
+    public double? MinAheadSeconds { get; set; }
+
+    public double? SecondsSinceOutput { get; set; }
+
+    public int Warnings { get; set; }
+
+    public string? LastWarning { get; set; }
+
+    /// <summary>ok, warn or bad.</summary>
+    public string State { get; set; } = "ok";
+
+    public List<string> Problems { get; set; } = new();
+}
+
+/// <summary>The hardware picture: Jellyfin's setting, what the default profile resolves to, and what ffmpeg and the host offer.</summary>
+public sealed class HardwareInfoDto
+{
+    public string JellyfinAcceleration { get; set; } = string.Empty;
+
+    public string? JellyfinQsvDevice { get; set; }
+
+    public string? JellyfinVaapiDevice { get; set; }
+
+    /// <summary>What the default encoding profile's "Follow Jellyfin" (or explicit choice) comes out as.</summary>
+    public string DefaultDecoder { get; set; } = string.Empty;
+
+    public string DefaultDevice { get; set; } = string.Empty;
+
+    public string DefaultEncoder { get; set; } = string.Empty;
+
+    public string Os { get; set; } = string.Empty;
+
+    public int CpuCores { get; set; }
+
+    public bool CanInspectProcesses { get; set; }
+
+    public List<string> DrmNodes { get; set; } = new();
+
+    public string FfmpegPath { get; set; } = string.Empty;
+
+    public string FfmpegVersion { get; set; } = string.Empty;
+
+    public List<string> Hwaccels { get; set; } = new();
+
+    public List<string> H264Encoders { get; set; } = new();
+
+    public bool HasTonemap { get; set; }
+
+    public string? FfmpegError { get; set; }
+
+    public List<string> Notes { get; set; } = new();
+}
+
+public sealed class HardwareTestRequestDto
+{
+    /// <summary>Station whose profile and current program to test; the first station with a playable file when omitted.</summary>
+    public Guid? StationId { get; set; }
+
+    /// <summary>Overrides the profile's hardware decoding for this run ("auto", "", qsv, vaapi, cuda, videotoolbox, d3d11va).</summary>
+    public string? HardwareDecode { get; set; }
+
+    public string? HardwareDevice { get; set; }
+
+    public string? VideoEncoder { get; set; }
+
+    /// <summary>Seconds of video to run through (2-15, default 5).</summary>
+    public int? Seconds { get; set; }
 }
 
 public sealed class ValidationErrorDto

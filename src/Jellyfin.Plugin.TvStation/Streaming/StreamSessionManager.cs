@@ -138,6 +138,7 @@ public sealed class StreamSessionManager : IDisposable
     private StationStreamSession CreateSession(Station station, GlobalSettings settings)
     {
         var profile = ResolveHardware(station.Encoding ?? settings.DefaultEncoding);
+        var policy = DecodePolicy(profile);
         var ffmpeg = FfmpegPath;
         var mediaSource = BuildMediaSource(station, profile);
         var logger = _loggerFactory.CreateLogger("Jellyfin.Plugin.TvStation.Stream." + station.Name);
@@ -159,7 +160,8 @@ public sealed class StreamSessionManager : IDisposable
                 station.EffectiveCardText,
                 buffer,
                 logger,
-                message => _faults[station.Id] = new StationFault(DateTime.UtcNow, message)),
+                message => _faults[station.Id] = new StationFault(DateTime.UtcNow, message),
+                policy),
             logger);
 
         session.MediaSource.Path = _appHost.GetApiUrlForLocalAccess() + "/LiveTv/LiveStreamFiles/" + session.UniqueId + "/stream.ts";
@@ -168,19 +170,24 @@ public sealed class StreamSessionManager : IDisposable
         return session;
     }
 
-    /// <summary>"auto" hardware decoding and an empty device follow Jellyfin's Dashboard > Playback > Transcoding settings.</summary>
-    public EncodingProfile ResolveHardware(EncodingProfile profile)
+    /// <summary>Jellyfin's own Dashboard > Playback > Transcoding hardware settings.</summary>
+    public sealed record JellyfinHardware(HardwareAccelerationType Type, string? QsvDevice, string? VaapiDevice, IReadOnlyList<string> DecodingCodecs, bool Hevc10, bool Vp9Ten, bool HevcRext10, bool HevcRext12);
+
+    public JellyfinHardware ReadJellyfinHardware()
     {
-        var type = HardwareAccelerationType.none;
-        string? qsv = null;
-        string? vaapi = null;
         try
         {
             if (_configuration.GetConfiguration("encoding") is EncodingOptions options)
             {
-                type = options.HardwareAccelerationType;
-                qsv = options.QsvDevice;
-                vaapi = options.VaapiDevice;
+                return new JellyfinHardware(
+                    options.HardwareAccelerationType,
+                    options.QsvDevice,
+                    options.VaapiDevice,
+                    options.HardwareDecodingCodecs?.ToList() ?? new List<string>(),
+                    options.EnableDecodingColorDepth10Hevc,
+                    options.EnableDecodingColorDepth10Vp9,
+                    options.EnableDecodingColorDepth10HevcRext,
+                    options.EnableDecodingColorDepth12HevcRext);
             }
         }
         catch (Exception ex)
@@ -188,7 +195,35 @@ public sealed class StreamSessionManager : IDisposable
             _logger.LogDebug(ex, "TvStation: could not read Jellyfin's encoding options; hardware decoding stays off for 'auto'");
         }
 
-        return HardwareDecodeResolver.Resolve(profile, type, qsv, vaapi, OperatingSystem.IsWindows());
+        return new JellyfinHardware(HardwareAccelerationType.none, null, null, Array.Empty<string>(), true, true, false, false);
+    }
+
+    /// <summary>
+    /// Which files the resolved decoder is handed: Jellyfin's per-codec checkboxes when the decoder is the one
+    /// Jellyfin itself uses (so "Follow Jellyfin" behaves exactly like Jellyfin's transcoder), the permissive
+    /// built-in list for a decoder picked by hand that Jellyfin is not using.
+    /// </summary>
+    public HardwareDecodePolicy DecodePolicy(EncodingProfile resolved) => DecodePolicy(resolved, ReadJellyfinHardware(), OperatingSystem.IsWindows());
+
+    public static HardwareDecodePolicy DecodePolicy(EncodingProfile resolved, JellyfinHardware jellyfin, bool isWindows)
+    {
+        var kind = resolved.HardwareDecode ?? string.Empty;
+        if (kind.Length == 0)
+        {
+            return HardwareDecodePolicy.Software;
+        }
+
+        var jellyfinKind = HardwareDecodeResolver.Resolve(new EncodingProfile(), jellyfin.Type, null, null, isWindows).HardwareDecode;
+        return string.Equals(kind, jellyfinKind, StringComparison.Ordinal)
+            ? new HardwareDecodePolicy(kind, jellyfin.DecodingCodecs, jellyfin.Hevc10, jellyfin.Vp9Ten, jellyfin.HevcRext10, jellyfin.HevcRext12, fromJellyfin: true)
+            : HardwareDecodePolicy.Permissive(kind);
+    }
+
+    /// <summary>"auto" hardware decoding and an empty device follow Jellyfin's Dashboard > Playback > Transcoding settings.</summary>
+    public EncodingProfile ResolveHardware(EncodingProfile profile)
+    {
+        var jellyfin = ReadJellyfinHardware();
+        return HardwareDecodeResolver.Resolve(profile, jellyfin.Type, jellyfin.QsvDevice, jellyfin.VaapiDevice, OperatingSystem.IsWindows());
     }
 
     private void OnReleased(StationStreamSession session)

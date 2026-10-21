@@ -553,11 +553,29 @@ public sealed class LibraryContentResolver
             HasAudio = HasAudioTrack(video),
             HdrTransfer = HdrTransferOf(video)
         };
+        ApplyVideoFacts(VideoStreamOf(video), (c, p, d, f) =>
+        {
+            playable.VideoCodec = c;
+            playable.VideoProfile = p;
+            playable.VideoBitDepth = d;
+            playable.PixelFormat = f;
+        });
 
         if (parts.Count > 1)
         {
             playable.Parts = parts
-                .Select(v => new PlayablePart { Path = v.Path, RuntimeTicks = v.RunTimeTicks!.Value, AudioStreamIndex = PickAudioStream(v, audioLanguage), HasAudio = HasAudioTrack(v), HdrTransfer = HdrTransferOf(v) })
+                .Select(v =>
+                {
+                    var part = new PlayablePart { Path = v.Path, RuntimeTicks = v.RunTimeTicks!.Value, AudioStreamIndex = PickAudioStream(v, audioLanguage), HasAudio = HasAudioTrack(v), HdrTransfer = HdrTransferOf(v) };
+                    ApplyVideoFacts(VideoStreamOf(v), (c, p, d, f) =>
+                    {
+                        part.VideoCodec = c;
+                        part.VideoProfile = p;
+                        part.VideoBitDepth = d;
+                        part.PixelFormat = f;
+                    });
+                    return part;
+                })
                 .ToList();
         }
 
@@ -635,15 +653,34 @@ public sealed class LibraryContentResolver
 
     private static string? HdrTransferOf(Video video)
     {
+        var stream = VideoStreamOf(video);
+        return stream is null ? null : HdrTransferOf(stream);
+    }
+
+    private static MediaStream? VideoStreamOf(Video video)
+    {
         try
         {
-            var stream = video.GetMediaStreams().FirstOrDefault(s => s.Type == MediaStreamType.Video);
-            return stream is null ? null : HdrTransferOf(stream);
+            return video.GetMediaStreams().FirstOrDefault(s => s.Type == MediaStreamType.Video);
         }
         catch (Exception)
         {
             return null;
         }
+    }
+
+    /// <summary>Codec, profile, bit depth and pixel format of the probed video stream: what decides whether a GPU can decode it.</summary>
+    private static void ApplyVideoFacts(MediaStream? stream, Action<string?, string?, int?, string?> apply)
+    {
+        if (stream is null)
+        {
+            return;
+        }
+
+        var codec = string.IsNullOrWhiteSpace(stream.Codec) ? null : stream.Codec.Trim().ToLowerInvariant();
+        var profile = string.IsNullOrWhiteSpace(stream.Profile) ? null : stream.Profile.Trim();
+        var format = string.IsNullOrWhiteSpace(stream.PixelFormat) ? null : stream.PixelFormat.Trim().ToLowerInvariant();
+        apply(codec, profile, stream.BitDepth > 0 ? stream.BitDepth : null, format);
     }
 
     /// <summary>

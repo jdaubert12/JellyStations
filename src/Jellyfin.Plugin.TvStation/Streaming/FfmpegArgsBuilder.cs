@@ -261,9 +261,44 @@ public static class FfmpegArgsBuilder
         }
     }
 
-    private static void Common(List<string> args)
+    private static void Common(List<string> args, string loglevel = "warning")
     {
-        args.AddRange(new[] { "-hide_banner", "-loglevel", "warning", "-nostdin", "-nostats" });
+        args.AddRange(new[] { "-hide_banner", "-loglevel", loglevel, "-nostdin", "-nostats" });
+    }
+
+    /// <summary>
+    /// A hardware check: decode, filter and encode <paramref name="seconds"/> of a file exactly as a program segment
+    /// would be, as fast as the machine can, with ffmpeg at verbose level so it names the decoder it attached, and no
+    /// output but ffmpeg's own final statistics (speed=... tells how far from real time the machine is).
+    /// </summary>
+    public static List<string> ForProbe(string path, string? hdrTransfer, EncodingProfile p, int seconds, TimeSpan seek)
+    {
+        var args = new List<string>();
+        Common(args, "verbose");
+        HardwareInputArgs(args, p, decode: true);
+        AddSplit(args, p.ExtraInputArgs);
+        if (seek > TimeSpan.FromMilliseconds(500))
+        {
+            args.Add("-ss");
+            args.Add(Sec(seek));
+        }
+
+        args.Add("-i");
+        args.Add(path);
+        args.Add("-t");
+        args.Add(Math.Max(1, seconds).ToString(CultureInfo.InvariantCulture));
+        args.Add("-an");
+        args.Add("-sn");
+        args.Add("-dn");
+        args.Add("-map");
+        args.Add("0:v:0");
+        args.Add("-vf");
+        args.Add(VideoFilter(p, hdrTransfer) + EncoderUploadSuffix(p));
+        VideoCodec(args, p);
+        args.Add("-f");
+        args.Add("null");
+        args.Add("-");
+        return args;
     }
 
     /// <summary>Frame tags every segment leaves the graph with. ffmpeg 7+ encoders take color metadata from the frames, not from -color_* options.</summary>
@@ -291,7 +326,8 @@ public static class FfmpegArgsBuilder
     /// <summary>Filters that hand the finished frame to the encoder: VA-API encoders only take frames already on the GPU.</summary>
     private static string EncoderUploadSuffix(EncodingProfile p) => p.IsVaapiEncoder ? ",format=nv12,hwupload" : string.Empty;
 
-    private static void Output(List<string> args, EncodingProfile p, TimeSpan tsOffset)
+    /// <summary>The video encoder and its rate control, shared by program segments and the hardware check.</summary>
+    private static void VideoCodec(List<string> args, EncodingProfile p)
     {
         var gop = Math.Max(1, p.Fps * Math.Max(1, p.GopSeconds));
         args.Add("-c:v");
@@ -332,6 +368,11 @@ public static class FfmpegArgsBuilder
         args.Add("0");
         args.Add("-force_key_frames");
         args.Add("expr:gte(t,n_forced*" + Math.Max(1, p.GopSeconds).ToString(CultureInfo.InvariantCulture) + ")");
+    }
+
+    private static void Output(List<string> args, EncodingProfile p, TimeSpan tsOffset)
+    {
+        VideoCodec(args, p);
 
         args.Add("-c:a");
         args.Add("aac");
