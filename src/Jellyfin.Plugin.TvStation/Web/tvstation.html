@@ -560,53 +560,6 @@
             </div>
           </div>
 
-          <details class="tvs-advanced" id="tvsAdvanced" data-steps="all">
-            <summary><span class="material-icons expand_more" aria-hidden="true"></span>Advanced <span class="tvs-secondary">call sign, padding grid, schedule anchor, station card text, encoding</span></summary>
-            <div class="tvs-advanced-body">
-              <div class="tvs-grid2">
-              <div class="inputContainer">
-                <input is="emby-input" id="tvsCallSign" label="Call sign" type="text" autocomplete="off">
-                <div class="fieldDescription">Optional short identifier, e.g. WKRP.</div>
-              </div>
-              <div class="selectContainer">
-                <label class="selectLabel" for="tvsPadding">Padding grid</label>
-                <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsPadding">
-                  <option value="0">None – programs play back to back</option>
-                  <option value="5">5 minutes</option>
-                  <option value="10">10 minutes</option>
-                  <option value="15">15 minutes</option>
-                  <option value="30">30 minutes</option>
-                  <option value="60">60 minutes</option>
-                  <option value="length">By length – half hours up to 60 min, whole hours beyond</option>
-                </select>
-                <div class="fieldDescription">With a grid, a “Station Break” slate pads each program so the next one starts on the grid (e.g. :00 / :30), like a real channel. “By length” gives a 22-minute episode a half-hour slot and a 95-minute film a two-hour slot. Without padding, programs start as soon as the previous ends.</div>
-              </div>
-              <div class="inputContainer">
-                <input is="emby-input" id="tvsAnchor" label="Schedule anchor" type="datetime-local">
-                <div class="fieldDescription">The schedule epoch: cycles and weeks are counted from this moment, so the schedule is reproducible. Changing it reshuffles the entire schedule.</div>
-                <div class="tvs-inline" style="margin-top:.5em">
-                  <button is="emby-button" type="button" id="tvsBtnResetAnchor" class="raised emby-button"><span>Reset anchor to now</span></button>
-                  <span id="tvsAnchorHint" class="tvs-secondary"></span>
-                  <button is="emby-button" type="button" id="tvsBtnAnchorNow" class="raised emby-button tvs-inline-btn" title="Start the schedule from now (rounded down to the padding grid)"><span>Set to now</span></button>
-                </div>
-              </div>
-              <div class="inputContainer">
-                <input is="emby-input" id="tvsCardText" label="Station card text" type="text" maxlength="80" placeholder="We'll be right back">
-                <div class="fieldDescription">Shown on the card during gaps and breaks.</div>
-              </div>
-              </div>
-              <h4 class="tvs-subtitle">Encoding</h4>
-            <div class="checkboxContainer checkboxContainer-withDescription">
-              <label class="emby-checkbox-label">
-                <input is="emby-checkbox" type="checkbox" id="tvsEncodingEnabled">
-                <span>Use custom encoding for this station</span>
-              </label>
-              <div class="fieldDescription checkboxFieldDescription">When off, the default profile from Settings is used. Changing encoding restarts this station's stream.</div>
-            </div>
-            <div id="tvsStationEncoding" class="tvs-hidden"></div>
-            </div>
-          </details>
-
           <div class="verticalSection" data-steps="2">
             <h3 class="sectionTitle">Leave out</h3>
             <div class="fieldDescription">Keep things off this channel even when a show, genre or library above would bring them in.</div>
@@ -694,6 +647,53 @@
             <div id="tvsPreview" class="tvs-tablewrap"></div>
           </div>
 
+          <details class="tvs-advanced" id="tvsAdvanced" data-steps="1 2 3 all">
+            <summary><span class="material-icons expand_more" aria-hidden="true"></span>Advanced <span class="tvs-secondary">call sign, padding grid, schedule anchor, station card text, encoding</span></summary>
+            <div class="tvs-advanced-body">
+              <div class="tvs-grid2">
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsCallSign" label="Call sign" type="text" autocomplete="off">
+                <div class="fieldDescription">Optional short identifier, e.g. WKRP.</div>
+              </div>
+              <div class="selectContainer">
+                <label class="selectLabel" for="tvsPadding">Padding grid</label>
+                <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsPadding">
+                  <option value="0">None – programs play back to back</option>
+                  <option value="5">5 minutes</option>
+                  <option value="10">10 minutes</option>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">60 minutes</option>
+                  <option value="length">By length – half hours up to 60 min, whole hours beyond</option>
+                </select>
+                <div class="fieldDescription">With a grid, a “Station Break” slate pads each program so the next one starts on the grid (e.g. :00 / :30), like a real channel. “By length” gives a 22-minute episode a half-hour slot and a 95-minute film a two-hour slot. Without padding, programs start as soon as the previous ends.</div>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsAnchor" label="Schedule anchor" type="datetime-local">
+                <div class="fieldDescription">The schedule epoch: cycles and weeks are counted from this moment, so the schedule is reproducible. Changing it reshuffles the entire schedule.</div>
+                <div class="tvs-inline" style="margin-top:.5em">
+                  <button is="emby-button" type="button" id="tvsBtnResetAnchor" class="raised emby-button"><span>Reset anchor to now</span></button>
+                  <span id="tvsAnchorHint" class="tvs-secondary"></span>
+                  <button is="emby-button" type="button" id="tvsBtnAnchorNow" class="raised emby-button tvs-inline-btn" title="Start the schedule from now (rounded down to the padding grid)"><span>Set to now</span></button>
+                </div>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsCardText" label="Station card text" type="text" maxlength="80" placeholder="We'll be right back">
+                <div class="fieldDescription">Shown on the card during gaps and breaks.</div>
+              </div>
+              </div>
+              <h4 class="tvs-subtitle">Encoding</h4>
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsEncodingEnabled">
+                <span>Use custom encoding for this station</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">When off, the default profile from Settings is used. Changing encoding restarts this station's stream.</div>
+            </div>
+            <div id="tvsStationEncoding" class="tvs-hidden"></div>
+            </div>
+          </details>
+
           <div id="tvsStepNav" class="tvs-step-nav"></div>
           <div class="tvs-actions">
             <button is="emby-button" type="button" id="tvsBtnSave" class="raised button-submit emby-button"><span>Save</span></button>
@@ -737,6 +737,10 @@
               <div class="inputContainer">
                 <input is="emby-input" id="tvsMaxSessions" label="Max concurrent sessions" type="number" min="1" max="64" step="1">
                 <div class="fieldDescription">Maximum number of stations encoding at the same time. Each one is a live ffmpeg process. 1–64.</div>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsIdleStop" label="Stop an unwatched stream after (seconds)" type="number" min="0" max="3600" step="1">
+                <div class="fieldDescription">A station nobody has been reading for this long is stopped even if Jellyfin still counts a viewer, which happens when an app is killed, a TV is switched off or a connection drops without telling the server. 0 turns this off; otherwise 30–3600.</div>
               </div>
             </div>
             <div class="inputContainer">

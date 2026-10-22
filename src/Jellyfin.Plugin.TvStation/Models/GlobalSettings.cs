@@ -7,6 +7,13 @@ public sealed class GlobalSettings
     /// <summary>Seconds a station stream keeps running after the last viewer leaves.</summary>
     public int LingerSeconds { get; set; } = 30;
 
+    /// <summary>
+    /// Seconds a station stream may run with nobody reading it before it is stopped, whatever the server's viewer
+    /// count says. Catches viewers that vanished without telling Jellyfin (an app killed, a TV switched off, a
+    /// dropped connection). 0 turns it off; otherwise 30 to 3600.
+    /// </summary>
+    public int IdleStopSeconds { get; set; } = 120;
+
     /// <summary>Safety cap on how far ahead schedules are enumerated.</summary>
     public int MaxGuideDays { get; set; } = 21;
 

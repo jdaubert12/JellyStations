@@ -13,9 +13,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.TvStation.Streaming;
 
-/// <summary>Owns one StationStreamSession per station, with linger-based teardown.</summary>
+/// <summary>Owns one StationStreamSession per station, with linger-based teardown and an unread-stream watchdog.</summary>
 public sealed class StreamSessionManager : IDisposable
 {
+    private static readonly TimeSpan WatchdogInterval = TimeSpan.FromSeconds(10);
     private readonly ConcurrentDictionary<Guid, StationStreamSession> _sessions = new();
     private readonly ConcurrentDictionary<Guid, CancellationTokenSource> _lingers = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -28,6 +29,7 @@ public sealed class StreamSessionManager : IDisposable
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<StreamSessionManager> _logger;
     private readonly ConcurrentDictionary<Guid, StationFault> _faults = new();
+    private readonly System.Threading.Timer _watchdog;
 
     public StreamSessionManager(
         IScheduleResolver resolver,
@@ -46,6 +48,7 @@ public sealed class StreamSessionManager : IDisposable
         _configuration = configuration;
         _loggerFactory = loggerFactory;
         _logger = loggerFactory.CreateLogger<StreamSessionManager>();
+        _watchdog = new System.Threading.Timer(_ => SweepUnreadSessions(), null, WatchdogInterval, WatchdogInterval);
     }
 
     public string FfmpegPath
@@ -229,8 +232,62 @@ public sealed class StreamSessionManager : IDisposable
         return HardwareDecodeResolver.Resolve(profile, jellyfin.Type, jellyfin.QsvDevice, jellyfin.VaapiDevice, OperatingSystem.IsWindows());
     }
 
+    /// <summary>
+    /// Stops any session nobody has read for longer than the idle-stop setting. Jellyfin only reports a viewer gone
+    /// when the client says so or its connection to the server closes, so an app that was killed, a TV switched off
+    /// on a channel or a dropped network can leave the viewer count stuck at 1 and ffmpeg encoding for nobody.
+    /// The HTTP reader count tells the truth within seconds of the socket dying.
+    /// </summary>
+    public void SweepUnreadSessions()
+    {
+        var idleStop = _settings.Get().IdleStopSeconds;
+        if (idleStop <= 0)
+        {
+            return;
+        }
+
+        var now = DateTime.UtcNow;
+        foreach (var session in _sessions.Values.ToList())
+        {
+            if (session.IsDisposed)
+            {
+                continue;
+            }
+
+            var unreadFor = UnreadFor(session.ReadersIdleSinceUtc, now);
+            if (unreadFor < TimeSpan.FromSeconds(idleStop))
+            {
+                continue;
+            }
+
+            _logger.LogWarning(
+                "TvStation [{Station}]: nobody has read the stream for {Seconds:0}s although {Count} viewer(s) are still counted; stopping the encoder",
+                session.StationName,
+                unreadFor.TotalSeconds,
+                session.ConsumerCount);
+            Remove(session.StationId);
+        }
+    }
+
+    /// <summary>How long a stream has had no reader; zero while someone is reading.</summary>
+    public static TimeSpan UnreadFor(DateTime? idleSinceUtc, DateTime nowUtc)
+    {
+        if (idleSinceUtc is null)
+        {
+            return TimeSpan.Zero;
+        }
+
+        var unread = nowUtc - idleSinceUtc.Value;
+        return unread < TimeSpan.Zero ? TimeSpan.Zero : unread;
+    }
+
     private void OnReleased(StationStreamSession session)
     {
+        if (session.IsDisposed)
+        {
+            return;
+        }
+
         var linger = TimeSpan.FromSeconds(Math.Max(0, _settings.Get().LingerSeconds));
         _logger.LogInformation("TvStation [{Station}]: last consumer left; lingering {Seconds}s", session.StationName, linger.TotalSeconds);
         session.ConsumerCount = 0;
@@ -338,6 +395,7 @@ public sealed class StreamSessionManager : IDisposable
 
     public void Dispose()
     {
+        _watchdog.Dispose();
         StopAll();
         _gate.Dispose();
     }

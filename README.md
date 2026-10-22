@@ -110,16 +110,16 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.13.0.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.13.0.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.13.0.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.13.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.13.0.0\`
+2. Copy it into a folder named `TvStation_1.13.1.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.13.1.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.13.1.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.13.1.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.13.1.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.13.0.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.13.0.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.13.1.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.13.1.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 
@@ -132,9 +132,9 @@ shuffle); the preset fills in the schedule settings, you add the shows and movie
 changed later. The editor walks through three steps: **Name and look** (name, number, a logo made from the name in
 a color of your choice, with a background pattern, and optionally the color, seeded from the name, number and what the channel plays), **What plays** (shows, films and how they play) and **When** (family hours, time
 blocks, the dates the channel is listed, and a preview). Time blocks are painted onto a seven-day grid:
-click or drag to add one, drag sideways to cover several days, click a block to edit it. **All settings** shows the whole form on one page;
-the rarely needed settings (call sign, padding grid, schedule anchor, card text, encoding) sit under
-**Advanced** there. Step 2 also has a **Leave out** section: tags to exclude, the minimum length, and
+click or drag to add one, drag sideways to cover several days, click a block to edit it. The rarely needed settings
+(call sign, padding grid, schedule anchor, card text, encoding) sit under **Advanced** at the bottom of every step.
+**All settings** shows the whole form on one page. Step 2 also has a **Leave out** section: tags to exclude, the minimum length, and
 whether the plugin-wide excluded tags from Settings apply to this station.
 
 1. Open **Dashboard > TV Stations > New station**.
@@ -239,11 +239,20 @@ decades, ratings, tags and libraries. It is the basis for station suggestions an
     demuxer treats as a key frame (a client would get audio and no video until the next program).
 - **Linger**: seconds the encoder keeps running after the last viewer leaves (quick re-tunes
   reuse it).
+- **Stop an unwatched stream after**: seconds a station may run with nobody reading it before
+  the plugin stops it regardless of the viewer count (default 120; 0 turns it off). Jellyfin only
+  reports a viewer gone when the client says so or its connection closes, so a killed app, a TV
+  switched off on a channel or a dropped network can leave the count stuck at 1 and ffmpeg
+  encoding for nobody; the reader count tells the truth within seconds.
 - **Max concurrent sessions**: cap on simultaneously encoded stations.
 - **Slate**: color and whether to draw text / the station logo on break cards.
 
 ## Troubleshooting
 
+- *ffmpeg keeps running with nobody watching*: Status shows the session with Viewers 1 or more
+  and Readers 0. Normal for the Linger seconds after a viewer leaves; beyond that the viewer
+  never told Jellyfin it stopped, and the **Stop an unwatched stream after** setting ends it
+  (a warning is logged). The Stop button on the Status row ends it at once.
 - *Channel has no programs*: check the station is enabled and has content; press
   **Refresh guide**. Jellyfin's own guide refresh runs every 24 h.
 - *Playback fails to start*: open **Dashboard > TV Stations > Status**. It shows the ffmpeg path,

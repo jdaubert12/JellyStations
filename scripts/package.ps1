@@ -2,7 +2,7 @@
 param([string]$Configuration = "Release")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.13.0.0"
+$version = "1.13.1.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.TvStation\bin\$Configuration\net10.0\Jellyfin.Plugin.TvStation.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -21,7 +21,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Up next card: a station can draw a panel over the last seconds of every program with the next program's title, artwork and start and end time, in a chosen corner at one or more times before the end, fading or sliding in and out, burned into the stream so every viewer sees it in step with the picture. Off by default. Fix: QSV (Intel Quick Sync) decoding failed on every file with ""Impossible to convert between the formats"", so stations and the hardware test never got Intel hardware decoding. The plugin now names the QSV decoder for the file's codec (h264_qsv, hevc_qsv, ...) on a QSV device created up front, which decodes to system memory; a file whose codec was never recorded stays in software. The hardware test confirms the decoder from ffmpeg's stream mapping or from the GPU device node ffmpeg holds open while it runs, and reports an unconfirmable hwaccel as unverified rather than as a problem. Fix: with the h264_qsv, h264_nvenc or h264_amf encoder a client tuning in mid-program got audio but no video until the next program started, because those encoders turn a forced key frame into a plain I frame without headers; they now set key frames by GOP alone, as Jellyfin does, so every GOP starts with an IDR frame and its SPS/PPS."
+    changelog = "Fix: a station could keep encoding for nobody. Jellyfin only reports a viewer gone when the client says so or its connection to the server closes, so an app that was killed, a TV switched off on a channel or a dropped network connection left the viewer count stuck at 1 and ffmpeg running with no one reading the stream, sometimes for hours. The plugin now stops any station stream nobody has read for longer than the new ""Stop an unwatched stream after"" setting (default 120 seconds; 0 turns it off), whatever the viewer count says, and logs that it did. Linger is unchanged. Station editor: the Advanced section (call sign, padding grid, schedule anchor, station card text, encoding) was only shown under ""All settings""; it now sits at the bottom of every step."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

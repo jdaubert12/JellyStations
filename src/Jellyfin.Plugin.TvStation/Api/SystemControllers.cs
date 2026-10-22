@@ -44,6 +44,11 @@ public sealed class SettingsController : ControllerBase
             errors.Add("Linger must be between 0 and 600 seconds.");
         }
 
+        if (settings.IdleStopSeconds != 0 && (settings.IdleStopSeconds < 30 || settings.IdleStopSeconds > 3600))
+        {
+            errors.Add("Stop an unwatched stream after must be 0 (off) or between 30 and 3600 seconds.");
+        }
+
         if (settings.MaxGuideDays < 1 || settings.MaxGuideDays > 30)
         {
             errors.Add("Max guide days must be between 1 and 30.");

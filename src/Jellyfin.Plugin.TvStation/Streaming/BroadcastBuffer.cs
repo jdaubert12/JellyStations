@@ -18,8 +18,21 @@ public sealed class BroadcastBuffer
     private byte[] _carry = Array.Empty<byte>();
     private long _preRollSize;
     private bool _completed;
+    private DateTime? _idleSinceUtc = DateTime.UtcNow;
 
     public long TotalBytes { get; private set; }
+
+    /// <summary>When the last reader left (or the buffer was created), or null while at least one reader is attached.</summary>
+    public DateTime? IdleSinceUtc
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _idleSinceUtc;
+            }
+        }
+    }
 
     public int ConsumerCount
     {
@@ -107,6 +120,7 @@ public sealed class BroadcastBuffer
             else
             {
                 _consumers.Add(channel);
+                _idleSinceUtc = null;
             }
         }
 
@@ -135,6 +149,7 @@ public sealed class BroadcastBuffer
             }
 
             _consumers.Clear();
+            _idleSinceUtc ??= DateTime.UtcNow;
         }
     }
 
@@ -142,7 +157,10 @@ public sealed class BroadcastBuffer
     {
         lock (_lock)
         {
-            _consumers.Remove(channel);
+            if (_consumers.Remove(channel) && _consumers.Count == 0)
+            {
+                _idleSinceUtc = DateTime.UtcNow;
+            }
         }
 
         channel.Writer.TryComplete();

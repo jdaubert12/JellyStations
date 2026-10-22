@@ -67,6 +67,9 @@ public sealed class StationStreamSession : ILiveStream
 
     public int ReaderCount => _buffer.ConsumerCount;
 
+    /// <summary>When the last reader detached (or the session was created), or null while someone is reading.</summary>
+    public DateTime? ReadersIdleSinceUtc => _buffer.IdleSinceUtc;
+
     public long BytesStreamed => _buffer.TotalBytes;
 
     public bool IsDisposed => _disposed;

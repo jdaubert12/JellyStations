@@ -3916,6 +3916,7 @@
     }
     state.settingsEncoding.set(s.DefaultEncoding || defaultEncoding());
     setVal('#tvsLinger', s.LingerSeconds !== undefined ? s.LingerSeconds : 30);
+    setVal('#tvsIdleStop', s.IdleStopSeconds !== undefined ? s.IdleStopSeconds : 120);
     setVal('#tvsMaxSessions', s.MaxConcurrentSessions !== undefined ? s.MaxConcurrentSessions : 4);
     setVal('#tvsFfmpegPath', s.FfmpegPathOverride || '');
     setVal('#tvsMaxGuideDays', s.MaxGuideDays !== undefined ? s.MaxGuideDays : 21);
@@ -3932,6 +3933,7 @@
     const payload = {
       DefaultEncoding: state.settingsEncoding.get(),
       LingerSeconds: parseInt(val('#tvsLinger'), 10),
+      IdleStopSeconds: parseInt(val('#tvsIdleStop'), 10),
       MaxGuideDays: parseInt(val('#tvsMaxGuideDays'), 10),
       FfmpegPathOverride: val('#tvsFfmpegPath').trim() || null,
       MaxConcurrentSessions: parseInt(val('#tvsMaxSessions'), 10),
@@ -3944,6 +3946,9 @@
     const errors = [];
     if (isNaN(payload.LingerSeconds)) {
       errors.push('Linger seconds must be a number.');
+    }
+    if (isNaN(payload.IdleStopSeconds)) {
+      errors.push('Stop an unwatched stream after must be a number.');
     }
     if (isNaN(payload.MaxGuideDays)) {
       errors.push('Max guide days must be a number.');
