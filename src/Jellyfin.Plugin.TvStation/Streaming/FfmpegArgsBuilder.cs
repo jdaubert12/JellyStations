@@ -10,7 +10,7 @@ namespace Jellyfin.Plugin.TvStation.Streaming;
 /// Every segment is tagged BT.709 SDR; HDR sources are tone mapped so no PQ/HLG pixels or HDR
 /// side data reach the stream (an HDR tag is what makes clients re-encode the channel).
 /// </summary>
-public static class FfmpegArgsBuilder
+public static partial class FfmpegArgsBuilder
 {
     /// <summary>The default DRM render node when a VA-API or QSV device is not configured anywhere.</summary>
     public const string DefaultDrmDevice = "/dev/dri/renderD128";
@@ -593,7 +593,8 @@ public static class FfmpegArgsBuilder
     public static bool ForcedKeyFramesAreIdr(string encoder) =>
         encoder.StartsWith("lib", StringComparison.OrdinalIgnoreCase) || encoder.EndsWith("_vaapi", StringComparison.OrdinalIgnoreCase);
 
-    private static void Output(List<string> args, EncodingProfile p, TimeSpan tsOffset)
+    /// <param name="audioFromGraph">True when the audio stream comes out of -filter_complex, which rules out -af.</param>
+    private static void Output(List<string> args, EncodingProfile p, TimeSpan tsOffset, bool audioFromGraph = false)
     {
         VideoCodec(args, p);
 
@@ -605,8 +606,11 @@ public static class FfmpegArgsBuilder
         args.Add("48000");
         args.Add("-ac");
         args.Add("2");
-        args.Add("-af");
-        args.Add("aresample=async=1:first_pts=0");
+        if (!audioFromGraph)
+        {
+            args.Add("-af");
+            args.Add("aresample=async=1:first_pts=0");
+        }
 
         args.Add("-sn");
         args.Add("-dn");
@@ -698,7 +702,7 @@ public static class FfmpegArgsBuilder
         return c.StartsWith('#') ? "0x" + c[1..] : c;
     }
 
-    private static string EscapeDrawText(string text)
+    internal static string EscapeDrawText(string text)
     {
         return text
             .Replace("\\", "\\\\", StringComparison.Ordinal)

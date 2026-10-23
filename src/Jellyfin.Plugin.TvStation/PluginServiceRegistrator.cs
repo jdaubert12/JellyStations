@@ -4,6 +4,8 @@ using Jellyfin.Plugin.TvStation.Scheduling;
 using Jellyfin.Plugin.TvStation.Services;
 using Jellyfin.Plugin.TvStation.Storage;
 using Jellyfin.Plugin.TvStation.Streaming;
+using Jellyfin.Plugin.TvStation.Weather;
+using Jellyfin.Plugin.TvStation.Weather.Screens;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.LiveTv;
 using MediaBrowser.Controller.Plugins;
@@ -22,7 +24,18 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<SettingsRepository>();
 
         serviceCollection.AddSingleton<LibraryContentResolver>();
+        serviceCollection.AddSingleton<MusicFolderScanner>();
+        serviceCollection.AddSingleton<MusicResolver>();
         serviceCollection.AddSingleton<StationCompiler>();
+
+        serviceCollection.AddHttpClient();
+        serviceCollection.AddSingleton<IWeatherProvider, OpenMeteoProvider>();
+        serviceCollection.AddSingleton<WeatherService>();
+        serviceCollection.AddSingleton(sp => new WeatherAssets(sp.GetRequiredService<TvStationPaths>().AssetsDir));
+        serviceCollection.AddSingleton<WeatherPainter>();
+        serviceCollection.AddSingleton<WeatherScreenRenderer>();
+        serviceCollection.AddSingleton<WeatherChannelService>();
+        serviceCollection.AddSingleton<Music.MusicPackService>();
         serviceCollection.AddSingleton<LibrarySearchService>();
         serviceCollection.AddSingleton<StationImportResolver>();
         serviceCollection.AddSingleton<LibraryAnalysisService>();

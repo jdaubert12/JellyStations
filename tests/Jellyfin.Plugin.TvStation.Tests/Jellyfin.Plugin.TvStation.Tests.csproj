@@ -12,6 +12,11 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
     <PackageReference Include="Jellyfin.Controller" Version="12.2.0" />
     <PackageReference Include="Jellyfin.Model" Version="12.2.0" />
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Fixtures\Weather\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

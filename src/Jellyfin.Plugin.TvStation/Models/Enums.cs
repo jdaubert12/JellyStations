@@ -10,7 +10,10 @@ public enum ScheduleMode
     Slots,
 
     /// <summary>A hand-ordered list that loops forever from the anchor time.</summary>
-    Lineup
+    Lineup,
+
+    /// <summary>A weather channel: forecast screens for a few places over music, no library video.</summary>
+    Weather
 }
 
 /// <summary>Order in which items of a pool or block are played.</summary>
@@ -39,7 +42,22 @@ public enum SourceKind
     Library,
 
     /// <summary>Every movie/episode carrying a library tag (series tags apply to their episodes).</summary>
-    Tag
+    Tag,
+
+    /// <summary>A music album (weather channel music).</summary>
+    Album,
+
+    /// <summary>Every track by a music artist (weather channel music).</summary>
+    Artist,
+
+    /// <summary>Every track in a music genre (weather channel music).</summary>
+    MusicGenre,
+
+    /// <summary>One audio track (weather channel music).</summary>
+    Audio,
+
+    /// <summary>A folder of audio files on the server (weather channel music); not a library item.</summary>
+    Folder
 }
 
 /// <summary>What to do when the next item does not fit in the remaining time of a slot block.</summary>
@@ -59,7 +77,10 @@ public enum EntryKind
     Slate,
 
     /// <summary>A short clip (ident, trailer, bumper) filling a gap between programs.</summary>
-    Bumper
+    Bumper,
+
+    /// <summary>A weather channel program: forecast screens cycling over music, drawn by the plugin.</summary>
+    Weather
 }
 
 /// <summary>Reason an item was excluded during compilation.</summary>

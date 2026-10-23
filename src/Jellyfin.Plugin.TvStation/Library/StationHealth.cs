@@ -49,6 +49,12 @@ public static class StationHealth
                 : source.Section + ": " + source.Label + " found " + source.Found + " item(s) but none were usable (excluded, no runtime, or already listed by an earlier source).");
         }
 
+        if (station.Mode == ScheduleMode.Weather)
+        {
+            WeatherWarnings(station, compiled, dto);
+            return dto;
+        }
+
         if (compiled.TotalItemCount == 0)
         {
             dto.Warnings.Add("No playable items: the station shows a card until content is added.");
@@ -68,6 +74,37 @@ public static class StationHealth
         }
 
         return dto;
+    }
+
+    /// <summary>A weather channel is judged on its places and its music, not on hours of programming.</summary>
+    private static void WeatherWarnings(Station station, CompiledStation compiled, StationHealthDto dto)
+    {
+        var w = station.Weather;
+        var places = w.Locations.Count(l => l.IsValid);
+        if (places == 0)
+        {
+            dto.Warnings.Add("No places: the channel shows a card until a place is added.");
+        }
+
+        dto.MusicHours = Math.Round(compiled.Music.Sum(t => (double)t.RuntimeTicks) / TimeSpan.TicksPerHour, 1);
+        if (w.MusicEnabled)
+        {
+            if (compiled.Music.Count == 0)
+            {
+                dto.Warnings.Add(w.MusicSources.Count == 0 && string.IsNullOrWhiteSpace(w.MusicFolder)
+                    ? "No music: the channel is silent. Add a playlist, album or a folder of audio files, or turn music off."
+                    : "No music: none of the music sources produced a playable track, so the channel is silent.");
+            }
+            else if (dto.MusicHours < 1)
+            {
+                dto.Warnings.Add("Only " + compiled.Music.Count + " music track" + (compiled.Music.Count == 1 ? string.Empty : "s") + " (" + dto.MusicHours.Value.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + " h): the music repeats often.");
+            }
+        }
+
+        if (w.ShowTravelCities && places == 1)
+        {
+            dto.Warnings.Add("The travel screen needs two or more places; it is skipped.");
+        }
     }
 
     /// <summary>Hours of distinct programming (pool, lineup, blocks and filler; each item once; bumper clips not counted).</summary>

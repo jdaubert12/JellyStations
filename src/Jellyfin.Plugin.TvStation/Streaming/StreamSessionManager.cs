@@ -27,6 +27,7 @@ public sealed class StreamSessionManager : IDisposable
     private readonly IServerApplicationHost _appHost;
     private readonly IServerConfigurationManager _configuration;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly Weather.WeatherChannelService? _weather;
     private readonly ILogger<StreamSessionManager> _logger;
     private readonly ConcurrentDictionary<Guid, StationFault> _faults = new();
     private readonly System.Threading.Timer _watchdog;
@@ -38,8 +39,10 @@ public sealed class StreamSessionManager : IDisposable
         IMediaEncoder mediaEncoder,
         IServerApplicationHost appHost,
         IServerConfigurationManager configuration,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        Weather.WeatherChannelService? weather = null)
     {
+        _weather = weather;
         _resolver = resolver;
         _settings = settings;
         _paths = paths;
@@ -167,7 +170,8 @@ public sealed class StreamSessionManager : IDisposable
                 policy,
                 station.UpNextCard ?? new UpNextCardConfig(),
                 _paths.CardsDir,
-                station.TimeZoneId),
+                station.TimeZoneId,
+                _weather is null ? null : (entry, now, p) => _weather.BuildSegment(station.Id, now, entry, p)),
             logger);
 
         session.MediaSource.Path = _appHost.GetApiUrlForLocalAccess() + "/LiveTv/LiveStreamFiles/" + session.UniqueId + "/stream.ts";

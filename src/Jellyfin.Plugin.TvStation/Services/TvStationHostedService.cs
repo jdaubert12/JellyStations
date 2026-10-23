@@ -1,6 +1,7 @@
 using Jellyfin.Plugin.TvStation.Scheduling;
 using Jellyfin.Plugin.TvStation.Storage;
 using Jellyfin.Plugin.TvStation.Streaming;
+using Jellyfin.Plugin.TvStation.Weather;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -13,13 +14,17 @@ public sealed class TvStationHostedService : IHostedService
     private readonly StationService _stations;
     private readonly StreamSessionManager _sessions;
     private readonly GuideRefreshService _guide;
+    private readonly WeatherService _weather;
+    private readonly Music.MusicPackService _packs;
     private readonly ILogger<TvStationHostedService> _logger;
     private readonly object _seasonLock = new();
     private HashSet<Guid>? _inSeason;
     private Timer? _seasonTimer;
 
-    public TvStationHostedService(TvStationPaths paths, StationService stations, StreamSessionManager sessions, GuideRefreshService guide, ILogger<TvStationHostedService> logger)
+    public TvStationHostedService(TvStationPaths paths, StationService stations, StreamSessionManager sessions, GuideRefreshService guide, WeatherService weather, Music.MusicPackService packs, ILogger<TvStationHostedService> logger)
     {
+        _weather = weather;
+        _packs = packs;
         _paths = paths;
         _stations = stations;
         _sessions = sessions;
@@ -79,6 +84,7 @@ public sealed class TvStationHostedService : IHostedService
             _paths.EnsureDirectories();
             _stations.EnsureCompiled();
             CheckSeasons();
+            _weather.Start();
             _seasonTimer = new Timer(_ => SafeCheckSeasons(), null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10));
             _logger.LogInformation(
                 "TvStation started: {Count} station(s), data at {Path}",
@@ -96,6 +102,8 @@ public sealed class TvStationHostedService : IHostedService
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _seasonTimer?.Dispose();
+        _weather.Dispose();
+        _packs.Dispose();
         _sessions.StopAll();
         return Task.CompletedTask;
     }

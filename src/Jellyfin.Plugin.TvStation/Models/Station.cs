@@ -48,6 +48,9 @@ public sealed class Station
 
     public LineupConfig Lineup { get; set; } = new();
 
+    /// <summary>Weather channel settings (Weather mode): places, units, screens and music.</summary>
+    public WeatherConfig Weather { get; set; } = new();
+
     /// <summary>Per-station encoding override; null uses the global default.</summary>
     public EncodingProfile? Encoding { get; set; }
 

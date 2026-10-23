@@ -3,6 +3,7 @@ using Jellyfin.Database.Implementations.Enums;
 using Jellyfin.Plugin.TvStation.Api.Dto;
 using MediaBrowser.Controller.Dto;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Entities.Audio;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
@@ -190,6 +191,16 @@ public sealed class LibrarySearchService
             dto.SeriesName = s.SeriesName;
             dto.SeasonNumber = s.IndexNumber;
         }
+        else if (item is MediaBrowser.Controller.Entities.Audio.Audio audio)
+        {
+            // The picker shows this under the name, as it shows the series of an episode.
+            dto.SeriesName = string.Join(", ", (audio.Artists ?? Array.Empty<string>()).Take(2));
+            dto.EpisodeNumber = audio.IndexNumber;
+        }
+        else if (item is MusicAlbum album)
+        {
+            dto.SeriesName = string.Join(", ", (album.AlbumArtists ?? Array.Empty<string>()).Take(2));
+        }
 
         return dto;
     }
@@ -203,6 +214,10 @@ public sealed class LibrarySearchService
         BoxSet => "BoxSet",
         Playlist => "Playlist",
         Video => "Video",
+        MusicAlbum => "Album",
+        MusicArtist => "Artist",
+        MusicGenre => "MusicGenre",
+        MediaBrowser.Controller.Entities.Audio.Audio => "Audio",
         _ => item.GetType().Name
     };
 
@@ -215,6 +230,10 @@ public sealed class LibrarySearchService
         "boxset" or "collection" => BaseItemKind.BoxSet,
         "playlist" => BaseItemKind.Playlist,
         "video" => BaseItemKind.Video,
+        "album" or "musicalbum" => BaseItemKind.MusicAlbum,
+        "artist" or "musicartist" => BaseItemKind.MusicArtist,
+        "musicgenre" => BaseItemKind.MusicGenre,
+        "audio" or "track" => BaseItemKind.Audio,
         _ => null
     };
 }

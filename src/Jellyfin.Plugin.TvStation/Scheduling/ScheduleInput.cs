@@ -61,6 +61,12 @@ public sealed class ScheduleInput
 
     public PlayOrder FillerOrder { get; init; }
 
+    /// <summary>Weather channel settings; null unless the station is in Weather mode.</summary>
+    public WeatherConfig? Weather { get; init; }
+
+    /// <summary>Music tracks of a weather channel, in compile order.</summary>
+    public IReadOnlyList<MusicTrack> Music { get; init; } = Array.Empty<MusicTrack>();
+
     public static ScheduleInput From(Station station, CompiledStation compiled)
     {
         var blocks = station.Slots.Blocks
@@ -113,6 +119,8 @@ public sealed class ScheduleInput
             Blocks = blocks,
             Filler = compiled.Filler,
             FillerOrder = station.Slots.Filler.Order,
+            Weather = station.Mode == ScheduleMode.Weather ? station.Weather : null,
+            Music = station.Mode == ScheduleMode.Weather ? compiled.Music : Array.Empty<MusicTrack>(),
             Bumpers = station.Bumpers?.Enabled == true ? compiled.Bumpers : Array.Empty<PlayableItem>(),
             PreRoll = station.Bumpers?.Enabled == true && station.Bumpers.PreRoll?.Enabled == true ? compiled.PreRoll : Array.Empty<PlayableItem>(),
             PostRoll = station.Bumpers?.Enabled == true && station.Bumpers.PostRoll?.Enabled == true ? compiled.PostRoll : Array.Empty<PlayableItem>(),

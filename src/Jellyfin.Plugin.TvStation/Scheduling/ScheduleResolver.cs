@@ -68,6 +68,11 @@ public sealed class ScheduleResolver : IScheduleResolver
 
     private static IStationScheduler Create(ScheduleInput input)
     {
+        if (input.Mode == ScheduleMode.Weather)
+        {
+            return new WeatherScheduler(input);
+        }
+
         return input.HasBlocks
             ? new WeeklySlotScheduler(input)
             : new CyclicScheduler(input);

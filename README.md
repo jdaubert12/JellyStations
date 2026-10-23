@@ -23,6 +23,7 @@ joining whatever is airing right now, exactly like broadcast television.
 | **Pool** ("Shuffle a collection" in the dashboard) | Pick shows, movies, genres, collections or playlists. The station plays through the pool in shuffled or sequential cycles, or shuffled with each series' episodes kept in order (a random show comes up, but it is always that show's next episode). Shuffle avoids the same series or the same movie back to back, also across the seam between two cycles. A pool can also **rest** a show or film for N hours before it plays again, which keeps a film from coming straight back when one round ends and the next begins (a gentle rule: when nothing rested is available the station plays on; stations with time blocks are not covered yet). Optional **time blocks** take over at fixed local times, say a movie every evening from 18:00 to 21:00 on a cartoon station, and the pool carries on where it left off afterwards. When the block's content ends early, the pool fills the rest and its last program may finish past the block end rather than being cut, and a block can start up to N minutes late so the program already playing finishes first, keeping its full duration (both per-block options, on for new blocks). |
 | **Slots** ("Weekly schedule" in the dashboard) | Recurring blocks in the station's time zone, e.g. weekdays 20:00-21:00 = Seinfeld, Saturday 08:00-12:00 = cartoons. A filler pool plays between blocks. Sequential blocks pick up where they left off each day. |
 | **Lineup** ("Play a fixed list" in the dashboard) | A hand-ordered list that loops forever from the station's anchor time. |
+| **Weather** ("Weather channel" in the dashboard) | No library items: the plugin draws the screens itself. Current conditions, the next twelve hours and the week ahead for up to eight places, cycling over music, with a live clock. See [Weather channel](#weather-channel). |
 
 **Bumpers** are optional short clips (idents, trailers) that fill the gaps between programs. Pick any
 sources, cap the clip length, and optionally reserve a break of a few minutes after every program so
@@ -48,6 +49,67 @@ and no client support is needed; it cannot be dismissed. Bumper clips and statio
 when choosing what to announce, programs too short to carry the card do without it, and a card that
 ffmpeg cannot draw is dropped for the session with a note on the station row. Off by default: like
 the logo it costs encoder CPU for the whole program, and the two should sit in different corners.
+
+### Weather channel
+
+A **Weather channel** station is in the spirit of the cable weather channel's "Local on the 8s": no
+voice, no library items, just forecasts drawn as full-screen graphics over music. Pick up to eight
+places (a search box finds towns and cities and fills in the coordinates and time zone), and the
+channel cycles through them: for each place **current conditions** (big temperature, condition,
+feels like, high and low, humidity, wind, gusts, pressure, cloud cover, sunrise and sunset), the
+**next 12 hours** (hourly icons, temperatures, rain chance and a temperature curve) and the **7-day
+forecast**, then a **travel cities** screen with every place at a glance. Screens cross-fade; each
+stays a configurable number of seconds (default 10). With **On the 8s** a full pass starts at :08,
+:18, :28... and the rest of each ten minutes repeats current conditions, like the real format.
+Three colour themes (classic blue, dark, light), °F or °C with matching wind and pressure units, a 12
+or 24-hour clock, and the station logo on every screen. The lower band carries the **local time in
+that place's own zone** as a live clock, the music credit, and "Weather data by Open-Meteo.com".
+
+The guide shows one entry per hour (configurable, 15 minutes to 4 hours) titled from a template,
+default "Local weather: Boston, Denver, Tokyo", so the channel reads like a channel and not like a
+hundred three-minute programs. The cycle runs from the station clock, so every viewer sees the same
+screen at the same moment and tuning in lands mid-cycle like real TV.
+
+**Forecasts** come from [Open-Meteo](https://open-meteo.com) (free for non-commercial use, no account
+or key, data under CC BY 4.0, hence the attribution on every screen). This is the only part of the
+plugin that talks to the internet; it is per station, and the only thing ever sent is a latitude and
+longitude. Each place is polled every 15 minutes while the station is enabled and in season (failures
+back off up to 15 minutes), reports are cached under `data/TvStation/weather/` so a restart has
+something to show, and when a report is older than the station allows (default 3 hours) the screens
+say so plainly instead of showing old numbers as current. The editor's **Forecast status** table shows
+the last fetch and any error per place, **Fetch now** polls at once, and **Preview screen** renders
+any screen for any place as it will air. Rendered screens are PNGs under `data/TvStation/weather/screens/`,
+regenerated only when the report, the clock hour or the look changes.
+
+**Music** plays underneath from two kinds of source, which can be combined: items from your Jellyfin
+music library (playlists, albums, artists, music genres or single tracks, through the same picker as
+the other modes) and every audio file in a **folder** on the server (a name means a folder under
+`data/TvStation/music/`; an absolute path works too; mp3, flac, ogg, opus, m4a, wav and more, tagged
+with ffprobe at compile time). Tracks play back to back in a seeded shuffle that only repeats once
+every track has played, the same for every viewer and continuous across the plugin's internal segment
+boundaries, at a configurable level, with the title and artist drawn on the screens (switchable).
+Several folders can be listed, separated by `;`. New files in a folder are picked up when the
+station is recompiled (nightly, or **Refresh content**); with music off the channel is silent.
+
+The plugin bundles **no audio**, but the editor offers **music packs**: curated instrumental sets
+under licences that allow playing and passing them on. **Get it** fetches each track from the
+artist's own site into `data/TvStation/music/<pack>/`, checks it against its published SHA-256,
+writes a `CREDITS.txt` beside the files and recompiles the stations that use the folder; a run that
+stops picks up where it left off. The starter pack, **Lounge and light jazz**, is thirty pieces by
+Kevin MacLeod (CC BY 4.0, about 1 h 54 min, 240 MB) in the register the cable weather channel is
+known for, "Local Forecast" included; the on-screen title and artist line is the credit the licence
+asks for, so leave it on. A second, optional pack, **Lo-fi jazz guitar** by HoliznaCC0 (CC0, two
+short albums), lives on the Free Music Archive, which needs a free account to download, so the
+editor gives the links and the folder to drop the files into. **Use this folder** adds the pack's
+folder to the station. "Royalty free" and "free to redistribute" are different things; the packs
+only carry licences that allow both, and anything else you have the right to play goes in a folder of
+your own.
+
+API: `GET /TvStation/MusicPacks` (catalogue with install state), `POST /TvStation/MusicPacks/{id}/Install`,
+`POST /TvStation/MusicPacks/{id}/Cancel`; `GET /TvStation/Weather/Search?q=` (place search), `GET /TvStation/Weather/Status/{stationId}`,
+`POST /TvStation/Weather/Refresh/{stationId}`, `GET /TvStation/Weather/Preview/{stationId}?screen=Current|Hourly|Daily|Travel&location=0&width=1280` (PNG).
+Screens are drawn with SkiaSharp, which the Jellyfin server already ships; the Inter font (SIL Open
+Font License) is embedded in the plugin.
 
 The editor's **Content** section lists everything a station expands to, with a text filter, totals,
 and an **Exclude** switch per item for the one episode or film that does not belong. Exclusions are
@@ -103,6 +165,9 @@ saved station has a **Start schedule from now** button on its row.
   Hardware encoders (`h264_nvenc`, `h264_qsv`, `h264_vaapi`) can be configured in Settings, and
   hardware decoding follows Jellyfin's own transcoding setting by default (4K HEVC sources are
   the heavy part; decoding them on the GPU is what keeps a 4K movie station real time).
+- Internet access from the server to `api.open-meteo.com` and `geocoding-api.open-meteo.com`, only
+  for Weather channel stations, and to `incompetech.com` only while a music pack downloads.
+  Everything else works offline.
 - HDR sources (HDR10, HDR10+, Dolby Vision on an HDR10 base, HLG) are tone mapped to SDR
   BT.709 by the plugin, so every channel is a plain 8-bit SDR H.264 stream that clients play
   without re-encoding. This needs `zscale` in ffmpeg (`jellyfin-ffmpeg` has it).
@@ -110,16 +175,16 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.13.1.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.13.1.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.13.1.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.13.1.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.13.1.0\`
+2. Copy it into a folder named `TvStation_1.14.0.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.14.0.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.14.0.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.14.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.14.0.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.13.1.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.13.1.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.14.0.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.14.0.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 
@@ -253,6 +318,14 @@ decades, ratings, tags and libraries. It is the basis for station suggestions an
   and Readers 0. Normal for the Linger seconds after a viewer leaves; beyond that the viewer
   never told Jellyfin it stopped, and the **Stop an unwatched stream after** setting ends it
   (a warning is logged). The Stop button on the Status row ends it at once.
+- *Weather channel shows "Forecast unavailable"*: the server could not reach `api.open-meteo.com`
+  for longer than the station's staleness limit, or no report has been fetched yet. The editor's
+  Forecast status table has the error per place (DNS, time-out, HTTP status); **Fetch now** retries.
+  A place with coordinates 0, 0 was typed rather than picked from the search; pick it again.
+- *Weather channel is silent*: music is off, or the folder and sources expanded to nothing (the
+  station row says "no music"; the Content section lists the tracks found). Folder names are
+  relative to `data/TvStation/music/` unless absolute, and the Jellyfin user must be able to read
+  the files.
 - *Channel has no programs*: check the station is enabled and has content; press
   **Refresh guide**. Jellyfin's own guide refresh runs every 24 h.
 - *Playback fails to start*: open **Dashboard > TV Stations > Status**. It shows the ffmpeg path,

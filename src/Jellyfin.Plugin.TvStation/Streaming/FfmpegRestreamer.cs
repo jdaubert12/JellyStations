@@ -35,6 +35,8 @@ public sealed class FfmpegRestreamer : IDisposable
     private readonly Action<string>? _onFault;
     private readonly HardwareDecodePolicy _policy;
     private readonly HashSet<string> _softwarePrograms = new(StringComparer.Ordinal);
+    private readonly Func<ScheduleEntry, DateTime, EncodingProfile, WeatherSegment?>? _weather;
+    private int _weatherFailures;
     private string? _lastStderr;
     private ProcessRunner? _current;
     private TsPacer? _pacer;
@@ -68,8 +70,10 @@ public sealed class FfmpegRestreamer : IDisposable
         HardwareDecodePolicy? policy = null,
         UpNextCardConfig? upNext = null,
         string? cardsDir = null,
-        string? timeZoneId = null)
+        string? timeZoneId = null,
+        Func<ScheduleEntry, DateTime, EncodingProfile, WeatherSegment?>? weather = null)
     {
+        _weather = weather;
         _upNext = upNext ?? new UpNextCardConfig();
         _cardsDir = cardsDir ?? Path.Combine(Path.GetTempPath(), "TvStation", "cards");
         _zone = UpNextCard.Zone(timeZoneId);
@@ -206,6 +210,12 @@ public sealed class FfmpegRestreamer : IDisposable
                 }
 
                 CurrentEntry = entry;
+
+                if (entry.Kind == EntryKind.Weather)
+                {
+                    await PlayWeatherAsync(entry, now, remaining, ct).ConfigureAwait(false);
+                    continue;
+                }
 
                 // A multi-part item (Blu-ray split into part1/part2) plays as consecutive segments on one clock:
                 // the part the offset falls in now, then the loop comes back here for the next part.
@@ -568,6 +578,74 @@ public sealed class FfmpegRestreamer : IDisposable
                 Fault("Slate encoder failed (ffmpeg exit " + code + ")" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
                 await Task.Delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
             }
+        }
+    }
+
+    /// <summary>
+    /// One segment of a weather channel: a few minutes of screens and music built by the weather service for this
+    /// moment. Without places or when the screens cannot be drawn, a slate fills the entry instead.
+    /// </summary>
+    private async Task PlayWeatherAsync(ScheduleEntry entry, DateTime now, TimeSpan remaining, CancellationToken ct)
+    {
+        var profile = EffectiveProfile();
+        WeatherSegment? segment = null;
+        try
+        {
+            segment = _weather?.Invoke(entry, now, profile);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "TvStation [{Station}]: weather screens could not be built", _stationName);
+            Fault("Weather screens could not be built: " + ex.Message);
+        }
+
+        if (segment is null || segment.Slides.Count == 0)
+        {
+            var hold = remaining < TimeSpan.FromSeconds(60) ? remaining : TimeSpan.FromSeconds(60);
+            await RunSlateAsync(hold, _weather is null ? _cardText : "Weather channel: add a place in the station editor", ct, entry.EndUtc).ConfigureAwait(false);
+            return;
+        }
+
+        var args = FfmpegArgsBuilder.ForWeather(segment, NextTsOffset(), profile);
+        _logger.LogInformation(
+            "TvStation [{Station}]: weather segment of {Length} ({Screens} screens, {Tracks} music piece(s))",
+            _stationName,
+            (segment.EndUtc - segment.StartUtc).ToString(@"mm\:ss"),
+            segment.Slides.Count,
+            segment.Audio.Count);
+        _logger.LogDebug("TvStation ffmpeg {Args}", FfmpegArgsBuilder.ToLogString(args));
+        _telemetry = new SegmentTelemetry(segment.Title, isSlate: false, string.Empty, profile.VideoEncoder, toneMapping: false, sourceIsHdr: false, overlay: false);
+
+        var started = DateTime.UtcNow;
+        var exitCode = await RunProcessAsync(args, segment.EndUtc + HardKillGrace, ct).ConfigureAwait(false);
+        if (ct.IsCancellationRequested)
+        {
+            return;
+        }
+
+        var ran = DateTime.UtcNow - started;
+        if (exitCode != 0 && ran < TimeSpan.FromSeconds(5))
+        {
+            _weatherFailures++;
+            _logger.LogError("TvStation [{Station}]: weather encoder failed (exit {Code}): {Error}", _stationName, exitCode, _lastStderr);
+            Fault("Weather encoder failed (ffmpeg exit " + exitCode + ")" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
+            if (_weatherFailures >= 3)
+            {
+                await RunSlateAsync(TimeSpan.FromSeconds(60), "Technical difficulties", ct, entry.EndUtc).ConfigureAwait(false);
+            }
+            else
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
+            }
+
+            return;
+        }
+
+        _weatherFailures = 0;
+        var gap = segment.EndUtc - DateTime.UtcNow;
+        if (gap > TimeSpan.FromMilliseconds(200) && gap < TimeSpan.FromSeconds(10))
+        {
+            await Task.Delay(gap, ct).ConfigureAwait(false);
         }
     }
 

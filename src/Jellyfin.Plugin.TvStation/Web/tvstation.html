@@ -21,6 +21,9 @@
       #TvStationPage .tvs-section > .sectionTitle .material-icons { font-size: 1.25em; opacity: .85; }
       #TvStationPage .tvs-section > .fieldDescription:first-of-type { margin: 0 0 .9em; }
       #TvStationPage .tvs-grid2 { display: grid; grid-template-columns: 1fr 1fr; column-gap: 1.5em; }
+      #TvStationPage .tvs-weather-mode [data-not-weather] { display: none !important; }
+      #TvStationPage .tvs-weather-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .5em .8em; margin: .6em 0; }
+      #TvStationPage .tvs-weather-tools select { width: auto; min-width: 9em; }
       #TvStationPage .tvs-grid2 > * { min-width: 0; }
       @media (max-width: 800px) { #TvStationPage .tvs-grid2 { grid-template-columns: 1fr; } }
       #TvStationPage .tvs-inline { display: flex; flex-wrap: wrap; align-items: center; gap: .6em; }
@@ -439,6 +442,7 @@
                 <option value="Pool">Shuffle a collection – shows and movies play around the clock, reshuffled each round</option>
                 <option value="Slots">Weekly schedule – blocks at fixed times each week, with filler in between</option>
                 <option value="Lineup">Play a fixed list – your hand-ordered list, looping forever</option>
+                <option value="Weather">Weather channel – forecasts for a few places, drawn by the plugin, over music</option>
               </select>
               <div class="fieldDescription" id="tvsModeHelp"></div>
             </div>
@@ -532,6 +536,136 @@
               <div id="tvsLineupList" class="paperList tvs-lineup"></div>
               <div id="tvsLineupTotal" class="tvs-info"></div>
             </div>
+
+            <!-- Weather channel -->
+            <div id="tvsPanelWeather" class="tvs-panel tvs-hidden" data-steps="2">
+              <h4 class="tvs-subtitle">Places</h4>
+              <div class="fieldDescription">The channel cycles through these in order: current conditions, the next twelve hours and the week ahead for each, then every place on one screen. Up to eight. Only each place's latitude and longitude is ever sent to the forecast provider.</div>
+              <div id="tvsWeatherPlaces" class="paperList tvs-lineup"></div>
+              <div id="tvsWeatherPlacesEmpty" class="tvs-secondary">No places yet. Search for a town or city below and press Add.</div>
+              <div class="inputContainer" style="margin-top:.6em">
+                <input is="emby-input" id="tvsWeatherSearch" label="Add a place" type="text" autocomplete="off" placeholder="Type a town or city name…">
+              </div>
+              <div id="tvsWeatherSearchStatus" class="tvs-info"></div>
+              <div id="tvsWeatherSearchResults" class="tvs-results tvs-hidden"></div>
+
+              <h4 class="tvs-subtitle">Look</h4>
+              <div class="tvs-grid2">
+                <div class="selectContainer">
+                  <label class="selectLabel" for="tvsWeatherUnits">Units</label>
+                  <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsWeatherUnits">
+                    <option value="Imperial">°F, mph, inches</option>
+                    <option value="Metric">°C, km/h, millimetres</option>
+                  </select>
+                </div>
+                <div class="selectContainer">
+                  <label class="selectLabel" for="tvsWeatherTheme">Colours</label>
+                  <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsWeatherTheme">
+                    <option value="Classic">Classic – deep blue</option>
+                    <option value="Dark">Dark – near black</option>
+                    <option value="Light">Light – pale with dark type</option>
+                  </select>
+                </div>
+              </div>
+              <div class="tvs-grid2">
+                <div class="inputContainer">
+                  <input is="emby-input" id="tvsWeatherScreenSeconds" label="Seconds per screen" type="number" min="4" max="60" step="1">
+                  <div class="fieldDescription">How long each screen stays before it cross-fades to the next. 8 to 12 reads well.</div>
+                </div>
+                <div class="inputContainer">
+                  <input is="emby-input" id="tvsWeatherEntryMinutes" label="Guide entry length (minutes)" type="number" min="15" max="240" step="15">
+                  <div class="fieldDescription">The guide shows one entry per this many minutes, on the hour. The screens keep cycling inside it.</div>
+                </div>
+              </div>
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsWeatherEights">
+                  <span>On the 8s: start a full pass at :08, :18, :28…</span>
+                </label>
+                <div class="fieldDescription checkboxFieldDescription">Like the cable format: the full tour of every place starts eight minutes past each ten, and the rest of the ten minutes repeats current conditions. Off: passes simply follow one another.</div>
+              </div>
+              <div class="checkboxContainer">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsWeatherClock24">
+                  <span>24-hour clock</span>
+                </label>
+              </div>
+              <div class="checkboxContainer">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsWeatherHourly">
+                  <span>Show the next-12-hours screen</span>
+                </label>
+              </div>
+              <div class="checkboxContainer">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsWeatherDaily">
+                  <span>Show the 7-day screen</span>
+                </label>
+              </div>
+              <div class="checkboxContainer">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsWeatherTravel">
+                  <span>Show the travel screen (every place at a glance; needs two or more places)</span>
+                </label>
+              </div>
+              <div class="checkboxContainer">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsWeatherLogo">
+                  <span>Show the station logo on every screen</span>
+                </label>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsWeatherGuideTitle" label="Guide title" type="text" autocomplete="off" placeholder="Local weather: {places}">
+                <div class="fieldDescription">What the guide calls each entry. <code>{places}</code> becomes the place names, e.g. “Local weather: Boston, Denver”.</div>
+              </div>
+
+              <h4 class="tvs-subtitle">Music</h4>
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsWeatherMusic">
+                  <span>Play music under the screens</span>
+                </label>
+                <div class="fieldDescription checkboxFieldDescription">Tracks play back to back in a shuffled order that repeats only when every track has played. Off: the channel is silent. Use music you have the right to play; the plugin ships none.</div>
+              </div>
+              <div id="tvsWeatherMusicOptions">
+                <div class="fieldDescription">From your Jellyfin music library: playlists, albums, artists, music genres or single tracks.</div>
+                <div id="tvsMusicPicker"></div>
+                <div class="inputContainer">
+                  <input is="emby-input" id="tvsWeatherMusicFolder" label="Also play every audio file in this folder on the server" type="text" autocomplete="off" placeholder="e.g. lounge; weather (folders under the plugin's music folder) or /media/music/ambient">
+                  <div class="fieldDescription" id="tvsWeatherMusicFolderHint">A name here means a folder under <code>data/TvStation/music/</code> in the Jellyfin data folder; an absolute path works too; several folders separated by <code>;</code>. mp3, flac, ogg, opus, m4a, wav and more. New files are picked up when the station is recompiled (nightly, or Refresh content).</div>
+                </div>
+                <div class="fieldDescription" style="margin-top:.8em"><strong>Music packs.</strong> Curated instrumental sets you may play and pass on: the plugin fetches each track from the artist's own site into the music folder, checks it against its published checksum and writes a CREDITS.txt beside the files. Nothing is bundled with the plugin.</div>
+                <div id="tvsMusicPacks" class="paperList"></div>
+                <div class="tvs-grid2">
+                  <div class="inputContainer">
+                    <input is="emby-input" id="tvsWeatherVolume" label="Music level (%)" type="number" min="20" max="150" step="5">
+                    <div class="fieldDescription">100 = as recorded.</div>
+                  </div>
+                  <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:1.4em">
+                    <label class="emby-checkbox-label">
+                      <input is="emby-checkbox" type="checkbox" id="tvsWeatherCredit">
+                      <span>Show the track title and artist on the screens</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <h4 class="tvs-subtitle">Forecast status</h4>
+              <div id="tvsWeatherStatus" class="tvs-info">Save the station to start fetching forecasts.</div>
+              <div class="tvs-weather-tools" id="tvsWeatherStatusTools">
+                <button is="emby-button" type="button" id="tvsBtnWeatherRefresh" class="raised emby-button"><span>Fetch now</span></button>
+                <select is="emby-select" class="emby-select" id="tvsWeatherPreviewScreen" title="Which screen to preview">
+                  <option value="Current">Current conditions</option>
+                  <option value="Hourly">Next 12 hours</option>
+                  <option value="Daily">7-day forecast</option>
+                  <option value="Travel">Travel cities</option>
+                </select>
+                <select is="emby-select" class="emby-select" id="tvsWeatherPreviewPlace" title="Which place to preview"></select>
+                <button is="emby-button" type="button" id="tvsBtnWeatherPreview" class="raised emby-button"><span>Preview screen</span></button>
+              </div>
+              <img id="tvsWeatherPreviewImg" class="tvs-hidden" alt="Weather screen preview" style="max-width:100%;border-radius:6px;margin-top:.5em">
+              <div class="fieldDescription">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0), free for non-commercial use; the attribution is drawn on every screen.</div>
+            </div>
           </div>
 
           <div class="verticalSection" data-steps="3">
@@ -560,7 +694,7 @@
             </div>
           </div>
 
-          <div class="verticalSection" data-steps="2">
+          <div class="verticalSection" data-steps="2" data-not-weather>
             <h3 class="sectionTitle">Leave out</h3>
             <div class="fieldDescription">Keep things off this channel even when a show, genre or library above would bring them in.</div>
             <div class="inputContainer">
@@ -580,13 +714,13 @@
             </div>
           </div>
 
-          <div class="verticalSection" id="tvsExcludedSection" data-steps="2">
+          <div class="verticalSection" id="tvsExcludedSection" data-steps="2" data-not-weather>
             <h3 class="sectionTitle">Excluded items</h3>
             <div id="tvsExcludedInfo" class="fieldDescription"></div>
             <div id="tvsExcludedList" class="paperList"></div>
           </div>
 
-          <div class="verticalSection" data-steps="2">
+          <div class="verticalSection" data-steps="2" data-not-weather>
             <h3 class="sectionTitle">Bumpers</h3>
             <div class="checkboxContainer checkboxContainer-withDescription">
               <label class="emby-checkbox-label">

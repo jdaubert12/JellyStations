@@ -76,6 +76,13 @@ public sealed class TvStationLiveTvService : ILiveTvService, ISupportsDirectStre
 
         foreach (var entry in entries)
         {
+            if (entry.Kind == EntryKind.Weather)
+            {
+                current = WeatherProgram(channelId, entry);
+                programs.Add(current);
+                continue;
+            }
+
             if (entry.Kind != EntryKind.Program || entry.Item is null)
             {
                 // Cards and bumper clips are not guide entries; they extend whatever aired before them.
@@ -141,6 +148,24 @@ public sealed class TvStationLiveTvService : ILiveTvService, ISupportsDirectStre
         }
 
         return p;
+    }
+
+    private static ProgramInfo WeatherProgram(string channelId, ScheduleEntry entry)
+    {
+        return new ProgramInfo
+        {
+            Id = entry.ProgramId,
+            ChannelId = channelId,
+            Name = entry.Title,
+            Overview = "Current conditions, the next twelve hours and the week ahead, with music.",
+            StartDate = DateTime.SpecifyKind(entry.StartUtc, DateTimeKind.Utc),
+            EndDate = DateTime.SpecifyKind(entry.EndUtc, DateTimeKind.Utc),
+            Genres = new List<string> { "Weather" },
+            IsNews = true,
+            IsLive = true,
+            IsRepeat = false,
+            IsHD = true
+        };
     }
 
     private static ProgramInfo OffAir(string channelId, ScheduleEntry entry, string cardText)

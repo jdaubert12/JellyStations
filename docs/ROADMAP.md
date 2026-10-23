@@ -2,6 +2,8 @@
 
 Working plan for scheduling and curation features. Phase 1 is the agreed next three steps, in order.
 Later phases are candidates, roughly ordered by payoff per effort; reorder freely.
+Phase 7 (smarter stations: embeddings, watch history, optional local model) is the current plan.
+Phase 8 (weather channel) steps 1-6 shipped in 1.14.0.0 (2026-10-23); step 7 polish is open.
 
 Conventions for every step:
 
@@ -22,6 +24,7 @@ export, station logos, Jellyfin 12.2 / .NET 10. Multi-part (stacked) movies play
 consecutive segments on one clock (2026-10-15), which is also the groundwork for mid-roll breaks.
 Stream output is SDR BT.709 end to end since 1.11.0.0 (2026-10-20): HDR sources are tone mapped and stripped of HDR side data at the plugin, hardware decoding follows Jellyfin's setting, h264_vaapi works.
 Stream health since 1.12.0.0 (2026-10-20): Status shows per session whether the hardware decoder is really in use, CPU, real-time margin and problems; Hardware section with a decode/encode test.
+Weather channel since 1.14.0.0 (2026-10-23): `ScheduleMode.Weather`, Open-Meteo provider, Skia-drawn screens with a live per-place clock, xfade cycle on the station clock, hourly guide entries, music timeline from Jellyfin music and a folder, poller with disk cache and staleness, editor with place search and previews.
 
 ---
 
@@ -272,7 +275,7 @@ Considered and parked: off-air hours (a daypart rule approximates it),
 custom guide titles per block, studio and people sources, smart (search) collections, multi-part
 episode grouping, rerun blocks, channel redirects, on-demand channels (contradicts the always-on
 clock), DVR (files are already in the library), music videos, AI lineup builder (the rule-based
-suggester covers it). Revisit when someone asks.
+suggester covers it; see Phase 7 for what a model is and is not allowed to do). Revisit when someone asks.
 
 ---
 
@@ -320,6 +323,243 @@ From a 2026-10-19 review of the dashboard: the base is solid but speaks engineer
    `emby-input` class itself, or Jellyfin's upgrade throws and every later element stays plain.
 6. **Smaller wins.** Duplicate station, "Pause" instead of a Disabled badge, generated logos, a
    one-line plain summary per row, a read-only "What's on" page for non-admins.
+
+---
+
+## Phase 7 — smarter stations
+
+From the 2026-10-23 discussion and the `prototypes/TvStation.Brain` experiment (LLamaSharp + Qwen2.5
+1.5B on the CPU, results in `prototypes/TvStation.Brain/RESULTS.md`). What the prototype settled:
+a 1.5B model referring to titles by id over the whole library produces valid-looking garbage; by
+exact title under a grammar over ~30 candidates it ranks acceptably; it cannot do times, durations
+or de-duplication (0/5 valid stations) and a repair round only helps on short prompts; without a
+grammar it invents titles. Cost is ~1.2 GB RSS, 1 GB on disk, 16 s to read a 160-title library on a
+fast desktop. So: every decision about *when* stays in code, models only ever rank real items or
+write text, and the plugin never asks a model for ids. Everything below is offline; nothing talks to
+the internet.
+
+In payoff order. Steps 1-3 need no language model at all.
+
+1. **Embedding index and "Describe the channel".** A small sentence-embedding model (bge-small or
+   nomic-embed-text, 30-130 MB GGUF, through `LLamaEmbedder` in LLamaSharp, CPU only, ~10-50 ms
+   per item) embeds every movie and series once (name, year, genres, tags, first sentence of the
+   overview) into `data/TvStation/embeddings.bin`, refreshed with the library analysis for changed
+   items only. Features on top of it:
+   - A text box on the station preset page and on the sources step: "Describe what should play"
+     returns the 30 nearest titles with tick boxes and a similarity bar; "Use these" adds them as
+     pool sources (or a lineup). Output is always a ranked list of real items, so nothing can be
+     invented and the editor stays the editing surface.
+   - A `SourceKind.SimilarTo` content source: seeds (item ids) plus a count or a similarity floor,
+     expanded at compile time to the nearest items; recompiles when the index changes.
+   - The suggester gets **theme channels**: cluster the embeddings (and tag co-occurrence) and
+     propose a station for every cluster with enough hours, named after its most frequent tags
+     ("Heists", "Time travel", "Space westerns"). Not-on-a-channel leftovers are grouped the same
+     way so "New channel with selected" can offer coherent groups instead of one pile.
+   The native runtime ships in the plugin zip (linux-x64 and win-x64 CPU backends, ~30-60 MB);
+   `meta.json` `assemblies` lists only the managed DLLs so a Windows host never loads a native
+   `.dll` as an assembly. The model file is a one-time download from the plugin's own GitHub
+   release with a checksum, or a file the person drops in the data folder; until it is there the
+   features are shown greyed with a one-line explanation. Pure parts (`Library/Embeddings/`:
+   cosine search, clustering, naming) get xUnit tests with fixed vectors; the model call is behind
+   an interface so tests never load a model. Index a 2,000-movie library inside a scheduled task,
+   never in a web request. Medium-large.
+2. **Watch-history awareness.** Jellyfin's per-user played state and favorites, read through
+   `IUserDataManager` for the users the admin ticks in Settings ("Our household"). Per station, all
+   off by default:
+   - "Skip what we finished in the last N days" (cooldown keyed on real playback, not airing).
+   - "Favorites play more often" (weight multiplier on favorited items).
+   - "Follow our progress": a series source plays from the first unwatched episode and advances as
+     the household watches, in `ShuffleEpisodesInOrder` and `Sequential` orders; the schedule stays
+     deterministic because progress is sampled at compile time and recorded in the compiled
+     station (recompile when it changes, like the library refresh).
+   Pure logic in `Scheduling/WatchHistory*.cs` with tests; the Jellyfin reads live in
+   `Library/`. Fingerprint: these change the timeline, so they are part of it. Medium.
+3. **Day shape preset and "why this is playing".**
+   - One control on the When step, "Shape the day like a channel": a dropdown of shapes (Kids
+     daytime, Family evening, Grown-up nights, Weekend movie marathons) that writes the daypart
+     rules and, for pools with blocks, a feature block at prime time, instead of asking for six
+     rules. Shapes are data in `tvstation.js` like `PRESETS`.
+   - The compiler already knows why every item is on the timeline (source, gate, cooldown, run);
+     keep that trace per entry and show it on the Now and next row and in the content preview:
+     "Action genre · PG-13 allowed after 20:00 · 9 days since it last aired". Small-medium.
+4. **People, studios and keywords as sources** (parked in Phase 5, unparked here because step 1's
+   candidate lists need them): `SourceKind.Person` (actor or director, with the role), `Studio`,
+   and `Tag` already exists. Resolver queries via `ILibraryManager` with `PersonIds` / `StudioIds`;
+   name matching on import like the other kinds. Small.
+5. **Local model endpoint for station authoring (optional, advanced).** A Settings field "Local
+   language model URL" for an OpenAI-compatible server on the LAN (Ollama, LM Studio,
+   llama-server), with model name and a test button; nothing ships in the zip for this. When set,
+   the preset page shows "Make a channel from a sentence": the request goes to the model with the
+   embedding search as a tool (`find_titles(query, filters)`), the existing station shapes as the
+   output schema, titles referenced by exact name, and a validator that checks ids, ratings against
+   dayparts, runtime versus block length, duplicates, and feeds problems back once. The result opens
+   as an unsaved draft in the editor; nothing is saved without the person. Requires a 7B+ model to
+   be useful; the dashboard says so next to the field. Pure parts (prompt assembly, schema,
+   validator, repair) in `Library/Authoring/` with tests against recorded model replies. Medium.
+6. **In-process tiny model for text only (defer; maybe never).** Qwen2.5 1.5B or Qwen3 0.6B at Q4
+   through the same LLamaSharp runtime as step 1, used solely for prose: channel descriptions, block
+   names, up next blurbs, the one-line plain summary per station row. Grammar-constrained picking
+   from a step-1 candidate list is possible (prototype: most picks sensible) but adds 1 GB and a
+   second model download for a small gain over ranking by similarity, so it waits for someone to
+   ask. If it comes: on-demand load, thread cap, unload after the job, run inside a scheduled task,
+   refuse unknown model files, and the KV prefix cache from the prototype (157 MB per 5.7k tokens,
+   0.07 s reload) if whole-library prompts are ever wanted.
+
+Not planned: any cloud model, or sending library data anywhere. The design-time path (export a
+library digest, have any large model write station JSON, import by name) already works through the
+Import page and stays the power-user route; a "Copy library digest" button on the Import page is a
+small add if someone asks.
+
+---
+
+## Phase 8 — Weather channel — steps 1-6 DONE 2026-10-23 (1.14.0.0)
+
+Shipped as planned below with these differences. The **starter pack** is not a zip on the plugin's
+release but a manifest (`Assets/music-packs.json`) of thirty Kevin MacLeod pieces (CC BY 4.0) with
+URLs on incompetech.com and SHA-256 checksums; `MusicPackService` fetches them into
+`data/TvStation/music/lounge/` on request and writes CREDITS.txt, so nothing is re-hosted and the
+private repo is not in the path. A second pack (HoliznaCC0, CC0) is "manual": the Free Music
+Archive needs a login, so the editor gives links and the folder. The music folder setting takes
+several folders separated by ";". No title card between
+places and no alerts screen yet (step 7). The clock is `drawtext` with an offset per place rather than
+a re-rendered PNG, so it ticks every minute at no render cost; the screens themselves are re-rendered
+when the report, the hour or the look changes. Per-track volume is a plain `volume` filter, not
+`loudnorm`. Verified on the dev container: a 150 s tune-in ran one 4-minute segment of 31 screens
+and 6 music pieces with no PCR jump, the clock advanced in each place's zone, credits drawn.
+
+From the 2026-10-23 request: a station in the spirit of The Weather Channel's "Local on the 8s".
+No voice. It cycles through a few locations, shows current conditions and forecasts as full-screen
+graphics, and plays royalty-free music underneath, with a way to add more music. This is the first
+feature that talks to the internet; it is per station, opt-in, and the only thing it ever sends is a
+latitude and longitude.
+
+**Data.** Default provider is [Open-Meteo](https://open-meteo.com): no account, no key, global,
+current conditions plus hourly and 7-16 day daily forecasts in one call, with a geocoding endpoint
+for turning "Boston" into coordinates. Its free tier is for non-commercial use under 10,000 calls a
+day (a household with five locations polling every 15 minutes makes ~500) and the data is CC BY 4.0,
+so every weather screen carries "Weather data by Open-Meteo.com" in small type. Behind an
+`IWeatherProvider` interface (`Weather/`) so the US National Weather Service (`api.weather.gov`:
+free, no key, has **alerts**, needs a User-Agent) can be added as a second provider for US locations
+and alerts, and a keyed provider later if anyone asks. Everything in the plugin speaks one neutral
+`WeatherReport` model (observed at, current, hourly[48], daily[7], alerts[], units converted in code
+from the provider's metric values).
+
+**Rendering.** Screens are PNGs drawn with **SkiaSharp**, which the Jellyfin server ships for its own
+image pipeline. Verified on the dev container (Jellyfin 12.2 image) on 2026-10-23: `/jellyfin` holds
+`SkiaSharp.dll` 3.119.4 with `libSkiaSharp.so`, plus HarfBuzzSharp; a plugin that references the
+`SkiaSharp` package with `ExcludeAssets="runtime"` (as it does `Jellyfin.Controller`) resolves the
+server's copy from the default load context and draws text to a PNG without shipping any native
+library (probe: 640x360, DejaVu Sans, 12 KB PNG). The host image has 41 font families (DejaVu, Noto
+CJK, IPA, UnFonts) but no modern UI sans, so the zip ships one open-licensed font (Inter or Noto
+Sans, OFL) loaded with `SKTypeface.FromFile`, with DejaVu Sans as the fallback, and an open-licensed
+weather icon set rendered to PNG at two sizes, keyed by WMO weather code and day/night. The layout is
+a pure model (`Weather/Screens/`: given a `WeatherReport`, the location, the clock and the picture
+size, produce text and icon placements; xUnit tests check placements and measured-text fits, never
+pixels); a thin Skia painter turns it into a PNG. Two or three colour themes (the classic blue
+gradient, dark, light) and the station logo in the corner. Version coupling: the plugin follows the
+server's SkiaSharp major, pinned with the Jellyfin version it targets. The ffmpeg in the image
+(8.1.3-Jellyfin) has `drawtext`, `xfade`, `fade`, `overlay`, `loudnorm`, `afade` and `acrossfade`,
+so the slideshow and the music mix need nothing extra.
+
+**Screens per location**, each a fixed number of seconds (default 8-12, configurable), in order:
+
+1. Current conditions: big temperature, icon, condition text, feels like, humidity, wind with
+   direction, pressure trend, visibility, sunrise and sunset, "as of 3:47 PM".
+2. Next 12 hours: a strip of hourly icon, temperature and rain chance.
+3. 7-day extended forecast: columns with day name, icon, high, low, rain chance.
+4. Alerts, only when the provider has one for the location (headline and until-when; the full text
+   scrolls if it fits the screen time).
+5. Optional: "Travel cities", every configured location on one screen; "Almanac" (today's normal
+   high and low, record, moon phase) when the provider offers it.
+
+A lower band on every screen carries the station name, the location, the local time in that
+location's zone (not the station's), and the music credit ("♫ Lobby Time · Kevin MacLeod"). Screens
+within a location cross-fade; locations are separated by a short title card ("Denver, CO"). The whole
+pass over all locations is the **cycle**; a cycle for five locations with four screens each at ten
+seconds runs about 3.5 minutes.
+
+**Schedule.** A new `ScheduleMode.Weather` (the station's content is the cycle, not library items).
+The compiler emits one `EntryKind.Program` per hour (or per padding grid) titled from a template,
+default "Local weather: Boston, Denver, Austin", so the Live TV guide reads like a channel and not
+like 400 three-minute programs; the cycle repeats inside the entry from the station clock, so every
+viewer sees the same screen at the same moment and tune-in lands mid-cycle like real TV. Option
+"Start a pass on the 8s": the cycle restarts at :08, :18, :28..., and fills the time before the next
+eight with the travel-cities screen and the current conditions of the first location. Pure and
+deterministic (`Scheduling/WeatherCycle.cs`: given the clock and the config, which screen of which
+location is on and how long it has left), tested like the other schedulers.
+
+**Playback.** The restreamer treats a Weather entry as a run of short ffmpeg segments on the one
+clock, the same handover the multi-part movies use: each segment is one location pass (or one
+screen when a report changed mid-pass), built by `FfmpegArgsBuilder.ForWeather`: the screen PNGs as
+inputs with `-loop 1 -t`, `xfade` between them, the audio from the music timeline, the usual
+`-output_ts_offset` and pacing. Rendered PNGs live in `data/TvStation/weather/{station}/` and are
+regenerated only when the report or the theme changes (never inside the segment loop). When the
+provider is unreachable the last report keeps showing with its real "as of" time; after a configurable
+staleness (default 3 h) the screen says so plainly ("Forecast unavailable since 2:10 PM") instead of
+showing old numbers as current. Startup with no report yet shows the title card and music until the
+first fetch lands (seconds).
+
+**Fetching.** A hosted poller (`Weather/WeatherService.cs`, `IHttpClientFactory`, timeouts, one
+retry, jittered schedule): current conditions every 15 minutes, forecast hourly, only for stations
+that are enabled and only while they are listed in the guide (an inactive season window stops the
+polling). Reports are cached on disk so a restart has something to show. The Status page shows the
+last fetch time and error per station, and a station fault is raised after repeated failures. Honest
+User-Agent with the plugin name and version.
+
+**Music.** The audio is its own deterministic timeline: a seeded shuffle of the station's tracks
+played back to back from the anchor (`Scheduling/MusicTimeline.cs`, pure; `TrackAt(utc)` gives the
+track and offset, so any segment can `-ss` into the right track and, when a track ends mid-segment,
+the next one follows through the `concat` demuxer with `inpoint`). Tracks come from two places and
+the station can use both:
+
+- **Jellyfin music**: `ContentSource` kinds for music (`Playlist` already exists; add `Album`,
+  `Artist`, `MusicGenre`), resolved to audio files through the existing resolver. This is "add more":
+  drop albums in the music library, tick them on the station.
+- **A folder**: `data/TvStation/music/<station or shared>/` scanned at compile time (mp3, flac, m4a,
+  ogg), for people without a Jellyfin music library.
+
+A **starter pack** is downloaded on demand from the plugin's own GitHub release with a checksum (like
+the Phase 7 model file), never bundled in the zip: eight to twelve instrumental tracks in the smooth
+jazz and light electronic register the format is known for, every one under CC0 or CC BY 4.0, with
+a `CREDITS.txt` carrying title, artist, source URL and licence, and the on-screen credit line drawn
+from the file's tags. Only licences that allow redistribution go in the pack (CC0 from the Free Music
+Archive; Kevin MacLeod's catalogue is CC BY 4.0 and widely redistributed with credit, but confirm
+incompetech's own licence page before including any track; Pixabay and YouTube Audio Library forbid
+redistribution and are left for people to download themselves). "Royalty free" and "free to
+redistribute" are different things, and the pack respects the second. Volume normalisation with
+`loudnorm` at compile time or `-af volume`, so a quiet flac and a hot mp3 sit at the same level; a
+0.5 s crossfade between tracks is a later polish.
+
+**Editor.** The "New station" preset page gets "Weather channel". The editor for a Weather station
+has three steps like the others: Name and look (theme, logo, units: °F/°C, mph/km/h, 12/24 h, on the
+8s), Locations (a search box backed by the geocoding endpoint through the plugin's API, so the browser
+never calls the provider; results as pick-one rows; up to eight locations, drag to order, a per-
+location display name), Music (sources, folder, "Get the starter pack" button with progress, track
+list with play length, total hours). The content preview shows the cycle as a list of screens with
+times, and the guide shows the hourly entries.
+
+**Steps, in order.**
+
+1. `WeatherReport` model, Open-Meteo provider with recorded JSON fixtures, WMO code to icon and
+   text mapping, unit conversion. Pure and tested. Small.
+2. Screen layouts, the Skia painter and the `ForWeather` argument builder; render the four screens
+   for one fixture report to PNG on the dev container and eyeball them at 720p and 1080p. Font and
+   icons in the zip. Medium.
+3. `ScheduleMode.Weather`, the cycle and the hourly guide entries; restreamer plays the cycle with
+   silence. Verify with the stream test (mid-cycle tune-in lands on the right screen). Medium.
+4. Music timeline, music sources and folder, segment audio with concat and inpoint; verify no gap or
+   jump at a track boundary and across a segment handover. Medium; the risky part is audio
+   continuity across ffmpeg processes, which the video path already solves with the PCR offset.
+5. Poller, disk cache, staleness screen, Status page row, faults. Small-medium.
+6. Editor: preset, locations step with geocoding, music step, starter pack download. Medium.
+7. Polish: alerts screen (and the NWS provider for US alerts), travel cities, almanac, crossfades,
+   themes, "Local weather at the top of the hour" as a two-minute block type on ordinary stations
+   (the cycle runs as a bumper-length program, which is the real Weather Channel's place in a cable
+   lineup). Only after 1-6 are on the real server.
+
+Not planned: speech or a synthesized voice (the user asked for none; a local TTS could be a later
+option under Phase 7's rules), radar imagery (needs tiles from a map provider and a licence check),
+and any provider that needs the person's own paid key before the free ones have shown their limits.
 
 ---
 

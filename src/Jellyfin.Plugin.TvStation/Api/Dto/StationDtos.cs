@@ -5,6 +5,9 @@ namespace Jellyfin.Plugin.TvStation.Api.Dto;
 /// <summary>One compiled item of a station, for the content view.</summary>
 public sealed class ContentItemDto
 {
+    /// <summary>A music track of a weather channel (the title is the track, the episode title the artist).</summary>
+    public bool IsMusic { get; set; }
+
     public Guid ItemId { get; set; }
 
     public string Title { get; set; } = string.Empty;
@@ -112,6 +115,12 @@ public sealed class StationSummaryDto
 
     public int ItemCount { get; set; }
 
+    /// <summary>Weather channel: music tracks compiled.</summary>
+    public int MusicCount { get; set; }
+
+    /// <summary>Weather channel: places configured.</summary>
+    public int LocationCount { get; set; }
+
     public int ExcludedCount { get; set; }
 
     public int Revision { get; set; }
@@ -166,6 +175,9 @@ public sealed class StationHealthDto
 
     /// <summary>Human-readable problems; empty when the station is healthy.</summary>
     public List<string> Warnings { get; set; } = new();
+
+    /// <summary>Weather channel: hours of music before it repeats; null for other stations.</summary>
+    public double? MusicHours { get; set; }
 
     public bool Healthy => Warnings.Count == 0;
 }

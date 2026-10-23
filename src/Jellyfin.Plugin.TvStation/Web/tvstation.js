@@ -30,13 +30,15 @@
   const RECURRENCES = ['Weekly', 'EveryNWeeks', 'WeeksOfMonth', 'Dates'];
   const KIND_LABEL = {
     Movie: 'Movie', Series: 'Series', Season: 'Season', Episode: 'Episode', BoxSet: 'Collection',
-    Playlist: 'Playlist', Genre: 'Genre', Tag: 'Tag', Library: 'Library', Video: 'Video'
+    Playlist: 'Playlist', Genre: 'Genre', Tag: 'Tag', Library: 'Library', Video: 'Video',
+    Album: 'Album', Artist: 'Artist', MusicGenre: 'Music genre', Audio: 'Track', Folder: 'Folder'
   };
-  const MODE_LABEL = { Pool: 'Shuffle', Slots: 'Weekly schedule', Lineup: 'Fixed list' };
+  const MODE_LABEL = { Pool: 'Shuffle', Slots: 'Weekly schedule', Lineup: 'Fixed list', Weather: 'Weather channel' };
   const MODE_HELP = {
     Pool: 'Everything you add plays around the clock, reshuffled each time the channel has been through it all. Example: a comedy channel that never repeats a film twice in a row. Time blocks are optional and take over at fixed times, say a film every evening from 18:00; the shuffle carries on where it left off afterwards.',
     Slots: 'Blocks play their own content at fixed times on chosen days, like cartoons on weekday mornings and a film on Friday night. Whenever no block is on, the filler plays.',
-    Lineup: 'Exactly the items you pick, in your order, looping forever. Good for a fixed marathon or a hand-built evening.'
+    Lineup: 'Exactly the items you pick, in your order, looping forever. Good for a fixed marathon or a hand-built evening.',
+    Weather: 'Current conditions, the next twelve hours and the week ahead for a few places, drawn by the plugin as full-screen graphics with a live clock, cycling over music. Forecasts come from Open-Meteo, a free service; only each place\'s coordinates are sent.'
   };
   /** Starting points for "New station": each fills in the schedule settings; the person adds the content. */
   const PRESETS = [
@@ -54,7 +56,9 @@
     { key: 'weekly', icon: 'event', name: 'Weekly schedule', desc: 'Blocks at fixed times each week, say cartoons on weekday mornings and a film on Friday night, with filler in between.', next: 'Next: add blocks and the filler.',
       apply: d => { d.Mode = 'Slots'; d.PaddingGridMinutes = 15; } },
     { key: 'list', icon: 'format_list_numbered', name: 'Play a fixed list', desc: 'Exactly the items you pick, in your order, looping forever.', next: 'Next: add items in order.',
-      apply: d => { d.Mode = 'Lineup'; } }
+      apply: d => { d.Mode = 'Lineup'; } },
+    { key: 'weather', icon: 'wb_sunny', name: 'Weather channel', desc: 'Local forecasts for a few places, like the cable weather channel: current conditions, the hours ahead and the week, over music, with a live clock.', next: 'Next: add places and some music.',
+      apply: d => { d.Mode = 'Weather'; d.Name = d.Name || 'Weather'; } }
   ];
   const BLOCKS_HELP = {
     Pool: 'Optional. A block takes over at a fixed time on the days you pick and plays its own content; the shuffle carries on whenever no block is on. Times are in the station\'s time zone; family hours do not apply inside a block.',
@@ -431,6 +435,9 @@
     if (entry.Kind === 'Bumper') {
       const role = entry.SourceLabel === 'Pre-roll' || entry.SourceLabel === 'Post-roll' ? entry.SourceLabel : 'Bumper';
       return role + ' · ' + (entry.Title || '');
+    }
+    if (entry.Kind === 'Weather') {
+      return entry.Title || 'Local weather';
     }
     const parts = [entry.Title || ''];
     if (entry.IsSeries) {
@@ -874,7 +881,9 @@
     ]);
     body.appendChild(title);
 
-    const meta = [MODE_LABEL[s.Mode] || s.Mode, s.ItemCount + (s.ItemCount === 1 ? ' item' : ' items')];
+    const meta = s.Mode === 'Weather'
+      ? [MODE_LABEL.Weather, s.LocationCount + (s.LocationCount === 1 ? ' place' : ' places'), s.MusicCount + (s.MusicCount === 1 ? ' track' : ' tracks')]
+      : [MODE_LABEL[s.Mode] || s.Mode, s.ItemCount + (s.ItemCount === 1 ? ' item' : ' items')];
     const metaLine = el('div', { className: 'listItemBodyText secondary' }, meta.join(' · '));
     const health = s.Health || null;
     const warn = (text, title) => {
@@ -886,7 +895,7 @@
       metaLine.appendChild(warn(s.ExcludedCount + ' excluded', excludedTitle(health)));
     }
     if (health) {
-      if (s.ItemCount > 0 && health.UniqueHours < 24) {
+      if (s.Mode !== 'Weather' && s.ItemCount > 0 && health.UniqueHours < 24) {
         metaLine.appendChild(warn(fmtHours(health.UniqueHours) + ' unique', 'Under a day of unique content: programs repeat within 24 hours. Add more shows or films.'));
       }
       const empty = Array.isArray(health.EmptySources) ? health.EmptySources : [];
@@ -1045,6 +1054,7 @@
       Pool: { Sources: [], Order: 'Shuffle', AvoidSameSeriesBackToBack: true, CooldownHours: 0, MarathonMin: 1, MarathonMax: 1, DaypartRules: [] },
       Slots: { Blocks: [], Filler: { Sources: [], Order: 'Shuffle' } },
       Lineup: { Items: [] },
+      Weather: defaultWeather(),
       Encoding: null,
       AutoRecompileNightly: true,
       ActiveWindows: [],
@@ -1093,6 +1103,7 @@
     s.Slots.Filler.Order = s.Slots.Filler.Order || 'Shuffle';
     s.Lineup = s.Lineup || {};
     s.Lineup.Items = s.Lineup.Items || [];
+    s.Weather = normalizeWeather(s.Weather);
     s.Mode = s.Mode || 'Pool';
     s.ActiveWindows = Array.isArray(s.ActiveWindows) ? s.ActiveWindows : [];
     s.ExcludedItemIds = Array.isArray(s.ExcludedItemIds) ? s.ExcludedItemIds : [];
@@ -1345,6 +1356,7 @@
       onRemove: index => state.draft.Bumpers.PostRoll.Sources.splice(index, 1)
     });
     renderSeasonRows();
+    renderWeatherPanel();
     state.content = null;
     clear($('#tvsContent'));
     $('#tvsContentSummary').textContent = '';
@@ -1469,6 +1481,8 @@
     show($('#tvsPanelBlocks'), mode === 'Pool' || mode === 'Slots');
     show($('#tvsPanelSlots'), mode === 'Slots');
     show($('#tvsPanelLineup'), mode === 'Lineup');
+    show($('#tvsPanelWeather'), mode === 'Weather');
+    $('#tvsViewEditor').classList.toggle('tvs-weather-mode', mode === 'Weather');
     if (changed) {
       renderBlocks(); // block wording depends on the mode
     }
@@ -1928,6 +1942,22 @@
     d.Pool.MarathonMin = Math.max(1, parseInt(val('#tvsMarathonMin'), 10) || 1);
     d.Pool.MarathonMax = Math.max(d.Pool.MarathonMin, parseInt(val('#tvsMarathonMax'), 10) || 1);
     d.Slots.Filler.Order = val('#tvsFillerOrder') || 'Shuffle';
+    const w = d.Weather;
+    w.Units = val('#tvsWeatherUnits') || 'Imperial';
+    w.Theme = val('#tvsWeatherTheme') || 'Classic';
+    w.ScreenSeconds = Math.min(60, Math.max(4, parseInt(val('#tvsWeatherScreenSeconds'), 10) || 10));
+    w.GuideEntryMinutes = Math.min(240, Math.max(15, parseInt(val('#tvsWeatherEntryMinutes'), 10) || 60));
+    w.OnTheEights = checked('#tvsWeatherEights');
+    w.TwentyFourHourClock = checked('#tvsWeatherClock24');
+    w.ShowHourly = checked('#tvsWeatherHourly');
+    w.ShowDaily = checked('#tvsWeatherDaily');
+    w.ShowTravelCities = checked('#tvsWeatherTravel');
+    w.ShowLogo = checked('#tvsWeatherLogo');
+    w.GuideTitle = val('#tvsWeatherGuideTitle').trim() || null;
+    w.MusicEnabled = checked('#tvsWeatherMusic');
+    w.MusicFolder = val('#tvsWeatherMusicFolder').trim() || null;
+    w.MusicVolumePercent = Math.min(150, Math.max(20, parseInt(val('#tvsWeatherVolume'), 10) || 100));
+    w.ShowMusicCredit = checked('#tvsWeatherCredit');
     d.Encoding = checked('#tvsEncodingEnabled') && state.stationEncoding ? state.stationEncoding.get() : null;
     return toPayload(d);
   }
@@ -1952,6 +1982,11 @@
       }
       b.DurationMinutes = parseInt(b.DurationMinutes, 10) || 0;
     });
+    ((p.Weather && p.Weather.Locations) || []).forEach(l => {
+      if (!l.Id || l.Id === ZERO_GUID) {
+        delete l.Id; // server assigns
+      }
+    });
     return p;
   }
 
@@ -1971,6 +2006,9 @@
     }
     if (p.Mode === 'Slots' && !p.Slots.Blocks.length && !p.Slots.Filler.Sources.length) {
       errors.push('Add at least one time block or some filler content.');
+    }
+    if (p.Mode === 'Weather' && !(p.Weather.Locations || []).some(weatherPlaceValid)) {
+      errors.push('Add at least one place to the weather channel.');
     }
     if (p.Mode === 'Pool' || p.Mode === 'Slots') {
       p.Slots.Blocks.forEach((b, i) => {
@@ -2152,8 +2190,10 @@
       const excluded = isExcluded(r.ItemId) || !!r.ExcludedByRule;
       const title = r.IsSeries
         ? r.Title + (r.SeasonNumber || r.EpisodeNumber ? ' S' + (r.SeasonNumber || 0) + 'E' + (r.EpisodeNumber || 0) : '') + (r.EpisodeTitle ? ' – ' + r.EpisodeTitle : '')
-        : r.Title;
-      const btn = r.ExcludedByRule
+        : r.IsMusic ? r.Title + (r.EpisodeTitle ? ' – ' + r.EpisodeTitle : '') : r.Title;
+      const btn = r.IsMusic
+        ? el('span', { className: 'tvs-secondary', text: 'music' })
+        : r.ExcludedByRule
         ? el('span', { className: 'tvs-secondary', text: 'by tag', title: 'Dropped by an excluded tag (station or Settings). Remove the tag rule to include it.' })
         : el('button', { type: 'button', text: excluded ? 'Include' : 'Exclude', onClick: () => {
           setExcluded(r.ItemId, !excluded);
@@ -3381,9 +3421,11 @@
   function createPicker(opts) {
     const container = clear(opts.container);
     const mode = opts.mode || 'sources';
-    const itemKinds = mode === 'items'
+    const itemKinds = opts.kinds ? opts.kinds.slice() : mode === 'items'
       ? ['Movie', 'Series', 'Season', 'Episode', 'BoxSet', 'Playlist']
       : ['Movie', 'Series', 'BoxSet', 'Playlist'];
+    const specials = opts.specials !== false && mode === 'sources';
+    const tune = opts.tune !== false;
     const filter = { kinds: itemKinds.slice(), special: null };
     let lastResults = [];
     let searched = false;
@@ -3394,7 +3436,7 @@
     const kindRow = el('div', { className: 'tvs-chips tvs-kinds' });
     const input = el('input', {
       type: 'text', className: 'emby-input', autocomplete: 'off',
-      placeholder: mode === 'items' ? 'Search movies, series, seasons, episodes, collections, playlists…' : 'Search the library…'
+      placeholder: opts.placeholder || (mode === 'items' ? 'Search movies, series, seasons, episodes, collections, playlists…' : 'Search the library…')
     });
     const inputWrap = el('div', { className: 'inputContainer' }, input);
     const status = el('div', { className: 'tvs-info' });
@@ -3440,7 +3482,7 @@
           search();
         }));
       });
-      if (mode === 'sources') {
+      if (specials) {
         ['Genre', 'Tag', 'Library'].forEach(special => {
           kindRow.appendChild(kindChip(KIND_LABEL[special], filter.special === special, () => {
             filter.special = filter.special === special ? null : special;
@@ -3499,7 +3541,7 @@
       const sources = opts.getSources() || [];
       if (!sources.length) {
         editing = -1;
-        chips.appendChild(el('span', { className: 'tvs-secondary', text: 'No content selected yet. Search below and press Add.' }));
+        chips.appendChild(el('span', { className: 'tvs-secondary', text: opts.emptyText || 'No content selected yet. Search below and press Add.' }));
         return;
       }
       if (editing >= sources.length) {
@@ -3515,10 +3557,12 @@
         if (badge) {
           children.push(el('span', { className: 'badge', text: badge }));
         }
-        children.push(el('button', { type: 'button', title: 'Tune this source', 'aria-label': 'Tune', text: '✎', onClick: () => {
-          editing = editing === index ? -1 : index;
-          renderChips();
-        } }));
+        if (tune) {
+          children.push(el('button', { type: 'button', title: 'Tune this source', 'aria-label': 'Tune', text: '✎', onClick: () => {
+            editing = editing === index ? -1 : index;
+            renderChips();
+          } }));
+        }
         children.push(el('button', { type: 'button', title: 'Remove', 'aria-label': 'Remove', text: '×', onClick: () => {
           opts.onRemove(index);
           editing = -1;
@@ -3722,6 +3766,10 @@
         case 'Genre': return 'theater_comedy';
         case 'Tag': return 'label';
         case 'Library': return 'folder';
+        case 'Album': return 'album';
+        case 'Artist': return 'person';
+        case 'MusicGenre': return 'music_note';
+        case 'Audio': return 'audiotrack';
         default: return 'videocam';
       }
     }
@@ -4344,6 +4392,359 @@
     }
   }
 
+  // ---- Weather channel ---------------------------------------------------------------------
+
+  const MUSIC_KINDS = ['Playlist', 'Album', 'Artist', 'MusicGenre', 'Audio'];
+  const WEATHER_SCREEN_LABEL = { Current: 'Current conditions', Hourly: 'Next 12 hours', Daily: '7-day forecast', Travel: 'Travel cities' };
+
+  function defaultWeather() {
+    return {
+      Locations: [], Units: 'Imperial', TwentyFourHourClock: false, ScreenSeconds: 10, OnTheEights: false, Theme: 'Classic',
+      ShowLogo: true, ShowTravelCities: true, ShowHourly: true, ShowDaily: true, GuideTitle: null, GuideEntryMinutes: 60, StaleHours: 3,
+      Provider: 'open-meteo', MusicEnabled: true, MusicSources: [], MusicFolder: null, ShowMusicCredit: true, MusicVolumePercent: 100
+    };
+  }
+
+  function normalizeWeather(w) {
+    const d = defaultWeather();
+    w = w || {};
+    Object.keys(d).forEach(k => {
+      if (w[k] === undefined || w[k] === null) {
+        w[k] = d[k];
+      }
+    });
+    w.Locations = (Array.isArray(w.Locations) ? w.Locations : []).slice(0, 8).map(l => ({
+      Id: l.Id || ZERO_GUID,
+      Name: String(l.Name || '').trim(),
+      Region: l.Region || null,
+      Latitude: Number(l.Latitude) || 0,
+      Longitude: Number(l.Longitude) || 0,
+      TimeZoneId: l.TimeZoneId || null
+    }));
+    w.MusicSources = Array.isArray(w.MusicSources) ? w.MusicSources : [];
+    w.MusicSources.forEach(normalizeSource);
+    w.ScreenSeconds = Math.min(60, Math.max(4, parseInt(w.ScreenSeconds, 10) || 10));
+    w.GuideEntryMinutes = Math.min(240, Math.max(15, parseInt(w.GuideEntryMinutes, 10) || 60));
+    w.MusicVolumePercent = Math.min(150, Math.max(20, parseInt(w.MusicVolumePercent, 10) || 100));
+    w.MusicEnabled = w.MusicEnabled !== false;
+    w.ShowMusicCredit = w.ShowMusicCredit !== false;
+    return w;
+  }
+
+  function weatherPlaceValid(l) {
+    return !!l.Name && !(l.Latitude === 0 && l.Longitude === 0) && Math.abs(l.Latitude) <= 90 && Math.abs(l.Longitude) <= 180;
+  }
+
+  /** Fills the weather panel from the draft; called by renderEditor. */
+  function renderWeatherPanel() {
+    const w = state.draft.Weather;
+    setVal('#tvsWeatherUnits', w.Units || 'Imperial');
+    setVal('#tvsWeatherTheme', w.Theme || 'Classic');
+    setVal('#tvsWeatherScreenSeconds', w.ScreenSeconds);
+    setVal('#tvsWeatherEntryMinutes', w.GuideEntryMinutes);
+    setChecked('#tvsWeatherEights', !!w.OnTheEights);
+    setChecked('#tvsWeatherClock24', !!w.TwentyFourHourClock);
+    setChecked('#tvsWeatherHourly', w.ShowHourly !== false);
+    setChecked('#tvsWeatherDaily', w.ShowDaily !== false);
+    setChecked('#tvsWeatherTravel', w.ShowTravelCities !== false);
+    setChecked('#tvsWeatherLogo', w.ShowLogo !== false);
+    setVal('#tvsWeatherGuideTitle', w.GuideTitle || '');
+    setChecked('#tvsWeatherMusic', w.MusicEnabled !== false);
+    show($('#tvsWeatherMusicOptions'), w.MusicEnabled !== false);
+    setVal('#tvsWeatherMusicFolder', w.MusicFolder || '');
+    setVal('#tvsWeatherVolume', w.MusicVolumePercent);
+    setChecked('#tvsWeatherCredit', w.ShowMusicCredit !== false);
+    loadMusicPacks();
+    createPicker({
+      container: $('#tvsMusicPicker'),
+      mode: 'sources',
+      kinds: MUSIC_KINDS,
+      specials: false,
+      tune: false,
+      placeholder: 'Search playlists, albums, artists, music genres, tracks…',
+      emptyText: 'No music from the library yet. Search below and press Add, or name a folder underneath.',
+      getSources: () => state.draft.Weather.MusicSources,
+      onAdd: source => state.draft.Weather.MusicSources.push(source),
+      onRemove: index => state.draft.Weather.MusicSources.splice(index, 1)
+    });
+    $('#tvsWeatherSearch').value = '';
+    $('#tvsWeatherSearchStatus').textContent = '';
+    show($('#tvsWeatherSearchResults'), false);
+    show($('#tvsWeatherPreviewImg'), false);
+    renderWeatherPlaces();
+    renderWeatherStatus(null);
+    if (!isNewDraft() && state.draft.Mode === 'Weather') {
+      loadWeatherStatus();
+    }
+  }
+
+  function renderWeatherPlaces() {
+    const w = state.draft.Weather;
+    const list = clear($('#tvsWeatherPlaces'));
+    show($('#tvsWeatherPlacesEmpty'), !w.Locations.length);
+    w.Locations.forEach((l, index) => {
+      const row = el('div', { className: 'listItem' });
+      row.appendChild(el('div', { className: 'tvs-chnum', text: String(index + 1) }));
+      const body = el('div', { className: 'listItemBody two-line' });
+      body.appendChild(el('div', { className: 'listItemBodyText' }, [
+        el('span', { text: l.Name || '(unnamed)' }),
+        weatherPlaceValid(l) ? null : badge('Pick from the search', 'warn')
+      ]));
+      const meta = [l.Region, (l.Latitude || l.Longitude) ? l.Latitude.toFixed(2) + ', ' + l.Longitude.toFixed(2) : null, l.TimeZoneId].filter(Boolean).join(' · ');
+      body.appendChild(el('div', { className: 'listItemBodyText secondary tvs-ellipsis', text: meta }));
+      row.appendChild(body);
+      const actions = el('div', { className: 'tvs-station-actions' });
+      actions.appendChild(iconButton('arrow_upward', 'Earlier in the cycle', () => {
+        if (index > 0) {
+          w.Locations.splice(index - 1, 0, w.Locations.splice(index, 1)[0]);
+          renderWeatherPlaces();
+        }
+      }));
+      actions.appendChild(iconButton('arrow_downward', 'Later in the cycle', () => {
+        if (index < w.Locations.length - 1) {
+          w.Locations.splice(index + 1, 0, w.Locations.splice(index, 1)[0]);
+          renderWeatherPlaces();
+        }
+      }));
+      actions.appendChild(iconButton('delete', 'Remove', () => {
+        w.Locations.splice(index, 1);
+        renderWeatherPlaces();
+      }));
+      row.appendChild(actions);
+      list.appendChild(row);
+    });
+    const placeSelect = clear($('#tvsWeatherPreviewPlace'));
+    w.Locations.forEach((l, index) => placeSelect.appendChild(el('option', { value: String(index), text: l.Name || ('Place ' + (index + 1)) })));
+  }
+
+  let weatherSearchSeq = 0;
+
+  function weatherSearch() {
+    const q = ($('#tvsWeatherSearch').value || '').trim();
+    const status = $('#tvsWeatherSearchStatus');
+    const results = $('#tvsWeatherSearchResults');
+    const seq = ++weatherSearchSeq;
+    if (q.length < 2) {
+      status.textContent = '';
+      show(results, false);
+      return;
+    }
+    status.textContent = 'Searching…';
+    api('GET', 'Weather/Search', undefined, { q: q, count: 8 }).then(list => {
+      if (seq !== weatherSearchSeq) {
+        return;
+      }
+      clear(results);
+      show(results, true);
+      list = Array.isArray(list) ? list : [];
+      status.textContent = list.length ? list.length + ' place' + (list.length === 1 ? '' : 's') : '';
+      if (!list.length) {
+        results.appendChild(el('div', { className: 'tvs-msg', text: 'No places match.' }));
+        return;
+      }
+      list.forEach(p => {
+        const row = el('div', { className: 'tvs-result' });
+        row.appendChild(el('div', { className: 'tvs-thumb placeholder' }, el('span', { className: 'material-icons place', 'aria-hidden': 'true' })));
+        const meta = [p.Region, p.TimeZoneId, p.Population ? 'pop. ' + Number(p.Population).toLocaleString() : null].filter(Boolean).join(' · ');
+        row.appendChild(el('div', { className: 'body' }, [
+          el('div', { className: 'tvs-ellipsis', text: p.Name }),
+          el('div', { className: 'tvs-secondary tvs-ellipsis', text: meta })
+        ]));
+        const full = state.draft.Weather.Locations.length >= 8;
+        const addButton = textButton(full ? 'Full' : 'Add', () => {
+          if (state.draft.Weather.Locations.length >= 8) {
+            toast('A weather channel shows at most eight places.');
+            return;
+          }
+          state.draft.Weather.Locations.push({ Id: ZERO_GUID, Name: p.Name, Region: p.Region || null, Latitude: p.Latitude, Longitude: p.Longitude, TimeZoneId: p.TimeZoneId || null });
+          renderWeatherPlaces();
+          addButton.disabled = true;
+          addButton.firstChild.textContent = 'Added';
+        });
+        addButton.disabled = full;
+        row.appendChild(addButton);
+        results.appendChild(row);
+      });
+    }).catch(err => {
+      if (seq !== weatherSearchSeq) {
+        return;
+      }
+      readErrors(err).then(messages => {
+        status.textContent = 'Search failed: ' + messages.join(' ');
+        show(results, false);
+      });
+    });
+  }
+
+  // ---- Music packs ----
+
+  let musicPackTimer = null;
+
+  function loadMusicPacks() {
+    clearTimeout(musicPackTimer);
+    api('GET', 'MusicPacks').then(renderMusicPacks).catch(() => {
+      clear($('#tvsMusicPacks')).appendChild(el('div', { className: 'tvs-secondary', text: 'Music packs could not be loaded.' }));
+    });
+  }
+
+  function folderInUse(folder) {
+    const parts = (val('#tvsWeatherMusicFolder') || '').split(/[;\n\r]/).map(s => s.trim()).filter(Boolean);
+    return parts.some(p => p.toLowerCase() === folder.toLowerCase());
+  }
+
+  function addPackFolder(folder) {
+    if (folderInUse(folder)) {
+      return;
+    }
+    const current = (val('#tvsWeatherMusicFolder') || '').trim();
+    setVal('#tvsWeatherMusicFolder', current ? current.replace(/;\s*$/, '') + '; ' + folder : folder);
+    toast('Folder "' + folder + '" added. Save the station to use it.');
+  }
+
+  function renderMusicPacks(packs) {
+    const list = clear($('#tvsMusicPacks'));
+    packs = Array.isArray(packs) ? packs : [];
+    let anyRunning = false;
+    packs.forEach(p => {
+      const row = el('div', { className: 'listItem', style: 'flex-wrap:wrap' });
+      const body = el('div', { className: 'listItemBody three-line' });
+      const minutes = Math.round((p.TotalSeconds || 0) / 60);
+      const meta = [
+        p.Artist,
+        p.TrackCount + ' track' + (p.TrackCount === 1 ? '' : 's'),
+        minutes >= 60 ? Math.floor(minutes / 60) + ' h ' + (minutes % 60) + ' min' : minutes + ' min',
+        p.TotalBytes ? fmtBytes(p.TotalBytes) : null,
+        p.Licence
+      ].filter(Boolean).join(' · ');
+      body.appendChild(el('div', { className: 'listItemBodyText' }, [
+        el('span', { text: p.Name }),
+        p.Installed ? badge(p.Manual ? p.Present + ' file' + (p.Present === 1 ? '' : 's') + ' in place' : 'Installed', 'on') : null,
+        p.Running ? badge('Downloading ' + p.Downloaded + ' / ' + p.TrackCount, 'on') : null,
+        !p.Running && p.Error ? badge(p.Error === 'Cancelled.' ? 'Cancelled' : 'Failed', 'warn', p.Error) : null,
+        !p.Installed && !p.Running && !p.Error && !p.Manual && p.Present > 0 ? badge(p.Present + ' of ' + p.TrackCount + ' present', 'warn') : null
+      ]));
+      body.appendChild(el('div', { className: 'listItemBodyText secondary', text: meta }));
+      body.appendChild(el('div', { className: 'listItemBodyText secondary', text: p.Description }));
+      row.appendChild(body);
+
+      const actions = el('div', { className: 'tvs-station-actions' });
+      if (p.Running) {
+        anyRunning = true;
+        actions.appendChild(textButton('Cancel', () => api('POST', 'MusicPacks/' + p.Id + '/Cancel').then(loadMusicPacks).catch(err => alertErrors(err, 'Could not cancel'))));
+      } else if (!p.Manual && !p.Installed) {
+        actions.appendChild(textButton(p.Present > 0 ? 'Finish download' : 'Get it', () => {
+          api('POST', 'MusicPacks/' + p.Id + '/Install').then(() => {
+            toast('Downloading "' + p.Name + '" into the music folder.');
+            loadMusicPacks();
+          }).catch(err => alertErrors(err, 'Could not start the download'));
+        }));
+      }
+      if (p.Manual) {
+        actions.appendChild(textButton('Where to get it', () => {
+          const details = row.querySelector('.tvs-pack-details');
+          show(details, details.classList.contains('tvs-hidden'));
+        }));
+      }
+      if (!folderInUse(p.Folder)) {
+        actions.appendChild(textButton('Use this folder', () => {
+          addPackFolder(p.Folder);
+          renderMusicPacks(packs);
+        }));
+      } else {
+        actions.appendChild(el('span', { className: 'tvs-secondary', text: 'in use' }));
+      }
+      row.appendChild(actions);
+
+      const details = el('div', { className: 'tvs-pack-details tvs-secondary' + (p.Manual ? ' tvs-hidden' : ' tvs-hidden'), style: 'flex-basis:100%;padding:.4em 0 .2em 3.8em' });
+      if (p.Manual) {
+        details.appendChild(el('div', { text: 'Download the albums (a free account is needed there), then put the audio files into this folder on the server:' }));
+        details.appendChild(el('div', null, el('code', { text: p.FolderPath })));
+        const ul = el('ul', { style: 'margin:.3em 0' });
+        (p.Links || []).forEach(l => ul.appendChild(el('li', null, el('a', { href: l.Url, target: '_blank', rel: 'noopener', text: l.Label }))));
+        details.appendChild(ul);
+        details.appendChild(el('div', { text: 'Then save the station, or press Refresh content, and the files join the rotation. Credit: ' + p.Attribution }));
+      }
+      row.appendChild(details);
+      list.appendChild(row);
+    });
+    if (anyRunning) {
+      musicPackTimer = setTimeout(() => {
+        if (!$('#tvsPanelWeather').classList.contains('tvs-hidden') && !$('#tvsViewEditor').classList.contains('tvs-hidden')) {
+          loadMusicPacks();
+        }
+      }, 2000);
+    }
+  }
+
+  function loadWeatherStatus() {
+    if (isNewDraft()) {
+      return;
+    }
+    api('GET', 'Weather/Status/' + state.draft.Id).then(renderWeatherStatus).catch(() => renderWeatherStatus(null));
+  }
+
+  function renderWeatherStatus(status) {
+    const box = clear($('#tvsWeatherStatus'));
+    show($('#tvsWeatherStatusTools'), !isNewDraft());
+    if (isNewDraft()) {
+      box.textContent = 'Save the station to start fetching forecasts.';
+      return;
+    }
+    if (!status || !Array.isArray(status.Locations) || !status.Locations.length) {
+      box.textContent = 'No forecasts fetched yet.';
+      return;
+    }
+    const table = el('table', { className: 'tvs-table' });
+    table.appendChild(el('thead', null, el('tr', null, [el('th', { text: 'Place' }), el('th', { text: 'Now' }), el('th', { text: 'Last fetched' }), el('th', { text: '' })])));
+    const tbody = el('tbody');
+    const metric = state.draft.Weather.Units === 'Metric';
+    status.Locations.forEach(l => {
+      const temp = l.TemperatureC === null || l.TemperatureC === undefined ? '' : (metric ? Math.round(l.TemperatureC) + '°C' : Math.round(l.TemperatureC * 9 / 5 + 32) + '°F');
+      const now = temp ? temp + (l.Conditions ? ', ' + l.Conditions.toLowerCase() : '') : '—';
+      let note = null;
+      if (l.LastError) {
+        note = badge('Error', 'warn', l.LastError);
+      } else if (l.Stale) {
+        note = badge('Not current', 'warn', 'Older than the station allows; the screens say so.');
+      } else if (l.LastSuccessUtc) {
+        note = badge('OK', 'on');
+      }
+      tbody.appendChild(el('tr', null, [
+        el('td', { text: l.Name }),
+        el('td', { text: now }),
+        el('td', { className: 'nowrap', text: l.LastSuccessUtc ? fmtDateTime(l.LastSuccessUtc) : 'never' }),
+        el('td', { className: 'nowrap' }, [note, l.LastError ? el('span', { className: 'tvs-secondary', text: ' ' + l.LastError }) : null])
+      ]));
+    });
+    table.appendChild(tbody);
+    box.appendChild(table);
+    box.appendChild(el('div', { className: 'tvs-secondary', text: 'Refreshed every 15 minutes while the station is enabled. ' + (status.Attribution || '') }));
+  }
+
+  function refreshWeatherNow() {
+    if (isNewDraft()) {
+      return;
+    }
+    loading(true);
+    api('POST', 'Weather/Refresh/' + state.draft.Id).then(status => {
+      renderWeatherStatus(status);
+      toast('Forecasts fetched.');
+    }).catch(err => alertErrors(err, 'Could not fetch forecasts')).then(() => loading(false));
+  }
+
+  function previewWeatherScreen() {
+    if (isNewDraft()) {
+      toast('Save the station first.');
+      return;
+    }
+    const img = $('#tvsWeatherPreviewImg');
+    const screen = val('#tvsWeatherPreviewScreen') || 'Current';
+    const place = parseInt(val('#tvsWeatherPreviewPlace'), 10) || 0;
+    img.src = ApiClient.getUrl('TvStation/Weather/Preview/' + state.draft.Id, { screen: screen, location: place, width: 1280, v: Date.now() });
+    img.alt = WEATHER_SCREEN_LABEL[screen] || screen;
+    show(img, true);
+  }
+
   function wireHandlers() {
     // List
     on('#tvsBtnNew', 'click', openPresets);
@@ -4415,6 +4816,10 @@
     on('#tvsBtnSaveRefresh', 'click', () => saveStation(true));
     on('#tvsBtnRecompile', 'click', recompileStation);
     on('#tvsMode', 'change', updateModePanels);
+    on('#tvsWeatherSearch', 'input', debounce(weatherSearch, 350));
+    on('#tvsWeatherMusic', 'change', () => show($('#tvsWeatherMusicOptions'), checked('#tvsWeatherMusic')));
+    on('#tvsBtnWeatherRefresh', 'click', refreshWeatherNow);
+    on('#tvsBtnWeatherPreview', 'click', previewWeatherScreen);
     on('#tvsAnchor', 'change', updateAnchorHint);
     on('#tvsAnchor', 'input', updateAnchorHint);
     on('#tvsBtnResetAnchor', 'click', () => {

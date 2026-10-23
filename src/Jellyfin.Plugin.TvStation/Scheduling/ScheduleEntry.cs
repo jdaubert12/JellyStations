@@ -20,7 +20,12 @@ public sealed record ScheduleEntry(
 
     public bool Contains(DateTime utc) => utc >= StartUtc && utc < EndUtc;
 
-    public string Title => Kind == EntryKind.Slate ? "Station Break" : Item?.Title ?? string.Empty;
+    public string Title => Kind switch
+    {
+        EntryKind.Slate => "Station Break",
+        EntryKind.Weather => SourceLabel ?? "Local weather",
+        _ => Item?.Title ?? string.Empty
+    };
 }
 
 /// <summary>The entry airing at a given instant and how far into it we are.</summary>

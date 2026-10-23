@@ -49,6 +49,9 @@ public sealed class CompiledStation
     /// <summary>How each content source expanded at compile time (for the health report).</summary>
     public List<SourceExpansion> Sources { get; set; } = new();
 
+    /// <summary>Music tracks of a weather channel, from its music sources and folder, in compile order.</summary>
+    public List<MusicTrack> Music { get; set; } = new();
+
     public int TotalItemCount => Pool.Count + Lineup.Count + Filler.Count + Blocks.Values.Sum(b => b.Count);
 }
 

@@ -7,12 +7,14 @@ namespace Jellyfin.Plugin.TvStation.Library;
 public sealed class StationCompiler
 {
     private readonly LibraryContentResolver _resolver;
+    private readonly MusicResolver? _music;
     private readonly ILogger<StationCompiler> _logger;
 
-    public StationCompiler(LibraryContentResolver resolver, ILogger<StationCompiler> logger)
+    public StationCompiler(LibraryContentResolver resolver, ILogger<StationCompiler> logger, MusicResolver? music = null)
     {
         _resolver = resolver;
         _logger = logger;
+        _music = music;
     }
 
     public CompiledStation Compile(Station station, EncodingProfile effectiveProfile, IReadOnlyCollection<string>? globalExcludedTags = null)
@@ -75,6 +77,14 @@ public sealed class StationCompiler
                 CompileBlocks();
                 compiled.Filler = DropShort(ApplyExclusions(Expand(station.Slots.Filler.Sources, "Filler"), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
                 break;
+
+            case ScheduleMode.Weather:
+                if (_music is not null && station.Weather.MusicEnabled)
+                {
+                    compiled.Music = _music.Expand(station.Weather, compiled.Sources, compiled.Excluded);
+                }
+
+                break;
         }
 
         if (station.Bumpers?.Enabled == true && station.Bumpers.Sources.Count > 0)
@@ -99,10 +109,11 @@ public sealed class StationCompiler
             .ToList();
 
         _logger.LogInformation(
-            "TvStation: compiled station {Name} rev {Revision}: {Items} item(s), {Excluded} excluded",
+            "TvStation: compiled station {Name} rev {Revision}: {Items} item(s), {Tracks} music track(s), {Excluded} excluded",
             station.Name,
             station.Revision,
             compiled.TotalItemCount,
+            compiled.Music.Count,
             compiled.Excluded.Count);
 
         return compiled;
@@ -204,6 +215,11 @@ public sealed class StationCompiler
         }
 
         if (a.Blocks.Count != b.Blocks.Count)
+        {
+            return false;
+        }
+
+        if (!a.Music.Select(t => (t.Id, t.RuntimeTicks)).SequenceEqual(b.Music.Select(t => (t.Id, t.RuntimeTicks))))
         {
             return false;
         }

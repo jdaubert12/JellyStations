@@ -370,6 +370,25 @@ public sealed class StationService
         {
             Add(compiled.PostRoll, "Post-roll", false);
         }
+        foreach (var track in compiled.Music)
+        {
+            if (!seen.Add(track.Id))
+            {
+                continue;
+            }
+
+            uniqueTicks += track.RuntimeTicks;
+            rows.Add(new ContentItemDto
+            {
+                ItemId = track.Id,
+                Title = track.Title,
+                EpisodeTitle = track.Artist,
+                Minutes = (int)Math.Round(track.Runtime.TotalMinutes),
+                Source = "Music: " + track.Source,
+                IsMusic = true
+            });
+        }
+
         Add(compiled.UserExcluded, "Excluded", true);
         Add(compiled.TagExcluded, "Excluded by tag", true, byRule: true);
 
@@ -483,6 +502,9 @@ public sealed class StationService
             s.CardText = s.CardText[..80];
         }
 
+        s.Weather ??= new WeatherConfig();
+        s.Weather.Normalize();
+        NormalizeSources(s.Weather.MusicSources);
         s.LogoOverlay ??= new LogoOverlayConfig();
         s.LogoOverlay.Normalize();
         s.UpNextCard ??= new UpNextCardConfig();
@@ -650,6 +672,24 @@ public sealed class StationService
             errors.Add("Add at least one time slot block or filler source.");
         }
 
+        if (s.Mode == ScheduleMode.Weather)
+        {
+            if (!s.Weather.Locations.Any(l => l.IsValid))
+            {
+                errors.Add("Add at least one place to the weather channel.");
+            }
+
+            foreach (var l in s.Weather.Locations.Where(l => !l.IsValid))
+            {
+                errors.Add("Place \"" + (l.Name.Length == 0 ? "?" : l.Name) + "\": needs a name and coordinates; pick it from the search.");
+            }
+
+            if (!string.Equals(s.Weather.Provider, WeatherConfig.DefaultProvider, StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add("Unknown weather provider '" + s.Weather.Provider + "'.");
+            }
+        }
+
         if (s.Mode != ScheduleMode.Lineup)
         {
             for (var i = 0; i < s.Slots.Blocks.Count; i++)
@@ -746,7 +786,8 @@ public sealed class StationService
             s.PaddingByLength,
             s.TimeZoneId,
             s.Bumpers,
-            s.MinRuntimeMinutes
+            s.MinRuntimeMinutes,
+            s.Weather
         });
     }
 }

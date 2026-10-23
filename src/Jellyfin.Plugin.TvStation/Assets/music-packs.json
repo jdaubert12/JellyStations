@@ -1,0 +1,397 @@
+[
+  {
+    "Id": "lounge",
+    "Name": "Lounge and light jazz",
+    "Description": "Thirty instrumental lounge, bossa nova and light jazz pieces by Kevin MacLeod, in the register the cable weather channel is known for: the three \"Local Forecast\" takes, Lobby Time, Airport Lounge, Bossa Antigua and more. About 1 h 54 min, 320 kbps MP3, fetched from incompetech.com.",
+    "Folder": "lounge",
+    "Artist": "Kevin MacLeod",
+    "Licence": "Creative Commons Attribution 4.0 (CC BY 4.0)",
+    "LicenceUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "Attribution": "\"<Title>\" Kevin MacLeod (incompetech.com). Licensed under Creative Commons: By Attribution 4.0. The channel draws the title and artist on screen while a track plays; keep that on, or credit the tracks where people can find it.",
+    "Manual": false,
+    "Links": [
+      {
+        "Label": "incompetech.com (the catalogue)",
+        "Url": "https://incompetech.com/music/royalty-free/music.html"
+      },
+      {
+        "Label": "Licence FAQ",
+        "Url": "https://incompetech.com/music/royalty-free/faq.html"
+      }
+    ],
+    "Tracks": [
+      {
+        "Title": "Local Forecast",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Local Forecast.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Local%20Forecast.mp3",
+        "Sha256": "c0b120cb91a62468f5024162c8942dd2310696c076b6a1df2b88892350575b87",
+        "Bytes": 6611177,
+        "Seconds": 165,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300010"
+      },
+      {
+        "Title": "Local Forecast - Elevator",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Local Forecast - Elevator.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Local%20Forecast%20-%20Elevator.mp3",
+        "Sha256": "8c46b44e65324bc339fbbc3e770611d671f6c74a40f3ec8dd50332c082b25cc9",
+        "Bytes": 7570404,
+        "Seconds": 189,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300012"
+      },
+      {
+        "Title": "Local Forecast - Slower",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Local Forecast - Slower.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Local%20Forecast%20-%20Slower.mp3",
+        "Sha256": "8214ce19de17d6edfe4b83a156feb321d814278deb582fdd5209dcb47f56d440",
+        "Bytes": 7984182,
+        "Seconds": 200,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300011"
+      },
+      {
+        "Title": "Lobby Time",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Lobby Time.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Lobby%20Time.mp3",
+        "Sha256": "bc47dc1f1a0b1fe4ff631cee89ca3987b8f7b52f533d06233665d51300331beb",
+        "Bytes": 6184700,
+        "Seconds": 193,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600054"
+      },
+      {
+        "Title": "Backbay Lounge",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Backbay Lounge.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Backbay%20Lounge.mp3",
+        "Sha256": "9567e71a213b0026341b2c0ecd226950e7653abd235cf520fb9aee4247d74d96",
+        "Bytes": 8531962,
+        "Seconds": 267,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700068"
+      },
+      {
+        "Title": "Airport Lounge",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Airport Lounge.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Airport%20Lounge.mp3",
+        "Sha256": "e20d316b541c72690a3b0311c9f3d40fd00717359ab7567d7df82a9316c1dec4",
+        "Bytes": 12309016,
+        "Seconds": 308,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100806"
+      },
+      {
+        "Title": "Ultralounge",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Ultralounge.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Ultralounge.mp3",
+        "Sha256": "e03261bf6692ed0e4f8ae782c2ac1036ac9f634b5670e9f7430634346c395f6c",
+        "Bytes": 10141911,
+        "Seconds": 317,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1500017"
+      },
+      {
+        "Title": "Bossa Antigua",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Bossa Antigua.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Bossa%20Antigua.mp3",
+        "Sha256": "322103dd6ac5fae4872122f91d32cccd4d964b86d300585a5a0cdfaf7048af5d",
+        "Bytes": 9069455,
+        "Seconds": 283,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700069"
+      },
+      {
+        "Title": "Casa Bossa Nova",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Casa Bossa Nova.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Casa%20Bossa%20Nova.mp3",
+        "Sha256": "614b43e981c3f53ad96d4f95a23738889e8dd908cc877e61487ceb12d88e2606",
+        "Bytes": 7750389,
+        "Seconds": 242,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600012"
+      },
+      {
+        "Title": "BossaBossa",
+        "Artist": "Kevin MacLeod",
+        "FileName": "BossaBossa.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/BossaBossa.mp3",
+        "Sha256": "a89ec158f9113531e7cbd98955cdd1a557e88e19713a3ef8a5084e2f9f039a12",
+        "Bytes": 5355450,
+        "Seconds": 167,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1600055"
+      },
+      {
+        "Title": "Samba Isobel",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Samba Isobel.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Samba%20Isobel.mp3",
+        "Sha256": "563bd5a5686560f56f012d302a672796110cab392a0e3ecbbfdd8f96c6489527",
+        "Bytes": 8007838,
+        "Seconds": 250,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700071"
+      },
+      {
+        "Title": "Modern Jazz Samba",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Modern Jazz Samba.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Modern%20Jazz%20Samba.mp3",
+        "Sha256": "d993cbee80bba09af9c0b7eb92df80729ac68940059c6844f60e7f33f25c5bb1",
+        "Bytes": 6070802,
+        "Seconds": 249,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100153"
+      },
+      {
+        "Title": "George Street Shuffle",
+        "Artist": "Kevin MacLeod",
+        "FileName": "George Street Shuffle.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/George%20Street%20Shuffle.mp3",
+        "Sha256": "15ee9995e01ffe91678db6ba072ec13cf0bf258f17c01677c5367009932b9c07",
+        "Bytes": 10734389,
+        "Seconds": 268,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300035"
+      },
+      {
+        "Title": "Jazz Brunch",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Jazz Brunch.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Jazz%20Brunch.mp3",
+        "Sha256": "9e980a5a5ff7663d7f5ac22209190f34f1df465c5a6b588dd2c0bcbfc217e380",
+        "Bytes": 10341722,
+        "Seconds": 323,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700074"
+      },
+      {
+        "Title": "Apero Hour",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Apero Hour.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Apero%20Hour.mp3",
+        "Sha256": "248e2bbd81c7f0bc69e4bd1ad95513e640e3eb474872acfd63b8805ed73ea9ea",
+        "Bytes": 9059422,
+        "Seconds": 283,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700070"
+      },
+      {
+        "Title": "Hep Cats",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Hep Cats.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Hep%20Cats.mp3",
+        "Sha256": "090cbdd911a87a6e1f87859082e07a7569993b94ebcdb41e3b17dcf42cbf3476",
+        "Bytes": 8025406,
+        "Seconds": 251,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1500022"
+      },
+      {
+        "Title": "Deuces",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Deuces.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Deuces.mp3",
+        "Sha256": "a475a7612bc9fd9ee5af13b61bf74c10fdaae31c7d4aef8cc6e052073b3f486d",
+        "Bytes": 6107790,
+        "Seconds": 191,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700075"
+      },
+      {
+        "Title": "Cool Vibes",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Cool Vibes.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Cool%20Vibes.mp3",
+        "Sha256": "86e5afb1f71da4c45927bb693cc32e2f72954137cf010599a912fa89cfd4db2e",
+        "Bytes": 8737561,
+        "Seconds": 218,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100863"
+      },
+      {
+        "Title": "Groove Grove",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Groove Grove.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Groove%20Grove.mp3",
+        "Sha256": "e47b9c1615ad8e759c19109f487f7c484dd0785d3a66499ecd240bc492ee33b5",
+        "Bytes": 8232879,
+        "Seconds": 206,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200054"
+      },
+      {
+        "Title": "Smooth Lovin",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Smooth Lovin.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Smooth%20Lovin.mp3",
+        "Sha256": "97f914222378859a81de72f4c117cd456604d3b106e2041d6bf01cacaaf8801a",
+        "Bytes": 8302917,
+        "Seconds": 259,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700077"
+      },
+      {
+        "Title": "Night in Venice",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Night in Venice.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Night%20in%20Venice.mp3",
+        "Sha256": "c61435f6f86853b5aefcf4479f3a1266f8887da97d8022c8f1137798076129e4",
+        "Bytes": 8860758,
+        "Seconds": 218,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1900056"
+      },
+      {
+        "Title": "Backed Vibes (clean)",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Backed Vibes Clean.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Backed%20Vibes%20Clean.mp3",
+        "Sha256": "e8dbe9ebab11de3e492fc6a95a4d9523d9a52845f289c4205569268224d521e9",
+        "Bytes": 9277779,
+        "Seconds": 228,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100479"
+      },
+      {
+        "Title": "Sidewalk Shade",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Sidewalk Shade.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Sidewalk%20Shade.mp3",
+        "Sha256": "631ebc600aef0e798d3a209fc92e41125629f15e19a5ad1bd9e7039e5446ac50",
+        "Bytes": 6306070,
+        "Seconds": 158,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200103"
+      },
+      {
+        "Title": "Sidewalk Shade - slower",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Sidewalk Shade - slower.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Sidewalk%20Shade%20-%20slower.mp3",
+        "Sha256": "5873be42a761c430aef876afdf9cb4500517ec938c10963fbb03155ad5617b1d",
+        "Bytes": 7316486,
+        "Seconds": 183,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200104"
+      },
+      {
+        "Title": "Easy Lemon",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Easy Lemon.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Easy%20Lemon.mp3",
+        "Sha256": "2486b8ecfe4575f9ab31613a2c03c2ee45e6e5280301d05b4dd7237c9e1c2531",
+        "Bytes": 5057420,
+        "Seconds": 126,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1200076"
+      },
+      {
+        "Title": "Dispersion Relation",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Dispersion Relation.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Dispersion%20Relation.mp3",
+        "Sha256": "3bf9fbfcaca065afe76b942811c7b22c3a70b92ddbefc02611184d7908a0f6f7",
+        "Bytes": 9911419,
+        "Seconds": 244,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100258"
+      },
+      {
+        "Title": "Long Stroll",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Long Stroll.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Long%20Stroll.mp3",
+        "Sha256": "7a49e5469d77cde11619e543eb776ec7057e4143d62fd707620171df90bda7b7",
+        "Bytes": 8972966,
+        "Seconds": 255,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100174"
+      },
+      {
+        "Title": "Daybreak",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Daybreak.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Daybreak.mp3",
+        "Sha256": "712cdffccb219039679ee04ddbec35bc50c616443a5b5129d46d6ac9be6f98e0",
+        "Bytes": 6864771,
+        "Seconds": 201,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100266"
+      },
+      {
+        "Title": "Zazie",
+        "Artist": "Kevin MacLeod",
+        "FileName": "Zazie.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Zazie.mp3",
+        "Sha256": "82782a7152573f3f644a42a5f83d270c19543eeb5d322bfdea9966883ce132c3",
+        "Bytes": 6830855,
+        "Seconds": 213,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1700062"
+      },
+      {
+        "Title": "Acid Trumpet",
+        "Artist": "Kevin MacLeod",
+        "FileName": "AcidJazz.mp3",
+        "Url": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/AcidJazz.mp3",
+        "Sha256": "5e0843d42e22b175b7975c5567c91a21d2ebec5cdbc9749bce5e5179c1eb6cf0",
+        "Bytes": 5090909,
+        "Seconds": 208,
+        "SourcePage": "https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1100339"
+      }
+    ]
+  },
+  {
+    "Id": "lofi",
+    "Name": "Lo-fi jazz guitar",
+    "Description": "Two short albums by HoliznaCC0: \"Busted Guitar (LOFI EDIT)\" (4 tracks, 11 min; jazz guitar over lo-fi beats) and \"OCEAN MEMORY (Lo-fi Chill)\" (5 tracks, 15 min). Public domain, no credit needed. The Free Music Archive needs a free account to download, so fetch the albums yourself and drop the files into the folder below.",
+    "Folder": "lofi",
+    "Artist": "HoliznaCC0",
+    "Licence": "CC0 1.0 Universal (public domain)",
+    "LicenceUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "Attribution": "None required. The artist takes tips at buymeacoffee.com and Patreon.",
+    "Manual": true,
+    "Links": [
+      {
+        "Label": "Busted Guitar (LOFI EDIT) on the Free Music Archive",
+        "Url": "https://freemusicarchive.org/music/holiznacc0/busted-guitar-lofi-edit"
+      },
+      {
+        "Label": "OCEAN MEMORY (Lo-fi Chill) on the Free Music Archive",
+        "Url": "https://freemusicarchive.org/music/holiznacc0/ocean-memory-lo-fi-chill"
+      },
+      {
+        "Label": "HoliznaCC0 on the Free Music Archive",
+        "Url": "https://freemusicarchive.org/music/holiznacc0/"
+      }
+    ],
+    "Tracks": [
+      {
+        "Title": "Poor, But Happy",
+        "Artist": "HoliznaCC0",
+        "Seconds": 127
+      },
+      {
+        "Title": "Keeping Cool",
+        "Artist": "HoliznaCC0",
+        "Seconds": 153
+      },
+      {
+        "Title": "Come Again",
+        "Artist": "HoliznaCC0",
+        "Seconds": 182
+      },
+      {
+        "Title": "So Broke",
+        "Artist": "HoliznaCC0",
+        "Seconds": 221
+      },
+      {
+        "Title": "Ocean Memory",
+        "Artist": "HoliznaCC0",
+        "Seconds": 150
+      },
+      {
+        "Title": "Washed Up",
+        "Artist": "HoliznaCC0",
+        "Seconds": 234
+      },
+      {
+        "Title": "Cold (Salt) Water",
+        "Artist": "HoliznaCC0",
+        "Seconds": 153
+      },
+      {
+        "Title": "Currents We Used to Know",
+        "Artist": "HoliznaCC0",
+        "Seconds": 202
+      },
+      {
+        "Title": "I Don't Understand A Thing",
+        "Artist": "HoliznaCC0",
+        "Seconds": 164
+      }
+    ]
+  }
+]
