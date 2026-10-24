@@ -2,7 +2,7 @@
 param([string]$Configuration = "Release")
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.14.1.0"
+$version = "1.14.2.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.TvStation\bin\$Configuration\net10.0\Jellyfin.Plugin.TvStation.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -21,7 +21,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Chance of rain, snow, mix or ice. Open-Meteo gives one chance of precipitation that covers rain, showers and snow together, so the percentage on the hourly strip, the 7-day forecast and the current conditions panel now says what it is a chance of: ""rain"", ""snow"", ""mix"" (rain and snow both forecast) or ""ice"" (freezing rain or drizzle). The type comes from the hourly and daily rain, showers and snowfall amounts now fetched with the forecast, else from the weather code, else from the temperature (at or below freezing it would fall as snow). Snow days on the 7-day forecast quote the snowfall depth (""5 in snow"", ""13 cm snow"") instead of the melt-water total. The hourly strip puts the word on its own line under the percentage."
+    changelog = "Weather channel: the music line on the screens now reads ""Now playing: title - artist"" (or just the title when no artist is known) instead of the bare title and artist. The editor checkbox that turns the line off is unchanged."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

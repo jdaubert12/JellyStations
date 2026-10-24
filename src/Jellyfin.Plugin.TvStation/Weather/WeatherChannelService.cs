@@ -133,9 +133,9 @@ public sealed class WeatherChannelService
         };
     }
 
-    /// <summary>"Title – Artist" or just the title.</summary>
+    /// <summary>"Now playing: Title – Artist", or without the artist when none is known.</summary>
     public static string CreditText(MusicTrack track)
-        => string.IsNullOrWhiteSpace(track.Artist) ? track.Title : track.Title + " – " + track.Artist;
+        => "Now playing: " + (string.IsNullOrWhiteSpace(track.Artist) ? track.Title : track.Title + " – " + track.Artist);
 
     /// <summary>The place's UTC offset now: its configured zone, else the provider's, else the station's.</summary>
     public static long PlaceOffsetSeconds(PlaceWeather place, TimeZoneInfo stationZone, DateTime nowUtc)

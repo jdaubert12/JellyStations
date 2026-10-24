@@ -87,7 +87,7 @@ the other modes) and every audio file in a **folder** on the server (a name mean
 `data/TvStation/music/`; an absolute path works too; mp3, flac, ogg, opus, m4a, wav and more, tagged
 with ffprobe at compile time). Tracks play back to back in a seeded shuffle that only repeats once
 every track has played, the same for every viewer and continuous across the plugin's internal segment
-boundaries, at a configurable level, with the title and artist drawn on the screens (switchable).
+boundaries, at a configurable level, with "Now playing: title – artist" drawn on the screens (switchable).
 Several folders can be listed, separated by `;`. New files in a folder are picked up when the
 station is recompiled (nightly, or **Refresh content**); with music off the channel is silent.
 
@@ -175,16 +175,16 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.14.1.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.14.1.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.14.1.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.14.1.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.14.1.0\`
+2. Copy it into a folder named `TvStation_1.14.2.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.14.2.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.14.2.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.14.2.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.14.2.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.14.1.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.14.1.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.14.2.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.14.2.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 

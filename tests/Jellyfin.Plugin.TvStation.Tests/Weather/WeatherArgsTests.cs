@@ -1,5 +1,6 @@
 using Jellyfin.Plugin.TvStation.Models;
 using Jellyfin.Plugin.TvStation.Streaming;
+using Jellyfin.Plugin.TvStation.Weather;
 using Xunit;
 
 namespace Jellyfin.Plugin.TvStation.Tests.Weather;
@@ -110,5 +111,12 @@ public class WeatherArgsTests
         var args = FfmpegArgsBuilder.ForWeather(Segment(music: false), TimeSpan.Zero, p);
         Assert.EndsWith(",format=nv12,hwupload[v]", Filter(args));
         Assert.DoesNotContain("-pix_fmt", args);
+    }
+
+    [Fact]
+    public void CreditText_SaysNowPlaying_WithOrWithoutArtist()
+    {
+        Assert.Equal("Now playing: Local Forecast – Kevin MacLeod", WeatherChannelService.CreditText(new MusicTrack { Title = "Local Forecast", Artist = "Kevin MacLeod" }));
+        Assert.Equal("Now playing: Local Forecast", WeatherChannelService.CreditText(new MusicTrack { Title = "Local Forecast", Artist = " " }));
     }
 }
