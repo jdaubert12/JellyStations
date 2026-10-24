@@ -3861,7 +3861,7 @@
         selectHtml(p + 'enc', 'Video encoder', ENCODERS, 'Hardware encoders need the matching drivers and may need extra input arguments (e.g. -hwaccel).') +
         inputHtml(p + 'encCustom', 'Custom encoder name', 'text', {}, 'Exact ffmpeg encoder name, e.g. h264_amf or hevc_amf.') +
         selectHtml(p + 'range', 'Output', OUTPUT_RANGES, 'SDR: 8-bit BT.709, plays everywhere. HDR10: the whole channel is 10-bit BT.2020 PQ HEVC Main 10. HDR sources keep their range, SDR programs, slates, cards and weather screens are converted into it at SDR brightness; needs an HEVC encoder, HDR-capable clients direct play it and Jellyfin tone maps it for the rest (turn on tone mapping under Dashboard > Playback > Transcoding).') +
-        inputHtml(p + 'preset', 'Preset', 'text', {}, 'Encoder preset, e.g. veryfast (libx264) or p4 (nvenc).') +
+        inputHtml(p + 'preset', 'Preset', 'text', {}, 'Speed/quality preset. libx264, libx265 and Quick Sync take ultrafast … veryslow (Quick Sync has veryfast … veryslow; ultrafast and superfast become veryfast). NVENC takes p1 … p7, x264 words are translated (veryfast is p2). VA-API, AMF and VideoToolbox have no preset. Leave blank for the encoder default.') +
         inputHtml(p + 'profile', 'H.264 profile', 'text', {}, 'baseline, main or high (libx264 only; HEVC encoders take main, or main10 on an HDR10 profile).') +
         inputHtml(p + 'level', 'H.264 level', 'text', {}, 'For example 4.1 (libx264 only).') +
         inputHtml(p + 'lang', 'Preferred audio language', 'text', { maxlength: 3 }, 'ISO 639-2 code (eng, spa, jpn…) used to pick the audio track when compiling.') +

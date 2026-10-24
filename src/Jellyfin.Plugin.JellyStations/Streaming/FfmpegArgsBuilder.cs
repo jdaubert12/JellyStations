@@ -602,10 +602,15 @@ public static partial class FfmpegArgsBuilder
         var gop = Math.Max(1, p.Fps * Math.Max(1, p.GopSeconds));
         args.Add("-c:v");
         args.Add(p.VideoEncoder);
-        if (string.Equals(p.VideoEncoder, "libx264", StringComparison.OrdinalIgnoreCase))
+        var preset = EncoderPreset(p);
+        if (preset is not null)
         {
             args.Add("-preset");
-            args.Add(p.Preset);
+            args.Add(preset);
+        }
+
+        if (string.Equals(p.VideoEncoder, "libx264", StringComparison.OrdinalIgnoreCase))
+        {
             args.Add("-profile:v");
             args.Add(p.H264Profile);
             args.Add("-level");
@@ -617,8 +622,6 @@ public static partial class FfmpegArgsBuilder
         {
             // The same closed, fixed GOP as libx264, headers repeated on every key frame so a client joining
             // mid-program decodes at once, and x265's own chatter kept off stderr (it ignores ffmpeg's log level).
-            args.Add("-preset");
-            args.Add(p.Preset);
             args.Add("-x265-params");
             args.Add("scenecut=0:open-gop=0:repeat-headers=1:log-level=error");
         }
@@ -668,6 +671,69 @@ public static partial class FfmpegArgsBuilder
             args.Add("-sc_threshold");
             args.Add("0");
         }
+    }
+
+    private static readonly string[] X264Presets = { "ultrafast", "superfast", "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow", "placebo" };
+    private static readonly string[] QsvPresets = { "veryfast", "faster", "fast", "medium", "slow", "slower", "veryslow" };
+    private static readonly string[] NvencPresets = { "default", "slow", "medium", "fast", "hp", "hq", "bd", "ll", "llhq", "llhp", "lossless", "losslesshp" };
+
+    /// <summary>
+    /// The -preset value for the profile's encoder, or null when the profile leaves it blank or the encoder has no
+    /// preset option (VA-API, AMF and VideoToolbox take other knobs). libx264 and libx265 get the word as typed. The
+    /// hardware encoders used to run at their own default (QSV's "medium"), which on an i5-8500T made an HDR10 chain
+    /// 1.7x slower than "veryfast"; now they get the profile's preset in their own vocabulary: QSV knows
+    /// veryfast..veryslow (ultrafast and superfast become veryfast, placebo veryslow), NVENC knows p1..p7 and its
+    /// legacy names, so an x264 word is translated (veryfast is p2). Anything else is passed as typed.
+    /// </summary>
+    public static string? EncoderPreset(EncodingProfile p)
+    {
+        var preset = p.Preset?.Trim();
+        if (string.IsNullOrEmpty(preset))
+        {
+            return null;
+        }
+
+        var encoder = p.VideoEncoder ?? string.Empty;
+        if (encoder.StartsWith("lib", StringComparison.OrdinalIgnoreCase))
+        {
+            return preset;
+        }
+
+        var word = preset.ToLowerInvariant();
+        if (encoder.EndsWith("_qsv", StringComparison.OrdinalIgnoreCase))
+        {
+            if (Array.IndexOf(QsvPresets, word) >= 0 || (word.Length == 1 && word[0] >= '1' && word[0] <= '7'))
+            {
+                return word;
+            }
+
+            return word switch
+            {
+                "ultrafast" or "superfast" => "veryfast",
+                "placebo" => "veryslow",
+                _ => preset
+            };
+        }
+
+        if (encoder.EndsWith("_nvenc", StringComparison.OrdinalIgnoreCase))
+        {
+            if (Array.IndexOf(NvencPresets, word) >= 0 || (word.Length == 2 && word[0] == 'p' && word[1] >= '1' && word[1] <= '7'))
+            {
+                return word;
+            }
+
+            return word switch
+            {
+                "ultrafast" or "superfast" => "p1",
+                "veryfast" => "p2",
+                "faster" => "p3",
+                "slower" => "p6",
+                "veryslow" or "placebo" => "p7",
+                _ => preset
+            };
+        }
+
+        return null;
     }
 
     /// <summary>True for the encoders whose forced key frames are IDR frames with headers (libx264 and VA-API); false for QSV, NVENC and AMF.</summary>

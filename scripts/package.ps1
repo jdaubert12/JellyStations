@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.16.0.0"
+$version = "1.16.1.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "HDR channels. A profile's new Output setting (SDR, the default, or HDR10) makes a station a 10-bit BT.2020 PQ HEVC Main 10 channel: HDR10 programs keep their range and mastering metadata, HLG is converted to PQ, and SDR programs, slates, cards, the logo and weather screens are converted into the PQ container at SDR brightness, so the stream never changes format. Needs an HEVC encoder (libx265, hevc_qsv, hevc_nvenc, hevc_vaapi, hevc_amf, hevc_videotoolbox); HDR-capable clients direct play it and Jellyfin tone maps it for the rest (turn on tone mapping under Dashboard > Playback > Transcoding). The channel is declared as hevc Main 10 to Jellyfin instead of being probed (Jellyfin caches a channel's first probe for good, and skipping the probe makes tune-in quicker), the Hardware section lists the HEVC encoders in the ffmpeg build, Hardware Test takes an OutputRange override, and the Status page shows HDR10 out. Weather guide programs carry the station logo as their thumbnail (1.15.1.0)."
+    changelog = "The encoding profile's preset now reaches the hardware encoders: Quick Sync (h264_qsv, hevc_qsv) gets it in its own vocabulary (veryfast to veryslow; ultrafast and superfast become veryfast) and NVENC gets p1 to p7 (x264 words translated, veryfast is p2); VA-API, AMF and VideoToolbox, which have no preset option, get none, and a blank preset leaves the encoder default. Until now only libx264 and libx265 saw the preset, so hevc_qsv ran at its default medium: on an i5-8500T an HDR10 channel went from 2.0x to 3.5x real time with the default veryfast. README notes CPU passthrough for VMs (zscale needs AVX2)."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

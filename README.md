@@ -264,7 +264,12 @@ BT.2020 PQ **HEVC Main 10** instead:
   section lists the HEVC encoders in your ffmpeg build, and **Test** with the station runs the
   real 10-bit chain so you can check the speed before switching. Intel UHD 630 and later encode
   Main 10 fine (an i5-8500T does 1080p30 at about 5x real time, and the full 4K HDR decode, scale
-  and encode chain at about 3x).
+  and encode chain at about 3x). The profile's preset applies to `hevc_qsv` and `hevc_nvenc` too:
+  on that i5 the SDR-to-PQ chain runs at 2x with Quick Sync's default `medium` and 3.5x with
+  `veryfast`.
+- **In a virtual machine** pass the host CPU through (QEMU/KVM, Proxmox: CPU type `host`). The
+  PQ conversion runs in `zscale`, which is 40x slower without AVX2; a VM with a generic CPU model
+  hides it and the Hardware Test reports well under real time with the CPU pegged.
 - **Clients**: Android TV, Apple TV, Roku, Kodi and most TV apps direct play HEVC HDR10 and the
   display switches to HDR mode. Browsers mostly do not, so Jellyfin transcodes the channel for
   them. Turn on **tone mapping** under Dashboard > Playback > Transcoding, or those transcodes
@@ -292,12 +297,12 @@ script with each release.
 
 ### By hand
 
-1. Download `JellyStations_1.16.0.0.zip` from the [releases page](https://github.com/jdaubert12/JellyStations/releases)
+1. Download `JellyStations_1.16.1.0.zip` from the [releases page](https://github.com/jdaubert12/JellyStations/releases)
    and unzip it, or build `Jellyfin.Plugin.JellyStations.dll` yourself.
-2. Copy the DLL (and `meta.json` from the zip) into a folder named `JellyStations_1.16.0.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/JellyStations_1.16.0.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/JellyStations_1.16.0.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\JellyStations_1.16.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\JellyStations_1.16.0.0\`
+2. Copy the DLL (and `meta.json` from the zip) into a folder named `JellyStations_1.16.1.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/JellyStations_1.16.1.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/JellyStations_1.16.1.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\JellyStations_1.16.1.0\` or `%ProgramData%\Jellyfin\Server\plugins\JellyStations_1.16.1.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *JellyStations* as Active and the dashboard
    menu gains a **JellyStations** entry.
 
@@ -313,8 +318,8 @@ more restart clears it. Installing by hand, delete the old folder yourself and s
 API routes moved from `/TvStation/...` to `/JellyStations/...`.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/JellyStations_1.16.0.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.JellyStations.dll <container>:/config/plugins/JellyStations_1.16.0.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/JellyStations_1.16.1.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.JellyStations.dll <container>:/config/plugins/JellyStations_1.16.1.0/`
 followed by `docker restart <container>` is enough.
 
 ## Using it
@@ -403,6 +408,11 @@ by title, genre, rating or library.
   profile, which is the place for per-channel choices:
   - *Output*: SDR (default) or HDR10, see [HDR channels](#hdr-channels). HDR10 needs an HEVC
     encoder; the H.264 profile and level fields apply to libx264 only.
+  - *Preset*: the encoder's speed/quality trade-off, `veryfast` by default. libx264, libx265 and
+    Quick Sync take the x264 words (Quick Sync knows `veryfast` to `veryslow`; `ultrafast` and
+    `superfast` become `veryfast`), NVENC takes `p1` to `p7` and x264 words are translated
+    (`veryfast` is `p2`). VA-API, AMF and VideoToolbox have no preset. Blank leaves the encoder's
+    own default, which for Quick Sync is `medium` and noticeably slower.
   - *Frame rate*: 24 for a film station (most movies are 23.976 fps and judder when converted
     to 30), 30 for series, 60 only for 60 fps sources. Keep one rate per station; the profile
     must not change between programs.

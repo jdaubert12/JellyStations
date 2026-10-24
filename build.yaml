@@ -1,7 +1,7 @@
 ---
 name: "JellyStations"
 guid: "b7f3c1d2-5e8a-4f0b-9c6d-2a1e7f4b8d31"
-version: "1.16.0.0"
+version: "1.16.1.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "JD"
@@ -15,6 +15,7 @@ category: "LiveTV"
 artifacts:
   - "Jellyfin.Plugin.JellyStations.dll"
 changelog: >
+  1.16.1.0: The encoding profile's preset now reaches the hardware encoders: Quick Sync (h264_qsv, hevc_qsv) gets it in its own vocabulary (veryfast to veryslow; ultrafast and superfast become veryfast) and NVENC gets p1 to p7 (x264 words translated, veryfast is p2); VA-API, AMF and VideoToolbox, which have no preset option, get none, and a blank preset leaves the encoder default. Until now only libx264 and libx265 saw the preset, so hevc_qsv ran at its default medium: on an i5-8500T an HDR10 channel went from 2.0x to 3.5x real time with the default veryfast. README notes CPU passthrough for VMs (zscale needs AVX2).
   1.16.0.0: HDR channels. A profile's new Output setting (SDR, the default, or HDR10) makes a station a 10-bit BT.2020 PQ HEVC Main 10 channel: HDR10 programs keep their range and mastering metadata, HLG is converted to PQ, and SDR programs, slates, cards, the logo and weather screens are converted into the PQ container at SDR brightness, so the stream never changes format. Needs an HEVC encoder (libx265, hevc_qsv, hevc_nvenc, hevc_vaapi, hevc_amf, hevc_videotoolbox); HDR-capable clients direct play it and Jellyfin tone maps it for the rest (turn on tone mapping under Dashboard > Playback > Transcoding). The channel is declared as hevc Main 10 to Jellyfin instead of being probed (Jellyfin caches a channel's first probe for good, and skipping the probe makes tune-in quicker), the Hardware section lists the HEVC encoders in the ffmpeg build, Hardware Test takes an OutputRange override, and the Status page shows HDR10 out. Weather guide programs carry the station logo as their thumbnail (1.15.1.0).
   1.15.1.0: Weather channel: the weather program in the Live TV guide now shows the station's logo as its thumbnail when the station has one; it had no image before.
   1.15.0.0: Renamed to JellyStations. The plugin, its DLL (Jellyfin.Plugin.JellyStations.dll), the dashboard page, the API routes (/JellyStations/...) and the data folder (data/JellyStations) carry the new name. The plugin id is unchanged, so Jellyfin treats this as an update of the installed TvStation, an existing data/TvStation folder is moved to data/JellyStations on first start, and Live TV channels keep their ids. Plugin repository: add https://raw.githubusercontent.com/jdaubert12/JellyStations/main/manifest.json under Dashboard > Plugins > Repositories to install and update from the catalog. The example stations now carry placeholder titles.
