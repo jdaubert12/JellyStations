@@ -257,12 +257,12 @@ script with each release.
 
 ### By hand
 
-1. Download `JellyStations_1.15.0.0.zip` from the [releases page](https://github.com/jdaubert12/JellyStations/releases)
+1. Download `JellyStations_1.15.1.0.zip` from the [releases page](https://github.com/jdaubert12/JellyStations/releases)
    and unzip it, or build `Jellyfin.Plugin.JellyStations.dll` yourself.
-2. Copy the DLL (and `meta.json` from the zip) into a folder named `JellyStations_1.15.0.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/JellyStations_1.15.0.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/JellyStations_1.15.0.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\JellyStations_1.15.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\JellyStations_1.15.0.0\`
+2. Copy the DLL (and `meta.json` from the zip) into a folder named `JellyStations_1.15.1.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/JellyStations_1.15.1.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/JellyStations_1.15.1.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\JellyStations_1.15.1.0\` or `%ProgramData%\Jellyfin\Server\plugins\JellyStations_1.15.1.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *JellyStations* as Active and the dashboard
    menu gains a **JellyStations** entry.
 
@@ -278,8 +278,8 @@ more restart clears it. Installing by hand, delete the old folder yourself and s
 API routes moved from `/TvStation/...` to `/JellyStations/...`.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/JellyStations_1.15.0.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.JellyStations.dll <container>:/config/plugins/JellyStations_1.15.0.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/JellyStations_1.15.1.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.JellyStations.dll <container>:/config/plugins/JellyStations_1.15.1.0/`
 followed by `docker restart <container>` is enough.
 
 ## Using it

@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.15.0.0"
+$version = "1.15.1.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Renamed to JellyStations. The plugin, its DLL (Jellyfin.Plugin.JellyStations.dll), the dashboard page, the API routes (/JellyStations/...) and the data folder (data/JellyStations) carry the new name. The plugin id is unchanged, so Jellyfin treats this as an update of the installed TvStation, an existing data/TvStation folder is moved to data/JellyStations on first start, and Live TV channels keep their ids. Plugin repository: add https://raw.githubusercontent.com/jdaubert12/JellyStations/main/manifest.json under Dashboard > Plugins > Repositories to install and update from the catalog. The example stations now carry placeholder titles."
+    changelog = "Weather channel: the weather program in the Live TV guide now shows the station's logo as its thumbnail when the station has one; it had no image before."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

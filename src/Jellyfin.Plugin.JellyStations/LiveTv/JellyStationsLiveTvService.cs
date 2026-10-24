@@ -76,13 +76,15 @@ public sealed class JellyStationsLiveTvService : ILiveTvService, ISupportsDirect
         var entries = _resolver.Enumerate(stationId, startDateUtc, endDateUtc);
         var programs = new List<ProgramInfo>();
         ProgramInfo? current = null;
-        var cardText = _stations.Get(stationId)?.EffectiveCardText ?? Station.DefaultCardText;
+        var station = _stations.Get(stationId);
+        var cardText = station?.EffectiveCardText ?? Station.DefaultCardText;
+        var logo = station is null ? null : _stations.LogoPath(station);
 
         foreach (var entry in entries)
         {
             if (entry.Kind == EntryKind.Weather)
             {
-                current = WeatherProgram(channelId, entry);
+                current = WeatherProgram(channelId, entry, logo);
                 programs.Add(current);
                 continue;
             }
@@ -154,7 +156,8 @@ public sealed class JellyStationsLiveTvService : ILiveTvService, ISupportsDirect
         return p;
     }
 
-    private static ProgramInfo WeatherProgram(string channelId, ScheduleEntry entry)
+    /// <summary>A weather program has no library item to take a poster from, so it wears the channel's logo when one is set.</summary>
+    private static ProgramInfo WeatherProgram(string channelId, ScheduleEntry entry, string? logoPath)
     {
         return new ProgramInfo
         {
@@ -168,7 +171,9 @@ public sealed class JellyStationsLiveTvService : ILiveTvService, ISupportsDirect
             IsNews = true,
             IsLive = true,
             IsRepeat = false,
-            IsHD = true
+            IsHD = true,
+            ImagePath = logoPath,
+            HasImage = logoPath is not null
         };
     }
 

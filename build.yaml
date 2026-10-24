@@ -1,7 +1,7 @@
 ---
 name: "JellyStations"
 guid: "b7f3c1d2-5e8a-4f0b-9c6d-2a1e7f4b8d31"
-version: "1.15.0.0"
+version: "1.15.1.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "JD"
@@ -15,6 +15,7 @@ category: "LiveTV"
 artifacts:
   - "Jellyfin.Plugin.JellyStations.dll"
 changelog: >
+  1.15.1.0: Weather channel: the weather program in the Live TV guide now shows the station's logo as its thumbnail when the station has one; it had no image before.
   1.15.0.0: Renamed to JellyStations. The plugin, its DLL (Jellyfin.Plugin.JellyStations.dll), the dashboard page, the API routes (/JellyStations/...) and the data folder (data/JellyStations) carry the new name. The plugin id is unchanged, so Jellyfin treats this as an update of the installed TvStation, an existing data/TvStation folder is moved to data/JellyStations on first start, and Live TV channels keep their ids. Plugin repository: add https://raw.githubusercontent.com/jdaubert12/JellyStations/main/manifest.json under Dashboard > Plugins > Repositories to install and update from the catalog. The example stations now carry placeholder titles.
   1.14.2.0: Weather channel: the music line on the screens now reads "Now playing: title – artist" (or just the title when no artist is known) instead of the bare title and artist. The editor checkbox that turns the line off is unchanged.
   1.14.1.0: Chance of rain, snow, mix or ice. Open-Meteo gives one chance of precipitation that covers rain, showers and snow together, so the percentage on the hourly strip, the 7-day forecast and the current conditions panel now says what it is a chance of: "rain", "snow", "mix" (rain and snow both forecast) or "ice" (freezing rain or drizzle). The type comes from the hourly and daily rain, showers and snowfall amounts now fetched with the forecast, else from the weather code, else from the temperature (at or below freezing it would fall as snow). Snow days on the 7-day forecast quote the snowfall depth ("5 in snow", "13 cm snow") instead of the melt-water total. The hourly strip puts the word on its own line under the percentage.
