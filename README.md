@@ -57,7 +57,7 @@ voice, no library items, just forecasts drawn as full-screen graphics over music
 places (a search box finds towns and cities and fills in the coordinates and time zone), and the
 channel cycles through them: for each place **current conditions** (big temperature, condition,
 feels like, high and low, humidity, wind, gusts, pressure, cloud cover, sunrise and sunset), the
-**next 12 hours** (hourly icons, temperatures, rain chance and a temperature curve) and the **7-day
+**next 12 hours** (hourly icons, temperatures, the chance of rain, snow, a mix or ice, and a temperature curve) and the **7-day
 forecast**, then a **travel cities** screen with every place at a glance. Screens cross-fade; each
 stays a configurable number of seconds (default 10). With **On the 8s** a full pass starts at :08,
 :18, :28... and the rest of each ten minutes repeats current conditions, like the real format.
@@ -175,16 +175,16 @@ saved station has a **Start schedule from now** button on its row.
 ## Install
 
 1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.14.0.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.14.0.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.14.0.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.14.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.14.0.0\`
+2. Copy it into a folder named `TvStation_1.14.1.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/TvStation_1.14.1.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.14.1.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.14.1.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.14.1.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
    menu gains a **TV Stations** entry.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.14.0.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.14.0.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.14.1.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.14.1.0/`
 followed by `docker restart <container>` is enough. Station data lives in
 `<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
 

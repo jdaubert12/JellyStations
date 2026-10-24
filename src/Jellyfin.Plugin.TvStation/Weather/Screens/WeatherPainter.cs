@@ -288,7 +288,7 @@ public sealed class WeatherPainter
 
         if (rows.Count < 7 && today is not null)
         {
-            rows.Add(("Rain chance", today.PrecipitationProbabilityPercent.ToString(CultureInfo.InvariantCulture) + "%"));
+            rows.Add(("Chance of " + WmoWeather.PrecipitationWord(today.PrecipitationKind), today.PrecipitationProbabilityPercent.ToString(CultureInfo.InvariantCulture) + "%"));
         }
 
         var rowH = (panel.Height - 40) / rows.Count;
@@ -345,12 +345,14 @@ public sealed class WeatherPainter
             Text(x, Units.Temperature(h.TemperatureC, units), cx, 455, 50, FontWeight.SemiBold, x.T.Text, SKTextAlign.Center);
             if (h.PrecipitationProbabilityPercent > 0)
             {
+                // Two lines: "100% snow" does not fit a twelve-column strip at this size.
                 Text(x, h.PrecipitationProbabilityPercent.ToString(CultureInfo.InvariantCulture) + "%", cx, 505, 28, FontWeight.Regular, x.T.Cool, SKTextAlign.Center);
+                Text(x, WmoWeather.PrecipitationWord(h.PrecipitationKind), cx, 535, 24, FontWeight.Regular, x.T.Cool, SKTextAlign.Center, maxWidth: colW - 8);
             }
 
             if (i > 0)
             {
-                Line(x, left + colW * i, 190, left + colW * i, 520, 0x18);
+                Line(x, left + colW * i, 190, left + colW * i, 550, 0x18);
             }
         }
 
@@ -449,10 +451,15 @@ public sealed class WeatherPainter
             Text(x, Units.Temperature(d.LowC, units), cx, 700, 42, FontWeight.Regular, x.T.Low, SKTextAlign.Center);
             if (d.PrecipitationProbabilityPercent > 0)
             {
-                Text(x, d.PrecipitationProbabilityPercent.ToString(CultureInfo.InvariantCulture) + "%", cx, 780, 30, FontWeight.Regular, x.T.Cool, SKTextAlign.Center);
+                Text(x, d.PrecipitationProbabilityPercent.ToString(CultureInfo.InvariantCulture) + "% " + WmoWeather.PrecipitationWord(d.PrecipitationKind), cx, 780, 30, FontWeight.Regular, x.T.Cool, SKTextAlign.Center, maxWidth: colW - 8);
             }
 
-            if (d.PrecipitationMm >= 0.1)
+            // Snow is quoted as depth on the ground; anything else as liquid.
+            if (d.SnowfallCm >= 0.1)
+            {
+                Text(x, Units.Snowfall(d.SnowfallCm, units), cx, 820, 26, FontWeight.Regular, x.T.Secondary, SKTextAlign.Center, maxWidth: colW - 8);
+            }
+            else if (d.PrecipitationMm >= 0.1)
             {
                 Text(x, Units.Precipitation(d.PrecipitationMm, units), cx, 820, 26, FontWeight.Regular, x.T.Secondary, SKTextAlign.Center);
             }

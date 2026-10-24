@@ -20,6 +20,17 @@ public enum WeatherIcon
     Unknown
 }
 
+/// <summary>What a chance of precipitation is a chance of.</summary>
+public enum PrecipitationKind
+{
+    Rain,
+    Snow,
+    /// <summary>Rain and snow both forecast.</summary>
+    Mix,
+    /// <summary>Freezing rain or freezing drizzle.</summary>
+    Ice
+}
+
 /// <summary>WMO 4677 weather interpretation codes, as Open-Meteo reports them, to words and icons.</summary>
 public static class WmoWeather
 {
@@ -91,6 +102,52 @@ public static class WmoWeather
         85 or 86 => WeatherIcon.SnowShowers,
         95 or 96 or 99 => WeatherIcon.Thunderstorm,
         _ => WeatherIcon.Unknown
+    };
+
+    /// <summary>
+    /// Names the precipitation a chance refers to. Open-Meteo's probability covers rain, showers and snow together,
+    /// so the type comes from the forecast amounts when there are any (both kinds means a mix), else from the
+    /// weather code, else from the temperature (at or below freezing it would fall as snow).
+    /// </summary>
+    public static PrecipitationKind PrecipitationType(int code, double rainMm, double snowfallCm, double temperatureC)
+    {
+        var rain = rainMm >= 0.1;
+        var snow = snowfallCm >= 0.1;
+        if (rain && snow)
+        {
+            return PrecipitationKind.Mix;
+        }
+
+        if (snow)
+        {
+            return PrecipitationKind.Snow;
+        }
+
+        if (rain)
+        {
+            return code is 56 or 57 or 66 or 67 ? PrecipitationKind.Ice : PrecipitationKind.Rain;
+        }
+
+        switch (code)
+        {
+            case 56 or 57 or 66 or 67:
+                return PrecipitationKind.Ice;
+            case 71 or 73 or 75 or 77 or 85 or 86:
+                return PrecipitationKind.Snow;
+            case 51 or 53 or 55 or 61 or 63 or 65 or 80 or 81 or 82 or 95 or 96 or 99:
+                return PrecipitationKind.Rain;
+            default:
+                return temperatureC <= 0 ? PrecipitationKind.Snow : PrecipitationKind.Rain;
+        }
+    }
+
+    /// <summary>"rain", "snow", "mix" or "ice", to follow a percentage.</summary>
+    public static string PrecipitationWord(PrecipitationKind kind) => kind switch
+    {
+        PrecipitationKind.Snow => "snow",
+        PrecipitationKind.Mix => "mix",
+        PrecipitationKind.Ice => "ice",
+        _ => "rain"
     };
 
     /// <summary>Codes that mean precipitation is falling right now.</summary>

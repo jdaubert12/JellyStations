@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $proj = Join-Path $root "src\Jellyfin.Plugin.TvStation\Jellyfin.Plugin.TvStation.csproj"
-$version = "1.14.0.0"
+$version = "1.14.1.0"
 $pluginDir = Join-Path $root "dev\config\plugins\TvStation_$version"
 
 Write-Host "Building $Configuration..." -ForegroundColor Cyan

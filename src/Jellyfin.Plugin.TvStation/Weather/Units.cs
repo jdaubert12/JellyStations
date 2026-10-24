@@ -34,6 +34,12 @@ public static class Units
             ? MmToInches(mm).ToString("0.00", CultureInfo.InvariantCulture) + " in"
             : Math.Round(mm, mm < 1 ? 1 : 0).ToString(mm < 1 ? "0.0" : "0", CultureInfo.InvariantCulture) + " mm";
 
+    /// <summary>"2.5 in snow" / "6 cm snow": a snowfall depth, not its melt water.</summary>
+    public static string Snowfall(double cm, WeatherUnits units)
+        => units == WeatherUnits.Imperial
+            ? Math.Round(cm / 2.54, 1).ToString("0.#", CultureInfo.InvariantCulture) + " in snow"
+            : Math.Round(cm, cm < 1 ? 1 : 0).ToString(cm < 1 ? "0.0" : "0", CultureInfo.InvariantCulture) + " cm snow";
+
     /// <summary>"30.12 in" / "1020 hPa".</summary>
     public static string Pressure(double hpa, WeatherUnits units)
         => units == WeatherUnits.Imperial

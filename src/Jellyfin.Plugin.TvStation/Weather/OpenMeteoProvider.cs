@@ -19,8 +19,8 @@ public sealed class OpenMeteoProvider : IWeatherProvider
     public const string GeocodingUrl = "https://geocoding-api.open-meteo.com/v1/search";
 
     private const string CurrentFields = "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,pressure_msl,wind_speed_10m,wind_direction_10m,wind_gusts_10m";
-    private const string HourlyFields = "temperature_2m,precipitation_probability,weather_code,is_day";
-    private const string DailyFields = "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,sunrise,sunset,wind_speed_10m_max";
+    private const string HourlyFields = "temperature_2m,precipitation_probability,rain,showers,snowfall,weather_code,is_day";
+    private const string DailyFields = "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,precipitation_sum,rain_sum,showers_sum,snowfall_sum,sunrise,sunset,wind_speed_10m_max";
 
     private readonly IHttpClientFactory _http;
     private readonly ILogger<OpenMeteoProvider> _logger;
@@ -138,6 +138,9 @@ public sealed class OpenMeteoProvider : IWeatherProvider
         {
             var temps = Array(hourly, "temperature_2m");
             var probs = Array(hourly, "precipitation_probability");
+            var rains = Array(hourly, "rain");
+            var showers = Array(hourly, "showers");
+            var snows = Array(hourly, "snowfall");
             var codes = Array(hourly, "weather_code");
             var days = Array(hourly, "is_day");
             var i = 0;
@@ -151,6 +154,8 @@ public sealed class OpenMeteoProvider : IWeatherProvider
                         Local = local.Value,
                         TemperatureC = At(temps, i),
                         PrecipitationProbabilityPercent = (int)Math.Round(At(probs, i)),
+                        RainMm = At(rains, i) + At(showers, i),
+                        SnowfallCm = At(snows, i),
                         WeatherCode = (int)Math.Round(At(codes, i)),
                         IsDay = days is null || At(days, i, 1) != 0
                     });
@@ -167,6 +172,9 @@ public sealed class OpenMeteoProvider : IWeatherProvider
             var lows = Array(daily, "temperature_2m_min");
             var probs = Array(daily, "precipitation_probability_max");
             var sums = Array(daily, "precipitation_sum");
+            var rainSums = Array(daily, "rain_sum");
+            var showerSums = Array(daily, "showers_sum");
+            var snowSums = Array(daily, "snowfall_sum");
             var winds = Array(daily, "wind_speed_10m_max");
             var rises = StringArray(daily, "sunrise");
             var sets = StringArray(daily, "sunset");
@@ -184,6 +192,8 @@ public sealed class OpenMeteoProvider : IWeatherProvider
                         LowC = At(lows, i),
                         PrecipitationProbabilityPercent = (int)Math.Round(At(probs, i)),
                         PrecipitationMm = At(sums, i),
+                        RainMm = At(rainSums, i) + At(showerSums, i),
+                        SnowfallCm = At(snowSums, i),
                         WindMaxKmh = At(winds, i),
                         Sunrise = ParseLocal(rises is not null && i < rises.Count ? rises[i] : null),
                         Sunset = ParseLocal(sets is not null && i < sets.Count ? sets[i] : null)

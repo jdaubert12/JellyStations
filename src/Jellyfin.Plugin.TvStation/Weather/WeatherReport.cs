@@ -67,11 +67,21 @@ public sealed class HourForecast
 
     public double TemperatureC { get; set; }
 
+    /// <summary>Chance of any precipitation (rain, showers or snow) in the hour.</summary>
     public int PrecipitationProbabilityPercent { get; set; }
+
+    /// <summary>Rain plus showers forecast for the hour, liquid millimetres.</summary>
+    public double RainMm { get; set; }
+
+    /// <summary>Snowfall forecast for the hour, centimetres of snow.</summary>
+    public double SnowfallCm { get; set; }
 
     public int WeatherCode { get; set; }
 
     public bool IsDay { get; set; } = true;
+
+    /// <summary>What the chance is a chance of.</summary>
+    public PrecipitationKind PrecipitationKind => WmoWeather.PrecipitationType(WeatherCode, RainMm, SnowfallCm, TemperatureC);
 }
 
 public sealed class DayForecast
@@ -85,11 +95,22 @@ public sealed class DayForecast
 
     public double LowC { get; set; }
 
+    /// <summary>Highest hourly chance of any precipitation in the day.</summary>
     public int PrecipitationProbabilityPercent { get; set; }
 
+    /// <summary>Total precipitation for the day, liquid millimetres (snow counted as melt water).</summary>
     public double PrecipitationMm { get; set; }
 
+    /// <summary>Rain plus showers for the day, liquid millimetres.</summary>
+    public double RainMm { get; set; }
+
+    /// <summary>Snowfall for the day, centimetres of snow.</summary>
+    public double SnowfallCm { get; set; }
+
     public double WindMaxKmh { get; set; }
+
+    /// <summary>What the chance is a chance of.</summary>
+    public PrecipitationKind PrecipitationKind => WmoWeather.PrecipitationType(WeatherCode, RainMm, SnowfallCm, (HighC + LowC) / 2);
 
     /// <summary>Local sunrise, or null when the sun does not rise.</summary>
     public DateTime? Sunrise { get; set; }

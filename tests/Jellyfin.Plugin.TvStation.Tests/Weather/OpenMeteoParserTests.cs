@@ -30,7 +30,16 @@ public class OpenMeteoParserTests
         Assert.Equal(new DateTime(2026, 10, 23, 17, 0, 0), r.Hourly[0].Local);
         Assert.Equal(TimeSpan.FromHours(1), r.Hourly[1].Local - r.Hourly[0].Local);
 
+        Assert.Equal(0.3, r.Hourly[11].RainMm, 3);
+        Assert.Equal(PrecipitationKind.Rain, r.Hourly[11].PrecipitationKind);
+        Assert.Equal(0.7, r.Hourly[12].SnowfallCm, 3);
+        Assert.Equal(PrecipitationKind.Snow, r.Hourly[12].PrecipitationKind);
+
         Assert.Equal(7, r.Daily.Count);
+        Assert.Equal(1.6, r.Daily[4].RainMm, 3);
+        Assert.Equal(PrecipitationKind.Rain, r.Daily[4].PrecipitationKind);
+        Assert.Equal(2.1, r.Daily[6].SnowfallCm, 3);
+        Assert.Equal(PrecipitationKind.Snow, r.Daily[6].PrecipitationKind);
         Assert.Equal(new DateTime(2026, 10, 23), r.Daily[0].Date);
         Assert.True(r.Daily[0].HighC >= r.Daily[0].LowC);
         Assert.NotNull(r.Daily[0].Sunrise);
@@ -83,6 +92,8 @@ public class OpenMeteoParserTests
         Assert.StartsWith("https://api.open-meteo.com/v1/forecast?latitude=42.3601&longitude=-71.0589&", url);
         Assert.Contains("timezone=auto", url);
         Assert.Contains("forecast_days=7", url);
+        Assert.Contains("rain,showers,snowfall", url);
+        Assert.Contains("rain_sum,showers_sum,snowfall_sum", url);
         Assert.DoesNotContain("key", url);
     }
 
@@ -98,6 +109,29 @@ public class OpenMeteoParserTests
     {
         Assert.Equal(words, WmoWeather.Describe(code));
         Assert.Equal(icon, WmoWeather.Icon(code));
+    }
+
+    [Theory]
+    [InlineData(73, 0, 0, 5, PrecipitationKind.Snow)]        // code says snow
+    [InlineData(63, 0, 0, -5, PrecipitationKind.Rain)]       // code says rain even below freezing
+    [InlineData(66, 0, 0, -1, PrecipitationKind.Ice)]        // freezing rain
+    [InlineData(3, 0, 0, 8, PrecipitationKind.Rain)]         // cloudy, 20% chance: warm, so rain
+    [InlineData(3, 0, 0, -3, PrecipitationKind.Snow)]        // cloudy, 20% chance: freezing, so snow
+    [InlineData(3, 1.2, 0, 2, PrecipitationKind.Rain)]       // amounts beat the code
+    [InlineData(61, 0, 0.5, 0, PrecipitationKind.Snow)]
+    [InlineData(73, 0.8, 1.5, 0, PrecipitationKind.Mix)]     // both kinds forecast
+    [InlineData(56, 0.3, 0, -1, PrecipitationKind.Ice)]      // rain amount under a freezing-drizzle code stays ice
+    [InlineData(80, 0.05, 0.05, 1, PrecipitationKind.Rain)]  // traces below 0.1 do not count
+    public void PrecipitationType_FromAmountsThenCodeThenTemperature(int code, double rainMm, double snowCm, double tempC, PrecipitationKind kind)
+        => Assert.Equal(kind, WmoWeather.PrecipitationType(code, rainMm, snowCm, tempC));
+
+    [Fact]
+    public void PrecipitationWord_IsLowercaseAndShort()
+    {
+        Assert.Equal("rain", WmoWeather.PrecipitationWord(PrecipitationKind.Rain));
+        Assert.Equal("snow", WmoWeather.PrecipitationWord(PrecipitationKind.Snow));
+        Assert.Equal("mix", WmoWeather.PrecipitationWord(PrecipitationKind.Mix));
+        Assert.Equal("ice", WmoWeather.PrecipitationWord(PrecipitationKind.Ice));
     }
 
     [Theory]
@@ -118,6 +152,9 @@ public class OpenMeteoParserTests
         Assert.Equal("19 km/h", Units.Speed(19.3, Models.WeatherUnits.Metric));
         Assert.Equal("30.12 in", Units.Pressure(1020, Models.WeatherUnits.Imperial));
         Assert.Equal("1020 hPa", Units.Pressure(1020, Models.WeatherUnits.Metric));
+        Assert.Equal("2.5 in snow", Units.Snowfall(6.35, Models.WeatherUnits.Imperial));
+        Assert.Equal("6 cm snow", Units.Snowfall(6.35, Models.WeatherUnits.Metric));
+        Assert.Equal("0.4 cm snow", Units.Snowfall(0.4, Models.WeatherUnits.Metric));
         Assert.Equal("3:47 PM", Units.Clock(new DateTime(2026, 10, 23, 15, 47, 0), false));
         Assert.Equal("15:47", Units.Clock(new DateTime(2026, 10, 23, 15, 47, 0), true));
         Assert.Equal("Today", Units.DayName(new DateTime(2026, 10, 23), new DateTime(2026, 10, 23, 9, 0, 0)));
