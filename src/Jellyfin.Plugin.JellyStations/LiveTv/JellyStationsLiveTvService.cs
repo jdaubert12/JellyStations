@@ -57,7 +57,7 @@ public sealed class JellyStationsLiveTvService : ILiveTvService, ISupportsDirect
                     ImagePath = logo,
                     HasImage = logo is not null,
                     IsHD = true,
-                    VideoCodec = "h264",
+                    VideoCodec = _stations.EffectiveProfile(s).OutputCodec,
                     AudioCodec = "aac"
                 };
             })

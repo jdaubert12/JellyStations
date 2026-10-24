@@ -12,6 +12,7 @@ joining whatever is airing right now, exactly like broadcast television.
 - [Station features](#station-features): bumpers and cards, logo, "Up next" card, content filters,
   tags, family hours, seasonal stations, padding, block repeats, export and import
 - [Weather channel](#weather-channel): screens, forecasts, music, music packs
+- [HDR channels](#hdr-channels): an HDR10 station, what it needs, what clients get
 - [Requirements](#requirements)
 - [Install](#install)
 - [Using it](#using-it): the dashboard and editor, keeping stations fresh, station health, the Status page
@@ -239,8 +240,42 @@ your own.
   for Weather channel stations, and to `incompetech.com` only while a music pack downloads.
   Everything else works offline.
 - HDR sources (HDR10, HDR10+, Dolby Vision on an HDR10 base, HLG) are tone mapped to SDR
-  BT.709 by the plugin, so every channel is a plain 8-bit SDR H.264 stream that clients play
-  without re-encoding. This needs `zscale` in ffmpeg (`jellyfin-ffmpeg` has it).
+  BT.709 by the plugin, so by default every channel is a plain 8-bit SDR H.264 stream that
+  clients play without re-encoding. This needs `zscale` in ffmpeg (`jellyfin-ffmpeg` has it).
+  A station can instead be an [HDR channel](#hdr-channels), which needs an HEVC encoder.
+
+## HDR channels
+
+By default a station is SDR: HDR programs are tone mapped and the whole channel is 8-bit BT.709
+H.264, which every client direct plays. Set a profile's **Output** to **HDR10** (Settings >
+Default encoding, or the station's own encoding override) and that channel becomes 10-bit
+BT.2020 PQ **HEVC Main 10** instead:
+
+- **HDR10 and HDR10+ programs** are scaled in 10 bits and keep their range and mastering
+  metadata; nothing is tone mapped. **HLG** is converted to PQ. Dolby Vision plays from its HDR10
+  base layer, so profile 5 (no base layer) stays unsupported.
+- **SDR programs, slates, "Up next" cards, the logo and weather screens** are converted into the
+  PQ container at SDR brightness (100 nits reference white), so the picture looks as it did on an
+  SDR channel and the stream never changes format at a program boundary. A live MPEG-TS cannot
+  switch codec or colour space mid-stream without players stalling, which is why the whole
+  station is HDR or none of it.
+- **An HEVC encoder is required**: `libx265` (software, several times the CPU of libx264),
+  `hevc_qsv`, `hevc_nvenc`, `hevc_vaapi`, `hevc_amf` or `hevc_videotoolbox`. The Hardware
+  section lists the HEVC encoders in your ffmpeg build, and **Test** with the station runs the
+  real 10-bit chain so you can check the speed before switching. Intel UHD 630 and later encode
+  Main 10 fine (an i5-8500T does 1080p30 at about 5x real time, and the full 4K HDR decode, scale
+  and encode chain at about 3x).
+- **Clients**: Android TV, Apple TV, Roku, Kodi and most TV apps direct play HEVC HDR10 and the
+  display switches to HDR mode. Browsers mostly do not, so Jellyfin transcodes the channel for
+  them. Turn on **tone mapping** under Dashboard > Playback > Transcoding, or those transcodes
+  come out washed out. Jellyfin remuxes the channel for direct-play clients exactly as it does an
+  SDR one.
+- The guide and Live TV channel report `hevc`, and the stream is declared to Jellyfin as HEVC
+  Main 10 BT.2020 PQ outright rather than probed (Jellyfin caches a live channel's first probe
+  for good, which would keep announcing the old codec after a station switched to HDR10, and
+  skipping the probe also makes tune-in quicker). A station switched to or from HDR10 takes the
+  new format at its next tune-in; viewers already on it should change channel and back. `ffprobe`
+  on the stream URL should show `hevc (Main 10), yuv420p10le(tv, bt2020nc/bt2020/smpte2084)`.
 
 ## Install
 
@@ -257,12 +292,12 @@ script with each release.
 
 ### By hand
 
-1. Download `JellyStations_1.15.1.0.zip` from the [releases page](https://github.com/jdaubert12/JellyStations/releases)
+1. Download `JellyStations_1.16.0.0.zip` from the [releases page](https://github.com/jdaubert12/JellyStations/releases)
    and unzip it, or build `Jellyfin.Plugin.JellyStations.dll` yourself.
-2. Copy the DLL (and `meta.json` from the zip) into a folder named `JellyStations_1.15.1.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/JellyStations_1.15.1.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/JellyStations_1.15.1.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\JellyStations_1.15.1.0\` or `%ProgramData%\Jellyfin\Server\plugins\JellyStations_1.15.1.0\`
+2. Copy the DLL (and `meta.json` from the zip) into a folder named `JellyStations_1.16.0.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/JellyStations_1.16.0.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/JellyStations_1.16.0.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\JellyStations_1.16.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\JellyStations_1.16.0.0\`
 3. Restart Jellyfin. **Dashboard > Plugins** should list *JellyStations* as Active and the dashboard
    menu gains a **JellyStations** entry.
 
@@ -278,8 +313,8 @@ more restart clears it. Installing by hand, delete the old folder yourself and s
 API routes moved from `/TvStation/...` to `/JellyStations/...`.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/JellyStations_1.15.1.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.JellyStations.dll <container>:/config/plugins/JellyStations_1.15.1.0/`
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/JellyStations_1.16.0.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.JellyStations.dll <container>:/config/plugins/JellyStations_1.16.0.0/`
 followed by `docker restart <container>` is enough.
 
 ## Using it
@@ -361,11 +396,13 @@ by title, genre, rating or library.
 
 ## Settings
 
-- **Default encoding**: resolution, frame rate, bitrates, encoder, preset, GOP, hardware
-  decoding. All programs on a station are normalized to one profile so clients never need to
-  re-initialize at a program boundary. H.264 High 4.1 + AAC, tagged SDR BT.709, direct-streams
-  on nearly every client, so Jellyfin only remuxes. A station can override the profile, which is
-  the place for per-channel choices:
+- **Default encoding**: resolution, frame rate, bitrates, encoder, output range, preset, GOP,
+  hardware decoding. All programs on a station are normalized to one profile so clients never
+  need to re-initialize at a program boundary. H.264 High 4.1 + AAC, tagged SDR BT.709,
+  direct-streams on nearly every client, so Jellyfin only remuxes. A station can override the
+  profile, which is the place for per-channel choices:
+  - *Output*: SDR (default) or HDR10, see [HDR channels](#hdr-channels). HDR10 needs an HEVC
+    encoder; the H.264 profile and level fields apply to libx264 only.
   - *Frame rate*: 24 for a film station (most movies are 23.976 fps and judder when converted
     to 30), 30 for series, 60 only for 60 fps sources. Keep one rate per station; the profile
     must not change between programs.
@@ -425,10 +462,18 @@ by title, genre, rating or library.
   decode it; the plugin shows a card until the next program. The station row on the dashboard
   says which: permission denied, file not found, folder not found (share or volume not mounted),
   or the ffmpeg exit code with its last log line.
-- *Playback Info says "Transcoding" with reason "video range type"*: the stream carried HDR tags.
-  Since 1.11.0 every segment is tone mapped and tagged BT.709; if a station was compiled by an
-  older version, **Recompile all** (or a restart) records which items are HDR. `ffprobe` on the
-  stream URL should show `yuv420p(tv, bt709)` with no mastering-display side data.
+- *Playback Info says "Transcoding" with reason "video range type"*: on an SDR station the
+  stream carried HDR tags. Since 1.11.0 every segment is tone mapped and tagged BT.709; if a
+  station was compiled by an older version, **Recompile all** (or a restart) records which items
+  are HDR. `ffprobe` on the stream URL should show `yuv420p(tv, bt709)` with no mastering-display
+  side data. On an HDR10 station that reason is expected from a client that cannot play HDR (a
+  browser, most often): Jellyfin tone maps the channel for it, if tone mapping is on under
+  Dashboard > Playback > Transcoding.
+- *HDR10 station plays washed out or grey on a phone or browser*: Jellyfin is transcoding the
+  channel without tone mapping. Turn on tone mapping under Dashboard > Playback > Transcoding.
+- *HDR10 station will not start, "Encoding with hevc_qsv failed"*: the encoder cannot take 10-bit
+  input on this GPU or driver (Intel needs Kaby Lake or later for Main 10). Try `libx265` on a
+  720p profile, or go back to SDR output.
 - *Stutter on a 4K HEVC source*: the plugin's own ffmpeg is probably decoding in software and
   cannot keep real time. Turn on hardware decoding (Settings > Default encoding) or on the station.
 - *Is the GPU really being used?* **Status** answers it: the session's Encoder column says

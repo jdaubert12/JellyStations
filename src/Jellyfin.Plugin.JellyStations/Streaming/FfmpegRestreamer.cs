@@ -126,6 +126,7 @@ public sealed class FfmpegRestreamer : IDisposable
             GpuDevice = running ? ProcessInspector.OpenGpuDevice(proc!.Pid) : null,
             CanInspectDevices = ProcessInspector.CanInspect,
             VideoEncoder = _profile.VideoEncoder,
+            HdrOutput = _profile.IsHdrOutput,
             ToneMapping = telemetry?.ToneMapping ?? false,
             SourceIsHdr = telemetry?.SourceIsHdr ?? false,
             Overlay = telemetry?.Overlay ?? false,
@@ -272,8 +273,11 @@ public sealed class FfmpegRestreamer : IDisposable
                 }
 
                 var hardwareDecode = profile.HardwareDecode.Length > 0;
-                var tonemap = part.Part.IsHdr && _tonemapSupported;
-                var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, tonemap ? part.Part.HdrTransfer : null, seek, duration, NextTsOffset(), profile, overlay, part.Part.VideoCodec, upNext);
+                var hdrOutput = profile.IsHdrOutput;
+                var tonemap = !hdrOutput && part.Part.IsHdr && _tonemapSupported;
+                // An HDR10 channel needs the source's transfer to keep or convert it; an SDR channel only to tone map it.
+                var transfer = hdrOutput || tonemap ? part.Part.HdrTransfer : null;
+                var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, transfer, seek, duration, NextTsOffset(), profile, overlay, part.Part.VideoCodec, upNext);
 
                 _logger.LogInformation(
                     "JellyStations [{Station}]: playing {Title}{Part} from {Seek} ({Remaining} remaining){Hdr}{Hw}{Card}",
@@ -282,7 +286,7 @@ public sealed class FfmpegRestreamer : IDisposable
                     item.IsMultiPart ? " part " + (part.Index + 1) + "/" + item.Parts.Count : string.Empty,
                     seek.ToString(@"hh\:mm\:ss"),
                     remaining.ToString(@"hh\:mm\:ss"),
-                    tonemap ? ", tone mapping HDR to SDR" : string.Empty,
+                    hdrOutput ? (part.Part.IsHdr ? ", HDR10 out" : ", SDR source into HDR10") : tonemap ? ", tone mapping HDR to SDR" : string.Empty,
                     hardwareDecode ? ", " + profile.HardwareDecode + " decoding" : softwareReason is null ? string.Empty : ", software decoding (" + softwareReason + ")",
                     upNext is null ? string.Empty : ", up next card at " + string.Join(", ", upNext.Windows.Select(w => w.From.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "s")));
                 _logger.LogDebug("JellyStations ffmpeg {Args}", FfmpegArgsBuilder.ToLogString(args));

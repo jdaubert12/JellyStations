@@ -182,6 +182,7 @@ public sealed class StatusController : ControllerBase
             GpuDevice = snapshot.GpuDevice,
             VideoEncoder = snapshot.VideoEncoder,
             EncoderIsHardware = EncoderSnapshot.IsHardwareEncoder(snapshot.VideoEncoder),
+            HdrOutput = snapshot.HdrOutput,
             ToneMapping = snapshot.ToneMapping,
             SourceIsHdr = snapshot.SourceIsHdr,
             Overlay = snapshot.Overlay,
@@ -250,6 +251,7 @@ public sealed class HardwareController : ControllerBase
             FfmpegVersion = caps.Version,
             Hwaccels = caps.Hwaccels.ToList(),
             H264Encoders = caps.H264Encoders.ToList(),
+            HevcEncoders = caps.HevcEncoders.ToList(),
             HasTonemap = caps.HasZscale && caps.HasTonemap,
             FfmpegError = caps.Error
         };
@@ -284,9 +286,10 @@ public sealed class HardwareController : ControllerBase
             notes.Add("The configured device " + d.DefaultDevice + " is not among the host's nodes (" + string.Join(", ", d.DrmNodes) + ").");
         }
 
-        if (d.FfmpegError is null && d.H264Encoders.Count > 0 && !d.H264Encoders.Contains(d.DefaultEncoder, StringComparer.OrdinalIgnoreCase))
+        var encoders = d.H264Encoders.Concat(d.HevcEncoders).ToList();
+        if (d.FfmpegError is null && encoders.Count > 0 && !encoders.Contains(d.DefaultEncoder, StringComparer.OrdinalIgnoreCase))
         {
-            notes.Add("The encoder \"" + d.DefaultEncoder + "\" is not in this ffmpeg build; it has " + string.Join(", ", d.H264Encoders) + ".");
+            notes.Add("The encoder \"" + d.DefaultEncoder + "\" is not in this ffmpeg build; it has " + string.Join(", ", encoders) + ".");
         }
 
         if (d.FfmpegError is null && !d.HasTonemap)
@@ -330,6 +333,11 @@ public sealed class HardwareController : ControllerBase
         if (!string.IsNullOrWhiteSpace(request.VideoEncoder))
         {
             profile.VideoEncoder = request.VideoEncoder.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.OutputRange))
+        {
+            profile.OutputRange = request.OutputRange.Trim().ToLowerInvariant();
         }
 
         var errors = StationService.ValidateEncoding(profile);

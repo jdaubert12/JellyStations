@@ -46,6 +46,20 @@ public sealed class EncodingProfile
     /// <summary>Preferred audio language (ISO 639-2), used when compiling items.</summary>
     public string AudioLanguagePreference { get; set; } = "eng";
 
+    /// <summary>
+    /// What the channel is encoded and tagged as: <see cref="OutputSdr"/> (8-bit BT.709) or <see cref="OutputHdr10"/>
+    /// (10-bit BT.2020 PQ, HEVC Main 10). A live stream cannot change format between programs, so an HDR10 channel
+    /// plays its SDR sources, slates, cards and weather screens converted into the PQ container; HDR sources keep
+    /// their range (HLG is converted to PQ). Needs an HEVC encoder.
+    /// </summary>
+    public string OutputRange { get; set; } = OutputSdr;
+
+    public const string OutputSdr = "sdr";
+
+    public const string OutputHdr10 = "hdr10";
+
+    public static readonly string[] OutputRanges = { OutputSdr, OutputHdr10 };
+
     public const string HardwareDecodeAuto = "auto";
 
     /// <summary>ffmpeg -hwaccel names the plugin knows how to set up.</summary>
@@ -56,6 +70,15 @@ public sealed class EncodingProfile
 
     /// <summary>True for libx264 and the other lib* encoders, which never touch a GPU device.</summary>
     public bool IsSoftwareEncoder => VideoEncoder.StartsWith("lib", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>True for libx265 and the hevc_* encoders.</summary>
+    public bool IsHevcEncoder => VideoEncoder.StartsWith("hevc", StringComparison.OrdinalIgnoreCase) || VideoEncoder.Contains("265", StringComparison.Ordinal);
+
+    /// <summary>True when the channel is encoded as HDR10.</summary>
+    public bool IsHdrOutput => string.Equals(OutputRange, OutputHdr10, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The video codec the channel carries, as Jellyfin names it: hevc or h264.</summary>
+    public string OutputCodec => IsHevcEncoder ? "hevc" : "h264";
 
     public EncodingProfile Clone() => (EncodingProfile)MemberwiseClone();
 }

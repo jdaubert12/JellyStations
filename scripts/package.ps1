@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.15.1.0"
+$version = "1.16.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Weather channel: the weather program in the Live TV guide now shows the station's logo as its thumbnail when the station has one; it had no image before."
+    changelog = "HDR channels. A profile's new Output setting (SDR, the default, or HDR10) makes a station a 10-bit BT.2020 PQ HEVC Main 10 channel: HDR10 programs keep their range and mastering metadata, HLG is converted to PQ, and SDR programs, slates, cards, the logo and weather screens are converted into the PQ container at SDR brightness, so the stream never changes format. Needs an HEVC encoder (libx265, hevc_qsv, hevc_nvenc, hevc_vaapi, hevc_amf, hevc_videotoolbox); HDR-capable clients direct play it and Jellyfin tone maps it for the rest (turn on tone mapping under Dashboard > Playback > Transcoding). The channel is declared as hevc Main 10 to Jellyfin instead of being probed (Jellyfin caches a channel's first probe for good, and skipping the probe makes tune-in quicker), the Hardware section lists the HEVC encoders in the ffmpeg build, Hardware Test takes an OutputRange override, and the Status page shows HDR10 out. Weather guide programs carry the station logo as their thumbnail (1.15.1.0)."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

@@ -74,7 +74,8 @@
     TooShort: 'Shorter than the station minimum'
   };
   const RESOLUTIONS = [['1920x1080', '1920 × 1080 (1080p)'], ['1280x720', '1280 × 720 (720p)'], ['854x480', '854 × 480 (480p)'], ['custom', 'Custom']];
-  const ENCODERS = [['libx264', 'libx264 (software)'], ['h264_nvenc', 'h264_nvenc (NVIDIA)'], ['h264_qsv', 'h264_qsv (Intel Quick Sync)'], ['h264_vaapi', 'h264_vaapi (VA-API)'], ['custom', 'Custom…']];
+  const ENCODERS = [['libx264', 'libx264 (software)'], ['h264_nvenc', 'h264_nvenc (NVIDIA)'], ['h264_qsv', 'h264_qsv (Intel Quick Sync)'], ['h264_vaapi', 'h264_vaapi (VA-API)'], ['libx265', 'libx265 (software, HEVC)'], ['hevc_nvenc', 'hevc_nvenc (NVIDIA, HEVC)'], ['hevc_qsv', 'hevc_qsv (Intel Quick Sync, HEVC)'], ['hevc_vaapi', 'hevc_vaapi (VA-API, HEVC)'], ['custom', 'Custom…']];
+  const OUTPUT_RANGES = [['sdr', 'SDR (BT.709, 8-bit)'], ['hdr10', 'HDR10 (BT.2020 PQ, 10-bit HEVC)']];
   const HW_DECODERS = [['auto', 'Follow Jellyfin'], ['', 'None (software)'], ['qsv', 'Intel Quick Sync (qsv)'], ['vaapi', 'VA-API'], ['cuda', 'NVIDIA (cuda)'], ['videotoolbox', 'Apple VideoToolbox'], ['d3d11va', 'Windows (d3d11va)']];
   const STATUS_INTERVAL_MS = 5000;
   const LIST_INTERVAL_MS = 60000;
@@ -3838,7 +3839,7 @@
   function defaultEncoding() {
     return {
       Width: 1280, Height: 720, Fps: 30, VideoBitrateKbps: 3500, AudioBitrateKbps: 160,
-      VideoEncoder: 'libx264', Preset: 'veryfast', H264Profile: 'high', H264Level: '4.1', GopSeconds: 2,
+      VideoEncoder: 'libx264', OutputRange: 'sdr', Preset: 'veryfast', H264Profile: 'high', H264Level: '4.1', GopSeconds: 2,
       HardwareDecode: 'auto', HardwareDevice: '',
       ExtraInputArgs: '', ExtraOutputArgs: '', AudioLanguagePreference: 'eng'
     };
@@ -3858,10 +3859,11 @@
         inputHtml(p + 'vbr', 'Video bitrate (kbps)', 'number', { min: 100, max: 100000, step: 50 }, 'Target bitrate for the video stream. 3500 is plenty for 720p and 8000 for 1080p; more only inflates every client\'s download and Jellyfin\'s transcodes.') +
         inputHtml(p + 'abr', 'Audio bitrate (kbps)', 'number', { min: 32, max: 1024, step: 8 }, 'AAC audio bitrate.') +
         selectHtml(p + 'enc', 'Video encoder', ENCODERS, 'Hardware encoders need the matching drivers and may need extra input arguments (e.g. -hwaccel).') +
-        inputHtml(p + 'encCustom', 'Custom encoder name', 'text', {}, 'Exact ffmpeg encoder name, e.g. h264_amf or libx265.') +
+        inputHtml(p + 'encCustom', 'Custom encoder name', 'text', {}, 'Exact ffmpeg encoder name, e.g. h264_amf or hevc_amf.') +
+        selectHtml(p + 'range', 'Output', OUTPUT_RANGES, 'SDR: 8-bit BT.709, plays everywhere. HDR10: the whole channel is 10-bit BT.2020 PQ HEVC Main 10. HDR sources keep their range, SDR programs, slates, cards and weather screens are converted into it at SDR brightness; needs an HEVC encoder, HDR-capable clients direct play it and Jellyfin tone maps it for the rest (turn on tone mapping under Dashboard > Playback > Transcoding).') +
         inputHtml(p + 'preset', 'Preset', 'text', {}, 'Encoder preset, e.g. veryfast (libx264) or p4 (nvenc).') +
-        inputHtml(p + 'profile', 'H.264 profile', 'text', {}, 'baseline, main or high.') +
-        inputHtml(p + 'level', 'H.264 level', 'text', {}, 'For example 4.1.') +
+        inputHtml(p + 'profile', 'H.264 profile', 'text', {}, 'baseline, main or high (libx264 only; HEVC encoders take main, or main10 on an HDR10 profile).') +
+        inputHtml(p + 'level', 'H.264 level', 'text', {}, 'For example 4.1 (libx264 only).') +
         inputHtml(p + 'lang', 'Preferred audio language', 'text', { maxlength: 3 }, 'ISO 639-2 code (eng, spa, jpn…) used to pick the audio track when compiling.') +
         selectHtml(p + 'hwdec', 'Hardware decoding', HW_DECODERS, 'Decodes the source on the GPU (the heavy part for 4K HEVC); scaling, HDR tone mapping and the logo still run in software. "Follow Jellyfin" uses Dashboard > Playback > Transcoding. ffmpeg falls back to software when the device cannot be used.') +
         inputHtml(p + 'hwdev', 'Hardware device', 'text', {}, 'Render node or adapter for decoding and VA-API encoding, e.g. /dev/dri/renderD128. Empty uses the device Jellyfin is configured with.') +
@@ -3911,6 +3913,8 @@
           q('encCustom').value = e.VideoEncoder || '';
         }
         syncEncoderVisibility();
+        const range = String(e.OutputRange || 'sdr').toLowerCase();
+        q('range').value = OUTPUT_RANGES.some(o => o[0] === range) ? range : 'sdr';
         q('preset').value = e.Preset || '';
         q('profile').value = e.H264Profile || '';
         q('level').value = e.H264Level || '';
@@ -3930,6 +3934,7 @@
           VideoBitrateKbps: parseInt(q('vbr').value, 10) || 0,
           AudioBitrateKbps: parseInt(q('abr').value, 10) || 0,
           VideoEncoder: encoder,
+          OutputRange: q('range').value,
           Preset: q('preset').value.trim(),
           H264Profile: q('profile').value.trim(),
           H264Level: q('level').value.trim(),
@@ -4082,6 +4087,7 @@
     if (!h.FfmpegError) {
       kv('Hardware decoders in ffmpeg', (h.Hwaccels || []).length ? (h.Hwaccels || []).join(', ') : el('span', { className: 'tvs-bad', text: 'none' }));
       kv('H.264 encoders in ffmpeg', (h.H264Encoders || []).join(', '));
+      kv('HEVC encoders in ffmpeg (for HDR10 channels)', (h.HevcEncoders || []).length ? (h.HevcEncoders || []).join(', ') : el('span', { className: 'tvs-bad', text: 'none' }));
       kv('HDR tone mapping filters', h.HasTonemap ? el('span', { className: 'tvs-ok', text: 'zscale + tonemap present' }) : el('span', { className: 'tvs-bad', text: 'missing' }));
     }
     const notes = clear($('#tvsHardwareNotes'));
@@ -4363,7 +4369,9 @@
       badge(decoderBadge[0], decoderBadge[1], decoderBadge[2]);
     }
     badge(e.VideoEncoder || '', e.EncoderIsHardware ? 'on' : '', e.EncoderIsHardware ? 'Hardware encoder' : 'Software encoder');
-    if (e.ToneMapping) {
+    if (e.HdrOutput) {
+      badge('HDR10 out', 'live', e.SourceIsHdr ? 'HDR source kept in 10-bit PQ on this HDR10 channel' : 'SDR picture converted into this HDR10 channel at SDR brightness');
+    } else if (e.ToneMapping) {
       badge('HDR → SDR', 'live', 'Tone mapping this HDR program to BT.709 in software');
     } else if (e.SourceIsHdr) {
       badge('HDR untouched', 'warn', 'HDR source playing without tone mapping');

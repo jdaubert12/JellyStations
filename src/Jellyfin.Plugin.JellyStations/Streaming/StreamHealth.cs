@@ -37,6 +37,9 @@ public sealed class EncoderSnapshot
 
     public string VideoEncoder { get; init; } = string.Empty;
 
+    /// <summary>True when the profile encodes the channel as HDR10.</summary>
+    public bool HdrOutput { get; init; }
+
     public bool ToneMapping { get; init; }
 
     public bool SourceIsHdr { get; init; }

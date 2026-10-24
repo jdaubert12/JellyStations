@@ -17,6 +17,9 @@ public sealed class FfmpegCapabilities
     /// <summary>Every H.264 encoder the build has, software and hardware.</summary>
     public IReadOnlyList<string> H264Encoders { get; init; } = Array.Empty<string>();
 
+    /// <summary>Every HEVC encoder the build has, software and hardware: what an HDR10 channel can use.</summary>
+    public IReadOnlyList<string> HevcEncoders { get; init; } = Array.Empty<string>();
+
     public bool HasZscale { get; init; }
 
     public bool HasTonemap { get; init; }
@@ -114,6 +117,7 @@ public static class HardwareProbe
                 Version = version.Output.FirstOrDefault(l => l.StartsWith("ffmpeg version", StringComparison.OrdinalIgnoreCase))?.Trim() ?? version.Output.FirstOrDefault()?.Trim() ?? string.Empty,
                 Hwaccels = ParseHwaccels(hwaccels.Output),
                 H264Encoders = ParseH264Encoders(encoders.Output),
+                HevcEncoders = ParseHevcEncoders(encoders.Output),
                 HasZscale = filters.Output.Any(l => Regex.IsMatch(l, @"^\s*\S+\s+zscale\s")),
                 HasTonemap = filters.Output.Any(l => Regex.IsMatch(l, @"^\s*\S+\s+tonemap\s"))
             };
@@ -149,13 +153,18 @@ public static class HardwareProbe
         return list;
     }
 
-    public static IReadOnlyList<string> ParseH264Encoders(IEnumerable<string> lines)
+    public static IReadOnlyList<string> ParseH264Encoders(IEnumerable<string> lines) => ParseEncoders(lines, "h264", "libx264");
+
+    public static IReadOnlyList<string> ParseHevcEncoders(IEnumerable<string> lines) => ParseEncoders(lines, "hevc", "libx265");
+
+    /// <summary>The video encoders in -encoders output named after a codec (h264_qsv, hevc_nvenc...) plus the software one.</summary>
+    private static IReadOnlyList<string> ParseEncoders(IEnumerable<string> lines, string prefix, string software)
     {
         var list = new List<string>();
         foreach (var line in lines)
         {
             var m = EncoderLine.Match(line);
-            if (m.Success && (m.Groups[1].Value.StartsWith("h264", StringComparison.OrdinalIgnoreCase) || m.Groups[1].Value.Equals("libx264", StringComparison.OrdinalIgnoreCase)))
+            if (m.Success && (m.Groups[1].Value.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) || m.Groups[1].Value.Equals(software, StringComparison.OrdinalIgnoreCase)))
             {
                 list.Add(m.Groups[1].Value);
             }

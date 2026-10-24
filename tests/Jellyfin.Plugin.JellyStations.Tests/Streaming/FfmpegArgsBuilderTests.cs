@@ -10,7 +10,7 @@ public class FfmpegArgsBuilderTests
 
     private const string SdrOptions = "-color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv";
     private const string SdrTags = "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709:range=tv";
-    private const string PlainChain = "scale=1280:720:force_original_aspect_ratio=decrease:flags=bicubic,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p," + SdrTags;
+    private const string PlainChain = "scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p," + SdrTags;
     private const string TonemapChain = "format=yuv420p10le,zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0:peak=100,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,sidedata=mode=delete";
 
     private static PlayableItem Item(bool hasAudio = true, bool hdr = false, string transfer = "smpte2084") => new()
@@ -71,7 +71,7 @@ public class FfmpegArgsBuilderTests
         var vf = ValueAfter(args, "-vf");
 
         Assert.Equal(
-            "scale=1280:720:force_original_aspect_ratio=decrease:flags=bicubic,setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc," + TonemapChain + ",pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p," + SdrTags,
+            "scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic,setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc," + TonemapChain + ",pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p," + SdrTags,
             vf);
     }
 
@@ -96,7 +96,7 @@ public class FfmpegArgsBuilderTests
         var overlay = new FfmpegArgsBuilder.LogoOverlayInput("/data/logo.png", LogoCorner.TopRight, 70, 8);
         var graph = ValueAfter(FfmpegArgsBuilder.ForFile(Item(hdr: true), TimeSpan.Zero, null, TimeSpan.Zero, Profile, overlay), "-filter_complex");
 
-        Assert.Contains("[0:v]scale=1280:720:force_original_aspect_ratio=decrease:flags=bicubic,setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc," + TonemapChain, graph, StringComparison.Ordinal);
+        Assert.Contains("[0:v]scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic,setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc," + TonemapChain, graph, StringComparison.Ordinal);
         Assert.EndsWith("[base][logo]overlay=W-w-20:20:format=yuv420[v]", graph, StringComparison.Ordinal);
     }
 

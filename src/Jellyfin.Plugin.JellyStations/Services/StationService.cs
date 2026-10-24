@@ -764,6 +764,16 @@ public sealed class StationService
             errors.Add("video encoder is required.");
         }
 
+        var range = (p.OutputRange ?? string.Empty).Trim().ToLowerInvariant();
+        if (range.Length > 0 && !EncodingProfile.OutputRanges.Contains(range, StringComparer.Ordinal))
+        {
+            errors.Add("output must be " + string.Join(" or ", EncodingProfile.OutputRanges) + ".");
+        }
+        else if (p.IsHdrOutput && !string.IsNullOrWhiteSpace(p.VideoEncoder) && !p.IsHevcEncoder)
+        {
+            errors.Add("HDR10 output needs an HEVC encoder (libx265, hevc_qsv, hevc_nvenc, hevc_vaapi, hevc_amf or hevc_videotoolbox); " + p.VideoEncoder + " makes H.264, which cannot carry HDR.");
+        }
+
         var hw = (p.HardwareDecode ?? string.Empty).Trim().ToLowerInvariant();
         if (hw.Length > 0 && hw != EncodingProfile.HardwareDecodeAuto && !EncodingProfile.HardwareDecodeKinds.Contains(hw, StringComparer.Ordinal))
         {

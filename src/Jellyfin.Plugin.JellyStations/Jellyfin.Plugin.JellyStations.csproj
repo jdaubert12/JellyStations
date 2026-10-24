@@ -4,9 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>Jellyfin.Plugin.JellyStations</RootNamespace>
     <AssemblyName>Jellyfin.Plugin.JellyStations</AssemblyName>
-    <AssemblyVersion>1.15.1.0</AssemblyVersion>
-    <FileVersion>1.15.1.0</FileVersion>
-    <Version>1.15.1.0</Version>
+    <AssemblyVersion>1.16.0.0</AssemblyVersion>
+    <FileVersion>1.16.0.0</FileVersion>
+    <Version>1.16.0.0</Version>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>

@@ -7,8 +7,11 @@ namespace Jellyfin.Plugin.JellyStations.Streaming;
 /// <summary>
 /// Builds ffmpeg argument lists for program and slate segments. Output is not paced by ffmpeg (-re);
 /// the restreamer paces it from the TS PCR clock and back-pressures ffmpeg through the pipe.
-/// Every segment is tagged BT.709 SDR; HDR sources are tone mapped so no PQ/HLG pixels or HDR
-/// side data reach the stream (an HDR tag is what makes clients re-encode the channel).
+/// On an SDR profile every segment is tagged BT.709 SDR and HDR sources are tone mapped, so no PQ/HLG pixels
+/// or HDR side data reach the stream (an HDR tag is what makes clients re-encode an H.264 channel). On an HDR10
+/// profile every segment leaves as 10-bit BT.2020 PQ instead: HDR sources keep their range (HLG is converted to
+/// PQ), SDR sources, slates, logos, cards and weather screens are converted into the PQ container at SDR
+/// brightness, and the channel is HEVC Main 10 that HDR clients direct play and Jellyfin tone maps for the rest.
 /// </summary>
 public static partial class FfmpegArgsBuilder
 {
@@ -142,7 +145,7 @@ public static partial class FfmpegArgsBuilder
             if (!p.IsVaapiEncoder)
             {
                 args.Add("-pix_fmt");
-                args.Add("yuv420p");
+                args.Add(OutputPixelFormat(p));
             }
         }
 
@@ -168,7 +171,7 @@ public static partial class FfmpegArgsBuilder
         {
             var height = Math.Max(8, p.Height * Math.Clamp(overlay.HeightPercent, 3, 25) / 100);
             var alpha = (Math.Clamp(overlay.Opacity, 10, 100) / 100.0).ToString("0.00", CultureInfo.InvariantCulture);
-            sb.Append(CultureInfo.InvariantCulture, $";[{logoIndex}:v]scale=-1:{height},format=rgba,colorchannelmixer=aa={alpha}[logo];[{current}][logo]overlay={CornerPosition(p, overlay.Corner)}:format=yuv420[ov1]");
+            sb.Append(CultureInfo.InvariantCulture, $";[{logoIndex}:v]scale=-1:{height},format=rgba,colorchannelmixer=aa={alpha}{StillToOutput(p)}[logo];[{current}][logo]overlay={CornerPosition(p, overlay.Corner)}:format={OverlayFormat(p)}[ov1]");
             current = "ov1";
         }
 
@@ -180,11 +183,11 @@ public static partial class FfmpegArgsBuilder
             // late on the live stream, though never in a standalone run, so the card never leaves the graph.
             // Slide: the overlay's x expression parks the card off the nearest side edge and brings it in. The
             // enable window still gates both.
-            var cardChain = upNext.Fades
+            var cardChain = (upNext.Fades
                 ? $"format=rgba,loop=loop=-1:size=1:start=0,settb=1/{p.Fps},setpts=N/({p.Fps}*TB),trim=end={upNext.CardStreamEnd},sendcmd=c='{upNext.FadeCommands}',colorchannelmixer@fade=aa=0"
-                : "format=rgba";
+                : "format=rgba") + StillToOutput(p);
             var position = upNext.Slides ? SlidingPosition(p, upNext) : CornerPosition(p, upNext.Corner);
-            sb.Append(CultureInfo.InvariantCulture, $";[{cardIndex}:v]{cardChain}[card];[{current}][card]overlay={position}:format=yuv420:enable='{upNext.EnableExpression}'[ov2]");
+            sb.Append(CultureInfo.InvariantCulture, $";[{cardIndex}:v]{cardChain}[card];[{current}][card]overlay={position}:format={OverlayFormat(p)}:enable='{upNext.EnableExpression}'[ov2]");
             current = "ov2";
         }
 
@@ -346,7 +349,7 @@ public static partial class FfmpegArgsBuilder
 
         if (filter.Length > 0)
         {
-            filter.Append(CultureInfo.InvariantCulture, $";[{videoLabel}]format=yuv420p,{SdrTags}{EncoderUploadSuffix(p)}[v2]");
+            filter.Append(CultureInfo.InvariantCulture, $";[{videoLabel}]{SdrGraphToOutput(p)}{EncoderUploadSuffix(p)}[v2]");
             videoLabel = "v2";
         }
 
@@ -369,12 +372,12 @@ public static partial class FfmpegArgsBuilder
         if (filter.Length == 0)
         {
             args.Add("-vf");
-            args.Add("format=yuv420p," + SdrTags + EncoderUploadSuffix(p));
+            args.Add(SdrGraphToOutput(p) + EncoderUploadSuffix(p));
         }
         else if (!p.IsVaapiEncoder)
         {
             args.Add("-pix_fmt");
-            args.Add("yuv420p");
+            args.Add(OutputPixelFormat(p));
         }
 
         Output(args, p, tsOffset);
@@ -508,30 +511,90 @@ public static partial class FfmpegArgsBuilder
         return args;
     }
 
-    /// <summary>Frame tags every segment leaves the graph with. ffmpeg 7+ encoders take color metadata from the frames, not from -color_* options.</summary>
+    /// <summary>Frame tags an SDR segment leaves the graph with. ffmpeg 7+ encoders take color metadata from the frames, not from -color_* options.</summary>
     public const string SdrTags = "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709:range=tv";
 
+    /// <summary>Frame tags an HDR10 segment leaves the graph with: BT.2020 primaries, the PQ transfer, the non-constant-luminance matrix.</summary>
+    public const string HdrTags = "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc:range=tv";
+
     /// <summary>
-    /// Scale (letterboxed) to the profile, constant frame rate, 8-bit 4:2:0, tagged BT.709. An HDR source is first
-    /// tone mapped to BT.709 (the zscale/tonemap chain Jellyfin uses for software tone mapping) and stripped of its
-    /// HDR side data. The HDR input properties are stated outright so zscale does not depend on the file's tags.
+    /// SDR video into the PQ container: stamped BT.709 first (zscale refuses untagged frames), widened to 10 bits so
+    /// the PQ curve is not quantized at 8, and converted with SDR white at 100 nits, the brightness HDR displays
+    /// give SDR material.
+    /// </summary>
+    public const string SdrToPq = "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,format=yuv420p10le,zscale=t=smpte2084:p=bt2020:m=bt2020nc:r=tv:npl=100";
+
+    /// <summary>
+    /// An sRGB still with alpha (logo, card) into PQ for compositing over an HDR picture: converted in 10-bit planar
+    /// RGB and handed to the overlay filter as 4:4:4 10-bit YUV with alpha in the stream's own matrix, so the overlay
+    /// does no colour conversion of its own. 4:4:4 because a still of odd size cannot be subsampled.
+    /// </summary>
+    public const string StillToPq = "format=gbrap10le,zscale=tin=iec61966-2-1:pin=bt709:t=smpte2084:p=bt2020:m=bt2020nc:r=tv:npl=100,format=yuva444p10le";
+
+    /// <summary>The frame tags for the profile's output range.</summary>
+    public static string OutputTags(EncodingProfile p) => p.IsHdrOutput ? HdrTags : SdrTags;
+
+    /// <summary>
+    /// The pixel format the encoder is handed: 8-bit 4:2:0 for SDR. For HDR10 the 10-bit 4:2:0 layout the encoder
+    /// takes: planar yuv420p10le for libx265 and ahead of the VA-API upload, semi-planar p010le for the QSV, NVENC,
+    /// AMF and VideoToolbox encoders.
+    /// </summary>
+    public static string OutputPixelFormat(EncodingProfile p)
+        => !p.IsHdrOutput ? "yuv420p" : p.IsSoftwareEncoder || p.IsVaapiEncoder ? "yuv420p10le" : "p010le";
+
+    /// <summary>The overlay filter's output format for the profile: the base picture's own layout.</summary>
+    public static string OverlayFormat(EncodingProfile p) => p.IsHdrOutput ? "yuv420p10" : "yuv420";
+
+    /// <summary>The end of every video graph: the encoder's pixel format and the output range's frame tags.</summary>
+    public static string OutputTail(EncodingProfile p) => "format=" + OutputPixelFormat(p) + "," + OutputTags(p);
+
+    /// <summary>The end of a graph whose picture is SDR (slate, weather screens): converted into PQ on an HDR10 profile.</summary>
+    public static string SdrGraphToOutput(EncodingProfile p) => p.IsHdrOutput ? "format=yuv420p," + SdrToPq + "," + OutputTail(p) : OutputTail(p);
+
+    /// <summary>Appended to a logo or card still before it is laid over the picture: nothing on SDR, the PQ conversion on HDR10.</summary>
+    public static string StillToOutput(EncodingProfile p) => p.IsHdrOutput ? "," + StillToPq : string.Empty;
+
+    /// <summary>
+    /// Scale (letterboxed, to even dimensions: zscale refuses a 4:2:0 picture of odd size, which a 2.40:1 film at
+    /// 1280 wide would otherwise be) to the profile, constant frame rate, then the output range's pixel format and tags. On an
+    /// SDR profile an HDR source is first tone mapped to BT.709 (the zscale/tonemap chain Jellyfin uses for software
+    /// tone mapping) and stripped of its HDR side data. On an HDR10 profile an SDR source is converted into PQ, a PQ
+    /// source is kept in 10 bits with its mastering metadata, and an HLG source is converted to PQ. The HDR input
+    /// properties are stated outright so zscale does not depend on the file's tags.
     /// </summary>
     public static string VideoFilter(EncodingProfile p, string? hdrTransfer = null)
     {
         var sb = new StringBuilder();
-        sb.Append(CultureInfo.InvariantCulture, $"scale={p.Width}:{p.Height}:force_original_aspect_ratio=decrease:flags=bicubic");
-        if (!string.IsNullOrEmpty(hdrTransfer))
+        sb.Append(CultureInfo.InvariantCulture, $"scale={p.Width}:{p.Height}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic");
+        var hdrSource = !string.IsNullOrEmpty(hdrTransfer);
+        if (p.IsHdrOutput)
+        {
+            if (hdrSource)
+            {
+                sb.Append(CultureInfo.InvariantCulture, $",setparams=color_primaries=bt2020:color_trc={hdrTransfer}:colorspace=bt2020nc,format=yuv420p10le");
+                if (!string.Equals(hdrTransfer, "smpte2084", StringComparison.OrdinalIgnoreCase))
+                {
+                    sb.Append(",zscale=t=smpte2084:p=bt2020:m=bt2020nc:r=tv");
+                }
+            }
+            else
+            {
+                sb.Append(',').Append(SdrToPq);
+            }
+        }
+        else if (hdrSource)
         {
             sb.Append(CultureInfo.InvariantCulture, $",setparams=color_primaries=bt2020:color_trc={hdrTransfer}:colorspace=bt2020nc");
             sb.Append(",format=yuv420p10le,zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0:peak=100,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,sidedata=mode=delete");
         }
 
-        sb.Append(CultureInfo.InvariantCulture, $",pad={p.Width}:{p.Height}:(ow-iw)/2:(oh-ih)/2,fps={p.Fps},format=yuv420p,{SdrTags}");
+        sb.Append(CultureInfo.InvariantCulture, $",pad={p.Width}:{p.Height}:(ow-iw)/2:(oh-ih)/2,fps={p.Fps},{OutputTail(p)}");
         return sb.ToString();
     }
 
     /// <summary>Filters that hand the finished frame to the encoder: VA-API encoders only take frames already on the GPU.</summary>
-    private static string EncoderUploadSuffix(EncodingProfile p) => p.IsVaapiEncoder ? ",format=nv12,hwupload" : string.Empty;
+    private static string EncoderUploadSuffix(EncodingProfile p)
+        => p.IsVaapiEncoder ? (p.IsHdrOutput ? ",format=p010le,hwupload" : ",format=nv12,hwupload") : string.Empty;
 
     /// <summary>The video encoder and its rate control, shared by program segments and the hardware check.</summary>
     private static void VideoCodec(List<string> args, EncodingProfile p)
@@ -550,14 +613,32 @@ public static partial class FfmpegArgsBuilder
             args.Add("-x264-params");
             args.Add("scenecut=0:open-gop=0");
         }
+        else if (string.Equals(p.VideoEncoder, "libx265", StringComparison.OrdinalIgnoreCase))
+        {
+            // The same closed, fixed GOP as libx264, headers repeated on every key frame so a client joining
+            // mid-program decodes at once, and x265's own chatter kept off stderr (it ignores ffmpeg's log level).
+            args.Add("-preset");
+            args.Add(p.Preset);
+            args.Add("-x265-params");
+            args.Add("scenecut=0:open-gop=0:repeat-headers=1:log-level=error");
+        }
 
-        // Always declare SDR BT.709: the filter chain delivers that, and a leaked BT.2020/PQ tag makes clients transcode.
+        if (p.IsHdrOutput)
+        {
+            // 10-bit HEVC: libx265 and every hevc_* encoder call the profile "main10".
+            args.Add("-profile:v");
+            args.Add("main10");
+        }
+
+        // Declare the range the filter chain delivers (older builds read these options; newer ones take the frame
+        // tags). A leaked BT.2020/PQ tag on an SDR channel is what makes clients transcode it.
+        var hdr = p.IsHdrOutput;
         args.Add("-color_primaries");
-        args.Add("bt709");
+        args.Add(hdr ? "bt2020" : "bt709");
         args.Add("-color_trc");
-        args.Add("bt709");
+        args.Add(hdr ? "smpte2084" : "bt709");
         args.Add("-colorspace");
-        args.Add("bt709");
+        args.Add(hdr ? "bt2020nc" : "bt709");
         args.Add("-color_range");
         args.Add("tv");
 

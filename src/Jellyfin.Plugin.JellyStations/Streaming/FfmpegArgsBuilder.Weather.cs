@@ -79,7 +79,7 @@ public static partial class FfmpegArgsBuilder
         if (!p.IsVaapiEncoder)
         {
             args.Add("-pix_fmt");
-            args.Add("yuv420p");
+            args.Add(OutputPixelFormat(p));
         }
 
         Output(args, p, tsOffset, audioFromGraph: hasMusic);
@@ -149,7 +149,7 @@ public static partial class FfmpegArgsBuilder
             step++;
         }
 
-        sb.Append(CultureInfo.InvariantCulture, $"[{current}]format=yuv420p,{SdrTags}{EncoderUploadSuffix(p)}[v]");
+        sb.Append(CultureInfo.InvariantCulture, $"[{current}]{SdrGraphToOutput(p)}{EncoderUploadSuffix(p)}[v]");
         return sb.ToString();
     }
 

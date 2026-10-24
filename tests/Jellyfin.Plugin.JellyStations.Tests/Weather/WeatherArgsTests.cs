@@ -32,6 +32,18 @@ public class WeatherArgsTests
 
     private static EncodingProfile Profile() => new() { Width = 1280, Height = 720, Fps = 30 };
 
+    [Fact]
+    public void OnAnHdr10Profile_TheScreensAreConvertedIntoPq()
+    {
+        var p = new EncodingProfile { Width = 1280, Height = 720, Fps = 30, VideoEncoder = "hevc_qsv", OutputRange = EncodingProfile.OutputHdr10 };
+        var args = FfmpegArgsBuilder.ForWeather(Segment(music: false), TimeSpan.Zero, p);
+        var f = Filter(args);
+
+        Assert.EndsWith("format=yuv420p," + FfmpegArgsBuilder.SdrToPq + ",format=p010le," + FfmpegArgsBuilder.HdrTags + "[v]", f);
+        Assert.Equal("p010le", args[args.IndexOf("-pix_fmt") + 1]);
+        Assert.Equal("main10", args[args.IndexOf("-profile:v") + 1]);
+    }
+
     private static string Filter(List<string> args) => args[args.IndexOf("-filter_complex") + 1];
 
     [Fact]

@@ -344,6 +344,12 @@ public sealed class StreamSessionManager : IDisposable
     public static MediaSourceInfo BuildMediaSource(Station station, EncodingProfile profile)
     {
         var channelId = station.Id.ToString("N");
+        var hdr = profile.IsHdrOutput;
+        var hevc = profile.IsHevcEncoder;
+        // HEVC levels as ffprobe reports them (4.1 = 123, 5.1 = 153); H.264 "4.1" as 41.
+        var level = hevc
+            ? (profile.Width * (long)profile.Height * profile.Fps > 1920L * 1080 * 30 ? 153 : 123)
+            : double.TryParse(profile.H264Level, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var l) ? (double?)Math.Round(l * 10) : null;
         return new MediaSourceInfo
         {
             Id = channelId,
@@ -358,7 +364,10 @@ public sealed class StreamSessionManager : IDisposable
             SupportsDirectPlay = true,
             SupportsDirectStream = true,
             SupportsTranscoding = true,
-            SupportsProbing = true,
+            // Not probed: Jellyfin caches a live channel's probe per channel for good, so a station switched to
+            // HDR10 (or back) would keep being announced with its old codec and range. The declaration below is
+            // exact, and skipping the probe also drops Jellyfin's probe delay from every tune-in.
+            SupportsProbing = false,
             IgnoreDts = true,
             ReadAtNativeFramerate = false,
             Bitrate = (profile.VideoBitrateKbps + profile.AudioBitrateKbps) * 1000,
@@ -366,21 +375,24 @@ public sealed class StreamSessionManager : IDisposable
             {
                 new()
                 {
+                    // What the restreamer produces, declared so Jellyfin's direct-play decision (and its HDR range
+                    // classification, which it derives from the transfer) is right before it probes the stream.
                     Type = MediaStreamType.Video,
                     Index = -1,
-                    Codec = "h264",
+                    Codec = profile.OutputCodec,
                     Width = profile.Width,
                     Height = profile.Height,
                     AverageFrameRate = profile.Fps,
                     RealFrameRate = profile.Fps,
                     BitRate = profile.VideoBitrateKbps * 1000,
                     IsInterlaced = false,
-                    Profile = profile.H264Profile,
-                    PixelFormat = "yuv420p",
-                    BitDepth = 8,
-                    ColorPrimaries = "bt709",
-                    ColorTransfer = "bt709",
-                    ColorSpace = "bt709",
+                    Profile = hdr ? "Main 10" : hevc ? "Main" : profile.H264Profile,
+                    Level = level,
+                    PixelFormat = hdr ? "yuv420p10le" : "yuv420p",
+                    BitDepth = hdr ? 10 : 8,
+                    ColorPrimaries = hdr ? "bt2020" : "bt709",
+                    ColorTransfer = hdr ? "smpte2084" : "bt709",
+                    ColorSpace = hdr ? "bt2020nc" : "bt709",
                     ColorRange = "tv"
                 },
                 new()

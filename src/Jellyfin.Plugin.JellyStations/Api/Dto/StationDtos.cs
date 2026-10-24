@@ -335,6 +335,9 @@ public sealed class EncoderStatusDto
 
     public bool EncoderIsHardware { get; set; }
 
+    /// <summary>True when the station's profile encodes the channel as HDR10.</summary>
+    public bool HdrOutput { get; set; }
+
     public bool ToneMapping { get; set; }
 
     public bool SourceIsHdr { get; set; }
@@ -391,6 +394,8 @@ public sealed class HardwareInfoDto
 
     public List<string> H264Encoders { get; set; } = new();
 
+    public List<string> HevcEncoders { get; set; } = new();
+
     public bool HasTonemap { get; set; }
 
     public string? FfmpegError { get; set; }
@@ -409,6 +414,9 @@ public sealed class HardwareTestRequestDto
     public string? HardwareDevice { get; set; }
 
     public string? VideoEncoder { get; set; }
+
+    /// <summary>Overrides the profile's output range for this run ("sdr" or "hdr10"): a way to try the HDR chain before switching a station.</summary>
+    public string? OutputRange { get; set; }
 
     /// <summary>Seconds of video to run through (2-15, default 5).</summary>
     public int? Seconds { get; set; }
