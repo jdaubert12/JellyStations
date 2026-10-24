@@ -5,6 +5,22 @@ series, collections, playlists or genres, choose how each one is scheduled, and 
 client (web, mobile, Android TV, Roku, ...) tunes in through the built-in **Live TV** guide,
 joining whatever is airing right now, exactly like broadcast television.
 
+**Contents**
+
+- [How it works](#how-it-works)
+- [Scheduling modes](#scheduling-modes)
+- [Station features](#station-features): bumpers and cards, logo, "Up next" card, content filters,
+  tags, family hours, seasonal stations, padding, block repeats, export and import
+- [Weather channel](#weather-channel): screens, forecasts, music, music packs
+- [Requirements](#requirements)
+- [Install](#install)
+- [Using it](#using-it): the dashboard and editor, keeping stations fresh, station health, the Status page
+- [Settings](#settings)
+- [Troubleshooting](#troubleshooting)
+- [HTTP API](#http-api)
+- [Development](#development)
+- [License](#license)
+
 ## How it works
 
 - Stations are exposed as native Live TV channels, so the standard Jellyfin guide, channel list,
@@ -16,7 +32,9 @@ joining whatever is airing right now, exactly like broadcast television.
   MPEG-TS stream. Additional viewers share the same encoder. The encoder stops shortly after the
   last viewer leaves.
 
-### Scheduling modes
+## Scheduling modes
+
+Every station has one mode, chosen when it is created and changeable later.
 
 | Mode | What it does |
 |---|---|
@@ -24,6 +42,13 @@ joining whatever is airing right now, exactly like broadcast television.
 | **Slots** ("Weekly schedule" in the dashboard) | Recurring blocks in the station's time zone, e.g. weekdays 20:00-21:00 = Seinfeld, Saturday 08:00-12:00 = cartoons. A filler pool plays between blocks. Sequential blocks pick up where they left off each day. |
 | **Lineup** ("Play a fixed list" in the dashboard) | A hand-ordered list that loops forever from the station's anchor time. |
 | **Weather** ("Weather channel" in the dashboard) | No library items: the plugin draws the screens itself. Current conditions, the next twelve hours and the week ahead for up to eight places, cycling over music, with a live clock. See [Weather channel](#weather-channel). |
+
+## Station features
+
+These apply to the library-based modes (Pool, Slots and Lineup). Everything here is optional and
+set per station in the editor.
+
+### Bumpers and station cards
 
 **Bumpers** are optional short clips (idents, trailers) that fill the gaps between programs. Pick any
 sources, cap the clip length, and optionally reserve a break of a few minutes after every program so
@@ -34,41 +59,130 @@ right before the next program, and a **post-roll** clip that opens the break aft
 its own sources, or from the bumper sources when it has none; both come out of the existing break, so
 programs still start on the grid, and a position is skipped quietly when no clip fits.
 
+### Logo
+
 A station **logo** appears in the guide and on station cards. It can also be drawn over the video as a
 corner bug, with a choice of corner, size and opacity. That is off by default because the overlay
 filter costs encoder CPU.
 
+### "Up next" card
+
 An **"Up next" card** can be drawn over the last seconds of every program: a translucent panel in a
 corner with the next program's title, its poster or episode thumbnail, the season and episode or the
 year, and the time it starts and ends in the station's time zone (12 or 24-hour clock). Pick the
-corner, the times before the end it appears (one or more, e.g. 1h, 30m, 5m, 30s), how long it stays, its height and opacity,
-whether to show the artwork and the times, and how it arrives and leaves: a fade (the default), a slide in
-from the nearest side, both, or neither. The card is burned into the stream by the plugin's own
-ffmpeg, so every viewer sees it, it stays in step with the picture whatever the client's HLS delay,
-and no client support is needed; it cannot be dismissed. Bumper clips and station breaks are skipped
-when choosing what to announce, programs too short to carry the card do without it, and a card that
-ffmpeg cannot draw is dropped for the session with a note on the station row. Off by default: like
-the logo it costs encoder CPU for the whole program, and the two should sit in different corners.
+corner, the times before the end it appears (one or more, e.g. 1h, 30m, 5m, 30s), how long it stays,
+its height and opacity, whether to show the artwork and the times, and how it arrives and leaves: a
+fade (the default), a slide in from the nearest side, both, or neither. The card is burned into the
+stream by the plugin's own ffmpeg, so every viewer sees it, it stays in step with the picture whatever
+the client's HLS delay, and no client support is needed; it cannot be dismissed. Bumper clips and
+station breaks are skipped when choosing what to announce, programs too short to carry the card do
+without it, and a card that ffmpeg cannot draw is dropped for the session with a note on the station
+row. Off by default: like the logo it costs encoder CPU for the whole program, and the two should sit
+in different corners.
 
-### Weather channel
+### Content sources and filters
+
+Every content source can be tuned from its chip (the ✎ button): series sources take a **season range**
+and a **skip specials** switch; genre, playlist, collection and library sources can be limited to
+**movies only** or **shows only**; every expanding source can take a **max rating** ("PG / TV-PG" and
+below, with an "allow unrated" switch) and a **year range**; and any source gets a **weight** (×1 to
+×10) that controls how often it appears compared with the other sources. Episodes without their own
+rating use the series rating, and the year filter uses the show's year for episodes. Pools can also
+run **marathons**: play 2 to N episodes of a show back to back before switching.
+
+The editor's **Content** section lists everything a station expands to, with a text filter, totals,
+and an **Exclude** switch per item for the one episode or film that does not belong. Exclusions are
+saved with the station and survive recompiles. A station can also **skip items shorter than** a
+number of minutes, which keeps shorts and stubs out of pools and blocks.
+
+Films split across files (Blu-ray `part1` / `part2`, which Jellyfin stacks into one movie) are
+scheduled at their full combined length and play straight through, one guide entry. Items without a
+known runtime are skipped and listed in the editor; refresh their metadata in Jellyfin and press
+**Refresh content**.
+
+### Tags
+
+Library **tags** work both ways. A **Tag** source plays everything carrying a tag (for example
+"christmas", as TMDB tags holiday films), including every episode of a tagged series. **Excluded
+tags**, per station or plugin-wide in Settings, keep tagged items off a station when a genre, library,
+playlist, collection or series source expands to them. Hand-picked movies and episodes, lineups, and a
+Tag source for that same tag are never affected, whatever order the sources are in, so a seasonal
+holiday station keeps its films while "christmas" stays off every regular channel all year. Items
+dropped by a tag rule appear in the Content section marked "by tag".
+
+### Family hours
+
+Pools can carry **family hours** (daytime rating rules) such as "nothing above PG between 06:00 and
+20:00" (station time zone). The schedule moves items that would overlap a window to a later slot; if
+nothing fits, that slot shows a station card. Items can only be moved within their cycle, so a pool
+whose full cycle is shorter than the restricted window will show cards rather than defer; with a few
+hours of content this is never an issue. When the pool has time blocks, an item a rule keeps off the
+air is skipped and comes up later in the pass instead. Blocks are already time-bound and are not gated.
+
+### Seasonal stations
+
+A station can be **seasonal**: give it one or more yearly date ranges (for example December 1 to
+January 6, or pick a preset such as Halloween or Holiday season) and it is only listed in the guide
+during those dates, in the station's time zone. Off season it stays in the dashboard with an "Off
+season until …" badge and comes back by itself.
+
+### Padding and the schedule anchor
+
+Optional **padding grid** (5/15/30/60 minutes) rounds every program up to the grid like real TV,
+filling the gap with a station card. **By length** padding instead gives each program a slot sized to
+it: anything up to an hour fills half hours (a 22-minute episode gets 30, a 44-minute one 60) and
+anything longer fills whole hours (a 95-minute film gets 2 hours). The bumper break counts toward
+the length. The schedule anchor can be set to "now" from the editor, and a saved station has a
+**Start schedule from now** button on its row.
+
+### Time block repeats and templates
+
+A block repeats every week unless its **Repeats** setting says otherwise: every N weeks counted from a
+chosen date, certain weeks of the month (1st to 4th, or last; weeks run Monday to Sunday and belong to
+the month of their Monday, so a weekend stays together), or only on listed dates. A "Harry Potter
+weekend" is a Saturday and Sunday block with the collection as its source, set to the first week of the
+month or to the dates you want; list it above any regular block it should take over from, since the
+earlier block in the list wins when two coincide. Sequential blocks continue where the previous
+occurrence stopped, however far apart the occurrences are.
+
+A time block can be saved as a **template** (bookmark button on the block) and added to any station
+from the dropdown next to "Add block". Templates are managed in Settings.
+
+### Export and import
+
+**Export** downloads every station as a JSON file; **Import** creates or updates stations from such a
+file (matched by id, then by name), which makes station sets easy to back up, share, or hand-edit.
+Hand-picked items (movies, series, seasons, episodes, collections, playlists, libraries) are matched
+by title when their ids are unknown on the importing server, so a station file from another server,
+or one of the examples under `examples/stations/`, imports cleanly; anything that cannot be matched
+is dropped and listed.
+
+## Weather channel
 
 A **Weather channel** station is in the spirit of the cable weather channel's "Local on the 8s": no
 voice, no library items, just forecasts drawn as full-screen graphics over music. Pick up to eight
-places (a search box finds towns and cities and fills in the coordinates and time zone), and the
-channel cycles through them: for each place **current conditions** (big temperature, condition,
-feels like, high and low, humidity, wind, gusts, pressure, cloud cover, sunrise and sunset), the
-**next 12 hours** (hourly icons, temperatures, the chance of rain, snow, a mix or ice, and a temperature curve) and the **7-day
-forecast**, then a **travel cities** screen with every place at a glance. Screens cross-fade; each
-stays a configurable number of seconds (default 10). With **On the 8s** a full pass starts at :08,
-:18, :28... and the rest of each ten minutes repeats current conditions, like the real format.
-Three colour themes (classic blue, dark, light), °F or °C with matching wind and pressure units, a 12
-or 24-hour clock, and the station logo on every screen. The lower band carries the **local time in
-that place's own zone** as a live clock, the music credit, and "Weather data by Open-Meteo.com".
+places (a search box finds towns and cities and fills in the coordinates and time zone) and the
+channel cycles through them.
+
+### Screens and cycle
+
+For each place the channel shows **current conditions** (big temperature, condition, feels like,
+high and low, humidity, wind, gusts, pressure, cloud cover, sunrise and sunset), the **next 12
+hours** (hourly icons, temperatures, the chance of rain, snow, a mix or ice, and a temperature
+curve) and the **7-day forecast**, then a **travel cities** screen with every place at a glance.
+Screens cross-fade; each stays a configurable number of seconds (default 10). With **On the 8s** a
+full pass starts at :08, :18, :28... and the rest of each ten minutes repeats current conditions,
+like the real format. Three colour themes (classic blue, dark, light), °F or °C with matching wind
+and pressure units, a 12 or 24-hour clock, and the station logo on every screen. The lower band
+carries the **local time in that place's own zone** as a live clock, the music credit, and "Weather
+data by Open-Meteo.com".
 
 The guide shows one entry per hour (configurable, 15 minutes to 4 hours) titled from a template,
 default "Local weather: Boston, Denver, Tokyo", so the channel reads like a channel and not like a
 hundred three-minute programs. The cycle runs from the station clock, so every viewer sees the same
 screen at the same moment and tuning in lands mid-cycle like real TV.
+
+### Forecasts
 
 **Forecasts** come from [Open-Meteo](https://open-meteo.com) (free for non-commercial use, no account
 or key, data under CC BY 4.0, hence the attribution on every screen). This is the only part of the
@@ -81,6 +195,11 @@ the last fetch and any error per place, **Fetch now** polls at once, and **Previ
 any screen for any place as it will air. Rendered screens are PNGs under `data/TvStation/weather/screens/`,
 regenerated only when the report, the clock hour or the look changes.
 
+Screens are drawn with SkiaSharp, which the Jellyfin server already ships; the Inter font (SIL Open
+Font License) is embedded in the plugin.
+
+### Music
+
 **Music** plays underneath from two kinds of source, which can be combined: items from your Jellyfin
 music library (playlists, albums, artists, music genres or single tracks, through the same picker as
 the other modes) and every audio file in a **folder** on the server (a name means a folder under
@@ -90,6 +209,8 @@ every track has played, the same for every viewer and continuous across the plug
 boundaries, at a configurable level, with "Now playing: title – artist" drawn on the screens (switchable).
 Several folders can be listed, separated by `;`. New files in a folder are picked up when the
 station is recompiled (nightly, or **Refresh content**); with music off the channel is silent.
+
+### Music packs
 
 The plugin bundles **no audio**, but the editor offers **music packs**: curated instrumental sets
 under licences that allow playing and passing them on. **Get it** fetches each track from the
@@ -104,57 +225,6 @@ editor gives the links and the folder to drop the files into. **Use this folder*
 folder to the station. "Royalty free" and "free to redistribute" are different things; the packs
 only carry licences that allow both, and anything else you have the right to play goes in a folder of
 your own.
-
-API: `GET /TvStation/MusicPacks` (catalogue with install state), `POST /TvStation/MusicPacks/{id}/Install`,
-`POST /TvStation/MusicPacks/{id}/Cancel`; `GET /TvStation/Weather/Search?q=` (place search), `GET /TvStation/Weather/Status/{stationId}`,
-`POST /TvStation/Weather/Refresh/{stationId}`, `GET /TvStation/Weather/Preview/{stationId}?screen=Current|Hourly|Daily|Travel&location=0&width=1280` (PNG).
-Screens are drawn with SkiaSharp, which the Jellyfin server already ships; the Inter font (SIL Open
-Font License) is embedded in the plugin.
-
-The editor's **Content** section lists everything a station expands to, with a text filter, totals,
-and an **Exclude** switch per item for the one episode or film that does not belong. Exclusions are
-saved with the station and survive recompiles.
-
-Library **tags** work both ways. A **Tag** source plays everything carrying a tag (for example
-"christmas", as TMDB tags holiday films), including every episode of a tagged series. **Excluded
-tags**, per station or plugin-wide in Settings, keep tagged items off a station when a genre, library,
-playlist, collection or series source expands to them. Hand-picked movies and episodes, lineups, and a
-Tag source for that same tag are never affected, whatever order the sources are in, so a seasonal holiday station keeps its films while
-"christmas" stays off every regular channel all year. Items dropped by a tag rule appear in the
-Content section marked "by tag".
-
-Pools can carry **family hours** (daytime rating rules) such as "nothing above PG between 06:00 and 20:00" (station time
-zone). The schedule moves items that would overlap a window to a later slot; if nothing fits, that
-slot shows a station card. Items can only be moved within their cycle, so a pool whose full cycle is
-shorter than the restricted window will show cards rather than defer; with a few hours of content this
-is never an issue. When the pool has time blocks, an item a rule keeps off the air is skipped and comes up
-later in the pass instead. Blocks are already time-bound and are not gated.
-
-A station can be **seasonal**: give it one or more yearly date ranges (for example December 1 to
-January 6, or pick a preset such as Halloween or Holiday season) and it is only listed in the guide
-during those dates, in the station's time zone. Off
-season it stays in the dashboard with an "Off season until …" badge and comes back by itself.
-
-**Export** downloads every station as a JSON file; **Import** creates or updates stations from such a
-file (matched by id, then by name), which makes station sets easy to back up, share, or hand-edit. Hand-picked items (movies, series, seasons, episodes, collections, playlists, libraries) are
-matched by title when their ids are unknown on the importing server, so a station file from another
-server, or one of the examples under `examples/stations/`, imports cleanly; anything that cannot be
-matched is dropped and listed.
-
-Every content source can be tuned from its chip (the ✎ button): series sources take a **season range**
-and a **skip specials** switch; genre, playlist, collection and library sources can be limited to
-**movies only** or **shows only**; every expanding source can take a **max rating** ("PG / TV-PG" and
-below, with an "allow unrated" switch) and a **year range**; and any source gets a **weight** (×1 to
-×10) that controls how often it appears compared with the other sources. Episodes without their own
-rating use the series rating, and the year filter uses the show's year for episodes. Pools can also run **marathons**: play 2 to N episodes of a
-show back to back before switching.
-
-Optional **padding grid** (5/15/30/60 minutes) rounds every program up to the grid like real TV,
-filling the gap with a station card. **By length** padding instead gives each program a slot sized to
-it: anything up to an hour fills half hours (a 22-minute episode gets 30, a 44-minute one 60) and
-anything longer fills whole hours (a 95-minute film gets 2 hours). The bumper break counts toward
-the length. The schedule anchor can be set to "now" from the editor, and a
-saved station has a **Start schedule from now** button on its row.
 
 ## Requirements
 
@@ -190,23 +260,33 @@ followed by `docker restart <container>` is enough. Station data lives in
 
 ## Using it
 
+### Your first station
+
 With no stations yet, the dashboard opens on **what your library could support**: tick the suggested
 channels and press **Create selected**. **New station** starts from a preset (Kids channel, Movie night,
-Comfort reruns, Holiday channel, One show start to finish, Weekly schedule, Play a fixed list, or a plain
-shuffle); the preset fills in the schedule settings, you add the shows and movies, and everything can be
-changed later. The editor walks through three steps: **Name and look** (name, number, a logo made from the name in
-a color of your choice, with a background pattern, and optionally the color, seeded from the name, number and what the channel plays), **What plays** (shows, films and how they play) and **When** (family hours, time
-blocks, the dates the channel is listed, and a preview). Time blocks are painted onto a seven-day grid:
-click or drag to add one, drag sideways to cover several days, click a block to edit it. The rarely needed settings
-(call sign, padding grid, schedule anchor, card text, encoding) sit under **Advanced** at the bottom of every step.
-**All settings** shows the whole form on one page. Step 2 also has a **Leave out** section: tags to exclude, the minimum length, and
-whether the plugin-wide excluded tags from Settings apply to this station.
+Comfort reruns, Holiday channel, One show start to finish, Weekly schedule, Play a fixed list, Weather
+channel, or a plain shuffle); the preset fills in the schedule settings, you add the shows and movies,
+and everything can be changed later.
 
 1. Open **Dashboard > TV Stations > New station**.
 2. Give it a name and channel number, pick a mode, add content with the picker, and use
    **Preview** to see the next day of programming.
 3. **Save & refresh guide**. Within a few seconds the station appears under **Live TV**.
 4. Tune in from any client. The stream starts at the live position of the current program.
+
+### The editor
+
+The editor walks through three steps: **Name and look** (name, number, a logo made from the name in a
+color of your choice, with a background pattern, and optionally the color, seeded from the name,
+number and what the channel plays), **What plays** (shows, films and how they play) and **When**
+(family hours, time blocks, the dates the channel is listed, and a preview). Time blocks are painted
+onto a seven-day grid: click or drag to add one, drag sideways to cover several days, click a block to
+edit it. The rarely needed settings (call sign, padding grid, schedule anchor, card text, encoding) sit
+under **Advanced** at the bottom of every step. **All settings** shows the whole form on one page.
+Step 2 also has a **Leave out** section: tags to exclude, the minimum length, and whether the
+plugin-wide excluded tags from Settings apply to this station.
+
+### Keeping stations fresh
 
 Edits that change the schedule (content, mode, anchor, padding, time zone) bump the station's
 *revision*, which re-rolls the future schedule deterministically and refreshes the guide. Cosmetic
@@ -215,6 +295,8 @@ edits (name, number, logo) do not. A nightly task re-scans the library for stati
 wait for the night? **Refresh content** on the dashboard re-scans every station at once and refreshes
 the guide if anything changed; **Refresh content** in a station's editor does the same for one.
 
+### Station rows and health
+
 Each station row shows what is on now with the time left, the next two programs, and badges for
 anything the last compile flagged: a source that matched nothing, under a day of unique content,
 or items that had to be skipped (hover the excluded count for the reasons). If streaming hit a
@@ -222,6 +304,8 @@ problem, the row keeps the last error in red until you dismiss it: a file that c
 with permission denied told apart from a missing file or an unmounted folder, or an encoder that
 quit early, with ffmpeg's last log line. **Status** has a Health section listing every station
 that needs attention.
+
+### Status page and hardware
 
 **Status** also shows what each active encoder is really doing, refreshed every five seconds:
 whether the hardware decoder is in use (on Linux the plugin checks that ffmpeg holds a GPU device
@@ -234,13 +318,9 @@ to, the `/dev/dri` nodes the server can see, and the hwaccels, H.264 encoders an
 filters in this ffmpeg build, with notes on anything that does not line up. **Test** runs a few
 seconds of a station's current program through the real decode, filter and encode chain at full
 speed and reports which decoder ffmpeg attached and the speed relative to real time, so you can
-try a decoder before putting it on a profile (`GET /TvStation/Hardware`,
-`POST /TvStation/Hardware/Test`).
+try a decoder before putting it on a profile.
 
-Films split across files (Blu-ray `part1` / `part2`, which Jellyfin stacks into one movie) are
-scheduled at their full combined length and play straight through, one guide entry. Items without a
-known runtime are skipped and listed in the editor; refresh their metadata in
-Jellyfin and press **Refresh content**.
+### Filling out the lineup
 
 **Suggest stations** on the dashboard turns the library analysis into ready-made channels: genres and
 series with enough hours, a kids channel and family movies by rating, franchise marathons and a
@@ -249,27 +329,11 @@ channels from holiday tags. Tick the ones you want and they are created with the
 numbers, editable like any other station.
 
 **Not on a channel** on the dashboard lists the movies and shows no channel plays, from the compiled
-content of every enabled station (clips used as bumpers or idents count as on it). Tick titles and either start a new
-channel with them or add them to a channel you already have: its pool, its filler for a weekly
-schedule, or its list for a fixed list. A show with only some episodes on a channel is listed with a
-badge; adding it again gives the channel every episode. A filter box narrows the list by title, genre,
-rating or library.
-
-A block repeats every week unless its **Repeats** setting says otherwise: every N weeks counted from a
-chosen date, certain weeks of the month (1st to 4th, or last; weeks run Monday to Sunday and belong to
-the month of their Monday, so a weekend stays together), or only on listed dates. A "Harry Potter
-weekend" is a Saturday and Sunday block with the collection as its source, set to the first week of the
-month or to the dates you want; list it above any regular block it should take over from, since the
-earlier block in the list wins when two coincide. Sequential blocks continue where the previous
-occurrence stopped, however far apart the occurrences are.
-
-A time block can be saved as a **template** (bookmark button on the block) and added to any station
-from the dropdown next to "Add block". Templates are managed in Settings. A station can also **skip
-items shorter than** a number of minutes, which keeps shorts and stubs out of pools and blocks.
-
-`GET /TvStation/Library/Analysis` returns a one-pass summary of the library: hours per genre, every
-series with episode count and rating, collections, franchises detected from shared title prefixes,
-decades, ratings, tags and libraries. It is the basis for station suggestions and the health report.
+content of every enabled station (clips used as bumpers or idents count as on it). Tick titles and
+either start a new channel with them or add them to a channel you already have: its pool, its filler
+for a weekly schedule, or its list for a fixed list. A show with only some episodes on a channel is
+listed with a badge; adding it again gives the channel every episode. A filter box narrows the list
+by title, genre, rating or library.
 
 ## Settings
 
@@ -311,6 +375,8 @@ decades, ratings, tags and libraries. It is the basis for station suggestions an
   encoding for nobody; the reader count tells the truth within seconds.
 - **Max concurrent sessions**: cap on simultaneously encoded stations.
 - **Slate**: color and whether to draw text / the station logo on break cards.
+- **Excluded tags** (plugin-wide) and **block templates** are managed here too; see
+  [Tags](#tags) and [Time block repeats and templates](#time-block-repeats-and-templates).
 
 ## Troubleshooting
 
@@ -354,6 +420,24 @@ decades, ratings, tags and libraries. It is the basis for station suggestions an
   while a station plays.
 - Live HLS adds 10-30 s of latency behind the encoder; the position shown in the guide is the
   server's.
+
+## HTTP API
+
+Everything the dashboard does goes through the plugin's own endpoints under `/TvStation`, with the
+usual Jellyfin API key or session token. The ones worth calling by hand:
+
+| Endpoint | What it returns or does |
+|---|---|
+| `GET /TvStation/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises detected from shared title prefixes, decades, ratings, tags and libraries. The basis for station suggestions and the health report. |
+| `GET /TvStation/Health` | Every station that needs attention, as the Status page lists them. |
+| `GET /TvStation/Hardware` | Jellyfin's transcoding setting, what the default profile resolves to, the `/dev/dri` nodes and this ffmpeg build's hwaccels, encoders and filters. |
+| `POST /TvStation/Hardware/Test` | Runs a station's current program through the real chain at full speed and reports the decoder and the speed relative to real time. |
+| `GET /TvStation/Weather/Search?q=` | Place search (Open-Meteo geocoding). |
+| `GET /TvStation/Weather/Status/{stationId}` | Last fetch and any error per place. |
+| `POST /TvStation/Weather/Refresh/{stationId}` | Polls every place now. |
+| `GET /TvStation/Weather/Preview/{stationId}?screen=Current\|Hourly\|Daily\|Travel&location=0&width=1280` | A screen as it will air, as PNG. |
+| `GET /TvStation/MusicPacks` | The pack catalogue with install state. |
+| `POST /TvStation/MusicPacks/{id}/Install`, `POST /TvStation/MusicPacks/{id}/Cancel` | Start or stop a pack download. |
 
 ## Development
 
