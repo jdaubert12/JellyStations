@@ -1,116 +1,116 @@
 {
- "Name": "Anime",
- "ChannelNumber": "2",
- "CallSign": "ANIME",
- "Enabled": true,
- "TimeZoneId": "America/New_York",
- "AnchorUtc": "2026-10-14T10:00:00Z",
- "PaddingGridMinutes": 0,
- "Mode": "Pool",
- "Pool": {
-  "Sources": [
-   {
-    "Kind": "Series",
-    "ItemId": "98d7752c361f82161d8e06e7ecd75e0a",
-    "DisplayName": "Ghost in the Shell: Stand Alone Complex",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Series",
-    "ItemId": "7189af44fff940a72b2a470608ae3edb",
-    "DisplayName": "Cowboy Bebop",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Series",
-    "ItemId": "0887b3463da337b8110db5365384ed89",
-    "DisplayName": "Initial D",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Series",
-    "ItemId": "804659ba9744294f597ea336c8f38812",
-    "DisplayName": "Gurren Lagann",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Series",
-    "ItemId": "cd9fdf086dbc2993b91eb04d0f4fcc5f",
-    "DisplayName": "Nichijou: My Ordinary Life",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Series",
-    "ItemId": "c23917128feca5957ce6a73d0567722d",
-    "DisplayName": "Tamako Market",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Series",
-    "ItemId": "b78a5af3a64b0d55b3645b3221d2866a",
-    "DisplayName": "Excel Saga",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "65006c00daed95fb2264256852524c85",
-    "DisplayName": "Ghost in the Shell (1995)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "509fadc1ada46d9804c308b5521ceaa9",
-    "DisplayName": "Cowboy Bebop: The Movie (2001)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "e54d6a3893cc38861ddd9434d7c2d1a4",
-    "DisplayName": "Jin-Roh: The Wolf Brigade (1999)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "1308237e29ebbb88fe58d0cfa67eca91",
-    "DisplayName": "Tamako Love Story (2014)",
-    "ItemKinds": [],
-    "Weight": 1
-   }
-  ],
-  "Order": "ShuffleEpisodesInOrder",
-  "AvoidSameSeriesBackToBack": true,
-  "MarathonMin": 2,
-  "MarathonMax": 4,
-  "DaypartRules": [
-   {
-    "StartLocal": "06:00",
-    "EndLocal": "21:00",
-    "MaxRating": "TV-14",
-    "AllowUnrated": false
-   }
-  ]
- },
- "Slots": {
-  "Blocks": [],
-  "Filler": {
-   "Sources": [],
-   "Order": "Shuffle"
-  }
- },
- "Lineup": {
-  "Items": []
- },
- "AutoRecompileNightly": true,
- "ActiveWindows": [],
- "ExcludedItemIds": []
+  "Name": "Anime",
+  "ChannelNumber": "2",
+  "CallSign": "ANIME",
+  "Enabled": true,
+  "TimeZoneId": "America/New_York",
+  "AnchorUtc": "2026-10-14T10:00:00Z",
+  "PaddingGridMinutes": 0,
+  "Mode": "Pool",
+  "Pool": {
+    "Sources": [
+      {
+        "Kind": "Series",
+        "ItemId": "7c5a5ce8ca734105e11286bd7653bed6",
+        "DisplayName": "Anime Series 1",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Series",
+        "ItemId": "547de6444af869e68791ed30f893f8f4",
+        "DisplayName": "Anime Series 2",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Series",
+        "ItemId": "bc336e893325675a38eaf96d3aee2274",
+        "DisplayName": "Anime Series 3",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Series",
+        "ItemId": "c49fe922bb34257a961cc1e3c1d5a43a",
+        "DisplayName": "Anime Series 4",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Series",
+        "ItemId": "e4943604829f126f8d2a9092af546a2f",
+        "DisplayName": "Anime Series 5",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Series",
+        "ItemId": "f4af17e9ad207d7b4755ac6f218dc063",
+        "DisplayName": "Anime Series 6",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Series",
+        "ItemId": "48dd3c8a450039666bc294a6e56ecc8e",
+        "DisplayName": "Anime Series 7",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "bed6cb5bb63e4bb65d5aecea4cca0947",
+        "DisplayName": "Anime Film 1 (1993)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "e669d4b19a5aab0a07f20b4b6bc4319e",
+        "DisplayName": "Anime Film 2 (1996)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "fd09f4a4eaa7ed85a3ab416e7fa251d3",
+        "DisplayName": "Anime Film 3 (1999)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "e770b21f16591ca4028be41f42f50af7",
+        "DisplayName": "Anime Film 4 (2002)",
+        "ItemKinds": [],
+        "Weight": 1
+      }
+    ],
+    "Order": "ShuffleEpisodesInOrder",
+    "AvoidSameSeriesBackToBack": true,
+    "MarathonMin": 2,
+    "MarathonMax": 4,
+    "DaypartRules": [
+      {
+        "StartLocal": "06:00",
+        "EndLocal": "21:00",
+        "MaxRating": "TV-14",
+        "AllowUnrated": false
+      }
+    ]
+  },
+  "Slots": {
+    "Blocks": [],
+    "Filler": {
+      "Sources": [],
+      "Order": "Shuffle"
+    }
+  },
+  "Lineup": {
+    "Items": []
+  },
+  "AutoRecompileNightly": true,
+  "ActiveWindows": [],
+  "ExcludedItemIds": []
 }

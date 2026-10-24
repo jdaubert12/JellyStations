@@ -1,66 +1,66 @@
 {
- "Name": "Action",
- "ChannelNumber": "6",
- "CallSign": "ACTN",
- "Enabled": true,
- "TimeZoneId": "America/New_York",
- "AnchorUtc": "2026-10-14T10:00:00Z",
- "PaddingGridMinutes": 15,
- "Mode": "Pool",
- "Pool": {
-  "Sources": [
-   {
-    "Kind": "Genre",
-    "Genre": "Action",
-    "DisplayName": "Action",
-    "ItemKinds": [
-     "Movie"
+  "Name": "Action",
+  "ChannelNumber": "6",
+  "CallSign": "ACTN",
+  "Enabled": true,
+  "TimeZoneId": "America/New_York",
+  "AnchorUtc": "2026-10-14T10:00:00Z",
+  "PaddingGridMinutes": 15,
+  "Mode": "Pool",
+  "Pool": {
+    "Sources": [
+      {
+        "Kind": "Genre",
+        "Genre": "Action",
+        "DisplayName": "Action",
+        "ItemKinds": [
+          "Movie"
+        ],
+        "Weight": 1
+      },
+      {
+        "Kind": "Genre",
+        "Genre": "Thriller",
+        "DisplayName": "Thriller",
+        "ItemKinds": [
+          "Movie"
+        ],
+        "Weight": 1
+      },
+      {
+        "Kind": "Genre",
+        "Genre": "Crime",
+        "DisplayName": "Crime",
+        "ItemKinds": [
+          "Movie"
+        ],
+        "Weight": 1
+      }
     ],
-    "Weight": 1
-   },
-   {
-    "Kind": "Genre",
-    "Genre": "Thriller",
-    "DisplayName": "Thriller",
-    "ItemKinds": [
-     "Movie"
-    ],
-    "Weight": 1
-   },
-   {
-    "Kind": "Genre",
-    "Genre": "Crime",
-    "DisplayName": "Crime",
-    "ItemKinds": [
-     "Movie"
-    ],
-    "Weight": 1
-   }
-  ],
-  "Order": "Shuffle",
-  "AvoidSameSeriesBackToBack": true,
-  "MarathonMin": 1,
-  "MarathonMax": 1,
-  "DaypartRules": [
-   {
-    "StartLocal": "06:00",
-    "EndLocal": "20:00",
-    "MaxRating": "PG-13",
-    "AllowUnrated": false
-   }
-  ]
- },
- "Slots": {
-  "Blocks": [],
-  "Filler": {
-   "Sources": [],
-   "Order": "Shuffle"
-  }
- },
- "Lineup": {
-  "Items": []
- },
- "AutoRecompileNightly": true,
- "ActiveWindows": [],
- "ExcludedItemIds": []
+    "Order": "Shuffle",
+    "AvoidSameSeriesBackToBack": true,
+    "MarathonMin": 1,
+    "MarathonMax": 1,
+    "DaypartRules": [
+      {
+        "StartLocal": "06:00",
+        "EndLocal": "20:00",
+        "MaxRating": "PG-13",
+        "AllowUnrated": false
+      }
+    ]
+  },
+  "Slots": {
+    "Blocks": [],
+    "Filler": {
+      "Sources": [],
+      "Order": "Shuffle"
+    }
+  },
+  "Lineup": {
+    "Items": []
+  },
+  "AutoRecompileNightly": true,
+  "ActiveWindows": [],
+  "ExcludedItemIds": []
 }

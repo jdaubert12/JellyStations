@@ -1,53 +1,53 @@
 {
- "Name": "Kids TV",
- "ChannelNumber": "1",
- "CallSign": "KIDS",
- "Enabled": true,
- "TimeZoneId": "America/New_York",
- "AnchorUtc": "2026-10-14T10:00:00Z",
- "PaddingGridMinutes": 0,
- "Mode": "Pool",
- "Pool": {
-  "Sources": [
-   {
-    "Kind": "Series",
-    "ItemId": "3704da4b07870d343ce72832a8c9f9ec",
-    "DisplayName": "The Wild Thornberrys",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Series",
-    "ItemId": "d3dd5607e0947b30e445ebbff595d0ec",
-    "DisplayName": "Avatar: The Last Airbender",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Series",
-    "ItemId": "4fe7fb78e5eeee5ee0863423045f6a25",
-    "DisplayName": "The Legend of Korra",
-    "ItemKinds": [],
-    "Weight": 1
-   }
-  ],
-  "Order": "ShuffleEpisodesInOrder",
-  "AvoidSameSeriesBackToBack": true,
-  "MarathonMin": 2,
-  "MarathonMax": 3,
-  "DaypartRules": []
- },
- "Slots": {
-  "Blocks": [],
-  "Filler": {
-   "Sources": [],
-   "Order": "Shuffle"
-  }
- },
- "Lineup": {
-  "Items": []
- },
- "AutoRecompileNightly": true,
- "ActiveWindows": [],
- "ExcludedItemIds": []
+  "Name": "Kids TV",
+  "ChannelNumber": "1",
+  "CallSign": "KIDS",
+  "Enabled": true,
+  "TimeZoneId": "America/New_York",
+  "AnchorUtc": "2026-10-14T10:00:00Z",
+  "PaddingGridMinutes": 0,
+  "Mode": "Pool",
+  "Pool": {
+    "Sources": [
+      {
+        "Kind": "Series",
+        "ItemId": "2bfd8eb6b5655dae4e1cd105802141b8",
+        "DisplayName": "Kids Show 1",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Series",
+        "ItemId": "c65d59be6c74181a41420919a7c10c6e",
+        "DisplayName": "Kids Show 2",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Series",
+        "ItemId": "732ef8a0f5f696fe7aed12326c4fabd8",
+        "DisplayName": "Kids Show 3",
+        "ItemKinds": [],
+        "Weight": 1
+      }
+    ],
+    "Order": "ShuffleEpisodesInOrder",
+    "AvoidSameSeriesBackToBack": true,
+    "MarathonMin": 2,
+    "MarathonMax": 3,
+    "DaypartRules": []
+  },
+  "Slots": {
+    "Blocks": [],
+    "Filler": {
+      "Sources": [],
+      "Order": "Shuffle"
+    }
+  },
+  "Lineup": {
+    "Items": []
+  },
+  "AutoRecompileNightly": true,
+  "ActiveWindows": [],
+  "ExcludedItemIds": []
 }

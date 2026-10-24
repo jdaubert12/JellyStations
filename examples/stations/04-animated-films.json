@@ -1,0 +1,102 @@
+{
+  "Name": "Studio Ghibli",
+  "ChannelNumber": "4",
+  "CallSign": "GHIBL",
+  "Enabled": true,
+  "TimeZoneId": "America/New_York",
+  "AnchorUtc": "2026-10-14T10:00:00Z",
+  "PaddingGridMinutes": 15,
+  "Mode": "Pool",
+  "Pool": {
+    "Sources": [
+      {
+        "Kind": "Movie",
+        "ItemId": "16561a3b2f931503b799a5c42b7b1059",
+        "DisplayName": "Animated Feature 1 (1993)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "b08848950ee86b9ab0f2fcbbf3f7d1bc",
+        "DisplayName": "Animated Feature 2 (1996)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "ca46e6c6567997e2175db6b337fc809c",
+        "DisplayName": "Animated Feature 3 (1999)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "5056288eeac0c3293f925eeb538f4ecd",
+        "DisplayName": "Animated Feature 4 (2002)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "97a0a7f823c88cad7ae70f8e20029fde",
+        "DisplayName": "Animated Feature 5 (2005)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "d1ecea94b9ad3638e06034d25f4f0118",
+        "DisplayName": "Animated Feature 6 (2008)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "6be0788a0ddbd2d4d0663681d95b28ae",
+        "DisplayName": "Animated Feature 7 (2011)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "5e1ce4f78549a47b8a744cc05bb1549c",
+        "DisplayName": "Animated Feature 8 (2014)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "9145e4a8adb6e6a189f890d5de07491e",
+        "DisplayName": "Animated Feature 9 (2017)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "cb49daa75747370a784a995db0ef84ee",
+        "DisplayName": "Animated Feature 10 (2020)",
+        "ItemKinds": [],
+        "Weight": 1
+      }
+    ],
+    "Order": "Shuffle",
+    "AvoidSameSeriesBackToBack": true,
+    "MarathonMin": 1,
+    "MarathonMax": 1,
+    "DaypartRules": []
+  },
+  "Slots": {
+    "Blocks": [],
+    "Filler": {
+      "Sources": [],
+      "Order": "Shuffle"
+    }
+  },
+  "Lineup": {
+    "Items": []
+  },
+  "AutoRecompileNightly": true,
+  "ActiveWindows": [],
+  "ExcludedItemIds": []
+}

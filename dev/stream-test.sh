@@ -17,11 +17,11 @@ cat > /tmp/pb_test.json <<EOF
    "CodecProfiles":[],"SubtitleProfiles":[],"ContainerProfiles":[]}}
 EOF
 curl -s -X POST "$B/Items/$CH/PlaybackInfo" -H "$H" -H 'Content-Type: application/json' -d @/tmp/pb_test.json -o /tmp/pb_test_out.json -w "open HTTP %{http_code}\n"
-UNIQ=$(curl -s "$B/TvStation/Status" -H "$H" | grep -o 'tvs[0-9a-f]*' | head -1)
+UNIQ=$(curl -s "$B/JellyStations/Status" -H "$H" | grep -o 'tvs[0-9a-f]*' | head -1)
 echo "session $UNIQ, reading for ${SECS}s"
 H0=$(date +%s.%N); curl -s -m "$SECS" "$B/LiveTv/LiveStreamFiles/$UNIQ/stream.ts" -o /tmp/stream_test.ts; H1=$(date +%s.%N)
 echo "--- restreamer log ---"
-docker logs --since "$((SECS + 30))s" tvstation-jf 2>&1 | grep -E 'playing|slate|exited|ended early|overran' | sed -E 's/^\[([0-9:]+)\].*TvStation \[[^]]*\]: /\1 /' | cut -c1-160
+docker logs --since "$((SECS + 30))s" jellystations-jf 2>&1 | grep -E 'playing|slate|exited|ended early|overran' | sed -E 's/^\[([0-9:]+)\].*JellyStations \[[^]]*\]: /\1 /' | cut -c1-160
 python - "$W" "$H0" "$H1" <<'PY'
 import sys, os
 d = open(os.path.join(sys.argv[1], 'stream_test.ts'), 'rb').read()

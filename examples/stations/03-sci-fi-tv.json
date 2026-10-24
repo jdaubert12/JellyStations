@@ -1,46 +1,46 @@
 {
- "Name": "Sci-Fi TV",
- "ChannelNumber": "3",
- "CallSign": "SCIFI",
- "Enabled": true,
- "TimeZoneId": "America/New_York",
- "AnchorUtc": "2026-10-14T10:00:00Z",
- "PaddingGridMinutes": 0,
- "Mode": "Pool",
- "Pool": {
-  "Sources": [
-   {
-    "Kind": "Series",
-    "ItemId": "9118e6f6e824e8d1e2da2c5e9bbd9d52",
-    "DisplayName": "The Twilight Zone",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Series",
-    "ItemId": "ca803345212daf592ca59f2347d35d3d",
-    "DisplayName": "Firefly",
-    "ItemKinds": [],
-    "Weight": 1
-   }
-  ],
-  "Order": "ShuffleEpisodesInOrder",
-  "AvoidSameSeriesBackToBack": true,
-  "MarathonMin": 3,
-  "MarathonMax": 5,
-  "DaypartRules": []
- },
- "Slots": {
-  "Blocks": [],
-  "Filler": {
-   "Sources": [],
-   "Order": "Shuffle"
-  }
- },
- "Lineup": {
-  "Items": []
- },
- "AutoRecompileNightly": true,
- "ActiveWindows": [],
- "ExcludedItemIds": []
+  "Name": "Sci-Fi TV",
+  "ChannelNumber": "3",
+  "CallSign": "SCIFI",
+  "Enabled": true,
+  "TimeZoneId": "America/New_York",
+  "AnchorUtc": "2026-10-14T10:00:00Z",
+  "PaddingGridMinutes": 0,
+  "Mode": "Pool",
+  "Pool": {
+    "Sources": [
+      {
+        "Kind": "Series",
+        "ItemId": "37555d443eb958f1a27cfc9f76f61e80",
+        "DisplayName": "Sci-Fi Series 1",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Series",
+        "ItemId": "e39751c05c281b851559df326f110f31",
+        "DisplayName": "Sci-Fi Series 2",
+        "ItemKinds": [],
+        "Weight": 1
+      }
+    ],
+    "Order": "ShuffleEpisodesInOrder",
+    "AvoidSameSeriesBackToBack": true,
+    "MarathonMin": 3,
+    "MarathonMax": 5,
+    "DaypartRules": []
+  },
+  "Slots": {
+    "Blocks": [],
+    "Filler": {
+      "Sources": [],
+      "Order": "Shuffle"
+    }
+  },
+  "Lineup": {
+    "Items": []
+  },
+  "AutoRecompileNightly": true,
+  "ActiveWindows": [],
+  "ExcludedItemIds": []
 }

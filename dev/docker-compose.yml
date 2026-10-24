@@ -1,7 +1,7 @@
 services:
   jellyfin:
     image: jellyfin/jellyfin:12.2
-    container_name: tvstation-jf
+    container_name: jellystations-jf
     ports:
       - "8096:8096"
     volumes:

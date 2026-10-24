@@ -1,4 +1,4 @@
-# TvStation for Jellyfin
+# JellyStations for Jellyfin
 
 Turn your Jellyfin library into always-on TV stations. Build any number of stations from movies,
 series, collections, playlists or genres, choose how each one is scheduled, and every Jellyfin
@@ -188,11 +188,11 @@ screen at the same moment and tuning in lands mid-cycle like real TV.
 or key, data under CC BY 4.0, hence the attribution on every screen). This is the only part of the
 plugin that talks to the internet; it is per station, and the only thing ever sent is a latitude and
 longitude. Each place is polled every 15 minutes while the station is enabled and in season (failures
-back off up to 15 minutes), reports are cached under `data/TvStation/weather/` so a restart has
+back off up to 15 minutes), reports are cached under `data/JellyStations/weather/` so a restart has
 something to show, and when a report is older than the station allows (default 3 hours) the screens
 say so plainly instead of showing old numbers as current. The editor's **Forecast status** table shows
 the last fetch and any error per place, **Fetch now** polls at once, and **Preview screen** renders
-any screen for any place as it will air. Rendered screens are PNGs under `data/TvStation/weather/screens/`,
+any screen for any place as it will air. Rendered screens are PNGs under `data/JellyStations/weather/screens/`,
 regenerated only when the report, the clock hour or the look changes.
 
 Screens are drawn with SkiaSharp, which the Jellyfin server already ships; the Inter font (SIL Open
@@ -203,7 +203,7 @@ Font License) is embedded in the plugin.
 **Music** plays underneath from two kinds of source, which can be combined: items from your Jellyfin
 music library (playlists, albums, artists, music genres or single tracks, through the same picker as
 the other modes) and every audio file in a **folder** on the server (a name means a folder under
-`data/TvStation/music/`; an absolute path works too; mp3, flac, ogg, opus, m4a, wav and more, tagged
+`data/JellyStations/music/`; an absolute path works too; mp3, flac, ogg, opus, m4a, wav and more, tagged
 with ffprobe at compile time). Tracks play back to back in a seeded shuffle that only repeats once
 every track has played, the same for every viewer and continuous across the plugin's internal segment
 boundaries, at a configurable level, with "Now playing: title – artist" drawn on the screens (switchable).
@@ -214,7 +214,7 @@ station is recompiled (nightly, or **Refresh content**); with music off the chan
 
 The plugin bundles **no audio**, but the editor offers **music packs**: curated instrumental sets
 under licences that allow playing and passing them on. **Get it** fetches each track from the
-artist's own site into `data/TvStation/music/<pack>/`, checks it against its published SHA-256,
+artist's own site into `data/JellyStations/music/<pack>/`, checks it against its published SHA-256,
 writes a `CREDITS.txt` beside the files and recompiles the stations that use the folder; a run that
 stops picks up where it left off. The starter pack, **Lounge and light jazz**, is thirty pieces by
 Kevin MacLeod (CC BY 4.0, about 1 h 54 min, 240 MB) in the register the cable weather channel is
@@ -244,19 +244,43 @@ your own.
 
 ## Install
 
-1. Build or download `Jellyfin.Plugin.TvStation.dll`.
-2. Copy it into a folder named `TvStation_1.14.2.0` inside Jellyfin's plugins directory:
-   - Docker: `/config/plugins/TvStation_1.14.2.0/` (inside the config volume)
-   - Linux: `/var/lib/jellyfin/plugins/TvStation_1.14.2.0/`
-   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\TvStation_1.14.2.0\` or `%ProgramData%\Jellyfin\Server\plugins\TvStation_1.14.2.0\`
-3. Restart Jellyfin. **Dashboard > Plugins** should list *TvStation* as Active and the dashboard
-   menu gains a **TV Stations** entry.
+### From the plugin repository
+
+1. **Dashboard > Plugins > Repositories**, press **+**, give it any name (say "JellyStations") and the URL
+   `https://raw.githubusercontent.com/jdaubert12/JellyStations/main/manifest.json`, and save.
+2. **Dashboard > Plugins > Catalog**: JellyStations is listed under Live TV. Install it and restart Jellyfin
+   when asked.
+3. New versions then show up in the catalog and install like any other plugin update.
+
+The manifest lists every release with its download URL and MD5, and is updated by the packaging
+script with each release.
+
+### By hand
+
+1. Download `JellyStations_1.15.0.0.zip` from the [releases page](https://github.com/jdaubert12/JellyStations/releases)
+   and unzip it, or build `Jellyfin.Plugin.JellyStations.dll` yourself.
+2. Copy the DLL (and `meta.json` from the zip) into a folder named `JellyStations_1.15.0.0` inside Jellyfin's plugins directory:
+   - Docker: `/config/plugins/JellyStations_1.15.0.0/` (inside the config volume)
+   - Linux: `/var/lib/jellyfin/plugins/JellyStations_1.15.0.0/`
+   - Windows: `%LOCALAPPDATA%\jellyfin\plugins\JellyStations_1.15.0.0\` or `%ProgramData%\Jellyfin\Server\plugins\JellyStations_1.15.0.0\`
+3. Restart Jellyfin. **Dashboard > Plugins** should list *JellyStations* as Active and the dashboard
+   menu gains a **JellyStations** entry.
+
+Either way, station data lives in `<data>/JellyStations/` (`/config/data/JellyStations/` in Docker) and
+survives plugin upgrades.
+
+**Upgrading from TvStation** (the plugin's name up to 1.14.2.0): the id is unchanged, so the catalog
+offers JellyStations as an update and your stations carry over; the data folder is moved from
+`<data>/TvStation/` to `<data>/JellyStations/` on first start and Live TV channels keep their ids.
+Jellyfin retires older plugin versions by name, though, so an old `TvStation_<version>` folder is not
+replaced automatically: JellyStations marks it for removal when it starts and logs a warning, and one
+more restart clears it. Installing by hand, delete the old folder yourself and skip the second restart.
+API routes moved from `/TvStation/...` to `/JellyStations/...`.
 
 The folder must be readable and writable by the user Jellyfin runs as (on Linux packages
-`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/TvStation_1.14.2.0`); with wrong ownership the
-server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.TvStation.dll <container>:/config/plugins/TvStation_1.14.2.0/`
-followed by `docker restart <container>` is enough. Station data lives in
-`<data>/TvStation/` (`/config/data/TvStation/` in Docker) and survives plugin upgrades.
+`chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/JellyStations_1.15.0.0`); with wrong ownership the
+server sits on "Starting" and never finishes. For Docker, `docker cp Jellyfin.Plugin.JellyStations.dll <container>:/config/plugins/JellyStations_1.15.0.0/`
+followed by `docker restart <container>` is enough.
 
 ## Using it
 
@@ -268,7 +292,7 @@ Comfort reruns, Holiday channel, One show start to finish, Weekly schedule, Play
 channel, or a plain shuffle); the preset fills in the schedule settings, you add the shows and movies,
 and everything can be changed later.
 
-1. Open **Dashboard > TV Stations > New station**.
+1. Open **Dashboard > JellyStations > New station**.
 2. Give it a name and channel number, pick a mode, add content with the picker, and use
    **Preview** to see the next day of programming.
 3. **Save & refresh guide**. Within a few seconds the station appears under **Live TV**.
@@ -390,11 +414,11 @@ by title, genre, rating or library.
   A place with coordinates 0, 0 was typed rather than picked from the search; pick it again.
 - *Weather channel is silent*: music is off, or the folder and sources expanded to nothing (the
   station row says "no music"; the Content section lists the tracks found). Folder names are
-  relative to `data/TvStation/music/` unless absolute, and the Jellyfin user must be able to read
+  relative to `data/JellyStations/music/` unless absolute, and the Jellyfin user must be able to read
   the files.
 - *Channel has no programs*: check the station is enabled and has content; press
   **Refresh guide**. Jellyfin's own guide refresh runs every 24 h.
-- *Playback fails to start*: open **Dashboard > TV Stations > Status**. It shows the ffmpeg path,
+- *Playback fails to start*: open **Dashboard > JellyStations > Status**. It shows the ffmpeg path,
   active sessions and the last encoder log lines. Common causes are a wrong ffmpeg path, or media
   paths that are not visible from the server (e.g. missing Docker volume).
 - *Picture is a station card*: the file for the current program is missing or ffmpeg could not
@@ -423,21 +447,21 @@ by title, genre, rating or library.
 
 ## HTTP API
 
-Everything the dashboard does goes through the plugin's own endpoints under `/TvStation`, with the
+Everything the dashboard does goes through the plugin's own endpoints under `/JellyStations`, with the
 usual Jellyfin API key or session token. The ones worth calling by hand:
 
 | Endpoint | What it returns or does |
 |---|---|
-| `GET /TvStation/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises detected from shared title prefixes, decades, ratings, tags and libraries. The basis for station suggestions and the health report. |
-| `GET /TvStation/Health` | Every station that needs attention, as the Status page lists them. |
-| `GET /TvStation/Hardware` | Jellyfin's transcoding setting, what the default profile resolves to, the `/dev/dri` nodes and this ffmpeg build's hwaccels, encoders and filters. |
-| `POST /TvStation/Hardware/Test` | Runs a station's current program through the real chain at full speed and reports the decoder and the speed relative to real time. |
-| `GET /TvStation/Weather/Search?q=` | Place search (Open-Meteo geocoding). |
-| `GET /TvStation/Weather/Status/{stationId}` | Last fetch and any error per place. |
-| `POST /TvStation/Weather/Refresh/{stationId}` | Polls every place now. |
-| `GET /TvStation/Weather/Preview/{stationId}?screen=Current\|Hourly\|Daily\|Travel&location=0&width=1280` | A screen as it will air, as PNG. |
-| `GET /TvStation/MusicPacks` | The pack catalogue with install state. |
-| `POST /TvStation/MusicPacks/{id}/Install`, `POST /TvStation/MusicPacks/{id}/Cancel` | Start or stop a pack download. |
+| `GET /JellyStations/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises detected from shared title prefixes, decades, ratings, tags and libraries. The basis for station suggestions and the health report. |
+| `GET /JellyStations/Health` | Every station that needs attention, as the Status page lists them. |
+| `GET /JellyStations/Hardware` | Jellyfin's transcoding setting, what the default profile resolves to, the `/dev/dri` nodes and this ffmpeg build's hwaccels, encoders and filters. |
+| `POST /JellyStations/Hardware/Test` | Runs a station's current program through the real chain at full speed and reports the decoder and the speed relative to real time. |
+| `GET /JellyStations/Weather/Search?q=` | Place search (Open-Meteo geocoding). |
+| `GET /JellyStations/Weather/Status/{stationId}` | Last fetch and any error per place. |
+| `POST /JellyStations/Weather/Refresh/{stationId}` | Polls every place now. |
+| `GET /JellyStations/Weather/Preview/{stationId}?screen=Current\|Hourly\|Daily\|Travel&location=0&width=1280` | A screen as it will air, as PNG. |
+| `GET /JellyStations/MusicPacks` | The pack catalogue with install state. |
+| `POST /JellyStations/MusicPacks/{id}/Install`, `POST /JellyStations/MusicPacks/{id}/Cancel` | Start or stop a pack download. |
 
 ## Development
 
@@ -451,6 +475,14 @@ See `dev/README.md` for the local Jellyfin 12.2 test container. The scheduling e
 (`src/.../Scheduling`) and stream engine (`src/.../Streaming`) have no Jellyfin dependencies and
 are covered by xunit tests under `tests/`.
 
+**Releasing**: bump the version in the csproj, `build.yaml`, both scripts and the READMEs, add the
+changelog line to `build.yaml` and `package.ps1`, build Release, run `package.ps1` (it writes the zip
+and records the version, checksum and download URL in `manifest.json`), commit, tag `v<version>`,
+push, then `gh release create v<version> dist\JellyStations_<version>.zip`. The manifest entry points at
+that release asset, so the zip uploaded must be the one the script hashed.
+
 ## License
 
-GPL-3.0-only, matching the Jellyfin server it links against.
+GPL-3.0-only, matching the Jellyfin.Controller and Jellyfin.Model packages the plugin links against.
+The Inter font is under the SIL Open Font License 1.1 (`src/.../Assets/Inter-LICENSE.txt`); SkiaSharp (MIT)
+is used from the server's own copy and not redistributed. No music ships with the plugin.

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Jellyfin.Plugin.JellyStations</RootNamespace>
+    <AssemblyName>Jellyfin.Plugin.JellyStations</AssemblyName>
+    <AssemblyVersion>1.15.0.0</AssemblyVersion>
+    <FileVersion>1.15.0.0</FileVersion>
+    <Version>1.15.0.0</Version>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Jellyfin.Controller" Version="12.2.0" ExcludeAssets="runtime" />
+    <PackageReference Include="Jellyfin.Model" Version="12.2.0" ExcludeAssets="runtime" />
+    <!-- Drawn with the SkiaSharp the server ships (/jellyfin/SkiaSharp.dll); nothing native is packaged. -->
+    <PackageReference Include="SkiaSharp" Version="3.119.4" ExcludeAssets="runtime" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jellyfin.Plugin.JellyStations.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="Web\**" />
+    <EmbeddedResource Include="Web\**" />
+    <None Remove="Assets\**" />
+    <EmbeddedResource Include="Assets\**" />
+  </ItemGroup>
+
+</Project>

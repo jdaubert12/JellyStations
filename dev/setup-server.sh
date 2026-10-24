@@ -5,7 +5,7 @@
 set -euo pipefail
 BASE="${JF_URL:-http://localhost:8096}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
-AUTH='Authorization: MediaBrowser Client="tvstation-dev", Device="dev", DeviceId="tvstation-dev-1", Version="1.0"'
+AUTH='Authorization: MediaBrowser Client="jellystations-dev", Device="dev", DeviceId="jellystations-dev-1", Version="1.0"'
 
 echo "Waiting for $BASE ..."
 for i in $(seq 1 90); do
@@ -30,7 +30,7 @@ TOKEN=$(curl -sf -X POST "$BASE/Users/AuthenticateByName" -H "$AUTH" -H 'Content
   -d '{"Username":"admin","Pw":"admin"}' | grep -o '"AccessToken":"[^"]*"' | cut -d'"' -f4)
 [ -n "$TOKEN" ] || { echo "login failed"; exit 1; }
 echo "$TOKEN" > "$HERE/.token"
-H="Authorization: MediaBrowser Client=\"tvstation-dev\", Device=\"dev\", DeviceId=\"tvstation-dev-1\", Version=\"1.0\", Token=\"$TOKEN\""
+H="Authorization: MediaBrowser Client=\"jellystations-dev\", Device=\"dev\", DeviceId=\"jellystations-dev-1\", Version=\"1.0\", Token=\"$TOKEN\""
 
 have=$(curl -sf "$BASE/Library/VirtualFolders" -H "$H")
 opts='{"LibraryOptions":{"EnableRealtimeMonitor":false,"EnableChapterImageExtraction":false,"ExtractChapterImagesDuringLibraryScan":false,"EnableTrickplayImageExtraction":false,"SaveLocalMetadata":false,"TypeOptions":[{"Type":"Movie","MetadataFetchers":[],"ImageFetchers":[]},{"Type":"Series","MetadataFetchers":[],"ImageFetchers":[]},{"Type":"Season","MetadataFetchers":[],"ImageFetchers":[]},{"Type":"Episode","MetadataFetchers":[],"ImageFetchers":[]}]}}'

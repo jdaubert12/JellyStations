@@ -1,422 +1,422 @@
 {
- "Name": "Franchise Nights",
- "ChannelNumber": "11",
- "CallSign": "FRNCH",
- "Enabled": true,
- "TimeZoneId": "America/New_York",
- "AnchorUtc": "2026-10-14T10:00:00Z",
- "PaddingGridMinutes": 0,
- "Mode": "Slots",
- "Pool": {
-  "Sources": [],
-  "Order": "Shuffle",
-  "AvoidSameSeriesBackToBack": true,
-  "MarathonMin": 1,
-  "MarathonMax": 1,
-  "DaypartRules": []
- },
- "Slots": {
-  "Blocks": [
-   {
-    "Name": "Potter Monday",
-    "Days": [
-     "Monday"
+  "Name": "Franchise Nights",
+  "ChannelNumber": "11",
+  "CallSign": "FRNCH",
+  "Enabled": true,
+  "TimeZoneId": "America/New_York",
+  "AnchorUtc": "2026-10-14T10:00:00Z",
+  "PaddingGridMinutes": 0,
+  "Mode": "Slots",
+  "Pool": {
+    "Sources": [],
+    "Order": "Shuffle",
+    "AvoidSameSeriesBackToBack": true,
+    "MarathonMin": 1,
+    "MarathonMax": 1,
+    "DaypartRules": []
+  },
+  "Slots": {
+    "Blocks": [
+      {
+        "Name": "Franchise A Monday",
+        "Days": [
+          "Monday"
+        ],
+        "StartLocal": "19:00",
+        "DurationMinutes": 300,
+        "Sources": [
+          {
+            "Kind": "Movie",
+            "ItemId": "de587facfba9a3cb8cedf1d8ee6496c2",
+            "DisplayName": "Franchise A Part 1 (2000)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "d3e04f64699d63190e389b05a5a553c7",
+            "DisplayName": "Franchise A Part 2 (2002)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "b7f58f0a61c967a65eadf29f4e26765a",
+            "DisplayName": "Franchise A Part 3 (2004)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "d1bf56ee39c88a0461c0f71b286a0b3a",
+            "DisplayName": "Franchise A Part 4 (2006)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "f8a1b9917f4f92fe11a270b1d2df05cc",
+            "DisplayName": "Franchise A Part 5 (2008)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "6a2eeb1b8b5e814372918e5cc3344e06",
+            "DisplayName": "Franchise A Part 6 (2010)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "2ea3492637d983c3cb7293d34516596a",
+            "DisplayName": "Franchise A Part 7 (2012)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "dbe4345035992101e8c4e5ad18cda14e",
+            "DisplayName": "Franchise A Part 8 (2014)",
+            "ItemKinds": [],
+            "Weight": 1
+          }
+        ],
+        "Order": "Sequential",
+        "Overflow": "FillerRemainder"
+      },
+      {
+        "Name": "Franchise B Tuesday",
+        "Days": [
+          "Tuesday"
+        ],
+        "StartLocal": "19:00",
+        "DurationMinutes": 300,
+        "Sources": [
+          {
+            "Kind": "Movie",
+            "ItemId": "2e8127e3862818574bc881c53f8d0d3a",
+            "DisplayName": "Franchise B Part 1 (2000)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "78e8761e5588262f418df71575beebb4",
+            "DisplayName": "Franchise B Part 2 (2002)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "34532f4073c0657494dc6478cdbbac5e",
+            "DisplayName": "Franchise B Part 3 (2004)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "8a6373577b5f29a173b744c63c38a450",
+            "DisplayName": "Franchise B Part 4 (2006)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "51bf715032fa6c0dc1217b2293d318e3",
+            "DisplayName": "Franchise B Part 5 (2008)",
+            "ItemKinds": [],
+            "Weight": 1
+          }
+        ],
+        "Order": "Sequential",
+        "Overflow": "FillerRemainder"
+      },
+      {
+        "Name": "Franchise C Wednesday",
+        "Days": [
+          "Wednesday"
+        ],
+        "StartLocal": "19:00",
+        "DurationMinutes": 300,
+        "Sources": [
+          {
+            "Kind": "Movie",
+            "ItemId": "b27081e443a8fe095b3e16c162dee1b9",
+            "DisplayName": "Franchise C Part 1 (2000)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "4a55d8be743f28a35210fb1c2ddc11d5",
+            "DisplayName": "Franchise C Part 2 (2002)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "8b5d0f6e5aedeafa747b52b32439d416",
+            "DisplayName": "Franchise C Part 3 (2004)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "c6228ff1a3174c924c373e0271943e9a",
+            "DisplayName": "Franchise C Part 4 (2006)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "73e7b53be24dab4e025397787c6d373d",
+            "DisplayName": "Franchise C Part 5 (2008)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "a36a8b7c147ea6f0eb878be5e8edc3a4",
+            "DisplayName": "Franchise C Part 6 (2010)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "b9e0983f537174b7c3c104158cdc5ed2",
+            "DisplayName": "Franchise C Part 7 (2012)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "5445cfca766f8bf7697b63db5ae60eb5",
+            "DisplayName": "Franchise C Part 8 (2014)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "55cc55f419d1f9ec391b36a7104d1056",
+            "DisplayName": "Franchise C Part 9 (2016)",
+            "ItemKinds": [],
+            "Weight": 1
+          }
+        ],
+        "Order": "Sequential",
+        "Overflow": "FillerRemainder"
+      },
+      {
+        "Name": "Franchise D Thursday",
+        "Days": [
+          "Thursday"
+        ],
+        "StartLocal": "19:00",
+        "DurationMinutes": 300,
+        "Sources": [
+          {
+            "Kind": "Movie",
+            "ItemId": "dec38e9fb99962954a7aacdfefe03897",
+            "DisplayName": "Franchise D Part 1 (2000)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "05afd3b4c87d5bfc2e34db7df1856ee0",
+            "DisplayName": "Franchise D Part 2 (2002)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "4f9ec81a4da93e4808b3e96934db6414",
+            "DisplayName": "Franchise D Part 3 (2004)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "5548ecc22b37589d729854253bad8244",
+            "DisplayName": "Franchise D Part 4 (2006)",
+            "ItemKinds": [],
+            "Weight": 1
+          }
+        ],
+        "Order": "Sequential",
+        "Overflow": "FillerRemainder"
+      },
+      {
+        "Name": "Franchise E Friday",
+        "Days": [
+          "Friday"
+        ],
+        "StartLocal": "19:00",
+        "DurationMinutes": 300,
+        "Sources": [
+          {
+            "Kind": "Movie",
+            "ItemId": "6f40ce6ce72dff61d1d9c0363fd58ea8",
+            "DisplayName": "Franchise E Part 1 (2000)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "1ab1370a2bbab3b2c2b1e1057582bf70",
+            "DisplayName": "Franchise E Part 2 (2002)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "f73138d3dc26c4b759bcbfe9b3cdcfe7",
+            "DisplayName": "Franchise E Part 3 (2004)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "4147fbc50fd1f21b2c7bff7fb37995d5",
+            "DisplayName": "Franchise E Part 4 (2006)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "ab37b3c911107f40f0d496f05e5e14e2",
+            "DisplayName": "Franchise E Part 5 (2008)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "0078a9edd5db56d8d0bea63a33afc279",
+            "DisplayName": "Franchise E Part 6 (2010)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "6ac3cd245eb2f921874b72111d1cafee",
+            "DisplayName": "Franchise E Part 7 (2012)",
+            "ItemKinds": [],
+            "Weight": 1
+          }
+        ],
+        "Order": "Sequential",
+        "Overflow": "FillerRemainder"
+      },
+      {
+        "Name": "Trilogy Saturday",
+        "Days": [
+          "Saturday"
+        ],
+        "StartLocal": "18:00",
+        "DurationMinutes": 360,
+        "Sources": [
+          {
+            "Kind": "Movie",
+            "ItemId": "d7de7e388f4dcd8c5a2652964599e4f3",
+            "DisplayName": "Trilogy Part 1 (2000)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "9deb16a17e1631a5e770720728c06875",
+            "DisplayName": "Trilogy Part 2 (2002)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "2c1141eeedfa3fbcb7ea1e838be3dd87",
+            "DisplayName": "Trilogy Part 3 (2004)",
+            "ItemKinds": [],
+            "Weight": 1
+          }
+        ],
+        "Order": "Sequential",
+        "Overflow": "FillerRemainder"
+      },
+      {
+        "Name": "Franchise F Sunday",
+        "Days": [
+          "Sunday"
+        ],
+        "StartLocal": "19:00",
+        "DurationMinutes": 300,
+        "Sources": [
+          {
+            "Kind": "Movie",
+            "ItemId": "c796a8e64c71e367171bcdc15821e41c",
+            "DisplayName": "Franchise F Part 1 (2000)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "24201ec28338c966ac8e5b7d4e69ded2",
+            "DisplayName": "Franchise F Part 2 (2002)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "105c04a3cbb85f870c1a074154811a71",
+            "DisplayName": "Franchise F Part 3 (2004)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "33cc35e2c6f09adb0800650c6bebaefe",
+            "DisplayName": "Franchise F Part 4 (2006)",
+            "ItemKinds": [],
+            "Weight": 1
+          },
+          {
+            "Kind": "Movie",
+            "ItemId": "8c68aa146c5748647746349f43b00feb",
+            "DisplayName": "Franchise F Part 5 (2008)",
+            "ItemKinds": [],
+            "Weight": 1
+          }
+        ],
+        "Order": "Sequential",
+        "Overflow": "FillerRemainder"
+      }
     ],
-    "StartLocal": "19:00",
-    "DurationMinutes": 300,
-    "Sources": [
-     {
-      "Kind": "Movie",
-      "ItemId": "cdf413f950a2829288af382baac4e302",
-      "DisplayName": "Harry Potter and the Philosopher's Stone (2001)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "a9c34341af053c182de58e4e390035ff",
-      "DisplayName": "Harry Potter and the Chamber of Secrets (2002)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "9ffe85034616ba223f1535e1c536d64e",
-      "DisplayName": "Harry Potter and the Prisoner of Azkaban (2004)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "4379a69a1f0547f45eca0fb18e0a8ee6",
-      "DisplayName": "Harry Potter and the Goblet of Fire (2005)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "ba0c497d0a554233b9cbbbfe7f637cfd",
-      "DisplayName": "Harry Potter and the Order of the Phoenix (2007)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "62b42bcad5367731216de1914c2097fd",
-      "DisplayName": "Harry Potter and the Half-Blood Prince (2009)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "6bb44a9f485d3f60b96587e9ffbcaefa",
-      "DisplayName": "Harry Potter and the Deathly Hallows: Part 1 (2010)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "adf439754d2e09c49ceaf89e290f0f8a",
-      "DisplayName": "Harry Potter and the Deathly Hallows: Part 2 (2011)",
-      "ItemKinds": [],
-      "Weight": 1
-     }
-    ],
-    "Order": "Sequential",
-    "Overflow": "FillerRemainder"
-   },
-   {
-    "Name": "Bourne Tuesday",
-    "Days": [
-     "Tuesday"
-    ],
-    "StartLocal": "19:00",
-    "DurationMinutes": 300,
-    "Sources": [
-     {
-      "Kind": "Movie",
-      "ItemId": "c2bbdf36b2fd3732b4154c53155c500f",
-      "DisplayName": "The Bourne Identity (2002)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "bbd214c132c4579b7019e38100c66da7",
-      "DisplayName": "The Bourne Supremacy (2004)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "3744f814131eced816fe9ff085d51b9b",
-      "DisplayName": "The Bourne Ultimatum (2007)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "292edc7f67aa8bf1534bb22a1f45cfa5",
-      "DisplayName": "The Bourne Legacy (2012)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "13e38d7f329fd9ce64a2259848673599",
-      "DisplayName": "Jason Bourne (2016)",
-      "ItemKinds": [],
-      "Weight": 1
-     }
-    ],
-    "Order": "Sequential",
-    "Overflow": "FillerRemainder"
-   },
-   {
-    "Name": "Marvel Wednesday",
-    "Days": [
-     "Wednesday"
-    ],
-    "StartLocal": "19:00",
-    "DurationMinutes": 300,
-    "Sources": [
-     {
-      "Kind": "Movie",
-      "ItemId": "bce1ede3722d5111da59a471564cdc79",
-      "DisplayName": "Captain America: The First Avenger (2011)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "09e66eca4e0953a96cf381016ec10e1f",
-      "DisplayName": "The Avengers (2012)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "fcb6ecaf87c9a0aa7d8a4403d76fe8ec",
-      "DisplayName": "Captain America: The Winter Soldier (2014)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "9bf0334a2c7f300cfc4b89ca648a25f2",
-      "DisplayName": "Ant-Man (2015)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "492e4e2fbeff8bfefc9d6b96765adce3",
-      "DisplayName": "Captain America: Civil War (2016)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "cea8d98d54076fd205079cf13bc57aa2",
-      "DisplayName": "Black Panther (2018)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "958b06b13fce062ba51b51c29cb1f440",
-      "DisplayName": "Avengers: Infinity War (2018)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "0eb1d85cac0f96631cfe9b5ec6393510",
-      "DisplayName": "Captain Marvel (2019)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "8385169320e5b9fb23e3ca4d3fbd7268",
-      "DisplayName": "Avengers: Endgame (2019)",
-      "ItemKinds": [],
-      "Weight": 1
-     }
-    ],
-    "Order": "Sequential",
-    "Overflow": "FillerRemainder"
-   },
-   {
-    "Name": "Bond Thursday",
-    "Days": [
-     "Thursday"
-    ],
-    "StartLocal": "19:00",
-    "DurationMinutes": 300,
-    "Sources": [
-     {
-      "Kind": "Movie",
-      "ItemId": "ed094a21a457ee47acfecef6b0572142",
-      "DisplayName": "Casino Royale (2006)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "4209e27d7df52b295bfc233bcbf7ccdc",
-      "DisplayName": "Quantum of Solace (2008)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "5aad72119a12d2de7e830887b8144a1a",
-      "DisplayName": "Skyfall (2012)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "732079cf1df34df932f4ffd5136291a7",
-      "DisplayName": "Spectre (2015)",
-      "ItemKinds": [],
-      "Weight": 1
-     }
-    ],
-    "Order": "Sequential",
-    "Overflow": "FillerRemainder"
-   },
-   {
-    "Name": "Matrix & Riddick Friday",
-    "Days": [
-     "Friday"
-    ],
-    "StartLocal": "19:00",
-    "DurationMinutes": 300,
-    "Sources": [
-     {
-      "Kind": "Movie",
-      "ItemId": "2f8d11ad55f2bd9939cc70158de9b596",
-      "DisplayName": "The Matrix (1999)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "4f42956aced76bb3b5cc225a039868bb",
-      "DisplayName": "The Matrix Reloaded (2003)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "7fede6083224eed59c7339875700bbd0",
-      "DisplayName": "The Matrix Revolutions (2003)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "994066b0fa7f5d0274e38c8615d09fcb",
-      "DisplayName": "The Matrix Resurrections (2021)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "868eead12acf6eab4744351060036e17",
-      "DisplayName": "Pitch Black (2000)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "4a8fe443b990ee4c8452daea37f47e98",
-      "DisplayName": "The Chronicles of Riddick (2004)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "a6222cbfde8453d05273480e56fe6576",
-      "DisplayName": "Riddick (2013)",
-      "ItemKinds": [],
-      "Weight": 1
-     }
-    ],
-    "Order": "Sequential",
-    "Overflow": "FillerRemainder"
-   },
-   {
-    "Name": "Lord of the Rings Saturday",
-    "Days": [
-     "Saturday"
-    ],
-    "StartLocal": "18:00",
-    "DurationMinutes": 360,
-    "Sources": [
-     {
-      "Kind": "Movie",
-      "ItemId": "4445d09745f3f7d75c8d58d14a9edc98",
-      "DisplayName": "The Lord of the Rings: The Fellowship of the Ring (2001)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "8cbd481daabef6a19701471b11757795",
-      "DisplayName": "The Lord of the Rings: The Two Towers (2002)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "6dd06027b04e69bcd6c2156184b4f916",
-      "DisplayName": "The Lord of the Rings: The Return of the King (2003)",
-      "ItemKinds": [],
-      "Weight": 1
-     }
-    ],
-    "Order": "Sequential",
-    "Overflow": "FillerRemainder"
-   },
-   {
-    "Name": "Batman & Wick Sunday",
-    "Days": [
-     "Sunday"
-    ],
-    "StartLocal": "19:00",
-    "DurationMinutes": 300,
-    "Sources": [
-     {
-      "Kind": "Movie",
-      "ItemId": "337a34ef966bc1cb19c2b43d59861ac4",
-      "DisplayName": "Batman Begins (2005)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "0c89333be2b1c498c87ee61de0c4bb8f",
-      "DisplayName": "The Dark Knight (2008)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "e09a139da0210f8c3e6f833941e4a9cf",
-      "DisplayName": "The Dark Knight Rises (2012)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "91e0ff8c4119d809acadb5572052278f",
-      "DisplayName": "John Wick (2014)",
-      "ItemKinds": [],
-      "Weight": 1
-     },
-     {
-      "Kind": "Movie",
-      "ItemId": "9ff544fc39d517a8505e380ce309a0f3",
-      "DisplayName": "John Wick: Chapter 2 (2017)",
-      "ItemKinds": [],
-      "Weight": 1
-     }
-    ],
-    "Order": "Sequential",
-    "Overflow": "FillerRemainder"
-   }
-  ],
-  "Filler": {
-   "Sources": [
-    {
-     "Kind": "Genre",
-     "Genre": "Comedy",
-     "DisplayName": "Comedy",
-     "ItemKinds": [
-      "Movie"
-     ],
-     "Weight": 1
-    },
-    {
-     "Kind": "Genre",
-     "Genre": "Adventure",
-     "DisplayName": "Adventure",
-     "ItemKinds": [
-      "Movie"
-     ],
-     "Weight": 1
+    "Filler": {
+      "Sources": [
+        {
+          "Kind": "Genre",
+          "Genre": "Comedy",
+          "DisplayName": "Comedy",
+          "ItemKinds": [
+            "Movie"
+          ],
+          "Weight": 1
+        },
+        {
+          "Kind": "Genre",
+          "Genre": "Adventure",
+          "DisplayName": "Adventure",
+          "ItemKinds": [
+            "Movie"
+          ],
+          "Weight": 1
+        }
+      ],
+      "Order": "Shuffle"
     }
-   ],
-   "Order": "Shuffle"
-  }
- },
- "Lineup": {
-  "Items": []
- },
- "AutoRecompileNightly": true,
- "ActiveWindows": [],
- "ExcludedItemIds": []
+  },
+  "Lineup": {
+    "Items": []
+  },
+  "AutoRecompileNightly": true,
+  "ActiveWindows": [],
+  "ExcludedItemIds": []
 }

@@ -1,131 +1,131 @@
 {
- "Name": "Holiday",
- "ChannelNumber": "9",
- "CallSign": "XMAS",
- "Enabled": true,
- "TimeZoneId": "America/New_York",
- "AnchorUtc": "2026-10-14T10:00:00Z",
- "PaddingGridMinutes": 5,
- "Mode": "Pool",
- "Pool": {
-  "Sources": [
-   {
-    "Kind": "Movie",
-    "ItemId": "4b6a9b7911d1111a6b323e0869160ca1",
-    "DisplayName": "Miracle on 34th Street (1947)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "25bfdaab3495b6221bbc391235a8ef6d",
-    "DisplayName": "The Bishop's Wife (1947)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "a8a7322f234baaa15fffffe328488f10",
-    "DisplayName": "White Christmas (1954)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "c641960af8ac222b50a372d44d1fe1bd",
-    "DisplayName": "Rudolph the Red-Nosed Reindeer (1964)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "918ad5381fb0cf5d53e4fc9ef0ef69a0",
-    "DisplayName": "A Charlie Brown Christmas (1965)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "a06005c6bcfa164c943b933bc2a83944",
-    "DisplayName": "How the Grinch Stole Christmas! (1966)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "f4784bef510838939ceb15424ee8bcdb",
-    "DisplayName": "Frosty the Snowman (1969)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "95eb6a71ae192137fdd9fd98ec5ca775",
-    "DisplayName": "Santa Claus Is Comin' to Town (1970)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "0ed39daca74864d39e681fb196974ae8",
-    "DisplayName": "The Year Without a Santa Claus (1974)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "4af7bacaec07081d60fc28fd40c67da5",
-    "DisplayName": "Mickey's Christmas Carol (1983)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "3dc2dc59aac097e59110e87436c51f4f",
-    "DisplayName": "Babes in Toyland (1986)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "4e33df3c1943fa8cf8396f43328cc3e8",
-    "DisplayName": "It's Christmastime Again, Charlie Brown (1992)",
-    "ItemKinds": [],
-    "Weight": 1
-   },
-   {
-    "Kind": "Movie",
-    "ItemId": "04761c491fdf688d57ec7673de6fe424",
-    "DisplayName": "The Muppet Christmas Carol (1992)",
-    "ItemKinds": [],
-    "Weight": 1
-   }
+  "Name": "Holiday",
+  "ChannelNumber": "9",
+  "CallSign": "XMAS",
+  "Enabled": true,
+  "TimeZoneId": "America/New_York",
+  "AnchorUtc": "2026-10-14T10:00:00Z",
+  "PaddingGridMinutes": 5,
+  "Mode": "Pool",
+  "Pool": {
+    "Sources": [
+      {
+        "Kind": "Movie",
+        "ItemId": "35c4bf7813c12eb3367aa0f485a5c086",
+        "DisplayName": "Holiday Classic 1 (1993)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "7dd824e89243389d046f82541d385ec6",
+        "DisplayName": "Holiday Classic 2 (1996)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "eea4d0103b364b278c93fd8299927202",
+        "DisplayName": "Holiday Classic 3 (1999)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "1c61a14ecee680e3062b2e3efdd496a8",
+        "DisplayName": "Holiday Classic 4 (2002)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "5ed0688688bd7acecce7405286796efe",
+        "DisplayName": "Holiday Classic 5 (2005)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "fb74094792e5ba86b975e909c04eed6d",
+        "DisplayName": "Holiday Classic 6 (2008)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "efb5b6fd00e2e88ae1cef76aa570299f",
+        "DisplayName": "Holiday Classic 7 (2011)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "f8fb60be24525143a319ef99c520ada4",
+        "DisplayName": "Holiday Classic 8 (2014)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "532a2f682847a1cdafe64d7d9111b8f7",
+        "DisplayName": "Holiday Classic 9 (2017)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "0c32c25018b180d94893ece48225f958",
+        "DisplayName": "Holiday Classic 10 (2020)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "1a2a4b2bb641dcf343bd0c31d7f1f406",
+        "DisplayName": "Holiday Classic 11 (2023)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "a382284e05e66d430ec94385bbc046f3",
+        "DisplayName": "Holiday Classic 12 (1991)",
+        "ItemKinds": [],
+        "Weight": 1
+      },
+      {
+        "Kind": "Movie",
+        "ItemId": "5c813248c16be711b74a564f223bb43b",
+        "DisplayName": "Holiday Classic 13 (1994)",
+        "ItemKinds": [],
+        "Weight": 1
+      }
+    ],
+    "Order": "Shuffle",
+    "AvoidSameSeriesBackToBack": true,
+    "MarathonMin": 1,
+    "MarathonMax": 1,
+    "DaypartRules": []
+  },
+  "Slots": {
+    "Blocks": [],
+    "Filler": {
+      "Sources": [],
+      "Order": "Shuffle"
+    }
+  },
+  "Lineup": {
+    "Items": []
+  },
+  "AutoRecompileNightly": true,
+  "ActiveWindows": [
+    {
+      "Label": "Christmas",
+      "StartMonth": 12,
+      "StartDay": 1,
+      "EndMonth": 12,
+      "EndDay": 31
+    }
   ],
-  "Order": "Shuffle",
-  "AvoidSameSeriesBackToBack": true,
-  "MarathonMin": 1,
-  "MarathonMax": 1,
-  "DaypartRules": []
- },
- "Slots": {
-  "Blocks": [],
-  "Filler": {
-   "Sources": [],
-   "Order": "Shuffle"
-  }
- },
- "Lineup": {
-  "Items": []
- },
- "AutoRecompileNightly": true,
- "ActiveWindows": [
-  {
-   "Label": "Christmas",
-   "StartMonth": 12,
-   "StartDay": 1,
-   "EndMonth": 12,
-   "EndDay": 31
-  }
- ],
- "ExcludedItemIds": []
+  "ExcludedItemIds": []
 }

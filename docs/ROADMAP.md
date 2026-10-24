@@ -1,4 +1,4 @@
-# TvStation roadmap
+# JellyStations roadmap
 
 Working plan for scheduling and curation features. Phase 1 is the agreed next three steps, in order.
 Later phases are candidates, roughly ordered by payoff per effort; reorder freely.
@@ -13,8 +13,8 @@ Conventions for every step:
 - Existing stations must keep producing the same schedule after an upgrade unless the user edits
   them. New settings default to "off" and are excluded from the schedule fingerprint when they do
   not change the timeline.
-- Station JSON in `examples/stations/` is the source of truth for the real server (and doubles as
-  shipped examples); changes there go in via Import.
+- Station JSON in `examples/stations/` is a set of shipped examples with placeholder titles and
+  made-up item ids; keep real exports out of the repo.
 
 ## Already done (October 2026)
 
@@ -124,10 +124,10 @@ items are reported in the compile result with reason `UserExcluded` so the count
 
 **API.**
 
-- `GET /TvStation/Stations/{id}/Items?offset&limit&sort` — compiled items of the saved station
+- `GET /JellyStations/Stations/{id}/Items?offset&limit&sort` — compiled items of the saved station
   with title, episode title, season/episode, year, rating, runtime, genres, source label, and
   whether excluded. Served from the compiled snapshot, so it is cheap.
-- `POST /TvStation/Schedule/PreviewItems` — same for an unsaved draft (compiles in memory, like
+- `POST /JellyStations/Schedule/PreviewItems` — same for an unsaved draft (compiles in memory, like
   schedule preview; capped at 5000 items).
 - Exclusion toggling is just the station PUT with the updated list; recompile happens as today.
 
@@ -172,12 +172,12 @@ analyzer, then suggestion rules and the dashboard view on top of it.
   library (episode rating/genres/tags inherited from the series) and `LibraryAnalyzer` aggregates
   them: totals, kids/family/unrated hours, genres, series, collections, franchises
   (`FranchiseDetector`, title prefixes), decades, ratings, tags, libraries. Cached 15 minutes,
-  `GET /TvStation/Library/Analysis?refresh=true` recomputes. The health report reads the same data.
+  `GET /JellyStations/Library/Analysis?refresh=true` recomputes. The health report reads the same data.
 - **Suggest stations — DONE 2026-10-15.** `StationSuggester` (pure, tested) over the analysis:
   genres ≥ 8 h, series ≥ 20 episodes, Kids TV (libraries capped at G) and Family Movies (PG),
   franchise marathon lineups (≥ 3 titles) plus a "Franchise Nights" slots station, collections,
   decades ≥ 8 h, seasonal channels from holiday tags with their guide window. "Suggest stations"
-  view on the dashboard; `GET /TvStation/Suggestions`, `POST /TvStation/Suggestions/Create`.
+  view on the dashboard; `GET /JellyStations/Suggestions`, `POST /JellyStations/Suggestions/Create`.
 - **Franchise detection — DONE 2026-10-15** as part of the analyzer (`FranchiseDetector`). A
   "pick a franchise" source type can build on it later.
 - **Block recurrence — DONE 2026-10-16.** `SlotBlock.Recurrence`: weekly (default), every N
@@ -186,10 +186,10 @@ analyzer, then suggestion rules and the dashboard view on top of it.
   week's occurrences, so cursors still carry across sparse occurrences. Built for "a Harry
   Potter weekend on some weekends". Still open: a custom guide title per block.
 - **Block templates — DONE 2026-10-15.** Bookmark button on a block saves it under its name
-  (`/TvStation/BlockTemplates`, stored in settings); the dropdown next to "Add block" starts a new
+  (`/JellyStations/BlockTemplates`, stored in settings); the dropdown next to "Add block" starts a new
   block from a template; Settings lists and deletes them.
 - **Exclusion by tag — DONE 2026-10-14.** Per-station and global excluded tags (hand picks and
-  Tag sources for the same tag exempt), a Tag source kind, `GET /TvStation/Library/Tags`, and
+  Tag sources for the same tag exempt), a Tag source kind, `GET /JellyStations/Library/Tags`, and
   "by tag" rows in the content view. Changing the global list recompiles every station.
 - **Other rule exclusions — DONE 2026-10-15.** "Skip items shorter than N minutes" per station
   (pool, filler, blocks; reason `TooShort` in the content view). Items without a runtime were
@@ -205,7 +205,7 @@ analyzer, then suggestion rules and the dashboard view on top of it.
 - **Health report — DONE 2026-10-19.** The compiler records what every source found and kept
   (`CompiledStation.Sources`); `StationHealth` (pure, tested) turns the last compile into
   warnings: sources that matched nothing or contributed nothing, under a day of unique content,
-  items skipped for no runtime / path / file. `GET /TvStation/Health` feeds a Health section on
+  items skipped for no runtime / path / file. `GET /JellyStations/Health` feeds a Health section on
   the Status view; the station row carries "empty source" and "N h unique" badges and a
   by-reason tooltip on the excluded count. It reflects the nightly recompile; no extra task.
 - **Same movie twice in a row — FIXED 2026-10-19.** The back-to-back rule only compared series ids,
@@ -265,7 +265,7 @@ order; together they turn a station into a broadcast.
    playback, which also keeps it in step with the picture under HLS latency. Per program the
    restreamer finds the next `Program` entry (bumpers and slates skipped, 6 h lookahead), has
    ffmpeg render a PNG card (`FfmpegArgsBuilder.ForUpNextCard`: translucent `color` panel, the
-   artwork scaled into a left box, `drawtext` lines, no image library) into `data/TvStation/cards`,
+   artwork scaled into a left box, `drawtext` lines, no image library) into `data/JellyStations/cards`,
    and overlays it with `enable='between(t,from,to)'` on the segment that ends the program
    (`UpNextCard.Window`; multi-part items only on the last part or when cut). Falls back to a card
    without artwork, then disables the card for the session, each with a station fault. Unit tests
@@ -288,7 +288,7 @@ From a 2026-10-19 review of the dashboard: the base is solid but speaks engineer
    station" opens a preset page (Shuffle a collection, Kids channel, Movie night, Comfort reruns,
    Holiday channel, One show start to finish, Weekly schedule, Play a fixed list); a preset fills
    in mode, order, marathons, padding, family hours, season window and tag behaviour, and can cap
-   the rating or item kind of every source added afterwards (`PRESETS` in tvstation.js).
+   the rating or item kind of every source added afterwards (`PRESETS` in jellystations.js).
 2. **Plain words — DONE 2026-10-19.** Modes read "Shuffle a collection" / "Weekly schedule" /
    "Play a fixed list" with examples; "Recompile" is "Refresh content" everywhere; daytime rules
    are "Family hours"; the revision is no longer shown. Call sign, padding grid, anchor, card
@@ -312,7 +312,7 @@ From a 2026-10-19 review of the dashboard: the base is solid but speaks engineer
    (a click gives an hour, a drag the rows and days covered, the template select applies),
    clicking a block expands its card. Cards stay the editing surface; moving or resizing on the
    grid is not supported.
-5. **Not on a channel — DONE 2026-10-19.** `GET /TvStation/Library/Coverage` compares the library
+5. **Not on a channel — DONE 2026-10-19.** `GET /JellyStations/Library/Coverage` compares the library
    facts behind the analysis (now cached with it) against the compiled content of every enabled
    station (`includeDisabled=true` counts paused ones; bumper and ident clips count) and returns the movies
    and series left out, series with only some episodes covered carrying the covered count
@@ -328,8 +328,8 @@ From a 2026-10-19 review of the dashboard: the base is solid but speaks engineer
 
 ## Phase 7 — smarter stations
 
-From the 2026-10-23 discussion and the `prototypes/TvStation.Brain` experiment (LLamaSharp + Qwen2.5
-1.5B on the CPU, results in `prototypes/TvStation.Brain/RESULTS.md`). What the prototype settled:
+From the 2026-10-23 discussion and the `prototypes/JellyStations.Brain` experiment (LLamaSharp + Qwen2.5
+1.5B on the CPU, results in `prototypes/JellyStations.Brain/RESULTS.md`). What the prototype settled:
 a 1.5B model referring to titles by id over the whole library produces valid-looking garbage; by
 exact title under a grammar over ~30 candidates it ranks acceptably; it cannot do times, durations
 or de-duplication (0/5 valid stations) and a repair round only helps on short prompts; without a
@@ -343,7 +343,7 @@ In payoff order. Steps 1-3 need no language model at all.
 1. **Embedding index and "Describe the channel".** A small sentence-embedding model (bge-small or
    nomic-embed-text, 30-130 MB GGUF, through `LLamaEmbedder` in LLamaSharp, CPU only, ~10-50 ms
    per item) embeds every movie and series once (name, year, genres, tags, first sentence of the
-   overview) into `data/TvStation/embeddings.bin`, refreshed with the library analysis for changed
+   overview) into `data/JellyStations/embeddings.bin`, refreshed with the library analysis for changed
    items only. Features on top of it:
    - A text box on the station preset page and on the sources step: "Describe what should play"
      returns the 30 nearest titles with tick boxes and a similarity bar; "Use these" adds them as
@@ -378,7 +378,7 @@ In payoff order. Steps 1-3 need no language model at all.
    - One control on the When step, "Shape the day like a channel": a dropdown of shapes (Kids
      daytime, Family evening, Grown-up nights, Weekend movie marathons) that writes the daypart
      rules and, for pools with blocks, a feature block at prime time, instead of asking for six
-     rules. Shapes are data in `tvstation.js` like `PRESETS`.
+     rules. Shapes are data in `jellystations.js` like `PRESETS`.
    - The compiler already knows why every item is on the timeline (source, gate, cooldown, run);
      keep that trace per entry and show it on the Now and next row and in the content preview:
      "Action genre · PG-13 allowed after 20:00 · 9 days since it last aired". Small-medium.
@@ -417,7 +417,7 @@ small add if someone asks.
 Shipped as planned below with these differences. The **starter pack** is not a zip on the plugin's
 release but a manifest (`Assets/music-packs.json`) of thirty Kevin MacLeod pieces (CC BY 4.0) with
 URLs on incompetech.com and SHA-256 checksums; `MusicPackService` fetches them into
-`data/TvStation/music/lounge/` on request and writes CREDITS.txt, so nothing is re-hosted and the
+`data/JellyStations/music/lounge/` on request and writes CREDITS.txt, so nothing is re-hosted and the
 private repo is not in the path. A second pack (HoliznaCC0, CC0) is "manual": the Free Music
 Archive needs a login, so the editor gives links and the folder. The music folder setting takes
 several folders separated by ";". No title card between
@@ -492,7 +492,7 @@ location is on and how long it has left), tested like the other schedulers.
 clock, the same handover the multi-part movies use: each segment is one location pass (or one
 screen when a report changed mid-pass), built by `FfmpegArgsBuilder.ForWeather`: the screen PNGs as
 inputs with `-loop 1 -t`, `xfade` between them, the audio from the music timeline, the usual
-`-output_ts_offset` and pacing. Rendered PNGs live in `data/TvStation/weather/{station}/` and are
+`-output_ts_offset` and pacing. Rendered PNGs live in `data/JellyStations/weather/{station}/` and are
 regenerated only when the report or the theme changes (never inside the segment loop). When the
 provider is unreachable the last report keeps showing with its real "as of" time; after a configurable
 staleness (default 3 h) the screen says so plainly ("Forecast unavailable since 2:10 PM") instead of
@@ -515,7 +515,7 @@ the station can use both:
 - **Jellyfin music**: `ContentSource` kinds for music (`Playlist` already exists; add `Album`,
   `Artist`, `MusicGenre`), resolved to audio files through the existing resolver. This is "add more":
   drop albums in the music library, tick them on the station.
-- **A folder**: `data/TvStation/music/<station or shared>/` scanned at compile time (mp3, flac, m4a,
+- **A folder**: `data/JellyStations/music/<station or shared>/` scanned at compile time (mp3, flac, m4a,
   ogg), for people without a Jellyfin music library.
 
 A **starter pack** is downloaded on demand from the plugin's own GitHub release with a checksum (like
@@ -567,7 +567,7 @@ and any provider that needs the person's own paid key before the free ones have 
 
 Dropped from the plan on 2026-10-19; here in case it is ever wanted again.
 
-- **M3U and XMLTV export.** `GET /TvStation/Channels.m3u` and `GET /TvStation/Guide.xml` with a
+- **M3U and XMLTV export.** `GET /JellyStations/Channels.m3u` and `GET /JellyStations/Guide.xml` with a
   per-plugin access token in the URL, serving the same MPEG-TS stream the Live TV path uses and
   the same schedule as XMLTV, so VLC, Kodi, Tivimate, Plex or Emby could tune in. Not needed
   while every viewer uses a Jellyfin client. Medium.

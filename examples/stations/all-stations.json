@@ -1,1149 +1,1145 @@
 [
- {
-  "Name": "Kids TV",
-  "ChannelNumber": "1",
-  "CallSign": "KIDS",
-  "Enabled": true,
-  "TimeZoneId": "America/New_York",
-  "AnchorUtc": "2026-10-14T10:00:00Z",
-  "PaddingGridMinutes": 0,
-  "Mode": "Pool",
-  "Pool": {
-   "Sources": [
-    {
-     "Kind": "Series",
-     "ItemId": "3704da4b07870d343ce72832a8c9f9ec",
-     "DisplayName": "The Wild Thornberrys",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Series",
-     "ItemId": "d3dd5607e0947b30e445ebbff595d0ec",
-     "DisplayName": "Avatar: The Last Airbender",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Series",
-     "ItemId": "4fe7fb78e5eeee5ee0863423045f6a25",
-     "DisplayName": "The Legend of Korra",
-     "ItemKinds": [],
-     "Weight": 1
-    }
-   ],
-   "Order": "ShuffleEpisodesInOrder",
-   "AvoidSameSeriesBackToBack": true,
-   "MarathonMin": 2,
-   "MarathonMax": 3,
-   "DaypartRules": []
-  },
-  "Slots": {
-   "Blocks": [],
-   "Filler": {
-    "Sources": [],
-    "Order": "Shuffle"
-   }
-  },
-  "Lineup": {
-   "Items": []
-  },
-  "AutoRecompileNightly": true,
-  "ActiveWindows": [],
-  "ExcludedItemIds": []
- },
- {
-  "Name": "Anime",
-  "ChannelNumber": "2",
-  "CallSign": "ANIME",
-  "Enabled": true,
-  "TimeZoneId": "America/New_York",
-  "AnchorUtc": "2026-10-14T10:00:00Z",
-  "PaddingGridMinutes": 0,
-  "Mode": "Pool",
-  "Pool": {
-   "Sources": [
-    {
-     "Kind": "Series",
-     "ItemId": "98d7752c361f82161d8e06e7ecd75e0a",
-     "DisplayName": "Ghost in the Shell: Stand Alone Complex",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Series",
-     "ItemId": "7189af44fff940a72b2a470608ae3edb",
-     "DisplayName": "Cowboy Bebop",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Series",
-     "ItemId": "0887b3463da337b8110db5365384ed89",
-     "DisplayName": "Initial D",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Series",
-     "ItemId": "804659ba9744294f597ea336c8f38812",
-     "DisplayName": "Gurren Lagann",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Series",
-     "ItemId": "cd9fdf086dbc2993b91eb04d0f4fcc5f",
-     "DisplayName": "Nichijou: My Ordinary Life",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Series",
-     "ItemId": "c23917128feca5957ce6a73d0567722d",
-     "DisplayName": "Tamako Market",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Series",
-     "ItemId": "b78a5af3a64b0d55b3645b3221d2866a",
-     "DisplayName": "Excel Saga",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "65006c00daed95fb2264256852524c85",
-     "DisplayName": "Ghost in the Shell (1995)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "509fadc1ada46d9804c308b5521ceaa9",
-     "DisplayName": "Cowboy Bebop: The Movie (2001)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "e54d6a3893cc38861ddd9434d7c2d1a4",
-     "DisplayName": "Jin-Roh: The Wolf Brigade (1999)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "1308237e29ebbb88fe58d0cfa67eca91",
-     "DisplayName": "Tamako Love Story (2014)",
-     "ItemKinds": [],
-     "Weight": 1
-    }
-   ],
-   "Order": "ShuffleEpisodesInOrder",
-   "AvoidSameSeriesBackToBack": true,
-   "MarathonMin": 2,
-   "MarathonMax": 4,
-   "DaypartRules": [
-    {
-     "StartLocal": "06:00",
-     "EndLocal": "21:00",
-     "MaxRating": "TV-14",
-     "AllowUnrated": false
-    }
-   ]
-  },
-  "Slots": {
-   "Blocks": [],
-   "Filler": {
-    "Sources": [],
-    "Order": "Shuffle"
-   }
-  },
-  "Lineup": {
-   "Items": []
-  },
-  "AutoRecompileNightly": true,
-  "ActiveWindows": [],
-  "ExcludedItemIds": []
- },
- {
-  "Name": "Sci-Fi TV",
-  "ChannelNumber": "3",
-  "CallSign": "SCIFI",
-  "Enabled": true,
-  "TimeZoneId": "America/New_York",
-  "AnchorUtc": "2026-10-14T10:00:00Z",
-  "PaddingGridMinutes": 0,
-  "Mode": "Pool",
-  "Pool": {
-   "Sources": [
-    {
-     "Kind": "Series",
-     "ItemId": "9118e6f6e824e8d1e2da2c5e9bbd9d52",
-     "DisplayName": "The Twilight Zone",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Series",
-     "ItemId": "ca803345212daf592ca59f2347d35d3d",
-     "DisplayName": "Firefly",
-     "ItemKinds": [],
-     "Weight": 1
-    }
-   ],
-   "Order": "ShuffleEpisodesInOrder",
-   "AvoidSameSeriesBackToBack": true,
-   "MarathonMin": 3,
-   "MarathonMax": 5,
-   "DaypartRules": []
-  },
-  "Slots": {
-   "Blocks": [],
-   "Filler": {
-    "Sources": [],
-    "Order": "Shuffle"
-   }
-  },
-  "Lineup": {
-   "Items": []
-  },
-  "AutoRecompileNightly": true,
-  "ActiveWindows": [],
-  "ExcludedItemIds": []
- },
- {
-  "Name": "Studio Ghibli",
-  "ChannelNumber": "4",
-  "CallSign": "GHIBL",
-  "Enabled": true,
-  "TimeZoneId": "America/New_York",
-  "AnchorUtc": "2026-10-14T10:00:00Z",
-  "PaddingGridMinutes": 15,
-  "Mode": "Pool",
-  "Pool": {
-   "Sources": [
-    {
-     "Kind": "Movie",
-     "ItemId": "8223ce9320e53a7a506a0171d18ca88e",
-     "DisplayName": "Lupin the Third: The Castle of Cagliostro (1979)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "ef20e5963580db0c5a28597e12909d90",
-     "DisplayName": "Castle in the Sky (1986)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "5faece9bcf2df585b503aa9a399ad9ea",
-     "DisplayName": "My Neighbor Totoro (1988)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "aed8d89032a20659c77b6fcf54286040",
-     "DisplayName": "Kiki's Delivery Service (1989)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "39b11608470c0ca65f123b94f21f95de",
-     "DisplayName": "Porco Rosso (1992)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "62d1db3e9e1b5c07c2bd22e9606622e2",
-     "DisplayName": "Princess Mononoke (1997)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "a2cd3cd510dd0bad310a58b7009533a6",
-     "DisplayName": "Spirited Away (2001)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "7375cb4de9b0c489a542117e29324a26",
-     "DisplayName": "Howl's Moving Castle (2004)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "a8273c5ed21874c4f0213967c83a5ec0",
-     "DisplayName": "Ponyo (2008)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "475c6fa583922857ac1d6dc8c8026b88",
-     "DisplayName": "The Wind Rises (2013)",
-     "ItemKinds": [],
-     "Weight": 1
-    }
-   ],
-   "Order": "Shuffle",
-   "AvoidSameSeriesBackToBack": true,
-   "MarathonMin": 1,
-   "MarathonMax": 1,
-   "DaypartRules": []
-  },
-  "Slots": {
-   "Blocks": [],
-   "Filler": {
-    "Sources": [],
-    "Order": "Shuffle"
-   }
-  },
-  "Lineup": {
-   "Items": []
-  },
-  "AutoRecompileNightly": true,
-  "ActiveWindows": [],
-  "ExcludedItemIds": []
- },
- {
-  "Name": "Family Movies",
-  "ChannelNumber": "5",
-  "CallSign": "FAM",
-  "Enabled": true,
-  "TimeZoneId": "America/New_York",
-  "AnchorUtc": "2026-10-14T10:00:00Z",
-  "PaddingGridMinutes": 15,
-  "Mode": "Pool",
-  "Pool": {
-   "Sources": [
-    {
-     "Kind": "Genre",
-     "Genre": "Family",
-     "DisplayName": "Family",
-     "ItemKinds": [
-      "Movie"
-     ],
-     "Weight": 1,
-     "MaxRating": "PG"
-    },
-    {
-     "Kind": "Genre",
-     "Genre": "Animation",
-     "DisplayName": "Animation",
-     "ItemKinds": [
-      "Movie"
-     ],
-     "Weight": 1,
-     "MaxRating": "PG"
-    },
-    {
-     "Kind": "Genre",
-     "Genre": "Fantasy",
-     "DisplayName": "Fantasy",
-     "ItemKinds": [
-      "Movie"
-     ],
-     "Weight": 1,
-     "MaxRating": "PG"
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "4c99d71372391ce59afbe2bb2977993f",
-     "DisplayName": "Coco (2017)",
-     "ItemKinds": [],
-     "Weight": 1
-    }
-   ],
-   "Order": "Shuffle",
-   "AvoidSameSeriesBackToBack": true,
-   "MarathonMin": 1,
-   "MarathonMax": 1,
-   "DaypartRules": []
-  },
-  "Slots": {
-   "Blocks": [],
-   "Filler": {
-    "Sources": [],
-    "Order": "Shuffle"
-   }
-  },
-  "Lineup": {
-   "Items": []
-  },
-  "AutoRecompileNightly": true,
-  "ActiveWindows": [],
-  "ExcludedItemIds": []
- },
- {
-  "Name": "Action",
-  "ChannelNumber": "6",
-  "CallSign": "ACTN",
-  "Enabled": true,
-  "TimeZoneId": "America/New_York",
-  "AnchorUtc": "2026-10-14T10:00:00Z",
-  "PaddingGridMinutes": 15,
-  "Mode": "Pool",
-  "Pool": {
-   "Sources": [
-    {
-     "Kind": "Genre",
-     "Genre": "Action",
-     "DisplayName": "Action",
-     "ItemKinds": [
-      "Movie"
-     ],
-     "Weight": 1
-    },
-    {
-     "Kind": "Genre",
-     "Genre": "Thriller",
-     "DisplayName": "Thriller",
-     "ItemKinds": [
-      "Movie"
-     ],
-     "Weight": 1
-    },
-    {
-     "Kind": "Genre",
-     "Genre": "Crime",
-     "DisplayName": "Crime",
-     "ItemKinds": [
-      "Movie"
-     ],
-     "Weight": 1
-    }
-   ],
-   "Order": "Shuffle",
-   "AvoidSameSeriesBackToBack": true,
-   "MarathonMin": 1,
-   "MarathonMax": 1,
-   "DaypartRules": [
-    {
-     "StartLocal": "06:00",
-     "EndLocal": "20:00",
-     "MaxRating": "PG-13",
-     "AllowUnrated": false
-    }
-   ]
-  },
-  "Slots": {
-   "Blocks": [],
-   "Filler": {
-    "Sources": [],
-    "Order": "Shuffle"
-   }
-  },
-  "Lineup": {
-   "Items": []
-  },
-  "AutoRecompileNightly": true,
-  "ActiveWindows": [],
-  "ExcludedItemIds": []
- },
- {
-  "Name": "Sci-Fi & Fantasy Movies",
-  "ChannelNumber": "7",
-  "CallSign": "SFF",
-  "Enabled": true,
-  "TimeZoneId": "America/New_York",
-  "AnchorUtc": "2026-10-14T10:00:00Z",
-  "PaddingGridMinutes": 15,
-  "Mode": "Pool",
-  "Pool": {
-   "Sources": [
-    {
-     "Kind": "Genre",
-     "Genre": "Science Fiction",
-     "DisplayName": "Science Fiction",
-     "ItemKinds": [
-      "Movie"
-     ],
-     "Weight": 1
-    },
-    {
-     "Kind": "Genre",
-     "Genre": "Fantasy",
-     "DisplayName": "Fantasy",
-     "ItemKinds": [
-      "Movie"
-     ],
-     "Weight": 1
-    }
-   ],
-   "Order": "Shuffle",
-   "AvoidSameSeriesBackToBack": true,
-   "MarathonMin": 1,
-   "MarathonMax": 1,
-   "DaypartRules": []
-  },
-  "Slots": {
-   "Blocks": [],
-   "Filler": {
-    "Sources": [],
-    "Order": "Shuffle"
-   }
-  },
-  "Lineup": {
-   "Items": []
-  },
-  "AutoRecompileNightly": true,
-  "ActiveWindows": [],
-  "ExcludedItemIds": []
- },
- {
-  "Name": "Comedy",
-  "ChannelNumber": "8",
-  "CallSign": "COMDY",
-  "Enabled": true,
-  "TimeZoneId": "America/New_York",
-  "AnchorUtc": "2026-10-14T10:00:00Z",
-  "PaddingGridMinutes": 15,
-  "Mode": "Pool",
-  "Pool": {
-   "Sources": [
-    {
-     "Kind": "Genre",
-     "Genre": "Comedy",
-     "DisplayName": "Comedy",
-     "ItemKinds": [
-      "Movie"
-     ],
-     "Weight": 1
-    }
-   ],
-   "Order": "Shuffle",
-   "AvoidSameSeriesBackToBack": true,
-   "MarathonMin": 1,
-   "MarathonMax": 1,
-   "DaypartRules": [
-    {
-     "StartLocal": "06:00",
-     "EndLocal": "20:00",
-     "MaxRating": "PG-13",
-     "AllowUnrated": true
-    }
-   ]
-  },
-  "Slots": {
-   "Blocks": [],
-   "Filler": {
-    "Sources": [],
-    "Order": "Shuffle"
-   }
-  },
-  "Lineup": {
-   "Items": []
-  },
-  "AutoRecompileNightly": true,
-  "ActiveWindows": [],
-  "ExcludedItemIds": [
-   "a8a7322f234baaa15fffffe328488f10"
-  ]
- },
- {
-  "Name": "Holiday",
-  "ChannelNumber": "9",
-  "CallSign": "XMAS",
-  "Enabled": true,
-  "TimeZoneId": "America/New_York",
-  "AnchorUtc": "2026-10-14T10:00:00Z",
-  "PaddingGridMinutes": 5,
-  "Mode": "Pool",
-  "Pool": {
-   "Sources": [
-    {
-     "Kind": "Movie",
-     "ItemId": "4b6a9b7911d1111a6b323e0869160ca1",
-     "DisplayName": "Miracle on 34th Street (1947)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "25bfdaab3495b6221bbc391235a8ef6d",
-     "DisplayName": "The Bishop's Wife (1947)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "a8a7322f234baaa15fffffe328488f10",
-     "DisplayName": "White Christmas (1954)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "c641960af8ac222b50a372d44d1fe1bd",
-     "DisplayName": "Rudolph the Red-Nosed Reindeer (1964)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "918ad5381fb0cf5d53e4fc9ef0ef69a0",
-     "DisplayName": "A Charlie Brown Christmas (1965)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "a06005c6bcfa164c943b933bc2a83944",
-     "DisplayName": "How the Grinch Stole Christmas! (1966)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "f4784bef510838939ceb15424ee8bcdb",
-     "DisplayName": "Frosty the Snowman (1969)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "95eb6a71ae192137fdd9fd98ec5ca775",
-     "DisplayName": "Santa Claus Is Comin' to Town (1970)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "0ed39daca74864d39e681fb196974ae8",
-     "DisplayName": "The Year Without a Santa Claus (1974)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "4af7bacaec07081d60fc28fd40c67da5",
-     "DisplayName": "Mickey's Christmas Carol (1983)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "3dc2dc59aac097e59110e87436c51f4f",
-     "DisplayName": "Babes in Toyland (1986)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "4e33df3c1943fa8cf8396f43328cc3e8",
-     "DisplayName": "It's Christmastime Again, Charlie Brown (1992)",
-     "ItemKinds": [],
-     "Weight": 1
-    },
-    {
-     "Kind": "Movie",
-     "ItemId": "04761c491fdf688d57ec7673de6fe424",
-     "DisplayName": "The Muppet Christmas Carol (1992)",
-     "ItemKinds": [],
-     "Weight": 1
-    }
-   ],
-   "Order": "Shuffle",
-   "AvoidSameSeriesBackToBack": true,
-   "MarathonMin": 1,
-   "MarathonMax": 1,
-   "DaypartRules": []
-  },
-  "Slots": {
-   "Blocks": [],
-   "Filler": {
-    "Sources": [],
-    "Order": "Shuffle"
-   }
-  },
-  "Lineup": {
-   "Items": []
-  },
-  "AutoRecompileNightly": true,
-  "ActiveWindows": [
-   {
-    "Label": "Christmas",
-    "StartMonth": 12,
-    "StartDay": 1,
-    "EndMonth": 12,
-    "EndDay": 31
-   }
-  ],
-  "ExcludedItemIds": []
- },
- {
-  "Name": "Retro Movies",
-  "ChannelNumber": "10",
-  "CallSign": "RETRO",
-  "Enabled": true,
-  "TimeZoneId": "America/New_York",
-  "AnchorUtc": "2026-10-14T10:00:00Z",
-  "PaddingGridMinutes": 15,
-  "Mode": "Pool",
-  "Pool": {
-   "Sources": [
-    {
-     "Kind": "Library",
-     "ItemId": "f137a2dd21bbc1b99aa5c0f6bf02a805",
-     "DisplayName": "Movies",
-     "ItemKinds": [],
-     "Weight": 1,
-     "YearTo": 1989
-    }
-   ],
-   "Order": "Shuffle",
-   "AvoidSameSeriesBackToBack": true,
-   "MarathonMin": 1,
-   "MarathonMax": 1,
-   "DaypartRules": []
-  },
-  "Slots": {
-   "Blocks": [],
-   "Filler": {
-    "Sources": [],
-    "Order": "Shuffle"
-   }
-  },
-  "Lineup": {
-   "Items": []
-  },
-  "AutoRecompileNightly": true,
-  "ActiveWindows": [],
-  "ExcludedItemIds": [
-   "a8a7322f234baaa15fffffe328488f10"
-  ]
- },
- {
-  "Name": "Franchise Nights",
-  "ChannelNumber": "11",
-  "CallSign": "FRNCH",
-  "Enabled": true,
-  "TimeZoneId": "America/New_York",
-  "AnchorUtc": "2026-10-14T10:00:00Z",
-  "PaddingGridMinutes": 0,
-  "Mode": "Slots",
-  "Pool": {
-   "Sources": [],
-   "Order": "Shuffle",
-   "AvoidSameSeriesBackToBack": true,
-   "MarathonMin": 1,
-   "MarathonMax": 1,
-   "DaypartRules": []
-  },
-  "Slots": {
-   "Blocks": [
-    {
-     "Name": "Potter Monday",
-     "Days": [
-      "Monday"
-     ],
-     "StartLocal": "19:00",
-     "DurationMinutes": 300,
-     "Sources": [
-      {
-       "Kind": "Movie",
-       "ItemId": "cdf413f950a2829288af382baac4e302",
-       "DisplayName": "Harry Potter and the Philosopher's Stone (2001)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "a9c34341af053c182de58e4e390035ff",
-       "DisplayName": "Harry Potter and the Chamber of Secrets (2002)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "9ffe85034616ba223f1535e1c536d64e",
-       "DisplayName": "Harry Potter and the Prisoner of Azkaban (2004)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "4379a69a1f0547f45eca0fb18e0a8ee6",
-       "DisplayName": "Harry Potter and the Goblet of Fire (2005)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "ba0c497d0a554233b9cbbbfe7f637cfd",
-       "DisplayName": "Harry Potter and the Order of the Phoenix (2007)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "62b42bcad5367731216de1914c2097fd",
-       "DisplayName": "Harry Potter and the Half-Blood Prince (2009)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "6bb44a9f485d3f60b96587e9ffbcaefa",
-       "DisplayName": "Harry Potter and the Deathly Hallows: Part 1 (2010)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "adf439754d2e09c49ceaf89e290f0f8a",
-       "DisplayName": "Harry Potter and the Deathly Hallows: Part 2 (2011)",
-       "ItemKinds": [],
-       "Weight": 1
-      }
-     ],
-     "Order": "Sequential",
-     "Overflow": "FillerRemainder"
-    },
-    {
-     "Name": "Bourne Tuesday",
-     "Days": [
-      "Tuesday"
-     ],
-     "StartLocal": "19:00",
-     "DurationMinutes": 300,
-     "Sources": [
-      {
-       "Kind": "Movie",
-       "ItemId": "c2bbdf36b2fd3732b4154c53155c500f",
-       "DisplayName": "The Bourne Identity (2002)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "bbd214c132c4579b7019e38100c66da7",
-       "DisplayName": "The Bourne Supremacy (2004)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "3744f814131eced816fe9ff085d51b9b",
-       "DisplayName": "The Bourne Ultimatum (2007)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "292edc7f67aa8bf1534bb22a1f45cfa5",
-       "DisplayName": "The Bourne Legacy (2012)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "13e38d7f329fd9ce64a2259848673599",
-       "DisplayName": "Jason Bourne (2016)",
-       "ItemKinds": [],
-       "Weight": 1
-      }
-     ],
-     "Order": "Sequential",
-     "Overflow": "FillerRemainder"
-    },
-    {
-     "Name": "Marvel Wednesday",
-     "Days": [
-      "Wednesday"
-     ],
-     "StartLocal": "19:00",
-     "DurationMinutes": 300,
-     "Sources": [
-      {
-       "Kind": "Movie",
-       "ItemId": "bce1ede3722d5111da59a471564cdc79",
-       "DisplayName": "Captain America: The First Avenger (2011)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "09e66eca4e0953a96cf381016ec10e1f",
-       "DisplayName": "The Avengers (2012)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "fcb6ecaf87c9a0aa7d8a4403d76fe8ec",
-       "DisplayName": "Captain America: The Winter Soldier (2014)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "9bf0334a2c7f300cfc4b89ca648a25f2",
-       "DisplayName": "Ant-Man (2015)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "492e4e2fbeff8bfefc9d6b96765adce3",
-       "DisplayName": "Captain America: Civil War (2016)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "cea8d98d54076fd205079cf13bc57aa2",
-       "DisplayName": "Black Panther (2018)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "958b06b13fce062ba51b51c29cb1f440",
-       "DisplayName": "Avengers: Infinity War (2018)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "0eb1d85cac0f96631cfe9b5ec6393510",
-       "DisplayName": "Captain Marvel (2019)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "8385169320e5b9fb23e3ca4d3fbd7268",
-       "DisplayName": "Avengers: Endgame (2019)",
-       "ItemKinds": [],
-       "Weight": 1
-      }
-     ],
-     "Order": "Sequential",
-     "Overflow": "FillerRemainder"
-    },
-    {
-     "Name": "Bond Thursday",
-     "Days": [
-      "Thursday"
-     ],
-     "StartLocal": "19:00",
-     "DurationMinutes": 300,
-     "Sources": [
-      {
-       "Kind": "Movie",
-       "ItemId": "ed094a21a457ee47acfecef6b0572142",
-       "DisplayName": "Casino Royale (2006)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "4209e27d7df52b295bfc233bcbf7ccdc",
-       "DisplayName": "Quantum of Solace (2008)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "5aad72119a12d2de7e830887b8144a1a",
-       "DisplayName": "Skyfall (2012)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "732079cf1df34df932f4ffd5136291a7",
-       "DisplayName": "Spectre (2015)",
-       "ItemKinds": [],
-       "Weight": 1
-      }
-     ],
-     "Order": "Sequential",
-     "Overflow": "FillerRemainder"
-    },
-    {
-     "Name": "Matrix & Riddick Friday",
-     "Days": [
-      "Friday"
-     ],
-     "StartLocal": "19:00",
-     "DurationMinutes": 300,
-     "Sources": [
-      {
-       "Kind": "Movie",
-       "ItemId": "2f8d11ad55f2bd9939cc70158de9b596",
-       "DisplayName": "The Matrix (1999)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "4f42956aced76bb3b5cc225a039868bb",
-       "DisplayName": "The Matrix Reloaded (2003)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "7fede6083224eed59c7339875700bbd0",
-       "DisplayName": "The Matrix Revolutions (2003)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "994066b0fa7f5d0274e38c8615d09fcb",
-       "DisplayName": "The Matrix Resurrections (2021)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "868eead12acf6eab4744351060036e17",
-       "DisplayName": "Pitch Black (2000)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "4a8fe443b990ee4c8452daea37f47e98",
-       "DisplayName": "The Chronicles of Riddick (2004)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "a6222cbfde8453d05273480e56fe6576",
-       "DisplayName": "Riddick (2013)",
-       "ItemKinds": [],
-       "Weight": 1
-      }
-     ],
-     "Order": "Sequential",
-     "Overflow": "FillerRemainder"
-    },
-    {
-     "Name": "Lord of the Rings Saturday",
-     "Days": [
-      "Saturday"
-     ],
-     "StartLocal": "18:00",
-     "DurationMinutes": 360,
-     "Sources": [
-      {
-       "Kind": "Movie",
-       "ItemId": "4445d09745f3f7d75c8d58d14a9edc98",
-       "DisplayName": "The Lord of the Rings: The Fellowship of the Ring (2001)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "8cbd481daabef6a19701471b11757795",
-       "DisplayName": "The Lord of the Rings: The Two Towers (2002)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "6dd06027b04e69bcd6c2156184b4f916",
-       "DisplayName": "The Lord of the Rings: The Return of the King (2003)",
-       "ItemKinds": [],
-       "Weight": 1
-      }
-     ],
-     "Order": "Sequential",
-     "Overflow": "FillerRemainder"
-    },
-    {
-     "Name": "Batman & Wick Sunday",
-     "Days": [
-      "Sunday"
-     ],
-     "StartLocal": "19:00",
-     "DurationMinutes": 300,
-     "Sources": [
-      {
-       "Kind": "Movie",
-       "ItemId": "337a34ef966bc1cb19c2b43d59861ac4",
-       "DisplayName": "Batman Begins (2005)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "0c89333be2b1c498c87ee61de0c4bb8f",
-       "DisplayName": "The Dark Knight (2008)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "e09a139da0210f8c3e6f833941e4a9cf",
-       "DisplayName": "The Dark Knight Rises (2012)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "91e0ff8c4119d809acadb5572052278f",
-       "DisplayName": "John Wick (2014)",
-       "ItemKinds": [],
-       "Weight": 1
-      },
-      {
-       "Kind": "Movie",
-       "ItemId": "9ff544fc39d517a8505e380ce309a0f3",
-       "DisplayName": "John Wick: Chapter 2 (2017)",
-       "ItemKinds": [],
-       "Weight": 1
-      }
-     ],
-     "Order": "Sequential",
-     "Overflow": "FillerRemainder"
-    }
-   ],
-   "Filler": {
-    "Sources": [
-     {
-      "Kind": "Genre",
-      "Genre": "Comedy",
-      "DisplayName": "Comedy",
-      "ItemKinds": [
-       "Movie"
+  {
+    "Name": "Kids TV",
+    "ChannelNumber": "1",
+    "CallSign": "KIDS",
+    "Enabled": true,
+    "TimeZoneId": "America/New_York",
+    "AnchorUtc": "2026-10-14T10:00:00Z",
+    "PaddingGridMinutes": 0,
+    "Mode": "Pool",
+    "Pool": {
+      "Sources": [
+        {
+          "Kind": "Series",
+          "ItemId": "2bfd8eb6b5655dae4e1cd105802141b8",
+          "DisplayName": "Kids Show 1",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Series",
+          "ItemId": "c65d59be6c74181a41420919a7c10c6e",
+          "DisplayName": "Kids Show 2",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Series",
+          "ItemId": "732ef8a0f5f696fe7aed12326c4fabd8",
+          "DisplayName": "Kids Show 3",
+          "ItemKinds": [],
+          "Weight": 1
+        }
       ],
-      "Weight": 1
-     },
-     {
-      "Kind": "Genre",
-      "Genre": "Adventure",
-      "DisplayName": "Adventure",
-      "ItemKinds": [
-       "Movie"
+      "Order": "ShuffleEpisodesInOrder",
+      "AvoidSameSeriesBackToBack": true,
+      "MarathonMin": 2,
+      "MarathonMax": 3,
+      "DaypartRules": []
+    },
+    "Slots": {
+      "Blocks": [],
+      "Filler": {
+        "Sources": [],
+        "Order": "Shuffle"
+      }
+    },
+    "Lineup": {
+      "Items": []
+    },
+    "AutoRecompileNightly": true,
+    "ActiveWindows": [],
+    "ExcludedItemIds": []
+  },
+  {
+    "Name": "Anime",
+    "ChannelNumber": "2",
+    "CallSign": "ANIME",
+    "Enabled": true,
+    "TimeZoneId": "America/New_York",
+    "AnchorUtc": "2026-10-14T10:00:00Z",
+    "PaddingGridMinutes": 0,
+    "Mode": "Pool",
+    "Pool": {
+      "Sources": [
+        {
+          "Kind": "Series",
+          "ItemId": "7c5a5ce8ca734105e11286bd7653bed6",
+          "DisplayName": "Anime Series 1",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Series",
+          "ItemId": "547de6444af869e68791ed30f893f8f4",
+          "DisplayName": "Anime Series 2",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Series",
+          "ItemId": "bc336e893325675a38eaf96d3aee2274",
+          "DisplayName": "Anime Series 3",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Series",
+          "ItemId": "c49fe922bb34257a961cc1e3c1d5a43a",
+          "DisplayName": "Anime Series 4",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Series",
+          "ItemId": "e4943604829f126f8d2a9092af546a2f",
+          "DisplayName": "Anime Series 5",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Series",
+          "ItemId": "f4af17e9ad207d7b4755ac6f218dc063",
+          "DisplayName": "Anime Series 6",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Series",
+          "ItemId": "48dd3c8a450039666bc294a6e56ecc8e",
+          "DisplayName": "Anime Series 7",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "bed6cb5bb63e4bb65d5aecea4cca0947",
+          "DisplayName": "Anime Film 1 (1993)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "e669d4b19a5aab0a07f20b4b6bc4319e",
+          "DisplayName": "Anime Film 2 (1996)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "fd09f4a4eaa7ed85a3ab416e7fa251d3",
+          "DisplayName": "Anime Film 3 (1999)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "e770b21f16591ca4028be41f42f50af7",
+          "DisplayName": "Anime Film 4 (2002)",
+          "ItemKinds": [],
+          "Weight": 1
+        }
       ],
-      "Weight": 1
-     }
+      "Order": "ShuffleEpisodesInOrder",
+      "AvoidSameSeriesBackToBack": true,
+      "MarathonMin": 2,
+      "MarathonMax": 4,
+      "DaypartRules": [
+        {
+          "StartLocal": "06:00",
+          "EndLocal": "21:00",
+          "MaxRating": "TV-14",
+          "AllowUnrated": false
+        }
+      ]
+    },
+    "Slots": {
+      "Blocks": [],
+      "Filler": {
+        "Sources": [],
+        "Order": "Shuffle"
+      }
+    },
+    "Lineup": {
+      "Items": []
+    },
+    "AutoRecompileNightly": true,
+    "ActiveWindows": [],
+    "ExcludedItemIds": []
+  },
+  {
+    "Name": "Sci-Fi TV",
+    "ChannelNumber": "3",
+    "CallSign": "SCIFI",
+    "Enabled": true,
+    "TimeZoneId": "America/New_York",
+    "AnchorUtc": "2026-10-14T10:00:00Z",
+    "PaddingGridMinutes": 0,
+    "Mode": "Pool",
+    "Pool": {
+      "Sources": [
+        {
+          "Kind": "Series",
+          "ItemId": "37555d443eb958f1a27cfc9f76f61e80",
+          "DisplayName": "Sci-Fi Series 1",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Series",
+          "ItemId": "e39751c05c281b851559df326f110f31",
+          "DisplayName": "Sci-Fi Series 2",
+          "ItemKinds": [],
+          "Weight": 1
+        }
+      ],
+      "Order": "ShuffleEpisodesInOrder",
+      "AvoidSameSeriesBackToBack": true,
+      "MarathonMin": 3,
+      "MarathonMax": 5,
+      "DaypartRules": []
+    },
+    "Slots": {
+      "Blocks": [],
+      "Filler": {
+        "Sources": [],
+        "Order": "Shuffle"
+      }
+    },
+    "Lineup": {
+      "Items": []
+    },
+    "AutoRecompileNightly": true,
+    "ActiveWindows": [],
+    "ExcludedItemIds": []
+  },
+  {
+    "Name": "Studio Ghibli",
+    "ChannelNumber": "4",
+    "CallSign": "GHIBL",
+    "Enabled": true,
+    "TimeZoneId": "America/New_York",
+    "AnchorUtc": "2026-10-14T10:00:00Z",
+    "PaddingGridMinutes": 15,
+    "Mode": "Pool",
+    "Pool": {
+      "Sources": [
+        {
+          "Kind": "Movie",
+          "ItemId": "16561a3b2f931503b799a5c42b7b1059",
+          "DisplayName": "Animated Feature 1 (1993)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "b08848950ee86b9ab0f2fcbbf3f7d1bc",
+          "DisplayName": "Animated Feature 2 (1996)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "ca46e6c6567997e2175db6b337fc809c",
+          "DisplayName": "Animated Feature 3 (1999)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "5056288eeac0c3293f925eeb538f4ecd",
+          "DisplayName": "Animated Feature 4 (2002)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "97a0a7f823c88cad7ae70f8e20029fde",
+          "DisplayName": "Animated Feature 5 (2005)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "d1ecea94b9ad3638e06034d25f4f0118",
+          "DisplayName": "Animated Feature 6 (2008)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "6be0788a0ddbd2d4d0663681d95b28ae",
+          "DisplayName": "Animated Feature 7 (2011)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "5e1ce4f78549a47b8a744cc05bb1549c",
+          "DisplayName": "Animated Feature 8 (2014)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "9145e4a8adb6e6a189f890d5de07491e",
+          "DisplayName": "Animated Feature 9 (2017)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "cb49daa75747370a784a995db0ef84ee",
+          "DisplayName": "Animated Feature 10 (2020)",
+          "ItemKinds": [],
+          "Weight": 1
+        }
+      ],
+      "Order": "Shuffle",
+      "AvoidSameSeriesBackToBack": true,
+      "MarathonMin": 1,
+      "MarathonMax": 1,
+      "DaypartRules": []
+    },
+    "Slots": {
+      "Blocks": [],
+      "Filler": {
+        "Sources": [],
+        "Order": "Shuffle"
+      }
+    },
+    "Lineup": {
+      "Items": []
+    },
+    "AutoRecompileNightly": true,
+    "ActiveWindows": [],
+    "ExcludedItemIds": []
+  },
+  {
+    "Name": "Family Movies",
+    "ChannelNumber": "5",
+    "CallSign": "FAM",
+    "Enabled": true,
+    "TimeZoneId": "America/New_York",
+    "AnchorUtc": "2026-10-14T10:00:00Z",
+    "PaddingGridMinutes": 15,
+    "Mode": "Pool",
+    "Pool": {
+      "Sources": [
+        {
+          "Kind": "Genre",
+          "Genre": "Family",
+          "DisplayName": "Family",
+          "ItemKinds": [
+            "Movie"
+          ],
+          "Weight": 1,
+          "MaxRating": "PG"
+        },
+        {
+          "Kind": "Genre",
+          "Genre": "Animation",
+          "DisplayName": "Animation",
+          "ItemKinds": [
+            "Movie"
+          ],
+          "Weight": 1,
+          "MaxRating": "PG"
+        },
+        {
+          "Kind": "Genre",
+          "Genre": "Fantasy",
+          "DisplayName": "Fantasy",
+          "ItemKinds": [
+            "Movie"
+          ],
+          "Weight": 1,
+          "MaxRating": "PG"
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "9b4d5744695828ca852eeac53b1817df",
+          "DisplayName": "Family Film 1 (1993)",
+          "ItemKinds": [],
+          "Weight": 1
+        }
+      ],
+      "Order": "Shuffle",
+      "AvoidSameSeriesBackToBack": true,
+      "MarathonMin": 1,
+      "MarathonMax": 1,
+      "DaypartRules": []
+    },
+    "Slots": {
+      "Blocks": [],
+      "Filler": {
+        "Sources": [],
+        "Order": "Shuffle"
+      }
+    },
+    "Lineup": {
+      "Items": []
+    },
+    "AutoRecompileNightly": true,
+    "ActiveWindows": [],
+    "ExcludedItemIds": []
+  },
+  {
+    "Name": "Action",
+    "ChannelNumber": "6",
+    "CallSign": "ACTN",
+    "Enabled": true,
+    "TimeZoneId": "America/New_York",
+    "AnchorUtc": "2026-10-14T10:00:00Z",
+    "PaddingGridMinutes": 15,
+    "Mode": "Pool",
+    "Pool": {
+      "Sources": [
+        {
+          "Kind": "Genre",
+          "Genre": "Action",
+          "DisplayName": "Action",
+          "ItemKinds": [
+            "Movie"
+          ],
+          "Weight": 1
+        },
+        {
+          "Kind": "Genre",
+          "Genre": "Thriller",
+          "DisplayName": "Thriller",
+          "ItemKinds": [
+            "Movie"
+          ],
+          "Weight": 1
+        },
+        {
+          "Kind": "Genre",
+          "Genre": "Crime",
+          "DisplayName": "Crime",
+          "ItemKinds": [
+            "Movie"
+          ],
+          "Weight": 1
+        }
+      ],
+      "Order": "Shuffle",
+      "AvoidSameSeriesBackToBack": true,
+      "MarathonMin": 1,
+      "MarathonMax": 1,
+      "DaypartRules": [
+        {
+          "StartLocal": "06:00",
+          "EndLocal": "20:00",
+          "MaxRating": "PG-13",
+          "AllowUnrated": false
+        }
+      ]
+    },
+    "Slots": {
+      "Blocks": [],
+      "Filler": {
+        "Sources": [],
+        "Order": "Shuffle"
+      }
+    },
+    "Lineup": {
+      "Items": []
+    },
+    "AutoRecompileNightly": true,
+    "ActiveWindows": [],
+    "ExcludedItemIds": []
+  },
+  {
+    "Name": "Sci-Fi & Fantasy Movies",
+    "ChannelNumber": "7",
+    "CallSign": "SFF",
+    "Enabled": true,
+    "TimeZoneId": "America/New_York",
+    "AnchorUtc": "2026-10-14T10:00:00Z",
+    "PaddingGridMinutes": 15,
+    "Mode": "Pool",
+    "Pool": {
+      "Sources": [
+        {
+          "Kind": "Genre",
+          "Genre": "Science Fiction",
+          "DisplayName": "Science Fiction",
+          "ItemKinds": [
+            "Movie"
+          ],
+          "Weight": 1
+        },
+        {
+          "Kind": "Genre",
+          "Genre": "Fantasy",
+          "DisplayName": "Fantasy",
+          "ItemKinds": [
+            "Movie"
+          ],
+          "Weight": 1
+        }
+      ],
+      "Order": "Shuffle",
+      "AvoidSameSeriesBackToBack": true,
+      "MarathonMin": 1,
+      "MarathonMax": 1,
+      "DaypartRules": []
+    },
+    "Slots": {
+      "Blocks": [],
+      "Filler": {
+        "Sources": [],
+        "Order": "Shuffle"
+      }
+    },
+    "Lineup": {
+      "Items": []
+    },
+    "AutoRecompileNightly": true,
+    "ActiveWindows": [],
+    "ExcludedItemIds": []
+  },
+  {
+    "Name": "Comedy",
+    "ChannelNumber": "8",
+    "CallSign": "COMDY",
+    "Enabled": true,
+    "TimeZoneId": "America/New_York",
+    "AnchorUtc": "2026-10-14T10:00:00Z",
+    "PaddingGridMinutes": 15,
+    "Mode": "Pool",
+    "Pool": {
+      "Sources": [
+        {
+          "Kind": "Genre",
+          "Genre": "Comedy",
+          "DisplayName": "Comedy",
+          "ItemKinds": [
+            "Movie"
+          ],
+          "Weight": 1
+        }
+      ],
+      "Order": "Shuffle",
+      "AvoidSameSeriesBackToBack": true,
+      "MarathonMin": 1,
+      "MarathonMax": 1,
+      "DaypartRules": [
+        {
+          "StartLocal": "06:00",
+          "EndLocal": "20:00",
+          "MaxRating": "PG-13",
+          "AllowUnrated": true
+        }
+      ]
+    },
+    "Slots": {
+      "Blocks": [],
+      "Filler": {
+        "Sources": [],
+        "Order": "Shuffle"
+      }
+    },
+    "Lineup": {
+      "Items": []
+    },
+    "AutoRecompileNightly": true,
+    "ActiveWindows": [],
+    "ExcludedItemIds": []
+  },
+  {
+    "Name": "Holiday",
+    "ChannelNumber": "9",
+    "CallSign": "XMAS",
+    "Enabled": true,
+    "TimeZoneId": "America/New_York",
+    "AnchorUtc": "2026-10-14T10:00:00Z",
+    "PaddingGridMinutes": 5,
+    "Mode": "Pool",
+    "Pool": {
+      "Sources": [
+        {
+          "Kind": "Movie",
+          "ItemId": "35c4bf7813c12eb3367aa0f485a5c086",
+          "DisplayName": "Holiday Classic 1 (1993)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "7dd824e89243389d046f82541d385ec6",
+          "DisplayName": "Holiday Classic 2 (1996)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "eea4d0103b364b278c93fd8299927202",
+          "DisplayName": "Holiday Classic 3 (1999)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "1c61a14ecee680e3062b2e3efdd496a8",
+          "DisplayName": "Holiday Classic 4 (2002)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "5ed0688688bd7acecce7405286796efe",
+          "DisplayName": "Holiday Classic 5 (2005)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "fb74094792e5ba86b975e909c04eed6d",
+          "DisplayName": "Holiday Classic 6 (2008)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "efb5b6fd00e2e88ae1cef76aa570299f",
+          "DisplayName": "Holiday Classic 7 (2011)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "f8fb60be24525143a319ef99c520ada4",
+          "DisplayName": "Holiday Classic 8 (2014)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "532a2f682847a1cdafe64d7d9111b8f7",
+          "DisplayName": "Holiday Classic 9 (2017)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "0c32c25018b180d94893ece48225f958",
+          "DisplayName": "Holiday Classic 10 (2020)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "1a2a4b2bb641dcf343bd0c31d7f1f406",
+          "DisplayName": "Holiday Classic 11 (2023)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "a382284e05e66d430ec94385bbc046f3",
+          "DisplayName": "Holiday Classic 12 (1991)",
+          "ItemKinds": [],
+          "Weight": 1
+        },
+        {
+          "Kind": "Movie",
+          "ItemId": "5c813248c16be711b74a564f223bb43b",
+          "DisplayName": "Holiday Classic 13 (1994)",
+          "ItemKinds": [],
+          "Weight": 1
+        }
+      ],
+      "Order": "Shuffle",
+      "AvoidSameSeriesBackToBack": true,
+      "MarathonMin": 1,
+      "MarathonMax": 1,
+      "DaypartRules": []
+    },
+    "Slots": {
+      "Blocks": [],
+      "Filler": {
+        "Sources": [],
+        "Order": "Shuffle"
+      }
+    },
+    "Lineup": {
+      "Items": []
+    },
+    "AutoRecompileNightly": true,
+    "ActiveWindows": [
+      {
+        "Label": "Christmas",
+        "StartMonth": 12,
+        "StartDay": 1,
+        "EndMonth": 12,
+        "EndDay": 31
+      }
     ],
-    "Order": "Shuffle"
-   }
+    "ExcludedItemIds": []
   },
-  "Lineup": {
-   "Items": []
+  {
+    "Name": "Retro Movies",
+    "ChannelNumber": "10",
+    "CallSign": "RETRO",
+    "Enabled": true,
+    "TimeZoneId": "America/New_York",
+    "AnchorUtc": "2026-10-14T10:00:00Z",
+    "PaddingGridMinutes": 15,
+    "Mode": "Pool",
+    "Pool": {
+      "Sources": [
+        {
+          "Kind": "Library",
+          "ItemId": "f137a2dd21bbc1b99aa5c0f6bf02a805",
+          "DisplayName": "Movies",
+          "ItemKinds": [],
+          "Weight": 1,
+          "YearTo": 1989
+        }
+      ],
+      "Order": "Shuffle",
+      "AvoidSameSeriesBackToBack": true,
+      "MarathonMin": 1,
+      "MarathonMax": 1,
+      "DaypartRules": []
+    },
+    "Slots": {
+      "Blocks": [],
+      "Filler": {
+        "Sources": [],
+        "Order": "Shuffle"
+      }
+    },
+    "Lineup": {
+      "Items": []
+    },
+    "AutoRecompileNightly": true,
+    "ActiveWindows": [],
+    "ExcludedItemIds": []
   },
-  "AutoRecompileNightly": true,
-  "ActiveWindows": [],
-  "ExcludedItemIds": []
- }
+  {
+    "Name": "Franchise Nights",
+    "ChannelNumber": "11",
+    "CallSign": "FRNCH",
+    "Enabled": true,
+    "TimeZoneId": "America/New_York",
+    "AnchorUtc": "2026-10-14T10:00:00Z",
+    "PaddingGridMinutes": 0,
+    "Mode": "Slots",
+    "Pool": {
+      "Sources": [],
+      "Order": "Shuffle",
+      "AvoidSameSeriesBackToBack": true,
+      "MarathonMin": 1,
+      "MarathonMax": 1,
+      "DaypartRules": []
+    },
+    "Slots": {
+      "Blocks": [
+        {
+          "Name": "Franchise A Monday",
+          "Days": [
+            "Monday"
+          ],
+          "StartLocal": "19:00",
+          "DurationMinutes": 300,
+          "Sources": [
+            {
+              "Kind": "Movie",
+              "ItemId": "de587facfba9a3cb8cedf1d8ee6496c2",
+              "DisplayName": "Franchise A Part 1 (2000)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "d3e04f64699d63190e389b05a5a553c7",
+              "DisplayName": "Franchise A Part 2 (2002)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "b7f58f0a61c967a65eadf29f4e26765a",
+              "DisplayName": "Franchise A Part 3 (2004)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "d1bf56ee39c88a0461c0f71b286a0b3a",
+              "DisplayName": "Franchise A Part 4 (2006)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "f8a1b9917f4f92fe11a270b1d2df05cc",
+              "DisplayName": "Franchise A Part 5 (2008)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "6a2eeb1b8b5e814372918e5cc3344e06",
+              "DisplayName": "Franchise A Part 6 (2010)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "2ea3492637d983c3cb7293d34516596a",
+              "DisplayName": "Franchise A Part 7 (2012)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "dbe4345035992101e8c4e5ad18cda14e",
+              "DisplayName": "Franchise A Part 8 (2014)",
+              "ItemKinds": [],
+              "Weight": 1
+            }
+          ],
+          "Order": "Sequential",
+          "Overflow": "FillerRemainder"
+        },
+        {
+          "Name": "Franchise B Tuesday",
+          "Days": [
+            "Tuesday"
+          ],
+          "StartLocal": "19:00",
+          "DurationMinutes": 300,
+          "Sources": [
+            {
+              "Kind": "Movie",
+              "ItemId": "2e8127e3862818574bc881c53f8d0d3a",
+              "DisplayName": "Franchise B Part 1 (2000)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "78e8761e5588262f418df71575beebb4",
+              "DisplayName": "Franchise B Part 2 (2002)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "34532f4073c0657494dc6478cdbbac5e",
+              "DisplayName": "Franchise B Part 3 (2004)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "8a6373577b5f29a173b744c63c38a450",
+              "DisplayName": "Franchise B Part 4 (2006)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "51bf715032fa6c0dc1217b2293d318e3",
+              "DisplayName": "Franchise B Part 5 (2008)",
+              "ItemKinds": [],
+              "Weight": 1
+            }
+          ],
+          "Order": "Sequential",
+          "Overflow": "FillerRemainder"
+        },
+        {
+          "Name": "Franchise C Wednesday",
+          "Days": [
+            "Wednesday"
+          ],
+          "StartLocal": "19:00",
+          "DurationMinutes": 300,
+          "Sources": [
+            {
+              "Kind": "Movie",
+              "ItemId": "b27081e443a8fe095b3e16c162dee1b9",
+              "DisplayName": "Franchise C Part 1 (2000)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "4a55d8be743f28a35210fb1c2ddc11d5",
+              "DisplayName": "Franchise C Part 2 (2002)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "8b5d0f6e5aedeafa747b52b32439d416",
+              "DisplayName": "Franchise C Part 3 (2004)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "c6228ff1a3174c924c373e0271943e9a",
+              "DisplayName": "Franchise C Part 4 (2006)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "73e7b53be24dab4e025397787c6d373d",
+              "DisplayName": "Franchise C Part 5 (2008)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "a36a8b7c147ea6f0eb878be5e8edc3a4",
+              "DisplayName": "Franchise C Part 6 (2010)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "b9e0983f537174b7c3c104158cdc5ed2",
+              "DisplayName": "Franchise C Part 7 (2012)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "5445cfca766f8bf7697b63db5ae60eb5",
+              "DisplayName": "Franchise C Part 8 (2014)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "55cc55f419d1f9ec391b36a7104d1056",
+              "DisplayName": "Franchise C Part 9 (2016)",
+              "ItemKinds": [],
+              "Weight": 1
+            }
+          ],
+          "Order": "Sequential",
+          "Overflow": "FillerRemainder"
+        },
+        {
+          "Name": "Franchise D Thursday",
+          "Days": [
+            "Thursday"
+          ],
+          "StartLocal": "19:00",
+          "DurationMinutes": 300,
+          "Sources": [
+            {
+              "Kind": "Movie",
+              "ItemId": "dec38e9fb99962954a7aacdfefe03897",
+              "DisplayName": "Franchise D Part 1 (2000)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "05afd3b4c87d5bfc2e34db7df1856ee0",
+              "DisplayName": "Franchise D Part 2 (2002)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "4f9ec81a4da93e4808b3e96934db6414",
+              "DisplayName": "Franchise D Part 3 (2004)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "5548ecc22b37589d729854253bad8244",
+              "DisplayName": "Franchise D Part 4 (2006)",
+              "ItemKinds": [],
+              "Weight": 1
+            }
+          ],
+          "Order": "Sequential",
+          "Overflow": "FillerRemainder"
+        },
+        {
+          "Name": "Franchise E Friday",
+          "Days": [
+            "Friday"
+          ],
+          "StartLocal": "19:00",
+          "DurationMinutes": 300,
+          "Sources": [
+            {
+              "Kind": "Movie",
+              "ItemId": "6f40ce6ce72dff61d1d9c0363fd58ea8",
+              "DisplayName": "Franchise E Part 1 (2000)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "1ab1370a2bbab3b2c2b1e1057582bf70",
+              "DisplayName": "Franchise E Part 2 (2002)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "f73138d3dc26c4b759bcbfe9b3cdcfe7",
+              "DisplayName": "Franchise E Part 3 (2004)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "4147fbc50fd1f21b2c7bff7fb37995d5",
+              "DisplayName": "Franchise E Part 4 (2006)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "ab37b3c911107f40f0d496f05e5e14e2",
+              "DisplayName": "Franchise E Part 5 (2008)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "0078a9edd5db56d8d0bea63a33afc279",
+              "DisplayName": "Franchise E Part 6 (2010)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "6ac3cd245eb2f921874b72111d1cafee",
+              "DisplayName": "Franchise E Part 7 (2012)",
+              "ItemKinds": [],
+              "Weight": 1
+            }
+          ],
+          "Order": "Sequential",
+          "Overflow": "FillerRemainder"
+        },
+        {
+          "Name": "Trilogy Saturday",
+          "Days": [
+            "Saturday"
+          ],
+          "StartLocal": "18:00",
+          "DurationMinutes": 360,
+          "Sources": [
+            {
+              "Kind": "Movie",
+              "ItemId": "d7de7e388f4dcd8c5a2652964599e4f3",
+              "DisplayName": "Trilogy Part 1 (2000)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "9deb16a17e1631a5e770720728c06875",
+              "DisplayName": "Trilogy Part 2 (2002)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "2c1141eeedfa3fbcb7ea1e838be3dd87",
+              "DisplayName": "Trilogy Part 3 (2004)",
+              "ItemKinds": [],
+              "Weight": 1
+            }
+          ],
+          "Order": "Sequential",
+          "Overflow": "FillerRemainder"
+        },
+        {
+          "Name": "Franchise F Sunday",
+          "Days": [
+            "Sunday"
+          ],
+          "StartLocal": "19:00",
+          "DurationMinutes": 300,
+          "Sources": [
+            {
+              "Kind": "Movie",
+              "ItemId": "c796a8e64c71e367171bcdc15821e41c",
+              "DisplayName": "Franchise F Part 1 (2000)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "24201ec28338c966ac8e5b7d4e69ded2",
+              "DisplayName": "Franchise F Part 2 (2002)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "105c04a3cbb85f870c1a074154811a71",
+              "DisplayName": "Franchise F Part 3 (2004)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "33cc35e2c6f09adb0800650c6bebaefe",
+              "DisplayName": "Franchise F Part 4 (2006)",
+              "ItemKinds": [],
+              "Weight": 1
+            },
+            {
+              "Kind": "Movie",
+              "ItemId": "8c68aa146c5748647746349f43b00feb",
+              "DisplayName": "Franchise F Part 5 (2008)",
+              "ItemKinds": [],
+              "Weight": 1
+            }
+          ],
+          "Order": "Sequential",
+          "Overflow": "FillerRemainder"
+        }
+      ],
+      "Filler": {
+        "Sources": [
+          {
+            "Kind": "Genre",
+            "Genre": "Comedy",
+            "DisplayName": "Comedy",
+            "ItemKinds": [
+              "Movie"
+            ],
+            "Weight": 1
+          },
+          {
+            "Kind": "Genre",
+            "Genre": "Adventure",
+            "DisplayName": "Adventure",
+            "ItemKinds": [
+              "Movie"
+            ],
+            "Weight": 1
+          }
+        ],
+        "Order": "Shuffle"
+      }
+    },
+    "Lineup": {
+      "Items": []
+    },
+    "AutoRecompileNightly": true,
+    "ActiveWindows": [],
+    "ExcludedItemIds": []
+  }
 ]
