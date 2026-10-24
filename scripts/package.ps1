@@ -22,7 +22,7 @@ $meta = @{
     name = "JellyStations"
     description = "Curate always-on TV stations from your library, surfaced as native Live TV channels."
     overview = "Curate always-on TV stations from your library."
-    owner = "Justin"
+    owner = "JD"
     category = "LiveTV"
     version = $version
     targetAbi = "12.0.0.0"
@@ -66,6 +66,7 @@ $entry = [pscustomobject]@{
 $others = @($plugin.versions | Where-Object { $_.version -ne $version })
 $plugin.versions = @($entry) + $others
 $plugin.description = $meta.description
+$plugin.owner = $meta.owner
 $plugin.overview = $meta.overview
 $json = ConvertTo-Json -InputObject $manifest -Depth 10
 # ConvertTo-Json on 5.1 escapes non-ASCII as \uXXXX, which is valid JSON; normalise line endings only.

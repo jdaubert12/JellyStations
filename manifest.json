@@ -1,213 +1,213 @@
 [
-    {
-        "guid":  "b7f3c1d2-5e8a-4f0b-9c6d-2a1e7f4b8d31",
-        "name":  "JellyStations",
-        "description":  "Curate always-on TV stations from your library, surfaced as native Live TV channels.",
-        "overview":  "Curate always-on TV stations from your library.",
-        "owner":  "Justin",
-        "category":  "LiveTV",
-        "imageUrl":  "",
-        "versions":  [
-                         {
-                             "version":  "1.15.0.0",
-                             "changelog":  "Renamed to JellyStations. The plugin, its DLL (Jellyfin.Plugin.JellyStations.dll), the dashboard page, the API routes (/JellyStations/...) and the data folder (data/JellyStations) carry the new name. The plugin id is unchanged, so Jellyfin treats this as an update of the installed TvStation, an existing data/TvStation folder is moved to data/JellyStations on first start, and Live TV channels keep their ids. Plugin repository: add https://raw.githubusercontent.com/jdaubert12/JellyStations/main/manifest.json under Dashboard \u003e Plugins \u003e Repositories to install and update from the catalog. The example stations now carry placeholder titles.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.15.0.0/JellyStations_1.15.0.0.zip",
-                             "checksum":  "c76a5e0bd51f828cf156f67b0feb3f29",
-                             "timestamp":  "2026-10-24T02:38:46Z"
-                         },
-                         {
-                             "version":  "1.14.2.0",
-                             "changelog":  "Weather channel: the music line on the screens now reads \"Now playing: title – artist\" (or just the title when no artist is known) instead of the bare title and artist. The editor checkbox that turns the line off is unchanged.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.14.2.0/TvStation_1.14.2.0.zip",
-                             "checksum":  "ea28ad39f035c486b84dfdaf31ef286e",
-                             "timestamp":  "2026-10-24T01:52:15Z"
-                         },
-                         {
-                             "version":  "1.14.1.0",
-                             "changelog":  "Chance of rain, snow, mix or ice. Open-Meteo gives one chance of precipitation that covers rain, showers and snow together, so the percentage on the hourly strip, the 7-day forecast and the current conditions panel now says what it is a chance of: \"rain\", \"snow\", \"mix\" (rain and snow both forecast) or \"ice\" (freezing rain or drizzle). The type comes from the hourly and daily rain, showers and snowfall amounts now fetched with the forecast, else from the weather code, else from the temperature (at or below freezing it would fall as snow). Snow days on the 7-day forecast quote the snowfall depth (\"5 in snow\", \"13 cm snow\") instead of the melt-water total. The hourly strip puts the word on its own line under the percentage.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.14.1.0/TvStation_1.14.1.0.zip",
-                             "checksum":  "08bf533d3a54d49792c5bff50f094ce5",
-                             "timestamp":  "2026-10-24T00:15:28Z"
-                         },
-                         {
-                             "version":  "1.14.0.0",
-                             "changelog":  "Weather channel: a new station mode that shows current conditions, the next twelve hours and the week ahead for up to eight places, drawn by the plugin as full-screen graphics (three colour themes, the station logo, a live clock in each place\u0027s own time zone) that cross-fade and cycle like the cable weather channel, with an optional \"on the 8s\" pass at :08, :18, :28..., a travel-cities screen and hourly guide entries titled from the places. Forecasts come from Open-Meteo (free, no account; only each place\u0027s latitude and longitude is sent), polled every 15 minutes, cached on disk, and the screens say when a forecast is older than the station allows. Music plays underneath from Jellyfin music (playlists, albums, artists, music genres, tracks) and/or every audio file in a folder on the server, in a seeded shuffle that is the same for every viewer and crosses segment boundaries without a gap, with the track title and artist on screen. The editor gets a Weather channel preset, place search, a music picker, a forecast status table with Fetch now, and screen previews. New endpoints under /TvStation/Weather (Search, Status, Refresh, Preview). The plugin ships no music; use tracks you have the right to play. Also: the Inter font (SIL OFL) is embedded for the screens. Music packs: the editor lists curated instrumental sets under licences that allow playing and passing them on; \"Get it\" fetches each track from the artist\u0027s own site into data/TvStation/music/\u003cpack\u003e/ with a SHA-256 check and a CREDITS.txt (starter pack: thirty Kevin MacLeod lounge and light jazz pieces, CC BY 4.0; optional: HoliznaCC0 lo-fi jazz guitar, CC0, downloaded by hand from the Free Music Archive). The music folder setting takes several folders separated by \";\".",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.14.0.0/TvStation_1.14.0.0.zip",
-                             "checksum":  "6439216ab4bc115ff1797b19b5aa5bb7",
-                             "timestamp":  "2026-10-23T22:47:41Z"
-                         },
-                         {
-                             "version":  "1.13.1.0",
-                             "changelog":  "Fix: a station could keep encoding for nobody. Jellyfin only reports a viewer gone when the client says so or its connection to the server closes, so an app that was killed, a TV switched off on a channel or a dropped network connection left the viewer count stuck at 1 and ffmpeg running with no one reading the stream, sometimes for hours. The plugin now stops any station stream nobody has read for longer than the new \"Stop an unwatched stream after\" setting (default 120 seconds; 0 turns it off), whatever the viewer count says, and logs that it did. Linger is unchanged. Station editor: the Advanced section (call sign, padding grid, schedule anchor, station card text, encoding) was only shown under \"All settings\"; it now sits at the bottom of every step.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.13.1.0/TvStation_1.13.1.0.zip",
-                             "checksum":  "59f9f19c8eb47d86c070e19ea178a14f",
-                             "timestamp":  "2026-10-22T22:20:57Z"
-                         },
-                         {
-                             "version":  "1.13.0.0",
-                             "changelog":  "\"Up next\" card. A station can draw a translucent panel over the last seconds of every program with the next program\u0027s title, its poster or episode thumbnail, the season and episode or the year, and its start and end time in the station\u0027s time zone (12 or 24-hour clock); choose the corner, the times before the end it appears (one or more, e.g. an hour, half an hour and five minutes), how long it stays, its height and opacity, whether to show the artwork and the times, and how it arrives and leaves (fade, slide in from the side, both, or neither). It is burned into the stream by the plugin\u0027s ffmpeg, so every viewer sees it in step with the picture whatever the client\u0027s HLS delay. Bumper clips and station breaks are skipped when choosing what to announce; programs too short for the card do without it; a card ffmpeg cannot draw is dropped for the session with a note on the station row. Off by default. Fix: QSV (Intel Quick Sync) decoding failed on every file with \"Impossible to convert between the formats\" and \"Conversion failed\", so stations and the hardware test never got Intel hardware decoding. ffmpeg 7\u0027s \"-hwaccel qsv\" leaves the *_qsv decoders\u0027 frames on GPU surfaces the software filters cannot read; the plugin now names the QSV decoder for the file\u0027s codec (h264_qsv, hevc_qsv, mpeg2_qsv, vc1_qsv, vp8_qsv, vp9_qsv, av1_qsv) on a QSV device created up front, which decodes to system memory, and a file whose codec was never recorded stays in software. The hardware test now confirms the decoder from ffmpeg\u0027s stream mapping (a *_qsv or *_cuvid decoder) or from the GPU device node ffmpeg holds open while it runs (Linux, software encoder); an explicit VA-API, CUDA, D3D11VA or VideoToolbox hwaccel that reports no fallback but cannot be confirmed from outside is \"unverified\" rather than a problem. Fix: with the h264_qsv, h264_nvenc or h264_amf encoder a client tuning in mid-program got audio but no video until the next program started (Jellyfin\u0027s remux of the channel logged \"non-existing PPS 0 referenced\" and wrote no video for 78 s): those encoders turn a forced key frame into a plain I frame without headers that no demuxer treats as a key frame, so they now set key frames by GOP alone, as Jellyfin does, and every GOP starts with an IDR frame and its SPS/PPS. libx264 and the VA-API encoders keep forced key frames.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.13.0.0/TvStation_1.13.0.0.zip",
-                             "checksum":  "e7c7196fbf58fa4ecc2ac89f8e17f309",
-                             "timestamp":  "2026-10-21T17:50:24Z"
-                         },
-                         {
-                             "version":  "1.12.0.0",
-                             "changelog":  "Stream health. Status shows, per active session, what the encoder is really doing: the hardware decoder confirmed by the GPU device node ffmpeg holds open (Linux), or flagged when ffmpeg fell back to software or the device failed; the encoder; HDR tone mapping; CPU cores in use; and how far ahead of real time the encoder runs, with a plain-language problem line when a station stutters or stalls. A Hardware section shows Jellyfin\u0027s transcoding setting, what the default profile resolves to, the /dev/dri nodes the server can see and this ffmpeg build\u0027s hwaccels, H.264 encoders and tone mapping filters, with notes on anything that does not line up. \"Test\" runs a few seconds of a station\u0027s current program through the real decode, filter and encode chain at full speed and reports which decoder ffmpeg attached and the speed relative to real time (GET /TvStation/Hardware, POST /TvStation/Hardware/Test). Fix: the GPU decoder was handed every file, and ffmpeg\u0027s qsv/cuda decoders do not fall back to software on their own, so one file the GPU cannot decode (10-bit H.264, DivX/Xvid, a codec unticked in Jellyfin) exited ffmpeg with \"Nothing was written into output file\" and switched the whole session to software. Stations now record each file\u0027s codec, profile, bit depth and pixel format (one recompile at startup) and decide per file: \"Follow Jellyfin\" honors Jellyfin\u0027s \"Enable hardware decoding for\" checkboxes and 10-bit HEVC/VP9/RExt toggles, a hand-picked decoder takes everything GPUs can decode; the rest plays in software and the Status page says why. If the decoder still refuses a file, only that program is replayed in software; a device-level failure, or a second program failing, still turns the session to software. Faults name the program and quote ffmpeg\u0027s first error line rather than its last.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.12.0.0/TvStation_1.12.0.0.zip",
-                             "checksum":  "c85218abd016a3b28f3665c49d59f22b",
-                             "timestamp":  "2026-10-21T03:15:05Z"
-                         },
-                         {
-                             "version":  "1.11.0.0",
-                             "changelog":  "Stream fixes from a stuttering-playback diagnosis. HDR sources (PQ or HLG) are tone mapped to SDR BT.709 and stripped of HDR side data, and every segment is tagged BT.709, so clients no longer re-encode a channel because of \"video range type\"; stations are recompiled once at startup to record which items are HDR. Hardware decoding: new \"Hardware decoding\" and \"Hardware device\" fields on the encoding profile (default \"Follow Jellyfin\", which mirrors Dashboard \u003e Playback \u003e Transcoding: qsv, vaapi, cuda, videotoolbox or d3d11va), with the frames handed back to the software filters; a device that fails drops to software decoding for the session. VA-API encoders now get their device and frame upload, so h264_vaapi works. Reported media source carries the BT.709 SDR color tags. Frame rate and bitrate hints: 24 fps for film stations, 3500 kbps for 720p and 8000 for 1080p.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.11.0.0/TvStation_1.11.0.0.zip",
-                             "checksum":  "9482b6276b3147dc4523a1378cc3d84e",
-                             "timestamp":  "2026-10-21T00:22:28Z"
-                         },
-                         {
-                             "version":  "1.10.5.0",
-                             "changelog":  "Fix: a movie or episode added to a station by hand is never dropped by an excluded tag, even when a genre, library, collection or playlist source earlier in the same section lists it first. The station list no longer flags \"1 empty source\" for a hand-picked item that an earlier source already put on the station; a source only counts as empty when it adds nothing that is not already playing. Editor: when a movie already plays through a wider source of the same section (genre, tag, series, collection, playlist or library), search results say \"Already included via Genre \\\"Comedy\\\"\" and the chip of a hand-picked movie shows \"also via\" that source.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.10.5.0/TvStation_1.10.5.0.zip",
-                             "checksum":  "c093b6fb9c356b156180d754856f6823",
-                             "timestamp":  "2026-10-20T02:43:46Z"
-                         },
-                         {
-                             "version":  "1.10.4.0",
-                             "changelog":  "Make a logo from the name: new \"Pick the color too\" option seeds the card color from the name, number and what the channel plays (remembered per browser); \"Another look\" then changes the color as well as the pattern.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.10.4.0/TvStation_1.10.4.0.zip",
-                             "checksum":  "a8be6da9ea8a5421df0a9c8fbd5eda0d",
-                             "timestamp":  "2026-10-20T01:34:56Z"
-                         },
-                         {
-                             "version":  "1.10.3.0",
-                             "changelog":  "Make a logo from the name: the card now carries a pattern (gradient, stripes, dots, rings, slabs or color bars) seeded from the name, number and what the channel plays, so each channel looks different while the same station always draws the same card. \"Another look\" draws the next variation.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.10.3.0/TvStation_1.10.3.0.zip",
-                             "checksum":  "69db15a51754729313a66429c983ea10",
-                             "timestamp":  "2026-10-20T01:27:15Z"
-                         },
-                         {
-                             "version":  "1.10.2.0",
-                             "changelog":  "Editor: the station\u0027s excluded tags, the switch for the plugin-wide excluded tags, and the minimum length now sit in a \"Leave out\" section on step 2 (What plays), with the Excluded items list under them, instead of under Advanced in All settings.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.10.2.0/TvStation_1.10.2.0.zip",
-                             "checksum":  "af82d93fd734bcb85d0e540df2fdb0f5",
-                             "timestamp":  "2026-10-20T00:17:31Z"
-                         },
-                         {
-                             "version":  "1.10.1.0",
-                             "changelog":  "Fix: the filter box on the Not on a channel page made Jellyfin\u0027s page setup throw, which left buttons, inputs and checkboxes across the dashboard unstyled. Install this over 1.10.0.0.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.10.1.0/TvStation_1.10.1.0.zip",
-                             "checksum":  "840f39f73df5f82760628e3005084046",
-                             "timestamp":  "2026-10-20T00:07:44Z"
-                         },
-                         {
-                             "version":  "1.10.0.0",
-                             "changelog":  "Not on a channel: a dashboard page listing the movies and shows no channel plays (GET /TvStation/Library/Coverage). Tick titles to start a new channel with them or add them to an existing channel\u0027s pool, filler or list; shows with only some episodes on a channel are marked; paused channels count only when asked; bumper and ident clips count as on their channel.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.10.0.0/TvStation_1.10.0.0.zip",
-                             "checksum":  "7b08b4b6642862a73484fd934b56d91b",
-                             "timestamp":  "2026-10-19T22:46:15Z"
-                         },
-                         {
-                             "version":  "1.9.0.0",
-                             "changelog":  "Paint the week: the time blocks section shows a seven-day grid. Click or drag on it to add a block (drag sideways to cover several days), click a block to edit it; blocks that cross midnight continue in the next column and non-weekly ones are outlined.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.9.0.0/TvStation_1.9.0.0.zip",
-                             "checksum":  "0890d2b0133b7e9584dc0c0d2dc208b9",
-                             "timestamp":  "2026-10-19T17:56:08Z"
-                         },
-                         {
-                             "version":  "1.8.0.0",
-                             "changelog":  "Three-step editor: Name and look (with a logo made from the name), What plays, When; All settings keeps the full form. The editor opens on step 1, remembers when you prefer the full form, and jumps to the step a problem is on when a save is refused.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.8.0.0/TvStation_1.8.0.0.zip",
-                             "checksum":  "26d5124435021d82e7280b16816ed41c",
-                             "timestamp":  "2026-10-19T17:28:41Z"
-                         },
-                         {
-                             "version":  "1.7.0.0",
-                             "changelog":  "Cooldown: a pool can rest a show or film for N hours before it plays again (0 = off, Movie night preset uses 8). A gentle rule on the timeline: it holds films apart across the seam between two rounds and spaces out weighted repeats, and gives way when nothing rested is available. Stations with time blocks are not covered yet.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.7.0.0/TvStation_1.7.0.0.zip",
-                             "checksum":  "6776477886939f3fb8df3b87c462e6cc",
-                             "timestamp":  "2026-10-19T17:12:49Z"
-                         },
-                         {
-                             "version":  "1.6.0.0",
-                             "changelog":  "Station rows show the time left in the current program and the next two programs, the last streaming error (permission denied, file not found and an unmounted folder told apart; early ffmpeg exits carry their last log line) with a dismiss button, and health badges from the last compile. The Status view gains a Health section (GET /TvStation/Health): sources that matched nothing, stations under a day of unique content, items skipped for a missing runtime, path or file. Fixes a movie playing twice in a row across the seam between two shuffle cycles: the back-to-back rule now covers movies as well as series. Easier for non-technical people: an empty dashboard opens on what the library could support, New station starts from a preset (Kids channel, Movie night, Holiday channel and more), modes have plain names, Recompile is now Refresh content, daytime rules are Family hours, rarely used settings sit under Advanced, and health warnings carry fix buttons.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.6.0.0/TvStation_1.6.0.0.zip",
-                             "checksum":  "2c8280b0516d4bc05d33f51f0d79334c",
-                             "timestamp":  "2026-10-19T16:44:56Z"
-                         },
-                         {
-                             "version":  "1.5.0.0",
-                             "changelog":  "Block recurrence: a block can repeat every week (as before), every N weeks from a chosen date, in certain weeks of the month (1st-4th or last; weeks run Monday-Sunday so a weekend stays together), or only on listed dates. Sequential blocks continue across occurrences, so a marathon over two weekends picks up where it left off.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.5.0.0/TvStation_1.5.0.0.zip",
-                             "checksum":  "0fb25a72a045ad1a4c8baed4db2f8c91",
-                             "timestamp":  "2026-10-16T19:46:44Z"
-                         },
-                         {
-                             "version":  "1.4.1.0",
-                             "changelog":  "Dashboard: new \"Recompile all\" button re-scans the library for every station at once (for batches of newly added films) and refreshes the guide once if anything changed. Also available as POST /TvStation/Stations/RecompileAll.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.4.1.0/TvStation_1.4.1.0.zip",
-                             "checksum":  "45ae9efbc8c2445960aee2f85f28f71c",
-                             "timestamp":  "2026-10-16T19:17:14Z"
-                         },
-                         {
-                             "version":  "1.4.0.0",
-                             "changelog":  "Bumpers: pre-roll idents and post-roll clips. A pre-roll ends every break right before the next program (which still starts on the grid); a post-roll opens the break after one. Each picks from its own sources or the main bumper sources, and is skipped when no clip fits.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.4.0.0/TvStation_1.4.0.0.zip",
-                             "checksum":  "d715a0ed6e93d1b213d48696eb114873",
-                             "timestamp":  "2026-10-16T16:06:32Z"
-                         },
-                         {
-                             "version":  "1.3.1.0",
-                             "changelog":  "Blocks: new per-block option to let the pool or filler finish its last program past the block end instead of cutting it (on for new blocks). Settings page gets a header and sectioned cards; the plugin page now has a title in the dashboard.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.3.1.0/TvStation_1.3.1.0.zip",
-                             "checksum":  "c8c0848cbb445624b9453486077b6db1",
-                             "timestamp":  "2026-10-15T18:37:54Z"
-                         },
-                         {
-                             "version":  "1.3.0.0",
-                             "changelog":  "Films split across files (Blu-ray part1/part2 that Jellyfin stacks into one movie) are scheduled at their full combined length and play straight through as one program. Also fixes repeated encoder restarts when a file ends a second before its listed runtime.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.3.0.0/TvStation_1.3.0.0.zip",
-                             "checksum":  "6e2abd393e90c6897eac1bd07db24198",
-                             "timestamp":  "2026-10-15T18:12:39Z"
-                         },
-                         {
-                             "version":  "1.2.1.0",
-                             "changelog":  "Fix \"Suggest stations\" failing to load (GET request sent a body).",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.2.1.0/TvStation_1.2.1.0.zip",
-                             "checksum":  "1c1d4d4b25eaa4352f7085de0ea654b8",
-                             "timestamp":  "2026-10-15T17:31:34Z"
-                         },
-                         {
-                             "version":  "1.2.0.0",
-                             "changelog":  "Time blocks on Pool stations (a movie block at 18:00 while the pool keeps its shuffle, marathons and daytime rules); logo overlay over the video; Import matches movies, series, seasons, episodes and collections by name on another server; library analysis endpoint; Suggest stations on the dashboard (genres, series, kids and family, franchises, collections, decades, seasonal); block templates; per-station minimum runtime.",
-                             "targetAbi":  "12.0.0.0",
-                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.2.0.0/TvStation_1.2.0.0.zip",
-                             "checksum":  "8754dabc711503acc668fb9ae901977e",
-                             "timestamp":  "2026-10-15T17:18:27Z"
-                         }
-                     ]
-    }
+  {
+    "guid": "b7f3c1d2-5e8a-4f0b-9c6d-2a1e7f4b8d31",
+    "name": "JellyStations",
+    "description": "Curate always-on TV stations from your library, surfaced as native Live TV channels.",
+    "overview": "Curate always-on TV stations from your library.",
+    "owner": "JD",
+    "category": "LiveTV",
+    "imageUrl": "",
+    "versions": [
+      {
+        "version": "1.15.0.0",
+        "changelog": "Renamed to JellyStations. The plugin, its DLL (Jellyfin.Plugin.JellyStations.dll), the dashboard page, the API routes (/JellyStations/...) and the data folder (data/JellyStations) carry the new name. The plugin id is unchanged, so Jellyfin treats this as an update of the installed TvStation, an existing data/TvStation folder is moved to data/JellyStations on first start, and Live TV channels keep their ids. Plugin repository: add https://raw.githubusercontent.com/jdaubert12/JellyStations/main/manifest.json under Dashboard > Plugins > Repositories to install and update from the catalog. The example stations now carry placeholder titles.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.15.0.0/JellyStations_1.15.0.0.zip",
+        "checksum": "c76a5e0bd51f828cf156f67b0feb3f29",
+        "timestamp": "2026-10-24T02:38:46Z"
+      },
+      {
+        "version": "1.14.2.0",
+        "changelog": "Weather channel: the music line on the screens now reads \"Now playing: title – artist\" (or just the title when no artist is known) instead of the bare title and artist. The editor checkbox that turns the line off is unchanged.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.14.2.0/TvStation_1.14.2.0.zip",
+        "checksum": "ea28ad39f035c486b84dfdaf31ef286e",
+        "timestamp": "2026-10-24T01:52:15Z"
+      },
+      {
+        "version": "1.14.1.0",
+        "changelog": "Chance of rain, snow, mix or ice. Open-Meteo gives one chance of precipitation that covers rain, showers and snow together, so the percentage on the hourly strip, the 7-day forecast and the current conditions panel now says what it is a chance of: \"rain\", \"snow\", \"mix\" (rain and snow both forecast) or \"ice\" (freezing rain or drizzle). The type comes from the hourly and daily rain, showers and snowfall amounts now fetched with the forecast, else from the weather code, else from the temperature (at or below freezing it would fall as snow). Snow days on the 7-day forecast quote the snowfall depth (\"5 in snow\", \"13 cm snow\") instead of the melt-water total. The hourly strip puts the word on its own line under the percentage.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.14.1.0/TvStation_1.14.1.0.zip",
+        "checksum": "08bf533d3a54d49792c5bff50f094ce5",
+        "timestamp": "2026-10-24T00:15:28Z"
+      },
+      {
+        "version": "1.14.0.0",
+        "changelog": "Weather channel: a new station mode that shows current conditions, the next twelve hours and the week ahead for up to eight places, drawn by the plugin as full-screen graphics (three colour themes, the station logo, a live clock in each place's own time zone) that cross-fade and cycle like the cable weather channel, with an optional \"on the 8s\" pass at :08, :18, :28..., a travel-cities screen and hourly guide entries titled from the places. Forecasts come from Open-Meteo (free, no account; only each place's latitude and longitude is sent), polled every 15 minutes, cached on disk, and the screens say when a forecast is older than the station allows. Music plays underneath from Jellyfin music (playlists, albums, artists, music genres, tracks) and/or every audio file in a folder on the server, in a seeded shuffle that is the same for every viewer and crosses segment boundaries without a gap, with the track title and artist on screen. The editor gets a Weather channel preset, place search, a music picker, a forecast status table with Fetch now, and screen previews. New endpoints under /TvStation/Weather (Search, Status, Refresh, Preview). The plugin ships no music; use tracks you have the right to play. Also: the Inter font (SIL OFL) is embedded for the screens. Music packs: the editor lists curated instrumental sets under licences that allow playing and passing them on; \"Get it\" fetches each track from the artist's own site into data/TvStation/music/<pack>/ with a SHA-256 check and a CREDITS.txt (starter pack: thirty Kevin MacLeod lounge and light jazz pieces, CC BY 4.0; optional: HoliznaCC0 lo-fi jazz guitar, CC0, downloaded by hand from the Free Music Archive). The music folder setting takes several folders separated by \";\".",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.14.0.0/TvStation_1.14.0.0.zip",
+        "checksum": "6439216ab4bc115ff1797b19b5aa5bb7",
+        "timestamp": "2026-10-23T22:47:41Z"
+      },
+      {
+        "version": "1.13.1.0",
+        "changelog": "Fix: a station could keep encoding for nobody. Jellyfin only reports a viewer gone when the client says so or its connection to the server closes, so an app that was killed, a TV switched off on a channel or a dropped network connection left the viewer count stuck at 1 and ffmpeg running with no one reading the stream, sometimes for hours. The plugin now stops any station stream nobody has read for longer than the new \"Stop an unwatched stream after\" setting (default 120 seconds; 0 turns it off), whatever the viewer count says, and logs that it did. Linger is unchanged. Station editor: the Advanced section (call sign, padding grid, schedule anchor, station card text, encoding) was only shown under \"All settings\"; it now sits at the bottom of every step.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.13.1.0/TvStation_1.13.1.0.zip",
+        "checksum": "59f9f19c8eb47d86c070e19ea178a14f",
+        "timestamp": "2026-10-22T22:20:57Z"
+      },
+      {
+        "version": "1.13.0.0",
+        "changelog": "\"Up next\" card. A station can draw a translucent panel over the last seconds of every program with the next program's title, its poster or episode thumbnail, the season and episode or the year, and its start and end time in the station's time zone (12 or 24-hour clock); choose the corner, the times before the end it appears (one or more, e.g. an hour, half an hour and five minutes), how long it stays, its height and opacity, whether to show the artwork and the times, and how it arrives and leaves (fade, slide in from the side, both, or neither). It is burned into the stream by the plugin's ffmpeg, so every viewer sees it in step with the picture whatever the client's HLS delay. Bumper clips and station breaks are skipped when choosing what to announce; programs too short for the card do without it; a card ffmpeg cannot draw is dropped for the session with a note on the station row. Off by default. Fix: QSV (Intel Quick Sync) decoding failed on every file with \"Impossible to convert between the formats\" and \"Conversion failed\", so stations and the hardware test never got Intel hardware decoding. ffmpeg 7's \"-hwaccel qsv\" leaves the *_qsv decoders' frames on GPU surfaces the software filters cannot read; the plugin now names the QSV decoder for the file's codec (h264_qsv, hevc_qsv, mpeg2_qsv, vc1_qsv, vp8_qsv, vp9_qsv, av1_qsv) on a QSV device created up front, which decodes to system memory, and a file whose codec was never recorded stays in software. The hardware test now confirms the decoder from ffmpeg's stream mapping (a *_qsv or *_cuvid decoder) or from the GPU device node ffmpeg holds open while it runs (Linux, software encoder); an explicit VA-API, CUDA, D3D11VA or VideoToolbox hwaccel that reports no fallback but cannot be confirmed from outside is \"unverified\" rather than a problem. Fix: with the h264_qsv, h264_nvenc or h264_amf encoder a client tuning in mid-program got audio but no video until the next program started (Jellyfin's remux of the channel logged \"non-existing PPS 0 referenced\" and wrote no video for 78 s): those encoders turn a forced key frame into a plain I frame without headers that no demuxer treats as a key frame, so they now set key frames by GOP alone, as Jellyfin does, and every GOP starts with an IDR frame and its SPS/PPS. libx264 and the VA-API encoders keep forced key frames.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.13.0.0/TvStation_1.13.0.0.zip",
+        "checksum": "e7c7196fbf58fa4ecc2ac89f8e17f309",
+        "timestamp": "2026-10-21T17:50:24Z"
+      },
+      {
+        "version": "1.12.0.0",
+        "changelog": "Stream health. Status shows, per active session, what the encoder is really doing: the hardware decoder confirmed by the GPU device node ffmpeg holds open (Linux), or flagged when ffmpeg fell back to software or the device failed; the encoder; HDR tone mapping; CPU cores in use; and how far ahead of real time the encoder runs, with a plain-language problem line when a station stutters or stalls. A Hardware section shows Jellyfin's transcoding setting, what the default profile resolves to, the /dev/dri nodes the server can see and this ffmpeg build's hwaccels, H.264 encoders and tone mapping filters, with notes on anything that does not line up. \"Test\" runs a few seconds of a station's current program through the real decode, filter and encode chain at full speed and reports which decoder ffmpeg attached and the speed relative to real time (GET /TvStation/Hardware, POST /TvStation/Hardware/Test). Fix: the GPU decoder was handed every file, and ffmpeg's qsv/cuda decoders do not fall back to software on their own, so one file the GPU cannot decode (10-bit H.264, DivX/Xvid, a codec unticked in Jellyfin) exited ffmpeg with \"Nothing was written into output file\" and switched the whole session to software. Stations now record each file's codec, profile, bit depth and pixel format (one recompile at startup) and decide per file: \"Follow Jellyfin\" honors Jellyfin's \"Enable hardware decoding for\" checkboxes and 10-bit HEVC/VP9/RExt toggles, a hand-picked decoder takes everything GPUs can decode; the rest plays in software and the Status page says why. If the decoder still refuses a file, only that program is replayed in software; a device-level failure, or a second program failing, still turns the session to software. Faults name the program and quote ffmpeg's first error line rather than its last.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.12.0.0/TvStation_1.12.0.0.zip",
+        "checksum": "c85218abd016a3b28f3665c49d59f22b",
+        "timestamp": "2026-10-21T03:15:05Z"
+      },
+      {
+        "version": "1.11.0.0",
+        "changelog": "Stream fixes from a stuttering-playback diagnosis. HDR sources (PQ or HLG) are tone mapped to SDR BT.709 and stripped of HDR side data, and every segment is tagged BT.709, so clients no longer re-encode a channel because of \"video range type\"; stations are recompiled once at startup to record which items are HDR. Hardware decoding: new \"Hardware decoding\" and \"Hardware device\" fields on the encoding profile (default \"Follow Jellyfin\", which mirrors Dashboard > Playback > Transcoding: qsv, vaapi, cuda, videotoolbox or d3d11va), with the frames handed back to the software filters; a device that fails drops to software decoding for the session. VA-API encoders now get their device and frame upload, so h264_vaapi works. Reported media source carries the BT.709 SDR color tags. Frame rate and bitrate hints: 24 fps for film stations, 3500 kbps for 720p and 8000 for 1080p.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.11.0.0/TvStation_1.11.0.0.zip",
+        "checksum": "9482b6276b3147dc4523a1378cc3d84e",
+        "timestamp": "2026-10-21T00:22:28Z"
+      },
+      {
+        "version": "1.10.5.0",
+        "changelog": "Fix: a movie or episode added to a station by hand is never dropped by an excluded tag, even when a genre, library, collection or playlist source earlier in the same section lists it first. The station list no longer flags \"1 empty source\" for a hand-picked item that an earlier source already put on the station; a source only counts as empty when it adds nothing that is not already playing. Editor: when a movie already plays through a wider source of the same section (genre, tag, series, collection, playlist or library), search results say \"Already included via Genre \\\"Comedy\\\"\" and the chip of a hand-picked movie shows \"also via\" that source.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.10.5.0/TvStation_1.10.5.0.zip",
+        "checksum": "c093b6fb9c356b156180d754856f6823",
+        "timestamp": "2026-10-20T02:43:46Z"
+      },
+      {
+        "version": "1.10.4.0",
+        "changelog": "Make a logo from the name: new \"Pick the color too\" option seeds the card color from the name, number and what the channel plays (remembered per browser); \"Another look\" then changes the color as well as the pattern.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.10.4.0/TvStation_1.10.4.0.zip",
+        "checksum": "a8be6da9ea8a5421df0a9c8fbd5eda0d",
+        "timestamp": "2026-10-20T01:34:56Z"
+      },
+      {
+        "version": "1.10.3.0",
+        "changelog": "Make a logo from the name: the card now carries a pattern (gradient, stripes, dots, rings, slabs or color bars) seeded from the name, number and what the channel plays, so each channel looks different while the same station always draws the same card. \"Another look\" draws the next variation.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.10.3.0/TvStation_1.10.3.0.zip",
+        "checksum": "69db15a51754729313a66429c983ea10",
+        "timestamp": "2026-10-20T01:27:15Z"
+      },
+      {
+        "version": "1.10.2.0",
+        "changelog": "Editor: the station's excluded tags, the switch for the plugin-wide excluded tags, and the minimum length now sit in a \"Leave out\" section on step 2 (What plays), with the Excluded items list under them, instead of under Advanced in All settings.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.10.2.0/TvStation_1.10.2.0.zip",
+        "checksum": "af82d93fd734bcb85d0e540df2fdb0f5",
+        "timestamp": "2026-10-20T00:17:31Z"
+      },
+      {
+        "version": "1.10.1.0",
+        "changelog": "Fix: the filter box on the Not on a channel page made Jellyfin's page setup throw, which left buttons, inputs and checkboxes across the dashboard unstyled. Install this over 1.10.0.0.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.10.1.0/TvStation_1.10.1.0.zip",
+        "checksum": "840f39f73df5f82760628e3005084046",
+        "timestamp": "2026-10-20T00:07:44Z"
+      },
+      {
+        "version": "1.10.0.0",
+        "changelog": "Not on a channel: a dashboard page listing the movies and shows no channel plays (GET /TvStation/Library/Coverage). Tick titles to start a new channel with them or add them to an existing channel's pool, filler or list; shows with only some episodes on a channel are marked; paused channels count only when asked; bumper and ident clips count as on their channel.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.10.0.0/TvStation_1.10.0.0.zip",
+        "checksum": "7b08b4b6642862a73484fd934b56d91b",
+        "timestamp": "2026-10-19T22:46:15Z"
+      },
+      {
+        "version": "1.9.0.0",
+        "changelog": "Paint the week: the time blocks section shows a seven-day grid. Click or drag on it to add a block (drag sideways to cover several days), click a block to edit it; blocks that cross midnight continue in the next column and non-weekly ones are outlined.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.9.0.0/TvStation_1.9.0.0.zip",
+        "checksum": "0890d2b0133b7e9584dc0c0d2dc208b9",
+        "timestamp": "2026-10-19T17:56:08Z"
+      },
+      {
+        "version": "1.8.0.0",
+        "changelog": "Three-step editor: Name and look (with a logo made from the name), What plays, When; All settings keeps the full form. The editor opens on step 1, remembers when you prefer the full form, and jumps to the step a problem is on when a save is refused.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.8.0.0/TvStation_1.8.0.0.zip",
+        "checksum": "26d5124435021d82e7280b16816ed41c",
+        "timestamp": "2026-10-19T17:28:41Z"
+      },
+      {
+        "version": "1.7.0.0",
+        "changelog": "Cooldown: a pool can rest a show or film for N hours before it plays again (0 = off, Movie night preset uses 8). A gentle rule on the timeline: it holds films apart across the seam between two rounds and spaces out weighted repeats, and gives way when nothing rested is available. Stations with time blocks are not covered yet.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.7.0.0/TvStation_1.7.0.0.zip",
+        "checksum": "6776477886939f3fb8df3b87c462e6cc",
+        "timestamp": "2026-10-19T17:12:49Z"
+      },
+      {
+        "version": "1.6.0.0",
+        "changelog": "Station rows show the time left in the current program and the next two programs, the last streaming error (permission denied, file not found and an unmounted folder told apart; early ffmpeg exits carry their last log line) with a dismiss button, and health badges from the last compile. The Status view gains a Health section (GET /TvStation/Health): sources that matched nothing, stations under a day of unique content, items skipped for a missing runtime, path or file. Fixes a movie playing twice in a row across the seam between two shuffle cycles: the back-to-back rule now covers movies as well as series. Easier for non-technical people: an empty dashboard opens on what the library could support, New station starts from a preset (Kids channel, Movie night, Holiday channel and more), modes have plain names, Recompile is now Refresh content, daytime rules are Family hours, rarely used settings sit under Advanced, and health warnings carry fix buttons.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.6.0.0/TvStation_1.6.0.0.zip",
+        "checksum": "2c8280b0516d4bc05d33f51f0d79334c",
+        "timestamp": "2026-10-19T16:44:56Z"
+      },
+      {
+        "version": "1.5.0.0",
+        "changelog": "Block recurrence: a block can repeat every week (as before), every N weeks from a chosen date, in certain weeks of the month (1st-4th or last; weeks run Monday-Sunday so a weekend stays together), or only on listed dates. Sequential blocks continue across occurrences, so a marathon over two weekends picks up where it left off.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.5.0.0/TvStation_1.5.0.0.zip",
+        "checksum": "0fb25a72a045ad1a4c8baed4db2f8c91",
+        "timestamp": "2026-10-16T19:46:44Z"
+      },
+      {
+        "version": "1.4.1.0",
+        "changelog": "Dashboard: new \"Recompile all\" button re-scans the library for every station at once (for batches of newly added films) and refreshes the guide once if anything changed. Also available as POST /TvStation/Stations/RecompileAll.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.4.1.0/TvStation_1.4.1.0.zip",
+        "checksum": "45ae9efbc8c2445960aee2f85f28f71c",
+        "timestamp": "2026-10-16T19:17:14Z"
+      },
+      {
+        "version": "1.4.0.0",
+        "changelog": "Bumpers: pre-roll idents and post-roll clips. A pre-roll ends every break right before the next program (which still starts on the grid); a post-roll opens the break after one. Each picks from its own sources or the main bumper sources, and is skipped when no clip fits.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.4.0.0/TvStation_1.4.0.0.zip",
+        "checksum": "d715a0ed6e93d1b213d48696eb114873",
+        "timestamp": "2026-10-16T16:06:32Z"
+      },
+      {
+        "version": "1.3.1.0",
+        "changelog": "Blocks: new per-block option to let the pool or filler finish its last program past the block end instead of cutting it (on for new blocks). Settings page gets a header and sectioned cards; the plugin page now has a title in the dashboard.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.3.1.0/TvStation_1.3.1.0.zip",
+        "checksum": "c8c0848cbb445624b9453486077b6db1",
+        "timestamp": "2026-10-15T18:37:54Z"
+      },
+      {
+        "version": "1.3.0.0",
+        "changelog": "Films split across files (Blu-ray part1/part2 that Jellyfin stacks into one movie) are scheduled at their full combined length and play straight through as one program. Also fixes repeated encoder restarts when a file ends a second before its listed runtime.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.3.0.0/TvStation_1.3.0.0.zip",
+        "checksum": "6e2abd393e90c6897eac1bd07db24198",
+        "timestamp": "2026-10-15T18:12:39Z"
+      },
+      {
+        "version": "1.2.1.0",
+        "changelog": "Fix \"Suggest stations\" failing to load (GET request sent a body).",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.2.1.0/TvStation_1.2.1.0.zip",
+        "checksum": "1c1d4d4b25eaa4352f7085de0ea654b8",
+        "timestamp": "2026-10-15T17:31:34Z"
+      },
+      {
+        "version": "1.2.0.0",
+        "changelog": "Time blocks on Pool stations (a movie block at 18:00 while the pool keeps its shuffle, marathons and daytime rules); logo overlay over the video; Import matches movies, series, seasons, episodes and collections by name on another server; library analysis endpoint; Suggest stations on the dashboard (genres, series, kids and family, franchises, collections, decades, seasonal); block templates; per-station minimum runtime.",
+        "targetAbi": "12.0.0.0",
+        "sourceUrl": "https://github.com/jdaubert12/JellyStations/releases/download/v1.2.0.0/TvStation_1.2.0.0.zip",
+        "checksum": "8754dabc711503acc668fb9ae901977e",
+        "timestamp": "2026-10-15T17:18:27Z"
+      }
+    ]
+  }
 ]

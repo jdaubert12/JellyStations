@@ -4,7 +4,7 @@ guid: "b7f3c1d2-5e8a-4f0b-9c6d-2a1e7f4b8d31"
 version: "1.15.0.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
-owner: "Justin"
+owner: "JD"
 overview: "Curate always-on TV stations from your library. They appear as native Live TV channels with a full guide."
 description: >
   JellyStations turns your Jellyfin library into broadcast-style TV stations. Build any number of
