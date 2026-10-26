@@ -61,6 +61,21 @@ public sealed class WeatherScreenRenderer
         sb.Append(r.Kind).Append('|').Append(r.Width).Append('x').Append(r.Height).Append('|');
         sb.Append(r.Config.Theme).Append('|').Append(r.Config.Units).Append('|').Append(r.Config.TwentyFourHourClock).Append('|').Append(r.Config.ShowLogo).Append('|');
         sb.Append(r.Attribution).Append('|');
+        if (r.Radar is { } radar)
+        {
+            sb.Append("radar|").Append(radar.SourceId).Append('|').Append(radar.Zoom).Append('|')
+              .Append(radar.TimeUtc.ToString("yyyyMMddHHmm", CultureInfo.InvariantCulture)).Append('|')
+              .Append(radar.Index).Append('/').Append(radar.Count).Append('|');
+            try
+            {
+                sb.Append(File.GetLastWriteTimeUtc(radar.OverlayPath).Ticks).Append('|');
+            }
+            catch (Exception)
+            {
+                // Missing overlay: the frame draws the map alone.
+            }
+        }
+
         sb.Append(r.NowUtc.ToString("yyyyMMddHH", CultureInfo.InvariantCulture)).Append('|');
         if (!string.IsNullOrEmpty(r.LogoPath))
         {
@@ -112,7 +127,7 @@ public sealed class WeatherScreenRenderer
         _lastSweepUtc = now;
         try
         {
-            foreach (var file in Directory.EnumerateFiles(dir, "*.png"))
+            foreach (var file in Directory.EnumerateFiles(dir).Where(f => f.EndsWith(".png", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)))
             {
                 if (now - File.GetLastWriteTimeUtc(file) > KeepFor)
                 {

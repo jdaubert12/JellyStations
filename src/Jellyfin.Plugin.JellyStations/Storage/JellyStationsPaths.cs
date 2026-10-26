@@ -55,6 +55,9 @@ public sealed class JellyStationsPaths
 
     public string WeatherScreensDir(Guid stationId) => Path.Combine(WeatherDir, "screens", stationId.ToString("N"));
 
+    /// <summary>Fetched radar frames for one place.</summary>
+    public string RadarDir(Guid locationId) => Path.Combine(WeatherDir, "radar", locationId.ToString("N"));
+
     /// <summary>A folder name under <see cref="MusicDir"/>, or an absolute path, as the person typed it.</summary>
     public string ResolveMusicFolder(string folder)
         => Path.IsPathRooted(folder) ? folder : Path.Combine(MusicDir, folder);

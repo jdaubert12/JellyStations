@@ -1986,6 +1986,8 @@
     w.TwentyFourHourClock = checked('#tvsWeatherClock24');
     w.ShowHourly = checked('#tvsWeatherHourly');
     w.ShowDaily = checked('#tvsWeatherDaily');
+    w.ShowRadar = checked('#tvsWeatherRadar');
+    w.RadarZoom = val('#tvsWeatherRadarZoom') || 'State';
     w.ShowTravelCities = checked('#tvsWeatherTravel');
     w.ShowLogo = checked('#tvsWeatherLogo');
     w.GuideTitle = val('#tvsWeatherGuideTitle').trim() || null;
@@ -4456,12 +4458,12 @@
   // ---- Weather channel ---------------------------------------------------------------------
 
   const MUSIC_KINDS = ['Playlist', 'Album', 'Artist', 'MusicGenre', 'Audio'];
-  const WEATHER_SCREEN_LABEL = { Current: 'Current conditions', Hourly: 'Next 12 hours', Daily: '7-day forecast', Travel: 'Travel cities' };
+  const WEATHER_SCREEN_LABEL = { Current: 'Current conditions', Hourly: 'Next 12 hours', Daily: '7-day forecast', Radar: 'Local radar', Travel: 'Travel cities' };
 
   function defaultWeather() {
     return {
       Locations: [], Units: 'Imperial', TwentyFourHourClock: false, ScreenSeconds: 10, OnTheEights: false, Theme: 'Classic',
-      ShowLogo: true, ShowTravelCities: true, ShowHourly: true, ShowDaily: true, GuideTitle: null, GuideEntryMinutes: 60, StaleHours: 3,
+      ShowLogo: true, ShowTravelCities: true, ShowHourly: true, ShowDaily: true, ShowRadar: true, RadarZoom: 'State', GuideTitle: null, GuideEntryMinutes: 60, StaleHours: 3,
       Provider: 'open-meteo', MusicEnabled: true, MusicSources: [], MusicFolder: null, ShowMusicCredit: true, MusicVolumePercent: 100
     };
   }
@@ -4507,6 +4509,9 @@
     setChecked('#tvsWeatherClock24', !!w.TwentyFourHourClock);
     setChecked('#tvsWeatherHourly', w.ShowHourly !== false);
     setChecked('#tvsWeatherDaily', w.ShowDaily !== false);
+    setChecked('#tvsWeatherRadar', w.ShowRadar !== false);
+    setVal('#tvsWeatherRadarZoom', w.RadarZoom || 'State');
+    show($('#tvsWeatherRadarZoomBox'), w.ShowRadar !== false);
     setChecked('#tvsWeatherTravel', w.ShowTravelCities !== false);
     setChecked('#tvsWeatherLogo', w.ShowLogo !== false);
     setVal('#tvsWeatherGuideTitle', w.GuideTitle || '');
@@ -4756,7 +4761,7 @@
       return;
     }
     const table = el('table', { className: 'tvs-table' });
-    table.appendChild(el('thead', null, el('tr', null, [el('th', { text: 'Place' }), el('th', { text: 'Now' }), el('th', { text: 'Last fetched' }), el('th', { text: '' })])));
+    table.appendChild(el('thead', null, el('tr', null, [el('th', { text: 'Place' }), el('th', { text: 'Now' }), el('th', { text: 'Last fetched' }), el('th', { text: 'Radar' }), el('th', { text: '' })])));
     const tbody = el('tbody');
     const metric = state.draft.Weather.Units === 'Metric';
     status.Locations.forEach(l => {
@@ -4770,16 +4775,25 @@
       } else if (l.LastSuccessUtc) {
         note = badge('OK', 'on');
       }
+      let radar = '—';
+      if (l.RadarFrames > 0) {
+        radar = (l.RadarSource ? l.RadarSource.replace(/ via .*$/, '') : 'Radar') + ', ' + l.RadarFrames + ' frames' + (l.RadarLatestUtc ? ', newest ' + fmtDateTime(l.RadarLatestUtc) : '');
+      } else if (l.RadarError) {
+        radar = l.RadarError;
+      } else if (state.draft.Weather.ShowRadar === false) {
+        radar = 'off';
+      }
       tbody.appendChild(el('tr', null, [
         el('td', { text: l.Name }),
         el('td', { text: now }),
         el('td', { className: 'nowrap', text: l.LastSuccessUtc ? fmtDateTime(l.LastSuccessUtc) : 'never' }),
+        el('td', { text: radar, title: l.RadarSource || '' }),
         el('td', { className: 'nowrap' }, [note, l.LastError ? el('span', { className: 'tvs-secondary', text: ' ' + l.LastError }) : null])
       ]));
     });
     table.appendChild(tbody);
     box.appendChild(table);
-    box.appendChild(el('div', { className: 'tvs-secondary', text: 'Refreshed every 15 minutes while the station is enabled. ' + (status.Attribution || '') }));
+    box.appendChild(el('div', { className: 'tvs-secondary', text: 'Forecasts are refreshed every 15 minutes and radar every 5 while the station is enabled. ' + (status.Attribution || '') }));
   }
 
   function refreshWeatherNow() {
@@ -4879,6 +4893,7 @@
     on('#tvsMode', 'change', updateModePanels);
     on('#tvsWeatherSearch', 'input', debounce(weatherSearch, 350));
     on('#tvsWeatherMusic', 'change', () => show($('#tvsWeatherMusicOptions'), checked('#tvsWeatherMusic')));
+    on('#tvsWeatherRadar', 'change', () => show($('#tvsWeatherRadarZoomBox'), checked('#tvsWeatherRadar')));
     on('#tvsBtnWeatherRefresh', 'click', refreshWeatherNow);
     on('#tvsBtnWeatherPreview', 'click', previewWeatherScreen);
     on('#tvsAnchor', 'change', updateAnchorHint);

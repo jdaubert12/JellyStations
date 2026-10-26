@@ -5,6 +5,7 @@ using Jellyfin.Plugin.JellyStations.Scheduling;
 using Jellyfin.Plugin.JellyStations.Services;
 using Jellyfin.Plugin.JellyStations.Storage;
 using Jellyfin.Plugin.JellyStations.Weather;
+using Jellyfin.Plugin.JellyStations.Weather.Radar;
 using Jellyfin.Plugin.JellyStations.Weather.Screens;
 using MediaBrowser.Common.Api;
 using Microsoft.AspNetCore.Authorization;
@@ -21,13 +22,15 @@ namespace Jellyfin.Plugin.JellyStations.Api;
 public sealed class WeatherController : ControllerBase
 {
     private readonly WeatherService _weather;
+    private readonly RadarService _radar;
     private readonly StationService _stations;
     private readonly WeatherScreenRenderer _renderer;
     private readonly JellyStationsPaths _paths;
 
-    public WeatherController(WeatherService weather, StationService stations, WeatherScreenRenderer renderer, JellyStationsPaths paths)
+    public WeatherController(WeatherService weather, RadarService radar, StationService stations, WeatherScreenRenderer renderer, JellyStationsPaths paths)
     {
         _weather = weather;
+        _radar = radar;
         _stations = stations;
         _renderer = renderer;
         _paths = paths;
@@ -85,6 +88,11 @@ public sealed class WeatherController : ControllerBase
         }
 
         await _weather.RefreshAsync(station, ct).ConfigureAwait(false);
+        if (station.Weather.ShowRadar)
+        {
+            await _radar.RefreshAsync(station, ct).ConfigureAwait(false);
+        }
+
         return Ok(BuildStatus(station));
     }
 
@@ -118,11 +126,24 @@ public sealed class WeatherController : ControllerBase
             return NotFound(new ValidationErrorDto { Errors = new List<string> { "The station has no places yet." } });
         }
 
+        RadarFrameRequest? radar = null;
+        if (kind == WeatherScreenKind.Radar && place is not null)
+        {
+            var loop = _radar.Get(place.Location.Id);
+            if (loop is null)
+            {
+                return NotFound(new ValidationErrorDto { Errors = new List<string> { "No radar frames for " + place.Location.Name + " yet." } });
+            }
+
+            var frame = loop.Latest;
+            radar = new RadarFrameRequest(loop.SourceId, loop.SourceName, loop.Attribution, frame.TimeUtc, frame.Path, loop.Frames.Count - 1, loop.Frames.Count, WebMercator.ZoomOf(loop.Zoom));
+        }
+
         var w = Math.Clamp(width, 320, 1920);
         var h = w * 9 / 16;
         var attribution = places.Select(p => p.Report?.Attribution).FirstOrDefault(a => !string.IsNullOrEmpty(a)) ?? _weather.Provider.Attribution;
         var logo = config.ShowLogo && !string.IsNullOrEmpty(station.LogoFileName) ? _paths.LogoFile(station.LogoFileName) : null;
-        var request = new ScreenRequest(kind, place, places, config, now, WeeklySlotScheduler.ResolveTimeZone(station.TimeZoneId), logo, w, h, attribution);
+        var request = new ScreenRequest(kind, place, places, config, now, WeeklySlotScheduler.ResolveTimeZone(station.TimeZoneId), logo, w, h, attribution, radar);
         var path = _renderer.Render(station.Id, request);
         return PhysicalFile(path, "image/png");
     }
@@ -135,8 +156,14 @@ public sealed class WeatherController : ControllerBase
         {
             var status = _weather.Status(location.Id);
             var report = _weather.Get(location.Id);
+            var radarStatus = _radar.Status(location.Id);
+            var loop = _radar.Get(location.Id);
             dto.Locations.Add(new WeatherLocationStatusDto
             {
+                RadarSource = radarStatus.SourceName ?? loop?.SourceName,
+                RadarFrames = loop?.Frames.Count ?? 0,
+                RadarLatestUtc = loop?.Latest.TimeUtc,
+                RadarError = radarStatus.LastError,
                 LocationId = location.Id,
                 Name = location.Name,
                 Valid = location.IsValid,

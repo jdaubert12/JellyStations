@@ -602,6 +602,22 @@
                   <span>Show the 7-day screen</span>
                 </label>
               </div>
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsWeatherRadar">
+                  <span>Show the local radar screen</span>
+                </label>
+                <div class="fieldDescription checkboxFieldDescription">A loop of the last three quarters of an hour of precipitation radar over a map of the area, right after each place's current conditions. NOAA NEXRAD (via the Iowa Environmental Mesonet) for places in the contiguous United States, RainViewer elsewhere; fetched every five minutes while the station is on.</div>
+              </div>
+              <div class="selectContainer" id="tvsWeatherRadarZoomBox">
+                <label class="selectLabel" for="tvsWeatherRadarZoom">Radar map area</label>
+                <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsWeatherRadarZoom">
+                  <option value="Metro">Metro – about 250 miles across</option>
+                  <option value="State">State – about 500 miles across</option>
+                  <option value="Regional">Regional – about 1,000 miles across</option>
+                  <option value="Wide">Wide – about 2,000 miles across</option>
+                </select>
+              </div>
               <div class="checkboxContainer">
                 <label class="emby-checkbox-label">
                   <input is="emby-checkbox" type="checkbox" id="tvsWeatherTravel">
@@ -658,6 +674,7 @@
                   <option value="Current">Current conditions</option>
                   <option value="Hourly">Next 12 hours</option>
                   <option value="Daily">7-day forecast</option>
+                  <option value="Radar">Local radar</option>
                   <option value="Travel">Travel cities</option>
                 </select>
                 <select is="emby-select" class="emby-select" id="tvsWeatherPreviewPlace" title="Which place to preview"></select>

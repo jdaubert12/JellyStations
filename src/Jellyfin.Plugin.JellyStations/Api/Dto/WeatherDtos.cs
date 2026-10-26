@@ -54,4 +54,13 @@ public sealed class WeatherLocationStatusDto
     public string? Conditions { get; set; }
 
     public string? TimeZoneId { get; set; }
+
+    /// <summary>The radar source covering the place; null when none does or nothing was fetched yet.</summary>
+    public string? RadarSource { get; set; }
+
+    public int RadarFrames { get; set; }
+
+    public DateTime? RadarLatestUtc { get; set; }
+
+    public string? RadarError { get; set; }
 }

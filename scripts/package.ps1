@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.17.0.0"
+$version = "1.18.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Audio language and subtitles per source. Every content source (a series, a season, a collection, a genre...) can now name the audio language its items play in and a subtitle language to burn into the picture, with an option to burn them only when that audio language is missing from a file, so an anime station can run one show in Japanese with English subtitles next to dubbed ones. The editor reads the languages actually present on the source files (GET /JellyStations/Library/Items/{id}/Languages) and lists them with file counts. Text tracks (SRT, ASS, MP4 text, WebVTT, external files) are rendered by libass after scaling and tone mapping; PGS and DVD bitmap tracks are overlaid on the source picture; embedded text tracks are extracted once into data/JellyStations/subtitles so program starts do not read the whole file, and the next program track is extracted while the current one plays. Language codes match across spellings (ja, jpn; ger, deu). Press Refresh content after changing a source tracks. Also in this release, from 1.16.2.0: browser playback fixed (Jellyfin flags every plugin channel interlaced unless it probes the stream; probing is back on with a media source id derived from the station and its output format, the container is declared as ts so the aac_adtstoasc filter is applied, and a reader joining a channel starts at a keyframe)."
+    changelog = "Local radar on the weather channel. After each place's current conditions the channel now shows a loop of the last three quarters of an hour of precipitation radar over a map of the area, with nearby towns, a light-to-heavy legend and the frame clock. NOAA NEXRAD (through the Iowa Environmental Mesonet's time-enabled WMS) covers places in the contiguous United States; RainViewer covers the rest of the world. Frames are fetched every five minutes while the station is on, only the new ones each time, and cached under data/JellyStations/weather/radar. The map (coasts, lakes, borders, towns) is Natural Earth data packed into the plugin and drawn in the theme's colours, with four map areas to choose from (metro, state, regional, wide). The editor's forecast status shows the radar source and frame count per place, Fetch now refreshes radar too, and Preview screen can show the radar screen. Existing weather stations get the radar screen; untick Show the local radar screen to go back."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

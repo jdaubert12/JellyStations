@@ -212,6 +212,26 @@ regenerated only when the report, the clock hour or the look changes.
 Screens are drawn with SkiaSharp, which the Jellyfin server already ships; the Inter font (SIL Open
 Font License) is embedded in the plugin.
 
+### Radar
+
+With **Show the local radar screen** (on by default) each place's current conditions are followed by
+a **local radar** screen: a loop of the last three quarters of an hour of precipitation radar over a
+map of the area, with nearby towns, the place marked, a light-to-heavy legend and the clock of the
+frame on air. Four map areas: metro (about 250 miles across), state (500, the default), regional
+(1,000) and wide (2,000). Short screens play the loop once; longer ones repeat it about every eight
+seconds, holding the newest frame a moment each time.
+
+Two sources, picked per place: **NOAA NEXRAD** through the [Iowa Environmental Mesonet](https://mesonet.agron.iastate.edu/ogc/)'s
+time-enabled WMS for places in the contiguous United States (one small image per frame, five-minute
+steps), and [RainViewer](https://www.rainviewer.com/api.html) everywhere else (ten-minute steps, tiles
+stitched by the plugin; free for non-commercial use with the credit the screen shows). Frames are
+fetched every five minutes while the station is enabled and in season, only the frames not already on
+disk, and kept under `data/JellyStations/weather/radar/` so a restart has a loop to show. A place no
+source covers simply skips the screen. The map underneath (coasts, lakes, country and state borders,
+towns) is [Natural Earth](https://www.naturalearthdata.com/) 1:10m data (public domain), simplified
+and packed into the plugin (`dev/basemap/` has the build script), so nothing but the radar itself is
+fetched. The editor's forecast status shows the radar source, frame count and newest frame per place.
+
 ### Music
 
 **Music** plays underneath from two kinds of source, which can be combined: items from your Jellyfin

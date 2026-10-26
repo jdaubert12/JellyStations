@@ -10,8 +10,9 @@ public static partial class FfmpegArgsBuilder
 {
     /// <summary>
     /// Arguments that play one <see cref="WeatherSegment"/> as real-time MPEG-TS on stdout. Each screen PNG is
-    /// turned into a timed stream inside the graph (loop + setpts + trim, the way the up next card is), the
-    /// screens are joined with xfade cross-fades at the screen boundaries, and drawtext adds the clock (ffmpeg's
+    /// turned into a timed stream inside the graph (loop + setpts + trim, the way the up next card is; a radar
+    /// loop comes in as a concat-demuxer list of frames with durations and is filled to the frame rate instead),
+    /// the screens are joined with xfade cross-fades at the screen boundaries, and drawtext adds the clock (ffmpeg's
     /// own time expansion with a per-place offset, so it ticks live) and the music credit. The music pieces are
     /// seeked and cut at the demuxer and concatenated; silence when there is none.
     /// </summary>
@@ -29,8 +30,19 @@ public static partial class FfmpegArgsBuilder
         var fps = p.Fps.ToString(CultureInfo.InvariantCulture);
         foreach (var slide in seg.Slides)
         {
-            args.Add("-framerate");
-            args.Add(fps);
+            if (slide.IsSequence)
+            {
+                args.Add("-f");
+                args.Add("concat");
+                args.Add("-safe");
+                args.Add("0");
+            }
+            else
+            {
+                args.Add("-framerate");
+                args.Add(fps);
+            }
+
             args.Add("-i");
             args.Add(slide.Path);
         }
@@ -97,7 +109,8 @@ public static partial class FfmpegArgsBuilder
         for (var i = 0; i < n; i++)
         {
             var length = seg.Slides[i].Seconds + (i < n - 1 ? fade : 0);
-            sb.Append(CultureInfo.InvariantCulture, $"[{i}:v]scale={p.Width}:{p.Height}:force_original_aspect_ratio=decrease,pad={p.Width}:{p.Height}:(ow-iw)/2:(oh-ih)/2,format=yuv420p,loop=loop=-1:size=1:start=0,settb=1/{p.Fps},setpts=N/({p.Fps}*TB),trim=end={N(length)}[s{i}];");
+            var timing = seg.Slides[i].IsSequence ? "fps=" + p.Fps.ToString(CultureInfo.InvariantCulture) : "loop=loop=-1:size=1:start=0";
+            sb.Append(CultureInfo.InvariantCulture, $"[{i}:v]scale={p.Width}:{p.Height}:force_original_aspect_ratio=decrease,pad={p.Width}:{p.Height}:(ow-iw)/2:(oh-ih)/2,format=yuv420p,{timing},settb=1/{p.Fps},setpts=N/({p.Fps}*TB),trim=end={N(length)}[s{i}];");
         }
 
         // Cross-fade each screen into the next at the boundary; the offsets are the cumulative screen lengths.

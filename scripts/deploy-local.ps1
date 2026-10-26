@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $proj = Join-Path $root "src\Jellyfin.Plugin.JellyStations\Jellyfin.Plugin.JellyStations.csproj"
-$version = "1.17.0.0"
+$version = "1.18.0.0"
 $pluginDir = Join-Path $root "dev\config\plugins\JellyStations_$version"
 
 Write-Host "Building $Configuration..." -ForegroundColor Cyan

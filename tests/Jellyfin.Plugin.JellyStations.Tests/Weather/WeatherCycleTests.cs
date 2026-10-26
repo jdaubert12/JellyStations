@@ -8,8 +8,8 @@ public class WeatherCycleTests
 {
     private static readonly TimeZoneInfo NewYork = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
 
-    private static WeatherConfig Config(int screenSeconds = 10, bool eights = false, bool hourly = true, bool daily = true, bool travel = true)
-        => new() { ScreenSeconds = screenSeconds, OnTheEights = eights, ShowHourly = hourly, ShowDaily = daily, ShowTravelCities = travel };
+    private static WeatherConfig Config(int screenSeconds = 10, bool eights = false, bool hourly = true, bool daily = true, bool travel = true, bool radar = false)
+        => new() { ScreenSeconds = screenSeconds, OnTheEights = eights, ShowHourly = hourly, ShowDaily = daily, ShowTravelCities = travel, ShowRadar = radar };
 
     [Fact]
     public void Pass_ShowsEveryScreenOfEveryPlace_ThenTravel()

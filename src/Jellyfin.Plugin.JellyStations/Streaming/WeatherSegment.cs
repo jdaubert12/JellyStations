@@ -4,7 +4,11 @@ namespace Jellyfin.Plugin.JellyStations.Streaming;
 /// <param name="Path">The PNG.</param>
 /// <param name="Seconds">How long it stays, including the cross-fade into the next one.</param>
 /// <param name="ClockOffsetSeconds">Unix seconds the clock shows at the start of the segment (segment start plus the place's UTC offset).</param>
-public sealed record WeatherSlide(string Path, double Seconds, long ClockOffsetSeconds);
+/// <summary>
+/// One screen on air for <paramref name="Seconds"/>: a PNG, or with <paramref name="IsSequence"/> a concat-demuxer
+/// list of PNG frames with durations (the radar loop), which must cover the screen's seconds plus the cross-fade.
+/// </summary>
+public sealed record WeatherSlide(string Path, double Seconds, long ClockOffsetSeconds, bool IsSequence = false);
 
 /// <summary>A stretch of one audio file: seek to <see cref="InPoint"/> and play <see cref="Seconds"/>.</summary>
 public sealed record WeatherAudio(string Path, double InPoint, double Seconds);

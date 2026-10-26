@@ -1,7 +1,10 @@
+using System.Security.Cryptography;
+using System.Text;
 using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Scheduling;
 using Jellyfin.Plugin.JellyStations.Storage;
 using Jellyfin.Plugin.JellyStations.Streaming;
+using Jellyfin.Plugin.JellyStations.Weather.Radar;
 using Jellyfin.Plugin.JellyStations.Weather.Screens;
 using Microsoft.Extensions.Logging;
 
@@ -20,16 +23,18 @@ public sealed class WeatherChannelService
     private readonly StationRepository _stations;
     private readonly CompiledStationRepository _compiled;
     private readonly WeatherService _weather;
+    private readonly RadarService _radar;
     private readonly WeatherScreenRenderer _renderer;
     private readonly WeatherAssets _assets;
     private readonly JellyStationsPaths _paths;
     private readonly ILogger<WeatherChannelService> _logger;
 
-    public WeatherChannelService(StationRepository stations, CompiledStationRepository compiled, WeatherService weather, WeatherScreenRenderer renderer, WeatherAssets assets, JellyStationsPaths paths, ILogger<WeatherChannelService> logger)
+    public WeatherChannelService(StationRepository stations, CompiledStationRepository compiled, WeatherService weather, RadarService radar, WeatherScreenRenderer renderer, WeatherAssets assets, JellyStationsPaths paths, ILogger<WeatherChannelService> logger)
     {
         _stations = stations;
         _compiled = compiled;
         _weather = weather;
+        _radar = radar;
         _renderer = renderer;
         _assets = assets;
         _paths = paths;
@@ -53,7 +58,8 @@ public sealed class WeatherChannelService
         }
 
         var zone = WeeklySlotScheduler.ResolveTimeZone(station.TimeZoneId);
-        var screens = WeatherCycle.Timeline(config, locations.Count, nowUtc, entry.EndUtc, entry.StartUtc, zone);
+        var loops = locations.Select(l => config.ShowRadar ? _radar.Get(l.Id) : null).ToList();
+        var screens = WeatherCycle.Timeline(config, locations.Count, nowUtc, entry.EndUtc, entry.StartUtc, zone, i => loops[i] is { IsPlayable: true });
         if (screens.Count == 0)
         {
             return null;
@@ -87,9 +93,17 @@ public sealed class WeatherChannelService
         foreach (var s in kept)
         {
             var place = s.Screen.LocationIndex >= 0 && s.Screen.LocationIndex < places.Count ? places[s.Screen.LocationIndex] : null;
+            var offset = place is null ? (long)zone.GetUtcOffset(nowUtc).TotalSeconds : PlaceOffsetSeconds(place, zone, nowUtc);
+            var loop = s.Screen.Kind == WeatherScreenKind.Radar && place is not null ? loops[s.Screen.LocationIndex] : null;
+            if (loop is { IsPlayable: true })
+            {
+                var listPath = RadarSequence(station.Id, loop, s, place!, places, config, nowUtc, zone, logoPath, profile, attribution);
+                slides.Add(new WeatherSlide(listPath, s.Duration.TotalSeconds, unixStart + offset, IsSequence: true));
+                continue;
+            }
+
             var request = new ScreenRequest(s.Screen.Kind, place, places, config, nowUtc, zone, logoPath, profile.Width, profile.Height, attribution);
             var path = _renderer.Render(station.Id, request);
-            var offset = place is null ? (long)zone.GetUtcOffset(nowUtc).TotalSeconds : PlaceOffsetSeconds(place, zone, nowUtc);
             slides.Add(new WeatherSlide(path, s.Duration.TotalSeconds, unixStart + offset));
         }
 
@@ -131,6 +145,43 @@ public sealed class WeatherChannelService
             VolumePercent = config.MusicVolumePercent,
             Title = entry.Title
         };
+    }
+
+    /// <summary>
+    /// Renders the frames of one radar screen (each frame once, cached like any screen) and writes the concat list
+    /// that plays them on <see cref="RadarTiming"/>'s clock; the list is named by its content, so a repeat of the
+    /// same screen with the same frames reuses it.
+    /// </summary>
+    private string RadarSequence(Guid stationId, RadarLoop loop, TimedScreen s, PlaceWeather place, IReadOnlyList<PlaceWeather> places, WeatherConfig config, DateTime nowUtc, TimeZoneInfo zone, string? logoPath, EncodingProfile profile, string attribution)
+    {
+        var plan = RadarTiming.Plan(s.Duration.TotalSeconds + WeatherSegment.FadeSeconds + 1.0, loop.Frames.Count);
+        var framePaths = new string?[loop.Frames.Count];
+        var entries = new List<(string Path, double Seconds)>(plan.Count);
+        var zoom = WebMercator.ZoomOf(loop.Zoom);
+        foreach (var (index, seconds) in plan)
+        {
+            var path = framePaths[index];
+            if (path is null)
+            {
+                var frame = loop.Frames[index];
+                var radar = new RadarFrameRequest(loop.SourceId, loop.SourceName, loop.Attribution, frame.TimeUtc, frame.Path, index, loop.Frames.Count, zoom);
+                var request = new ScreenRequest(WeatherScreenKind.Radar, place, places, config, nowUtc, zone, logoPath, profile.Width, profile.Height, attribution, radar);
+                framePaths[index] = path = _renderer.Render(stationId, request);
+            }
+
+            entries.Add((path, seconds));
+        }
+
+        var text = ConcatList.Build(entries);
+        var name = "seq-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..24].ToLowerInvariant() + ".txt";
+        var listPath = Path.Combine(_paths.WeatherScreensDir(stationId), name);
+        if (!File.Exists(listPath))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(listPath)!);
+            File.WriteAllText(listPath, text);
+        }
+
+        return listPath;
     }
 
     /// <summary>"Now playing: Title – Artist", or without the artist when none is known.</summary>

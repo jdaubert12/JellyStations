@@ -19,7 +19,11 @@ public sealed record ScreenRequest(
     string? LogoPath,
     int Width,
     int Height,
-    string Attribution);
+    string Attribution,
+    RadarFrameRequest? Radar = null);
+
+/// <summary>One frame of a radar loop as the painter draws it: which overlay image, when it is from, where in the loop it sits.</summary>
+public sealed record RadarFrameRequest(string SourceId, string SourceName, string Attribution, DateTime TimeUtc, string OverlayPath, int Index, int Count, int Zoom);
 
 /// <summary>The colours of one theme.</summary>
 public sealed record Theme(SKColor BgTop, SKColor BgBottom, SKColor Band, SKColor Panel, SKColor Text, SKColor Secondary, SKColor Accent, SKColor Cool, SKColor Low, SKColor Line, SKColor BandText, IconPalette Icons)
@@ -46,7 +50,7 @@ public sealed record Theme(SKColor BgTop, SKColor BgBottom, SKColor Band, SKColo
 /// encoding profile's picture, so a 720p station gets the same screen smaller. The lower band leaves room on
 /// the left for the live clock and in the middle for the music credit, both drawn later by ffmpeg.
 /// </summary>
-public sealed class WeatherPainter
+public sealed partial class WeatherPainter
 {
     /// <summary>The band across the bottom, in 1080-grid units: y from here to 1080.</summary>
     public const float BandTop = 950f;
@@ -93,6 +97,9 @@ public sealed class WeatherPainter
                 break;
             case WeatherScreenKind.Travel:
                 Travel(ctx);
+                break;
+            case WeatherScreenKind.Radar:
+                Radar(ctx);
                 break;
         }
 
@@ -174,6 +181,7 @@ public sealed class WeatherPainter
             WeatherScreenKind.Current => "CURRENT CONDITIONS",
             WeatherScreenKind.Hourly => "NEXT 12 HOURS",
             WeatherScreenKind.Daily => "7-DAY FORECAST",
+            WeatherScreenKind.Radar => "LOCAL RADAR",
             _ => "AROUND THE MAP"
         };
         Text(x, label, x.W - 80, 78, 30, FontWeight.SemiBold, x.T.Text, SKTextAlign.Right);
@@ -182,6 +190,10 @@ public sealed class WeatherPainter
         if (x.R.Kind == WeatherScreenKind.Current && x.Report is { } rep)
         {
             under = "Updated " + Units.Clock(rep.ObservedUtc.AddSeconds(rep.UtcOffsetSeconds), x.C.TwentyFourHourClock);
+        }
+        else if (x.R.Kind == WeatherScreenKind.Radar && x.R.Radar is { } frame)
+        {
+            under = "As of " + Units.Clock(frame.TimeUtc + (x.NowLocal - x.R.NowUtc), x.C.TwentyFourHourClock);
         }
         else if (x.R.Kind != WeatherScreenKind.Travel)
         {

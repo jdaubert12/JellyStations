@@ -10,6 +10,22 @@ public enum WeatherUnits
     Metric
 }
 
+/// <summary>How much map the radar screen shows around a place; the widths are for mid-latitudes.</summary>
+public enum RadarZoom
+{
+    /// <summary>About 250 miles (400 km) across.</summary>
+    Metro,
+
+    /// <summary>About 500 miles (800 km) across.</summary>
+    State,
+
+    /// <summary>About 1,000 miles (1,600 km) across.</summary>
+    Regional,
+
+    /// <summary>About 2,000 miles (3,300 km) across.</summary>
+    Wide
+}
+
 /// <summary>Colour scheme of the weather screens.</summary>
 public enum WeatherTheme
 {
@@ -63,6 +79,12 @@ public sealed class WeatherConfig
 
     /// <summary>Show the 7-day screen for each place.</summary>
     public bool ShowDaily { get; set; } = true;
+
+    /// <summary>Show the local radar loop for each place (NEXRAD in the contiguous United States, RainViewer elsewhere).</summary>
+    public bool ShowRadar { get; set; } = true;
+
+    /// <summary>How much map the radar screen shows around the place.</summary>
+    public RadarZoom RadarZoom { get; set; } = RadarZoom.State;
 
     /// <summary>Guide entry title; "{places}" is replaced by the place names. Null = "Local weather: {places}".</summary>
     public string? GuideTitle { get; set; }

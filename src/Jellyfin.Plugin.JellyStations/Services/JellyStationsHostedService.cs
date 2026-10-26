@@ -15,15 +15,17 @@ public sealed class JellyStationsHostedService : IHostedService
     private readonly StreamSessionManager _sessions;
     private readonly GuideRefreshService _guide;
     private readonly WeatherService _weather;
+    private readonly Weather.Radar.RadarService _radar;
     private readonly Music.MusicPackService _packs;
     private readonly ILogger<JellyStationsHostedService> _logger;
     private readonly object _seasonLock = new();
     private HashSet<Guid>? _inSeason;
     private Timer? _seasonTimer;
 
-    public JellyStationsHostedService(JellyStationsPaths paths, StationService stations, StreamSessionManager sessions, GuideRefreshService guide, WeatherService weather, Music.MusicPackService packs, ILogger<JellyStationsHostedService> logger)
+    public JellyStationsHostedService(JellyStationsPaths paths, StationService stations, StreamSessionManager sessions, GuideRefreshService guide, WeatherService weather, Weather.Radar.RadarService radar, Music.MusicPackService packs, ILogger<JellyStationsHostedService> logger)
     {
         _weather = weather;
+        _radar = radar;
         _packs = packs;
         _paths = paths;
         _stations = stations;
@@ -93,6 +95,7 @@ public sealed class JellyStationsHostedService : IHostedService
             _stations.EnsureCompiled();
             CheckSeasons();
             _weather.Start();
+            _radar.Start();
             _seasonTimer = new Timer(_ => SafeCheckSeasons(), null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10));
             _logger.LogInformation(
                 "JellyStations started: {Count} station(s), data at {Path}",
@@ -111,6 +114,7 @@ public sealed class JellyStationsHostedService : IHostedService
     {
         _seasonTimer?.Dispose();
         _weather.Dispose();
+        _radar.Dispose();
         _packs.Dispose();
         _sessions.StopAll();
         return Task.CompletedTask;

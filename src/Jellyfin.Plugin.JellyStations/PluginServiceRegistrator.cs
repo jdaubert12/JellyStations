@@ -31,6 +31,10 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddHttpClient();
         serviceCollection.AddSingleton<IWeatherProvider, OpenMeteoProvider>();
         serviceCollection.AddSingleton<WeatherService>();
+        serviceCollection.AddSingleton<Weather.Radar.RadarHttp>();
+        serviceCollection.AddSingleton<Weather.Radar.IRadarSource, Weather.Radar.NexradSource>();
+        serviceCollection.AddSingleton<Weather.Radar.IRadarSource, Weather.Radar.RainViewerSource>();
+        serviceCollection.AddSingleton<Weather.Radar.RadarService>();
         serviceCollection.AddSingleton(sp => new WeatherAssets(sp.GetRequiredService<JellyStationsPaths>().AssetsDir));
         serviceCollection.AddSingleton<WeatherPainter>();
         serviceCollection.AddSingleton<WeatherScreenRenderer>();
