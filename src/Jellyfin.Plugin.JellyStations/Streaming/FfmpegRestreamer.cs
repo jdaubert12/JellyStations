@@ -36,6 +36,7 @@ public sealed class FfmpegRestreamer : IDisposable
     private readonly HardwareDecodePolicy _policy;
     private readonly HashSet<string> _softwarePrograms = new(StringComparer.Ordinal);
     private readonly Func<ScheduleEntry, DateTime, EncodingProfile, WeatherSegment?>? _weather;
+    private readonly SubtitleExtractor? _subtitles;
     private int _weatherFailures;
     private string? _lastStderr;
     private ProcessRunner? _current;
@@ -71,8 +72,10 @@ public sealed class FfmpegRestreamer : IDisposable
         UpNextCardConfig? upNext = null,
         string? cardsDir = null,
         string? timeZoneId = null,
-        Func<ScheduleEntry, DateTime, EncodingProfile, WeatherSegment?>? weather = null)
+        Func<ScheduleEntry, DateTime, EncodingProfile, WeatherSegment?>? weather = null,
+        SubtitleExtractor? subtitles = null)
     {
+        _subtitles = subtitles;
         _weather = weather;
         _upNext = upNext ?? new UpNextCardConfig();
         _cardsDir = cardsDir ?? Path.Combine(Path.GetTempPath(), "JellyStations", "cards");
@@ -277,10 +280,12 @@ public sealed class FfmpegRestreamer : IDisposable
                 var tonemap = !hdrOutput && part.Part.IsHdr && _tonemapSupported;
                 // An HDR10 channel needs the source's transfer to keep or convert it; an SDR channel only to tone map it.
                 var transfer = hdrOutput || tonemap ? part.Part.HdrTransfer : null;
-                var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, transfer, seek, duration, NextTsOffset(), profile, overlay, part.Part.VideoCodec, upNext);
+                var subtitles = await SubtitleInputAsync(part.Part, ct).ConfigureAwait(false);
+                var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, transfer, seek, duration, NextTsOffset(), profile, overlay, part.Part.VideoCodec, upNext, subtitles);
+                PrepareNextSubtitles(entry, ct);
 
                 _logger.LogInformation(
-                    "JellyStations [{Station}]: playing {Title}{Part} from {Seek} ({Remaining} remaining){Hdr}{Hw}{Card}",
+                    "JellyStations [{Station}]: playing {Title}{Part} from {Seek} ({Remaining} remaining){Hdr}{Hw}{Card}{Subs}",
                     _stationName,
                     item.DisplayTitle,
                     item.IsMultiPart ? " part " + (part.Index + 1) + "/" + item.Parts.Count : string.Empty,
@@ -288,7 +293,8 @@ public sealed class FfmpegRestreamer : IDisposable
                     remaining.ToString(@"hh\:mm\:ss"),
                     hdrOutput ? (part.Part.IsHdr ? ", HDR10 out" : ", SDR source into HDR10") : tonemap ? ", tone mapping HDR to SDR" : string.Empty,
                     hardwareDecode ? ", " + profile.HardwareDecode + " decoding" : softwareReason is null ? string.Empty : ", software decoding (" + softwareReason + ")",
-                    upNext is null ? string.Empty : ", up next card at " + string.Join(", ", upNext.Windows.Select(w => w.From.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "s")));
+                    upNext is null ? string.Empty : ", up next card at " + string.Join(", ", upNext.Windows.Select(w => w.From.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "s")),
+                    subtitles is null ? (part.Part.HasSubtitles ? ", subtitles unavailable" : string.Empty) : subtitles.IsBitmap ? ", bitmap subtitles" : ", subtitles burned in");
                 _logger.LogDebug("JellyStations ffmpeg {Args}", FfmpegArgsBuilder.ToLogString(args));
                 _telemetry = new SegmentTelemetry(item.DisplayTitle, isSlate: false, profile.HardwareDecode, profile.VideoEncoder, tonemap, part.Part.IsHdr, overlay is not null)
                 {
@@ -504,6 +510,74 @@ public sealed class FfmpegRestreamer : IDisposable
         _logger.LogWarning("JellyStations [{Station}]: ffmpeg could not render the up next card; disabled until the stream restarts: {Error}", _stationName, _lastCardError);
         Fault("Up next card could not be rendered; disabled until the stream restarts" + (_lastCardError is null ? string.Empty : ": " + _lastCardError));
         return null;
+    }
+
+    /// <summary>
+    /// The subtitles to burn into this part, if the station asked for any: an embedded bitmap track as is, an external
+    /// text file as is, an embedded text track through the extraction cache (extracted now when the look-ahead did not
+    /// get to it). Null when there are none or they could not be extracted.
+    /// </summary>
+    private async Task<FfmpegArgsBuilder.SubtitleInput?> SubtitleInputAsync(PlayablePart part, CancellationToken ct)
+    {
+        if (part.SubtitleIsBitmap && part.SubtitleStreamIndex is int bitmap)
+        {
+            return FfmpegArgsBuilder.SubtitleInput.Bitmap(bitmap);
+        }
+
+        if (!string.IsNullOrEmpty(part.SubtitlePath))
+        {
+            return FfmpegArgsBuilder.SubtitleInput.Text(part.SubtitlePath);
+        }
+
+        if (part.SubtitleStreamIndex is int embedded && _subtitles is not null)
+        {
+            var path = await _subtitles.EnsureExtractedAsync(part.Path, embedded, ct).ConfigureAwait(false);
+            return path is null ? null : FfmpegArgsBuilder.SubtitleInput.Text(path);
+        }
+
+        return null;
+    }
+
+    /// <summary>Extracts the next program's embedded text subtitles in the background while this one plays, so it starts without a pause.</summary>
+    private void PrepareNextSubtitles(ScheduleEntry entry, CancellationToken ct)
+    {
+        if (_subtitles is null)
+        {
+            return;
+        }
+
+        var next = UpNextCard.NextProgram(_resolver.Enumerate(_stationId, entry.EndUtc, entry.EndUtc + UpNextCard.Lookahead), entry.EndUtc);
+        var item = next?.Item;
+        if (item is null)
+        {
+            return;
+        }
+
+        var parts = item.Parts.Count > 0 ? item.Parts : new List<PlayablePart> { item.SegmentAt(TimeSpan.Zero).Part };
+        var pending = parts.Where(p => p.SubtitleStreamIndex is not null && !p.SubtitleIsBitmap && string.IsNullOrEmpty(p.SubtitlePath)).ToList();
+        if (pending.Count == 0)
+        {
+            return;
+        }
+
+        _ = Task.Run(async () =>
+        {
+            foreach (var p in pending)
+            {
+                try
+                {
+                    await _subtitles.EnsureExtractedAsync(p.Path, p.SubtitleStreamIndex!.Value, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "JellyStations [{Station}]: subtitle look-ahead for {Title} failed", _stationName, item.DisplayTitle);
+                }
+            }
+        }, ct);
     }
 
     private string? _lastCardError;

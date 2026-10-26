@@ -91,6 +91,19 @@ below, with an "allow unrated" switch) and a **year range**; and any source gets
 rating use the series rating, and the year filter uses the show's year for episodes. Pools can also
 run **marathons**: play 2 to N episodes of a show back to back before switching.
 
+Every source also has an **Audio** and a **Subtitles** choice, so an anime series can play in
+Japanese with English subtitles burned into the picture while the rest of the station keeps the
+station's language (the encoding profile's audio language preference). The lists show the languages
+actually found on the source's files with file counts. Subtitles can be limited to **only when the
+audio language is missing** from a file: ask for English audio with English subtitles "if needed" and
+dubbed episodes play dubbed while the others play in the original language with subtitles. Text
+tracks (SRT, ASS, MP4 text, WebVTT, and external subtitle files Jellyfin has found) are rendered by
+libass after scaling and tone mapping; PGS and DVD bitmap tracks are overlaid as pictures. Embedded
+text tracks are extracted once into `data/JellyStations/subtitles` (the next program's track is
+extracted while the current one plays, so program starts do not wait on it). Full subtitles win
+over forced-only and hearing-impaired tracks in the same language. Press **Refresh content** after
+changing a source's tracks; the server needs at least one font installed for libass to draw with.
+
 The editor's **Content** section lists everything a station expands to, with a text filter, totals,
 and an **Exclude** switch per item for the one episode or film that does not belong. Exclusions are
 saved with the station and survive recompiles. A station can also **skip items shorter than** a
@@ -276,11 +289,11 @@ BT.2020 PQ **HEVC Main 10** instead:
   come out washed out. Jellyfin remuxes the channel for direct-play clients exactly as it does an
   SDR one.
 - The guide and Live TV channel report `hevc`, and the stream is declared to Jellyfin as HEVC
-  Main 10 BT.2020 PQ outright rather than probed (Jellyfin caches a live channel's first probe
-  for good, which would keep announcing the old codec after a station switched to HDR10, and
-  skipping the probe also makes tune-in quicker). A station switched to or from HDR10 takes the
-  new format at its next tune-in; viewers already on it should change channel and back. `ffprobe`
-  on the stream URL should show `hevc (Main 10), yuv420p10le(tv, bt2020nc/bt2020/smpte2084)`.
+  Main 10 BT.2020 PQ. Jellyfin still probes the stream once per output format (it caches a live
+  channel's probe for good under the media source id, which is therefore derived from the codec, resolution
+  and range), so a station switched to or from HDR10 takes the new format at its next tune-in after
+  a probe of a few seconds; viewers already on it should change channel and back. `ffprobe` on the
+  stream URL should show `hevc (Main 10), yuv420p10le(tv, bt2020nc/bt2020/smpte2084)`.
 
 ## Install
 

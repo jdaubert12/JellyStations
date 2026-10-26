@@ -31,6 +31,7 @@ public sealed class JellyStationsPaths
         CompiledDir = Path.Combine(Root, "compiled");
         LogosDir = Path.Combine(Root, "logos");
         CardsDir = Path.Combine(Root, "cards");
+        SubtitlesDir = Path.Combine(Root, "subtitles");
         WeatherDir = Path.Combine(Root, "weather");
         MusicDir = Path.Combine(Root, "music");
         AssetsDir = Path.Combine(Root, "assets");
@@ -61,6 +62,9 @@ public sealed class JellyStationsPaths
     /// <summary>Rendered "Up next" cards, one file per program as it is about to play; rewritten constantly.</summary>
     public string CardsDir { get; }
 
+    /// <summary>Text subtitle tracks extracted from video files, ready for ffmpeg to burn in (see SubtitleExtractor).</summary>
+    public string SubtitlesDir { get; }
+
     public string Root { get; }
 
     /// <summary>Jellyfin's plugins folder, where the sibling folder of an older install under the TvStation name may sit.</summary>
@@ -87,6 +91,7 @@ public sealed class JellyStationsPaths
         Directory.CreateDirectory(CompiledDir);
         Directory.CreateDirectory(LogosDir);
         Directory.CreateDirectory(CardsDir);
+        Directory.CreateDirectory(SubtitlesDir);
         Directory.CreateDirectory(WeatherDir);
         Directory.CreateDirectory(MusicDir);
         Directory.CreateDirectory(AssetsDir);

@@ -29,6 +29,17 @@ public sealed class PlayablePart
     /// <summary>ffmpeg pixel format as probed (yuv420p, yuv420p10le, yuv422p10le...).</summary>
     public string? PixelFormat { get; set; }
 
+    /// <summary>Zero-based index among the file's embedded subtitle streams to burn in; null = none (or an external file, see SubtitlePath).</summary>
+    public int? SubtitleStreamIndex { get; set; }
+
+    /// <summary>An external subtitle file (.srt, .ass) to burn in; null when the track is embedded or there is none.</summary>
+    public string? SubtitlePath { get; set; }
+
+    /// <summary>True when the embedded track is bitmap subtitles (PGS, DVD), drawn over the picture rather than rendered from text.</summary>
+    public bool SubtitleIsBitmap { get; set; }
+
+    public bool HasSubtitles => SubtitleStreamIndex.HasValue || !string.IsNullOrEmpty(SubtitlePath);
+
     public TimeSpan Runtime => TimeSpan.FromTicks(RuntimeTicks);
 }
 
@@ -102,6 +113,17 @@ public sealed class PlayableItem
     /// <summary>ffmpeg pixel format as probed (yuv420p, yuv420p10le, yuv422p10le...).</summary>
     public string? PixelFormat { get; set; }
 
+    /// <summary>Zero-based index among the file's embedded subtitle streams to burn in; null = none (or an external file, see SubtitlePath).</summary>
+    public int? SubtitleStreamIndex { get; set; }
+
+    /// <summary>An external subtitle file (.srt, .ass) to burn in; null when the track is embedded or there is none.</summary>
+    public string? SubtitlePath { get; set; }
+
+    /// <summary>True when the embedded track is bitmap subtitles (PGS, DVD), drawn over the picture rather than rendered from text.</summary>
+    public bool SubtitleIsBitmap { get; set; }
+
+    public bool HasSubtitles => SubtitleStreamIndex.HasValue || !string.IsNullOrEmpty(SubtitlePath);
+
     /// <summary>Files in play order for a multi-part item. Empty for a single file, whose Path and RuntimeTicks apply.</summary>
     public List<PlayablePart> Parts { get; set; } = new();
 
@@ -124,7 +146,7 @@ public sealed class PlayableItem
 
         if (Parts.Count == 0)
         {
-            var single = new PlayablePart { Path = Path, RuntimeTicks = RuntimeTicks, AudioStreamIndex = AudioStreamIndex, HasAudio = HasAudio, HdrTransfer = HdrTransfer, VideoCodec = VideoCodec, VideoProfile = VideoProfile, VideoBitDepth = VideoBitDepth, PixelFormat = PixelFormat };
+            var single = new PlayablePart { Path = Path, RuntimeTicks = RuntimeTicks, AudioStreamIndex = AudioStreamIndex, HasAudio = HasAudio, HdrTransfer = HdrTransfer, VideoCodec = VideoCodec, VideoProfile = VideoProfile, VideoBitDepth = VideoBitDepth, PixelFormat = PixelFormat, SubtitleStreamIndex = SubtitleStreamIndex, SubtitlePath = SubtitlePath, SubtitleIsBitmap = SubtitleIsBitmap };
             var seek = offset < single.Runtime ? offset : single.Runtime;
             return new PlayableSegment(single, 0, seek, single.Runtime - seek) { IsLast = true };
         }

@@ -19,13 +19,19 @@ public sealed class LibraryController : ControllerBase
     private readonly LibrarySearchService _search;
     private readonly LibraryAnalysisService _analysis;
     private readonly StationService _stations;
+    private readonly LibraryContentResolver _resolver;
 
-    public LibraryController(LibrarySearchService search, LibraryAnalysisService analysis, StationService stations)
+    public LibraryController(LibrarySearchService search, LibraryAnalysisService analysis, StationService stations, LibraryContentResolver resolver)
     {
         _search = search;
         _analysis = analysis;
         _stations = stations;
+        _resolver = resolver;
     }
+
+    /// <summary>The audio and subtitle languages on an item's files (every episode of a series, every film of a collection), with counts.</summary>
+    [HttpGet("Items/{id}/Languages")]
+    public ActionResult<TrackLanguagesDto> Languages([FromRoute] Guid id) => Ok(_resolver.TrackLanguages(id));
 
     /// <summary>Searches the library. kinds is a comma-separated list: Movie, Series, Season, Episode, BoxSet, Playlist.</summary>
     [HttpGet("Search")]

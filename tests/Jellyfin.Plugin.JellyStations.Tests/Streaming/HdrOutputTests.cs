@@ -211,7 +211,7 @@ public class HdrOutputTests
         Assert.Equal("HDR", video.VideoRange.ToString());
         Assert.Equal("HDR10", video.VideoRangeType.ToString());
         Assert.Equal(123, video.Level);
-        Assert.False(source.SupportsProbing); // Jellyfin would cache the first probe per channel and keep announcing the old codec
+        Assert.True(source.SupportsProbing); // only Jellyfin's own probe clears the interlaced flag it forces on plugin channels
 
         var sdr = StreamSessionManager.BuildMediaSource(station, new EncodingProfile()).MediaStreams.Single(s => s.Type == MediaStreamType.Video);
         Assert.Equal("h264", sdr.Codec);

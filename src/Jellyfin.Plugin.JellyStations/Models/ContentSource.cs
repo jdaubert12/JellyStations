@@ -46,6 +46,15 @@ public sealed class ContentSource
     /// <summary>For Genre and Tag kinds: optional library to restrict to.</summary>
     public Guid? LibraryId { get; set; }
 
+    /// <summary>Audio language (ISO 639-2, "jpn") for this source's items; null or empty = the station's preference.</summary>
+    public string? AudioLanguage { get; set; }
+
+    /// <summary>Subtitle language to burn into the picture for this source's items; null or empty = no subtitles.</summary>
+    public string? SubtitleLanguage { get; set; }
+
+    /// <summary>Burn the subtitles only for items whose audio language could not be found (dub missing, so play the original with subtitles).</summary>
+    public bool SubtitlesOnlyIfAudioMissing { get; set; }
+
     /// <summary>Display name captured at pick time (for UI only).</summary>
     public string? DisplayName { get; set; }
 }

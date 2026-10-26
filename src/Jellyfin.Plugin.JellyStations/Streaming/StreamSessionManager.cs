@@ -171,7 +171,8 @@ public sealed class StreamSessionManager : IDisposable
                 station.UpNextCard ?? new UpNextCardConfig(),
                 _paths.CardsDir,
                 station.TimeZoneId,
-                _weather is null ? null : (entry, now, p) => _weather.BuildSegment(station.Id, now, entry, p)),
+                _weather is null ? null : (entry, now, p) => _weather.BuildSegment(station.Id, now, entry, p),
+                new SubtitleExtractor(ffmpeg, _paths.SubtitlesDir, logger)),
             logger);
 
         session.MediaSource.Path = _appHost.GetApiUrlForLocalAccess() + "/LiveTv/LiveStreamFiles/" + session.UniqueId + "/stream.ts";
@@ -340,10 +341,29 @@ public sealed class StreamSessionManager : IDisposable
         }
     }
 
+    /// <summary>
+    /// The media source id: a Guid derived from the station id and the profile's output format. Jellyfin probes a
+    /// live channel once and caches the result for good under a key that embeds this id, so a station whose profile
+    /// changes codec, resolution or range (SDR to HDR10) must present a new id to be probed afresh; otherwise clients
+    /// would keep being told the old format. It has to parse as a Guid (Jellyfin's HLS playlist code does), so the
+    /// format goes in as a hash; <see cref="LiveTv.JellyStationsLiveTvService.TryResolveStationId"/> maps it back.
+    /// </summary>
+    public static string MediaSourceId(Station station, EncodingProfile profile)
+    {
+        var key = System.Text.Encoding.UTF8.GetBytes(station.Id.ToString("N") + "|" + OutputSignature(profile));
+        var hash = System.Security.Cryptography.SHA256.HashData(key);
+        return new Guid(hash.AsSpan(0, 16)).ToString("N");
+    }
+
+    /// <summary>What a viewer's decoder has to handle: codec, frame size, rate and range. Bitrate and preset do not count.</summary>
+    public static string OutputSignature(EncodingProfile profile)
+        => profile.OutputCodec + "-" + profile.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)
+           + "x" + profile.Height.ToString(System.Globalization.CultureInfo.InvariantCulture) + "p" + profile.Fps.ToString(System.Globalization.CultureInfo.InvariantCulture)
+           + (profile.IsHdrOutput ? "-hdr10" : "-sdr");
+
     /// <summary>The media source description shared by PlaybackInfo and the opened stream.</summary>
     public static MediaSourceInfo BuildMediaSource(Station station, EncodingProfile profile)
     {
-        var channelId = station.Id.ToString("N");
         var hdr = profile.IsHdrOutput;
         var hevc = profile.IsHevcEncoder;
         // HEVC levels as ffprobe reports them (4.1 = 123, 5.1 = 153); H.264 "4.1" as 41.
@@ -352,10 +372,13 @@ public sealed class StreamSessionManager : IDisposable
             : double.TryParse(profile.H264Level, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var l) ? (double?)Math.Round(l * 10) : null;
         return new MediaSourceInfo
         {
-            Id = channelId,
+            Id = MediaSourceId(station, profile),
             Name = station.Name,
             Protocol = MediaProtocol.Http,
-            Container = "mpegts",
+            // "ts", as Jellyfin's own tuners and its probe say it (not ffmpeg's "mpegts"): Jellyfin adds the
+            // aac_adtstoasc bitstream filter to a copied AAC track in an fMP4 HLS transcode only for "ts", and
+            // without it the mp4 muxer rejects the ADTS frames and the transcode dies after two frames.
+            Container = "ts",
             Path = string.Empty,
             IsRemote = false,
             IsInfiniteStream = true,
@@ -364,10 +387,13 @@ public sealed class StreamSessionManager : IDisposable
             SupportsDirectPlay = true,
             SupportsDirectStream = true,
             SupportsTranscoding = true,
-            // Not probed: Jellyfin caches a live channel's probe per channel for good, so a station switched to
-            // HDR10 (or back) would keep being announced with its old codec and range. The declaration below is
-            // exact, and skipping the probe also drops Jellyfin's probe delay from every tune-in.
-            SupportsProbing = false,
+            // Probed. Jellyfin marks every video stream of a third-party Live TV service as interlaced
+            // (LiveTvMediaSourceProvider.Normalize) after this declaration, and only its own ffprobe of the
+            // stream corrects that; without the probe, browsers and other clients that refuse interlaced H.264
+            // transcode every station through a deinterlacer. The probe is cached for good per media source id,
+            // which is why MediaSourceId carries the output format. The declaration below still serves the
+            // PlaybackInfo listing before the stream is opened and is the fallback if the probe fails.
+            SupportsProbing = true,
             IgnoreDts = true,
             ReadAtNativeFramerate = false,
             Bitrate = (profile.VideoBitrateKbps + profile.AudioBitrateKbps) * 1000,

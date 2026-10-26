@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.16.1.0"
+$version = "1.17.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "The encoding profile's preset now reaches the hardware encoders: Quick Sync (h264_qsv, hevc_qsv) gets it in its own vocabulary (veryfast to veryslow; ultrafast and superfast become veryfast) and NVENC gets p1 to p7 (x264 words translated, veryfast is p2); VA-API, AMF and VideoToolbox, which have no preset option, get none, and a blank preset leaves the encoder default. Until now only libx264 and libx265 saw the preset, so hevc_qsv ran at its default medium: on an i5-8500T an HDR10 channel went from 2.0x to 3.5x real time with the default veryfast. README notes CPU passthrough for VMs (zscale needs AVX2)."
+    changelog = "Audio language and subtitles per source. Every content source (a series, a season, a collection, a genre...) can now name the audio language its items play in and a subtitle language to burn into the picture, with an option to burn them only when that audio language is missing from a file, so an anime station can run one show in Japanese with English subtitles next to dubbed ones. The editor reads the languages actually present on the source files (GET /JellyStations/Library/Items/{id}/Languages) and lists them with file counts. Text tracks (SRT, ASS, MP4 text, WebVTT, external files) are rendered by libass after scaling and tone mapping; PGS and DVD bitmap tracks are overlaid on the source picture; embedded text tracks are extracted once into data/JellyStations/subtitles so program starts do not read the whole file, and the next program track is extracted while the current one plays. Language codes match across spellings (ja, jpn; ger, deu). Press Refresh content after changing a source tracks. Also in this release, from 1.16.2.0: browser playback fixed (Jellyfin flags every plugin channel interlaced unless it probes the stream; probing is back on with a media source id derived from the station and its output format, the container is declared as ts so the aac_adtstoasc filter is applied, and a reader joining a channel starts at a keyframe)."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

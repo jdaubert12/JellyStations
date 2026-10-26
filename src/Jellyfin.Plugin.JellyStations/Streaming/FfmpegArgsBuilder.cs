@@ -21,6 +21,19 @@ public static partial class FfmpegArgsBuilder
     /// <summary>A logo to draw over the video: image path plus placement.</summary>
     public sealed record LogoOverlayInput(string Path, LogoCorner Corner, int Opacity, int HeightPercent);
 
+    /// <summary>
+    /// Subtitles to burn into a segment: a text file (external, or a track extracted by SubtitleExtractor), rendered
+    /// by libass after scaling and tone mapping, or an embedded bitmap track (PGS, DVD), overlaid on the source frame.
+    /// </summary>
+    public sealed record SubtitleInput(string? TextPath, int? BitmapStreamIndex)
+    {
+        public static SubtitleInput Text(string path) => new(path, null);
+
+        public static SubtitleInput Bitmap(int streamIndex) => new(null, streamIndex);
+
+        public bool IsBitmap => BitmapStreamIndex.HasValue;
+    }
+
     /// <summary>A rendered "Up next" card (PNG with alpha) to draw in a corner during one or more windows of the segment, in seconds from its start.</summary>
     public sealed record UpNextCardInput(string Path, LogoCorner Corner, IReadOnlyList<(double From, double To)> Windows)
     {
@@ -63,14 +76,15 @@ public static partial class FfmpegArgsBuilder
     }
 
     /// <summary>Arguments to play an item's (first) file from an offset, normalized to the profile, as real-time MPEG-TS on stdout.</summary>
-    public static List<string> ForFile(PlayableItem item, TimeSpan seek, TimeSpan? duration, TimeSpan tsOffset, EncodingProfile p, LogoOverlayInput? overlay = null, UpNextCardInput? upNext = null)
-        => ForSource(item.Path, item.HasAudio, item.AudioStreamIndex, item.HdrTransfer, seek, duration, tsOffset, p, overlay, item.VideoCodec, upNext);
+    public static List<string> ForFile(PlayableItem item, TimeSpan seek, TimeSpan? duration, TimeSpan tsOffset, EncodingProfile p, LogoOverlayInput? overlay = null, UpNextCardInput? upNext = null, SubtitleInput? subtitles = null)
+        => ForSource(item.Path, item.HasAudio, item.AudioStreamIndex, item.HdrTransfer, seek, duration, tsOffset, p, overlay, item.VideoCodec, upNext, subtitles);
 
     /// <summary>Arguments to play one file (an item, or one part of a multi-part item) from an offset.</summary>
     /// <param name="hdrTransfer">The source's HDR transfer ("smpte2084" or "arib-std-b67") to tone map from; null or empty for SDR.</param>
     /// <param name="videoCodec">The file's video codec as Jellyfin names it (h264, hevc, ...): QSV decoders are chosen per codec.</param>
     /// <param name="upNext">An "Up next" card to draw near the end of the segment, or null.</param>
-    public static List<string> ForSource(string path, bool hasAudio, int? audioStreamIndex, string? hdrTransfer, TimeSpan seek, TimeSpan? duration, TimeSpan tsOffset, EncodingProfile p, LogoOverlayInput? overlay = null, string? videoCodec = null, UpNextCardInput? upNext = null)
+    /// <param name="subtitles">Subtitles to burn into the picture, or null.</param>
+    public static List<string> ForSource(string path, bool hasAudio, int? audioStreamIndex, string? hdrTransfer, TimeSpan seek, TimeSpan? duration, TimeSpan tsOffset, EncodingProfile p, LogoOverlayInput? overlay = null, string? videoCodec = null, UpNextCardInput? upNext = null, SubtitleInput? subtitles = null)
     {
         var args = new List<string>();
         Common(args);
@@ -125,19 +139,21 @@ public static partial class FfmpegArgsBuilder
         }
 
         var audioMap = needSilence ? "1:a:0" : "0:a:" + (audioStreamIndex ?? 0).ToString(CultureInfo.InvariantCulture) + "?";
-        if (overlay is null && upNext is null)
+        // Input seeking (-ss before -i) is only applied past half a second; the subtitle file keeps the file's own clock.
+        var subtitleSeek = seek > TimeSpan.FromMilliseconds(500) ? seek : TimeSpan.Zero;
+        if (overlay is null && upNext is null && subtitles?.IsBitmap != true)
         {
             args.Add("-map");
             args.Add("0:v:0");
             args.Add("-map");
             args.Add(audioMap);
             args.Add("-vf");
-            args.Add(VideoFilter(p, hdrTransfer) + EncoderUploadSuffix(p));
+            args.Add(VideoFilter(p, hdrTransfer, subtitles, subtitleSeek) + EncoderUploadSuffix(p));
         }
         else
         {
             args.Add("-filter_complex");
-            args.Add(ComposeFilter(p, hdrTransfer, overlay, logoIndex, upNext, cardIndex));
+            args.Add(ComposeFilter(p, hdrTransfer, overlay, logoIndex, upNext, cardIndex, subtitles, subtitleSeek));
             args.Add("-map");
             args.Add("[v]");
             args.Add("-map");
@@ -162,10 +178,20 @@ public static partial class FfmpegArgsBuilder
     /// image: it only needs placing and switching on for its window (the overlay filter's enable expression, in
     /// seconds since the segment started; -output_ts_offset is applied later, at the muxer).
     /// </summary>
-    public static string ComposeFilter(EncodingProfile p, string? hdrTransfer, LogoOverlayInput? overlay, int logoIndex, UpNextCardInput? upNext, int cardIndex)
+    public static string ComposeFilter(EncodingProfile p, string? hdrTransfer, LogoOverlayInput? overlay, int logoIndex, UpNextCardInput? upNext, int cardIndex, SubtitleInput? subtitles = null, TimeSpan subtitleSeek = default)
     {
         var sb = new StringBuilder();
-        sb.Append(CultureInfo.InvariantCulture, $"[0:v]{VideoFilter(p, hdrTransfer)}[base]");
+        if (subtitles?.IsBitmap == true)
+        {
+            // Bitmap subtitles are pictures sized for the source frame, so they go on before scaling. They ride the
+            // same input as the video, so seeking keeps them in step; when the track runs out the picture goes on alone.
+            sb.Append(CultureInfo.InvariantCulture, $"[0:v][0:s:{subtitles.BitmapStreamIndex}]overlay=eof_action=pass:repeatlast=0[subbed];[subbed]{VideoFilter(p, hdrTransfer)}[base]");
+        }
+        else
+        {
+            sb.Append(CultureInfo.InvariantCulture, $"[0:v]{VideoFilter(p, hdrTransfer, subtitles, subtitleSeek)}[base]");
+        }
+
         var current = "base";
         if (overlay is not null)
         {
@@ -562,7 +588,7 @@ public static partial class FfmpegArgsBuilder
     /// source is kept in 10 bits with its mastering metadata, and an HLG source is converted to PQ. The HDR input
     /// properties are stated outright so zscale does not depend on the file's tags.
     /// </summary>
-    public static string VideoFilter(EncodingProfile p, string? hdrTransfer = null)
+    public static string VideoFilter(EncodingProfile p, string? hdrTransfer = null, SubtitleInput? subtitles = null, TimeSpan subtitleSeek = default)
     {
         var sb = new StringBuilder();
         sb.Append(CultureInfo.InvariantCulture, $"scale={p.Width}:{p.Height}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic");
@@ -588,9 +614,41 @@ public static partial class FfmpegArgsBuilder
             sb.Append(",format=yuv420p10le,zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0:peak=100,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,sidedata=mode=delete");
         }
 
+        if (subtitles?.TextPath is not null)
+        {
+            sb.Append(',').Append(TextSubtitleFilter(subtitles.TextPath, subtitleSeek));
+        }
+
         sb.Append(CultureInfo.InvariantCulture, $",pad={p.Width}:{p.Height}:(ow-iw)/2:(oh-ih)/2,fps={p.Fps},{OutputTail(p)}");
         return sb.ToString();
     }
+
+    /// <summary>
+    /// libass rendering of a subtitle file onto the scaled (and tone mapped) picture. After an input seek the frames'
+    /// clock starts at zero while the subtitle file keeps the file's own, so the timestamps are moved up to file time
+    /// around the filter and back again after it.
+    /// </summary>
+    public static string TextSubtitleFilter(string path, TimeSpan seek)
+    {
+        var filter = "subtitles=filename='" + QuoteFilterPath(path) + "'";
+        if (seek <= TimeSpan.Zero)
+        {
+            return filter;
+        }
+
+        var s = Sec(seek);
+        return $"setpts=PTS+{s}/TB,{filter},setpts=PTS-{s}/TB";
+    }
+
+    /// <summary>
+    /// A file path as a quoted filter option value. Inside the quotes the filter still splits on ':' and ends on a
+    /// quote, so both are escaped (the quote by closing, escaping and reopening); a backslash is escaped as well.
+    /// Windows drive letters become "C\:/...".
+    /// </summary>
+    public static string QuoteFilterPath(string path)
+        => path.Replace('\\', '/')
+            .Replace("'", "'\\\\\\''", StringComparison.Ordinal)
+            .Replace(":", "\\:", StringComparison.Ordinal);
 
     /// <summary>Filters that hand the finished frame to the encoder: VA-API encoders only take frames already on the GPU.</summary>
     private static string EncoderUploadSuffix(EncodingProfile p)

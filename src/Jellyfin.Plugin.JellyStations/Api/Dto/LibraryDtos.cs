@@ -51,3 +51,25 @@ public sealed class LibraryFolderDto
 
     public string? CollectionType { get; set; }
 }
+
+/// <summary>The audio and subtitle languages found on an item's files, for the editor's per-source track choices.</summary>
+public sealed class TrackLanguagesDto
+{
+    /// <summary>How many video files were looked at.</summary>
+    public int Files { get; set; }
+
+    public List<TrackLanguageDto> Audio { get; set; } = new();
+
+    public List<TrackLanguageDto> Subtitles { get; set; } = new();
+}
+
+public sealed class TrackLanguageDto
+{
+    /// <summary>ISO 639-2 code as the plugin canonicalizes it ("jpn", "eng", "deu").</summary>
+    public string Code { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>How many of the files carry a track in this language.</summary>
+    public int Files { get; set; }
+}

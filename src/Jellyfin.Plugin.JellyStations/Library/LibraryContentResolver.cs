@@ -1,5 +1,6 @@
 using Jellyfin.Data.Enums;
 using Jellyfin.Database.Implementations.Enums;
+using Jellyfin.Plugin.JellyStations.Api.Dto;
 using Jellyfin.Plugin.JellyStations.Models;
 using MediaBrowser.Controller.Dto;
 using MediaBrowser.Controller.Entities;
@@ -47,6 +48,7 @@ public sealed class LibraryContentResolver
         {
             var block = new List<PlayableItem>();
             var dropTags = EffectiveExcludedTags(source, excludedTags);
+            var tracks = TrackPreferences.For(source, audioLanguage);
             var found = 0;
             var alreadyListed = 0;
             foreach (var item in ExpandSource(source))
@@ -58,7 +60,7 @@ public sealed class LibraryContentResolver
                     continue;
                 }
 
-                var playable = ToPlayable(item, audioLanguage, excluded);
+                var playable = ToPlayable(item, tracks, excluded);
                 if (playable is null)
                 {
                     continue;
@@ -511,6 +513,64 @@ public sealed class LibraryContentResolver
     }
 
     public PlayableItem? ToPlayable(BaseItem item, string audioLanguage, List<ExcludedItem> excluded)
+        => ToPlayable(item, new TrackPreferences(audioLanguage), excluded);
+
+    /// <summary>
+    /// The audio and subtitle languages found on an item's files (a series' episodes, a season's, a collection's,
+    /// or the one file), with how many files carry each, for the editor's per-source track choices.
+    /// </summary>
+    public TrackLanguagesDto TrackLanguages(Guid itemId)
+    {
+        var result = new TrackLanguagesDto();
+        var item = _libraryManager.GetItemById(itemId);
+        if (item is null)
+        {
+            return result;
+        }
+
+        var kind = item switch
+        {
+            Series => SourceKind.Series,
+            Season => SourceKind.Season,
+            Episode => SourceKind.Episode,
+            Movie => SourceKind.Movie,
+            BoxSet => SourceKind.BoxSet,
+            Playlist => SourceKind.Playlist,
+            Folder => SourceKind.Library,
+            _ => SourceKind.Movie
+        };
+        var audio = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var subtitles = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var video in ExpandSource(new ContentSource { Kind = kind, ItemId = itemId }).OfType<Video>())
+        {
+            result.Files++;
+            IReadOnlyList<MediaStream> streams;
+            try
+            {
+                streams = video.GetMediaStreams();
+            }
+            catch (Exception)
+            {
+                continue;
+            }
+
+            foreach (var code in streams.Where(s => s.Type == MediaStreamType.Audio).Select(s => LanguageNames.Canonical(s.Language)).Where(c => c.Length > 0).Distinct())
+            {
+                audio[code] = audio.GetValueOrDefault(code) + 1;
+            }
+
+            foreach (var code in streams.Where(s => s.Type == MediaStreamType.Subtitle && (TrackPicker.IsText(s) || TrackPicker.IsBitmap(s))).Select(s => LanguageNames.Canonical(s.Language)).Where(c => c.Length > 0).Distinct())
+            {
+                subtitles[code] = subtitles.GetValueOrDefault(code) + 1;
+            }
+        }
+
+        result.Audio = audio.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => new TrackLanguageDto { Code = kv.Key, Name = LanguageNames.Describe(kv.Key), Files = kv.Value }).ToList();
+        result.Subtitles = subtitles.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => new TrackLanguageDto { Code = kv.Key, Name = LanguageNames.Describe(kv.Key), Files = kv.Value }).ToList();
+        return result;
+    }
+
+    public PlayableItem? ToPlayable(BaseItem item, TrackPreferences tracks, List<ExcludedItem> excluded)
     {
         if (item is not Video video)
         {
@@ -549,10 +609,16 @@ public sealed class LibraryContentResolver
             OfficialRating = video.OfficialRating,
             CommunityRating = video.CommunityRating,
             PrimaryImagePath = video.PrimaryImagePath,
-            AudioStreamIndex = PickAudioStream(video, audioLanguage),
             HasAudio = HasAudioTrack(video),
             HdrTransfer = HdrTransferOf(video)
         };
+        ApplyTracks(video, tracks, (a, s) =>
+        {
+            playable.AudioStreamIndex = a;
+            playable.SubtitleStreamIndex = s?.StreamIndex;
+            playable.SubtitlePath = s?.ExternalPath;
+            playable.SubtitleIsBitmap = s?.IsBitmap ?? false;
+        });
         ApplyVideoFacts(VideoStreamOf(video), (c, p, d, f) =>
         {
             playable.VideoCodec = c;
@@ -566,7 +632,14 @@ public sealed class LibraryContentResolver
             playable.Parts = parts
                 .Select(v =>
                 {
-                    var part = new PlayablePart { Path = v.Path, RuntimeTicks = v.RunTimeTicks!.Value, AudioStreamIndex = PickAudioStream(v, audioLanguage), HasAudio = HasAudioTrack(v), HdrTransfer = HdrTransferOf(v) };
+                    var part = new PlayablePart { Path = v.Path, RuntimeTicks = v.RunTimeTicks!.Value, HasAudio = HasAudioTrack(v), HdrTransfer = HdrTransferOf(v) };
+                    ApplyTracks(v, tracks, (a, s) =>
+                    {
+                        part.AudioStreamIndex = a;
+                        part.SubtitleStreamIndex = s?.StreamIndex;
+                        part.SubtitlePath = s?.ExternalPath;
+                        part.SubtitleIsBitmap = s?.IsBitmap ?? false;
+                    });
                     ApplyVideoFacts(VideoStreamOf(v), (c, p, d, f) =>
                     {
                         part.VideoCodec = c;
@@ -718,27 +791,24 @@ public sealed class LibraryContentResolver
         }
     }
 
-    private static int? PickAudioStream(Video video, string language)
+    /// <summary>The audio track and, when the source asks for them, the subtitle track of a file, from Jellyfin's probe of it.</summary>
+    private static void ApplyTracks(Video video, TrackPreferences tracks, Action<int?, SubtitlePick?> apply)
     {
+        IReadOnlyList<MediaStream> streams;
         try
         {
-            var audio = video.GetMediaStreams().Where(s => s.Type == MediaStreamType.Audio).OrderBy(s => s.Index).ToList();
-            if (audio.Count <= 1)
-            {
-                return null;
-            }
-
-            var idx = audio.FindIndex(s => !string.IsNullOrEmpty(language) && string.Equals(s.Language, language, StringComparison.OrdinalIgnoreCase));
-            if (idx < 0)
-            {
-                idx = audio.FindIndex(s => s.IsDefault);
-            }
-
-            return idx < 0 ? null : idx;
+            streams = video.GetMediaStreams();
         }
         catch (Exception)
         {
-            return null;
+            apply(null, null);
+            return;
         }
+
+        var audio = TrackPicker.PickAudio(streams, tracks.AudioLanguage, out var matched);
+        var subtitle = tracks.SubtitleLanguage is null || (tracks.SubtitlesOnlyIfAudioMissing && matched)
+            ? null
+            : TrackPicker.PickSubtitle(streams, tracks.SubtitleLanguage);
+        apply(audio, subtitle);
     }
 }

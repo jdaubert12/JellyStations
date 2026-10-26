@@ -1198,6 +1198,9 @@
     src.MaxRating = src.MaxRating || null;
     src.Ratings = Array.isArray(src.Ratings) ? src.Ratings : [];
     src.AllowUnrated = !!src.AllowUnrated;
+    src.AudioLanguage = (src.AudioLanguage || '').trim().toLowerCase() || null;
+    src.SubtitleLanguage = (src.SubtitleLanguage || '').trim().toLowerCase() || null;
+    src.SubtitlesOnlyIfAudioMissing = !!src.SubtitlesOnlyIfAudioMissing;
     if (src.YearFrom !== undefined && src.YearFrom !== null && !(src.YearFrom > 0)) { src.YearFrom = null; }
     if (src.YearTo !== undefined && src.YearTo !== null && !(src.YearTo > 0)) { src.YearTo = null; }
     return src;
@@ -1248,10 +1251,41 @@
     if (src.YearFrom || src.YearTo) {
       parts.push((src.YearFrom || '…') + '–' + (src.YearTo || '…'));
     }
+    if (src.AudioLanguage) {
+      parts.push('audio ' + src.AudioLanguage);
+    }
+    if (src.SubtitleLanguage) {
+      parts.push('subs ' + src.SubtitleLanguage + (src.SubtitlesOnlyIfAudioMissing ? ' if needed' : ''));
+    }
     if (src.Weight > 1) {
       parts.push('×' + src.Weight);
     }
     return parts.join(' · ');
+  }
+
+  /** Common three-letter language codes offered when the source has no files to read them from. */
+  const COMMON_LANGUAGES = [['eng', 'English'], ['jpn', 'Japanese'], ['spa', 'Spanish'], ['fra', 'French'], ['deu', 'German'], ['ita', 'Italian'], ['por', 'Portuguese'], ['kor', 'Korean'], ['zho', 'Chinese'], ['rus', 'Russian'], ['hin', 'Hindi'], ['ara', 'Arabic']];
+
+  /**
+   * A select of languages for a source's audio or subtitle track: the first option is the "none / default" choice,
+   * the rest come from the item's files (Library/Items/{id}/Languages) or, when there are none, a common list;
+   * a value already saved but not in the list is kept as its own option.
+   */
+  function languageSelect(current, noneText, onChange) {
+    const select = el('select', { className: 'emby-select' }, [el('option', { value: '', text: noneText })]);
+    let known = [];
+    function fill(list) {
+      known = list;
+      while (select.options.length > 1) { select.remove(1); }
+      list.forEach(l => select.appendChild(el('option', { value: l.Code, text: l.Name + ' (' + l.Code + ')' + (l.Files ? ' · ' + l.Files + ' file' + (l.Files === 1 ? '' : 's') : '') })));
+      if (current && !list.some(l => l.Code === current)) {
+        select.appendChild(el('option', { value: current, text: current }));
+      }
+      select.value = current || '';
+    }
+    fill(COMMON_LANGUAGES.map(c => ({ Code: c[0], Name: c[1], Files: 0 })));
+    select.addEventListener('change', () => { current = select.value || null; onChange(current); });
+    return { select: select, fill: fill, known: () => known };
   }
 
   /** The "New station" page: one card per preset. */
@@ -3648,6 +3682,25 @@
         box.appendChild(unratedLabel);
         box.appendChild(numberField('From year', source.YearFrom, n => { source.YearFrom = n; }));
         box.appendChild(numberField('To year', source.YearTo, n => { source.YearTo = n; }));
+      }
+
+      // Audio and subtitle tracks for this source's items: an anime series can play in Japanese with English
+      // subtitles burned in while the rest of the station keeps the station's language.
+      const audio = languageSelect(source.AudioLanguage, 'Station default', v => { source.AudioLanguage = v; renderChips(); });
+      const subs = languageSelect(source.SubtitleLanguage, 'Off', v => { source.SubtitleLanguage = v; onlyIfLabel.hidden = !v; renderChips(); });
+      const onlyIf = el('input', { type: 'checkbox', className: 'emby-checkbox' });
+      onlyIf.checked = !!source.SubtitlesOnlyIfAudioMissing;
+      onlyIf.addEventListener('change', () => { source.SubtitlesOnlyIfAudioMissing = onlyIf.checked; renderChips(); });
+      const onlyIfLabel = el('label', { className: 'f row' }, [onlyIf, el('span', { text: 'Only when the audio language is missing' })]);
+      onlyIfLabel.hidden = !source.SubtitleLanguage;
+      box.appendChild(el('label', { className: 'f', title: 'Which audio track to play when a file has more than one' }, [el('span', { text: 'Audio' }), audio.select]));
+      box.appendChild(el('label', { className: 'f', title: 'Subtitles drawn into the picture for every viewer' }, [el('span', { text: 'Subtitles' }), subs.select]));
+      box.appendChild(onlyIfLabel);
+      if (source.ItemId) {
+        api('GET', 'Library/Items/' + source.ItemId + '/Languages').then(found => {
+          if (found && Array.isArray(found.Audio) && found.Audio.length) { audio.fill(found.Audio); }
+          if (found && Array.isArray(found.Subtitles)) { subs.fill(found.Subtitles); }
+        }).catch(() => {});
       }
 
       const weight = el('select', { className: 'emby-select', title: 'How often this source appears compared with the others' });

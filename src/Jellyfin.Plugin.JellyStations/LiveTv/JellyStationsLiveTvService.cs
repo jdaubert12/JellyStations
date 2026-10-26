@@ -38,6 +38,34 @@ public sealed class JellyStationsLiveTvService : ILiveTvService, ISupportsDirect
 
     public static bool TryParseChannelId(string? id, out Guid stationId) => Guid.TryParse(id, out stationId);
 
+    /// <summary>
+    /// The station behind an id Jellyfin hands back: a channel id (the station id itself) or a media source id,
+    /// which is a hash of the station and its output format (StreamSessionManager.MediaSourceId) and so has to be
+    /// found by comparison.
+    /// </summary>
+    public static bool TryResolveStationId(string? id, IEnumerable<Station> stations, Func<Station, EncodingProfile> profileOf, out Guid stationId)
+    {
+        stationId = Guid.Empty;
+        if (!Guid.TryParse(id, out var parsed))
+        {
+            return false;
+        }
+
+        foreach (var station in stations)
+        {
+            if (station.Id == parsed || string.Equals(StreamSessionManager.MediaSourceId(station, profileOf(station)), parsed.ToString("N"), StringComparison.OrdinalIgnoreCase))
+            {
+                stationId = station.Id;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryResolveStationId(string? id, out Guid stationId)
+        => TryResolveStationId(id, _stations.GetAll(), _stations.EffectiveProfile, out stationId);
+
     public Task<IEnumerable<ChannelInfo>> GetChannelsAsync(CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
@@ -215,7 +243,7 @@ public sealed class JellyStationsLiveTvService : ILiveTvService, ISupportsDirect
 
     public Task CloseLiveStream(string id, CancellationToken cancellationToken)
     {
-        if (TryParseChannelId(id, out var stationId))
+        if (TryResolveStationId(id, out var stationId))
         {
             var session = _sessions.Get(stationId);
             if (session is not null)
@@ -233,7 +261,7 @@ public sealed class JellyStationsLiveTvService : ILiveTvService, ISupportsDirect
 
     public Task ResetTuner(string id, CancellationToken cancellationToken)
     {
-        if (TryParseChannelId(id, out var stationId))
+        if (TryResolveStationId(id, out var stationId))
         {
             _sessions.RestartStation(stationId);
         }
