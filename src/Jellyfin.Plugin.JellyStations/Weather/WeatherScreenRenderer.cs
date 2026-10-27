@@ -66,6 +66,11 @@ public sealed class WeatherScreenRenderer
             sb.Append("radar|").Append(radar.SourceId).Append('|').Append(radar.Zoom).Append('|')
               .Append(radar.TimeUtc.ToString("yyyyMMddHHmm", CultureInfo.InvariantCulture)).Append('|')
               .Append(radar.Index).Append('/').Append(radar.Count).Append('|');
+            if (radar.RunUtc is { } run)
+            {
+                sb.Append("run").Append(run.ToString("yyyyMMddHHmm", CultureInfo.InvariantCulture)).Append('|');
+            }
+
             try
             {
                 sb.Append(File.GetLastWriteTimeUtc(radar.OverlayPath).Ticks).Append('|');

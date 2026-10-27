@@ -28,6 +28,7 @@ public sealed partial class RadarService : IDisposable
     private readonly StationRepository _stations;
     private readonly JellyStationsPaths _paths;
     private readonly IReadOnlyList<IRadarSource> _sources;
+    private readonly IReadOnlyList<IForecastRadarSource> _forecastSources;
     private readonly ILogger<RadarService> _logger;
     private readonly ConcurrentDictionary<Guid, RadarLoop> _loops = new();
     private readonly ConcurrentDictionary<Guid, RadarFetchStatus> _status = new();
@@ -37,11 +38,12 @@ public sealed partial class RadarService : IDisposable
     private int _disposed;
     private int _ticking;
 
-    public RadarService(StationRepository stations, JellyStationsPaths paths, IEnumerable<IRadarSource> sources, ILogger<RadarService> logger)
+    public RadarService(StationRepository stations, JellyStationsPaths paths, IEnumerable<IRadarSource> sources, IEnumerable<IForecastRadarSource> forecastSources, ILogger<RadarService> logger)
     {
         _stations = stations;
         _paths = paths;
         _sources = sources.ToList();
+        _forecastSources = forecastSources.ToList();
         _logger = logger;
         _stations.Changed += (_, _) => Nudge();
     }
@@ -89,14 +91,23 @@ public sealed partial class RadarService : IDisposable
 
     public RadarFetchStatus Status(Guid locationId) => _status.GetOrAdd(locationId, id => new RadarFetchStatus { LocationId = id });
 
-    /// <summary>Fetches every place of a station now; used by the editor's "Fetch now".</summary>
+    /// <summary>Fetches every place of a station now (radar and forecast radar, whichever the station shows); used by the editor's "Fetch now".</summary>
     public async Task<IReadOnlyList<RadarFetchStatus>> RefreshAsync(Station station, CancellationToken ct)
     {
         var result = new List<RadarFetchStatus>();
         foreach (var location in station.Weather.Locations.Where(l => l.IsValid))
         {
-            await FetchAsync(station, location, ct).ConfigureAwait(false);
-            result.Add(Status(location.Id));
+            if (station.Weather.ShowRadar)
+            {
+                await FetchAsync(station, location, ct).ConfigureAwait(false);
+                result.Add(Status(location.Id));
+            }
+
+            if (station.Weather.ShowForecastRadar)
+            {
+                await FetchForecastAsync(station, location, ct).ConfigureAwait(false);
+                result.Add(ForecastStatus(location.Id));
+            }
         }
 
         return result;
@@ -139,7 +150,7 @@ public sealed partial class RadarService : IDisposable
         try
         {
             var now = DateTime.UtcNow;
-            foreach (var station in _stations.GetAll().Where(s => s.Mode == ScheduleMode.Weather && s.Enabled && s.Weather.ShowRadar && SeasonWindows.IsActive(s, now)))
+            foreach (var station in _stations.GetAll().Where(s => s.Mode == ScheduleMode.Weather && s.Enabled && (s.Weather.ShowRadar || s.Weather.ShowForecastRadar) && SeasonWindows.IsActive(s, now)))
             {
                 foreach (var location in station.Weather.Locations.Where(l => l.IsValid))
                 {
@@ -148,9 +159,14 @@ public sealed partial class RadarService : IDisposable
                         return;
                     }
 
-                    if (IsDue(location.Id, station.Weather.RadarZoom, now))
+                    if (station.Weather.ShowRadar && IsDue(location.Id, station.Weather.RadarZoom, now))
                     {
                         await FetchAsync(station, location, _cts.Token).ConfigureAwait(false);
+                    }
+
+                    if (station.Weather.ShowForecastRadar && IsForecastDue(location.Id, station.Weather, now))
+                    {
+                        await FetchForecastAsync(station, location, _cts.Token).ConfigureAwait(false);
                     }
                 }
             }

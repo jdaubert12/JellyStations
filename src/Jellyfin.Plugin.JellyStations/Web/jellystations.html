@@ -618,6 +618,37 @@
                   <option value="Wide">Wide – about 2,000 miles across</option>
                 </select>
               </div>
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsWeatherForecastRadar">
+                  <span>Show the forecast radar screen</span>
+                </label>
+                <div class="fieldDescription checkboxFieldDescription">Where the rain is expected to go: the NOAA HRRR model's forecast reflectivity from now out to the look-ahead below, played as a loop right after the local radar, on the same map. Contiguous United States only (places elsewhere skip it). A new model run arrives every hour; frames are fetched as the window moves.</div>
+              </div>
+              <div id="tvsWeatherForecastRadarBox">
+                <div class="selectContainer">
+                  <label class="selectLabel" for="tvsWeatherForecastHours">Forecast radar look-ahead</label>
+                  <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsWeatherForecastHours">
+                    <option value="1">1 hour</option>
+                    <option value="2">2 hours</option>
+                    <option value="3">3 hours</option>
+                    <option value="4">4 hours</option>
+                    <option value="6">6 hours</option>
+                    <option value="9">9 hours</option>
+                    <option value="12">12 hours</option>
+                    <option value="18">18 hours (the model's limit)</option>
+                  </select>
+                </div>
+                <div class="selectContainer">
+                  <label class="selectLabel" for="tvsWeatherForecastStep">Forecast radar step</label>
+                  <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsWeatherForecastStep">
+                    <option value="15">15 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="60">1 hour</option>
+                  </select>
+                  <div class="fieldDescription">Minutes between frames. The loop is kept to 25 frames, so a long look-ahead at a short step plays at the next step up (12 hours at 15 minutes plays at 30; 18 hours plays at 1 hour).</div>
+                </div>
+              </div>
               <div class="checkboxContainer">
                 <label class="emby-checkbox-label">
                   <input is="emby-checkbox" type="checkbox" id="tvsWeatherTravel">
@@ -675,6 +706,7 @@
                   <option value="Hourly">Next 12 hours</option>
                   <option value="Daily">7-day forecast</option>
                   <option value="Radar">Local radar</option>
+                  <option value="ForecastRadar">Forecast radar</option>
                   <option value="Travel">Travel cities</option>
                 </select>
                 <select is="emby-select" class="emby-select" id="tvsWeatherPreviewPlace" title="Which place to preview"></select>

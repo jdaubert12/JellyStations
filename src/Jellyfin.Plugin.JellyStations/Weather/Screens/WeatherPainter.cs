@@ -22,8 +22,11 @@ public sealed record ScreenRequest(
     string Attribution,
     RadarFrameRequest? Radar = null);
 
-/// <summary>One frame of a radar loop as the painter draws it: which overlay image, when it is from, where in the loop it sits.</summary>
-public sealed record RadarFrameRequest(string SourceId, string SourceName, string Attribution, DateTime TimeUtc, string OverlayPath, int Index, int Count, int Zoom);
+/// <summary>
+/// One frame of a radar loop as the painter draws it: which overlay image, when it is from (or, for a forecast,
+/// valid for, with the model run it came from), where in the loop it sits.
+/// </summary>
+public sealed record RadarFrameRequest(string SourceId, string SourceName, string Attribution, DateTime TimeUtc, string OverlayPath, int Index, int Count, int Zoom, DateTime? RunUtc = null);
 
 /// <summary>The colours of one theme.</summary>
 public sealed record Theme(SKColor BgTop, SKColor BgBottom, SKColor Band, SKColor Panel, SKColor Text, SKColor Secondary, SKColor Accent, SKColor Cool, SKColor Low, SKColor Line, SKColor BandText, IconPalette Icons)
@@ -99,6 +102,7 @@ public sealed partial class WeatherPainter
                 Travel(ctx);
                 break;
             case WeatherScreenKind.Radar:
+            case WeatherScreenKind.ForecastRadar:
                 Radar(ctx);
                 break;
         }
@@ -182,6 +186,7 @@ public sealed partial class WeatherPainter
             WeatherScreenKind.Hourly => "NEXT 12 HOURS",
             WeatherScreenKind.Daily => "7-DAY FORECAST",
             WeatherScreenKind.Radar => "LOCAL RADAR",
+            WeatherScreenKind.ForecastRadar => "FORECAST RADAR",
             _ => "AROUND THE MAP"
         };
         Text(x, label, x.W - 80, 78, 30, FontWeight.SemiBold, x.T.Text, SKTextAlign.Right);
@@ -194,6 +199,10 @@ public sealed partial class WeatherPainter
         else if (x.R.Kind == WeatherScreenKind.Radar && x.R.Radar is { } frame)
         {
             under = "As of " + Units.Clock(frame.TimeUtc + (x.NowLocal - x.R.NowUtc), x.C.TwentyFourHourClock);
+        }
+        else if (x.R.Kind == WeatherScreenKind.ForecastRadar && x.R.Radar is { } forecast)
+        {
+            under = "Forecast for " + Units.Clock(forecast.TimeUtc + (x.NowLocal - x.R.NowUtc), x.C.TwentyFourHourClock);
         }
         else if (x.R.Kind != WeatherScreenKind.Travel)
         {

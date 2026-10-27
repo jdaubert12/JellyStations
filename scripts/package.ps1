@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.18.0.0"
+$version = "1.19.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Local radar on the weather channel. After each place's current conditions the channel now shows a loop of the last three quarters of an hour of precipitation radar over a map of the area, with nearby towns, a light-to-heavy legend and the frame clock. NOAA NEXRAD (through the Iowa Environmental Mesonet's time-enabled WMS) covers places in the contiguous United States; RainViewer covers the rest of the world. Frames are fetched every five minutes while the station is on, only the new ones each time, and cached under data/JellyStations/weather/radar. The map (coasts, lakes, borders, towns) is Natural Earth data packed into the plugin and drawn in the theme's colours, with four map areas to choose from (metro, state, regional, wide). The editor's forecast status shows the radar source and frame count per place, Fetch now refreshes radar too, and Preview screen can show the radar screen. Existing weather stations get the radar screen; untick Show the local radar screen to go back."
+    changelog = "Forecast radar on the weather channel. After the local radar each place now gets a forecast radar screen on the same map: where NOAA's HRRR model (a new run every hour, 15-minute steps out to 18 hours) expects the rain and snow to go, from now out to a configurable look-ahead (1 to 18 hours, default 3) at a configurable step (15 or 30 minutes or an hour, default 15); the loop is kept to 25 frames, so a long look-ahead at a short step plays at the next step up. The header names the time each frame is a forecast for and the map credits the model run. Tiles come from the Iowa Environmental Mesonet, so the screen is for places in the contiguous United States only; other places skip it. The plugin finds the newest published run by probing, fetches the frames from now to the look-ahead plus two hours, tops the window up as the clock moves, and caches them under data/JellyStations/weather/radar/<place>/forecast. The editor gets the checkbox, the look-ahead and step selects, a Forecast radar column in the forecast status, Fetch now and Preview screen for it. Existing weather stations get the screen; untick Show the forecast radar screen to go back."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

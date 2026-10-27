@@ -1,4 +1,5 @@
 using Jellyfin.Plugin.JellyStations.Models;
+using Jellyfin.Plugin.JellyStations.Scheduling;
 using Jellyfin.Plugin.JellyStations.Weather.Radar;
 using SkiaSharp;
 
@@ -37,7 +38,7 @@ public sealed partial class WeatherPainter
         var frame = x.R.Radar;
         if (place is null || frame is null)
         {
-            Unavailable(x, "Radar not available here yet", place?.Location.Name);
+            Unavailable(x, x.R.Kind == WeatherScreenKind.ForecastRadar ? "Forecast radar not available here yet" : "Radar not available here yet", place?.Location.Name);
             return;
         }
 
@@ -98,7 +99,10 @@ public sealed partial class WeatherPainter
 
         FrameClock(x, frame, rect, pal);
         Legend(x, rect, pal);
-        HaloText(x, frame.SourceName, rect.Right - 20, rect.Top + 36, 20, FontWeight.Regular, x.T.Text.WithAlpha(0xCC), pal.Halo, SKTextAlign.Right);
+        var credit = frame.RunUtc is { } run
+            ? frame.SourceName + " \u00b7 " + Units.Clock(run + (x.NowLocal - x.R.NowUtc), x.C.TwentyFourHourClock) + " run"
+            : frame.SourceName;
+        HaloText(x, credit, rect.Right - 20, rect.Top + 36, 20, FontWeight.Regular, x.T.Text.WithAlpha(0xCC), pal.Halo, SKTextAlign.Right);
         x.Canvas.Restore();
 
         using var border = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 2, Color = x.T.Line };

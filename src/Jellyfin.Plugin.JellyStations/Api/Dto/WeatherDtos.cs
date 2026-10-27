@@ -63,4 +63,18 @@ public sealed class WeatherLocationStatusDto
     public DateTime? RadarLatestUtc { get; set; }
 
     public string? RadarError { get; set; }
+
+    /// <summary>The forecast radar source covering the place; null when none does or nothing was fetched yet.</summary>
+    public string? ForecastRadarSource { get; set; }
+
+    /// <summary>Forecast frames on hand from the current model run.</summary>
+    public int ForecastRadarFrames { get; set; }
+
+    /// <summary>The model run the forecast frames come from.</summary>
+    public DateTime? ForecastRadarRunUtc { get; set; }
+
+    /// <summary>The furthest forecast frame on hand.</summary>
+    public DateTime? ForecastRadarLatestUtc { get; set; }
+
+    public string? ForecastRadarError { get; set; }
 }

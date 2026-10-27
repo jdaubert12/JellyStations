@@ -59,7 +59,9 @@ public sealed class WeatherChannelService
 
         var zone = WeeklySlotScheduler.ResolveTimeZone(station.TimeZoneId);
         var loops = locations.Select(l => config.ShowRadar ? _radar.Get(l.Id) : null).ToList();
-        var screens = WeatherCycle.Timeline(config, locations.Count, nowUtc, entry.EndUtc, entry.StartUtc, zone, i => loops[i] is { IsPlayable: true });
+        var forecasts = locations.Select(l => config.ShowForecastRadar ? _radar.GetForecast(l.Id) : null).ToList();
+        var forecastFrames = forecasts.Select(f => f?.ForecastFrames(nowUtc, config.ForecastRadarHours, config.ForecastRadarStepMinutes) ?? Array.Empty<RadarFrame>()).ToList();
+        var screens = WeatherCycle.Timeline(config, locations.Count, nowUtc, entry.EndUtc, entry.StartUtc, zone, i => loops[i] is { IsPlayable: true }, i => forecastFrames[i].Count >= 2);
         if (screens.Count == 0)
         {
             return null;
@@ -97,7 +99,15 @@ public sealed class WeatherChannelService
             var loop = s.Screen.Kind == WeatherScreenKind.Radar && place is not null ? loops[s.Screen.LocationIndex] : null;
             if (loop is { IsPlayable: true })
             {
-                var listPath = RadarSequence(station.Id, loop, s, place!, places, config, nowUtc, zone, logoPath, profile, attribution);
+                var listPath = RadarSequence(station.Id, loop, loop.Frames, s, place!, places, config, nowUtc, zone, logoPath, profile, attribution);
+                slides.Add(new WeatherSlide(listPath, s.Duration.TotalSeconds, unixStart + offset, IsSequence: true));
+                continue;
+            }
+
+            var forecast = s.Screen.Kind == WeatherScreenKind.ForecastRadar && place is not null ? forecasts[s.Screen.LocationIndex] : null;
+            if (forecast is not null && forecastFrames[s.Screen.LocationIndex].Count >= 2)
+            {
+                var listPath = RadarSequence(station.Id, forecast, forecastFrames[s.Screen.LocationIndex], s, place!, places, config, nowUtc, zone, logoPath, profile, attribution);
                 slides.Add(new WeatherSlide(listPath, s.Duration.TotalSeconds, unixStart + offset, IsSequence: true));
                 continue;
             }
@@ -152,10 +162,10 @@ public sealed class WeatherChannelService
     /// that plays them on <see cref="RadarTiming"/>'s clock; the list is named by its content, so a repeat of the
     /// same screen with the same frames reuses it.
     /// </summary>
-    private string RadarSequence(Guid stationId, RadarLoop loop, TimedScreen s, PlaceWeather place, IReadOnlyList<PlaceWeather> places, WeatherConfig config, DateTime nowUtc, TimeZoneInfo zone, string? logoPath, EncodingProfile profile, string attribution)
+    private string RadarSequence(Guid stationId, RadarLoop loop, IReadOnlyList<RadarFrame> frames, TimedScreen s, PlaceWeather place, IReadOnlyList<PlaceWeather> places, WeatherConfig config, DateTime nowUtc, TimeZoneInfo zone, string? logoPath, EncodingProfile profile, string attribution)
     {
-        var plan = RadarTiming.Plan(s.Duration.TotalSeconds + WeatherSegment.FadeSeconds + 1.0, loop.Frames.Count);
-        var framePaths = new string?[loop.Frames.Count];
+        var plan = RadarTiming.Plan(s.Duration.TotalSeconds + WeatherSegment.FadeSeconds + 1.0, frames.Count);
+        var framePaths = new string?[frames.Count];
         var entries = new List<(string Path, double Seconds)>(plan.Count);
         var zoom = WebMercator.ZoomOf(loop.Zoom);
         foreach (var (index, seconds) in plan)
@@ -163,9 +173,9 @@ public sealed class WeatherChannelService
             var path = framePaths[index];
             if (path is null)
             {
-                var frame = loop.Frames[index];
-                var radar = new RadarFrameRequest(loop.SourceId, loop.SourceName, loop.Attribution, frame.TimeUtc, frame.Path, index, loop.Frames.Count, zoom);
-                var request = new ScreenRequest(WeatherScreenKind.Radar, place, places, config, nowUtc, zone, logoPath, profile.Width, profile.Height, attribution, radar);
+                var frame = frames[index];
+                var radar = new RadarFrameRequest(loop.SourceId, loop.SourceName, loop.Attribution, frame.TimeUtc, frame.Path, index, frames.Count, zoom, loop.RunUtc);
+                var request = new ScreenRequest(s.Screen.Kind, place, places, config, nowUtc, zone, logoPath, profile.Width, profile.Height, attribution, radar);
                 framePaths[index] = path = _renderer.Render(stationId, request);
             }
 

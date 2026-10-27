@@ -209,7 +209,7 @@ public class RadarTests
     [Fact]
     public void Cycle_PutsRadarRightAfterCurrentConditions_OnlyWherePlacesHaveIt()
     {
-        var config = new WeatherConfig { ShowRadar = true };
+        var config = new WeatherConfig { ShowRadar = true, ShowForecastRadar = false };
 
         var all = WeatherCycle.Pass(config, 2);
         Assert.Equal(9, all.Count);
@@ -222,11 +222,144 @@ public class RadarTests
         Assert.Single(second, s => s.Kind == WeatherScreenKind.Radar);
         Assert.Equal(1, second.Single(s => s.Kind == WeatherScreenKind.Radar).LocationIndex);
 
-        Assert.Equal(7, WeatherCycle.Pass(new WeatherConfig { ShowRadar = false }, 2).Count);
+        Assert.Equal(7, WeatherCycle.Pass(new WeatherConfig { ShowRadar = false, ShowForecastRadar = false }, 2).Count);
         Assert.DoesNotContain(WeatherCycle.ShortPass(config, 2), s => s.Kind == WeatherScreenKind.Radar);
 
         var timeline = WeatherCycle.Timeline(config, 1, Now, Now.AddSeconds(40), Now, TimeZoneInfo.Utc, _ => true);
         Assert.Equal(WeatherScreenKind.Radar, timeline[1].Screen.Kind);
+    }
+
+    [Fact]
+    public void Cycle_PutsForecastRadarAfterTheRadar_OnlyWherePlacesHaveIt()
+    {
+        var config = new WeatherConfig { ShowRadar = true, ShowForecastRadar = true };
+
+        var all = WeatherCycle.Pass(config, 2);
+        Assert.Equal(11, all.Count);
+        Assert.Equal(new[] { WeatherScreenKind.Current, WeatherScreenKind.Radar, WeatherScreenKind.ForecastRadar, WeatherScreenKind.Hourly, WeatherScreenKind.Daily }, all.Take(5).Select(s => s.Kind));
+
+        // Tokyo (index 1) has a past loop from RainViewer but no HRRR forecast.
+        var mixed = WeatherCycle.Pass(config, 2, _ => true, i => i == 0);
+        Assert.Equal(10, mixed.Count);
+        Assert.Equal(0, mixed.Single(s => s.Kind == WeatherScreenKind.ForecastRadar).LocationIndex);
+
+        // Forecast without the past loop still sits right after current conditions.
+        var forecastOnly = WeatherCycle.Pass(new WeatherConfig { ShowRadar = false, ShowForecastRadar = true }, 1);
+        Assert.Equal(new[] { WeatherScreenKind.Current, WeatherScreenKind.ForecastRadar, WeatherScreenKind.Hourly, WeatherScreenKind.Daily }, forecastOnly.Select(s => s.Kind));
+        Assert.DoesNotContain(WeatherCycle.ShortPass(config, 2), s => s.Kind == WeatherScreenKind.ForecastRadar);
+
+        var timeline = WeatherCycle.Timeline(config, 1, Now, Now.AddSeconds(40), Now, TimeZoneInfo.Utc, _ => false, _ => true);
+        Assert.Equal(WeatherScreenKind.ForecastRadar, timeline[1].Screen.Kind);
+    }
+
+    // ---- The HRRR forecast ---------------------------------------------------------------------
+
+    [Fact]
+    public void Hrrr_NamesTilesByRunAndForecastMinute_AndProbesTheLastFewHours()
+    {
+        var run = new DateTime(2026, 10, 27, 1, 0, 0, DateTimeKind.Utc);
+
+        Assert.Equal("hrrr::REFD-F0045-202610270100", HrrrSource.LayerName(run, 45));
+        Assert.Equal("https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/hrrr::REFD-F1080-202610270100/7/37/48.png", HrrrSource.TileUrl(run, 1080, 7, 37, 48));
+
+        var candidates = HrrrSource.RunCandidates(new DateTime(2026, 10, 27, 2, 44, 0, DateTimeKind.Utc)).ToList();
+        Assert.Equal(HrrrSource.ProbeHours + 1, candidates.Count);
+        Assert.Equal(new DateTime(2026, 10, 27, 2, 0, 0, DateTimeKind.Utc), candidates[0]);
+        Assert.Equal(run, candidates[1]);
+        Assert.All(candidates, c => Assert.Equal(0, c.Minute));
+
+        var source = new HrrrSource(null!, Microsoft.Extensions.Logging.Abstractions.NullLogger<HrrrSource>.Instance);
+        Assert.True(source.Covers(Boston.Latitude, Boston.Longitude));
+        Assert.True(source.Covers(39.74, -104.99));
+        Assert.False(source.Covers(35.68, 139.69));
+        Assert.False(source.Covers(21.31, -157.86));
+        Assert.Equal(1080, source.MaxMinutes);
+    }
+
+    [Fact]
+    public void ForecastMinutes_RunFromTheStepBeforeNow_ToTheLookAheadPlusTheNextRun()
+    {
+        var run = new DateTime(2026, 10, 27, 1, 0, 0, DateTimeKind.Utc);
+        var now = run.AddMinutes(52);
+
+        var minutes = RadarService.ForecastMinutes(run, now, hours: 3, stepMinutes: 15, maxMinutes: 1080);
+        Assert.Equal(45, minutes[0]);
+        Assert.Equal(15, minutes[1] - minutes[0]);
+        Assert.Equal(360, minutes[^1]);   // 52 + 180 + 120 = 352, rounded up to the step
+        Assert.Equal(22, minutes.Count);
+
+        var hourly = RadarService.ForecastMinutes(run, now, 18, 60, 1080);
+        Assert.Equal(0, hourly[0]);
+        Assert.Equal(1080, hourly[^1]);
+
+        Assert.Equal(0, RadarService.ForecastMinutes(run, run.AddMinutes(-5), 1, 15, 1080)[0]);
+        Assert.Empty(RadarService.ForecastMinutes(run, now, 1, 0, 1080));
+    }
+
+    [Fact]
+    public void ForecastLoop_PlaysFromNowOutToTheLookAhead_AtTheStationsStep()
+    {
+        var run = new DateTime(2026, 10, 27, 1, 0, 0, DateTimeKind.Utc);
+        var frames = Enumerable.Range(0, 25).Select(i => new RadarFrame(run.AddMinutes(i * 15), "f" + i)).ToList();
+        var loop = new RadarLoop("hrrr", "HRRR", "credit", RadarZoom.State, frames, run.AddMinutes(50), run);
+        Assert.True(loop.IsForecast);
+
+        var now = run.AddMinutes(52);
+        var play = loop.ForecastFrames(now, 3, 15);
+        Assert.Equal(13, play.Count);
+        Assert.Equal(run.AddMinutes(45), play[0].TimeUtc);
+        Assert.Equal(run.AddMinutes(225), play[^1].TimeUtc);
+
+        var coarse = loop.ForecastFrames(now, 3, 30);
+        Assert.Equal(run.AddMinutes(30), coarse[0].TimeUtc);
+        Assert.All(coarse, f => Assert.Equal(0, (int)(f.TimeUtc - run).TotalMinutes % 30));
+        Assert.Equal(7, coarse.Count);
+
+        // Frames beyond what was fetched are simply not there; a stale run yields nothing to play.
+        Assert.Equal(22, loop.ForecastFrames(now, 18, 15).Count);
+        Assert.Empty(loop.ForecastFrames(run.AddHours(9), 3, 15));
+        Assert.Empty(new RadarLoop("nexrad", "n", "a", RadarZoom.State, frames, now).ForecastFrames(now, 3, 15));
+    }
+
+    [Fact]
+    public void Config_CoarsensTheForecastStep_SoTheLoopStaysUnder25Frames()
+    {
+        var c = new WeatherConfig { ForecastRadarHours = 3, ForecastRadarStepMinutes = 15 };
+        c.Normalize();
+        Assert.Equal(15, c.ForecastRadarStepMinutes);
+        Assert.Equal(13, c.ForecastRadarFrameCount);
+
+        c = new WeatherConfig { ForecastRadarHours = 6, ForecastRadarStepMinutes = 15 };
+        c.Normalize();
+        Assert.Equal(15, c.ForecastRadarStepMinutes);
+        Assert.Equal(25, c.ForecastRadarFrameCount);
+
+        c = new WeatherConfig { ForecastRadarHours = 12, ForecastRadarStepMinutes = 15 };
+        c.Normalize();
+        Assert.Equal(30, c.ForecastRadarStepMinutes);
+
+        c = new WeatherConfig { ForecastRadarHours = 18, ForecastRadarStepMinutes = 15 };
+        c.Normalize();
+        Assert.Equal(60, c.ForecastRadarStepMinutes);
+        Assert.Equal(19, c.ForecastRadarFrameCount);
+
+        c = new WeatherConfig { ForecastRadarHours = 40, ForecastRadarStepMinutes = 20 };
+        c.Normalize();
+        Assert.Equal(18, c.ForecastRadarHours);
+        Assert.Equal(60, c.ForecastRadarStepMinutes);
+
+        c = new WeatherConfig { ForecastRadarHours = 0, ForecastRadarStepMinutes = 0 };
+        c.Normalize();
+        Assert.Equal(1, c.ForecastRadarHours);
+        Assert.Equal(15, c.ForecastRadarStepMinutes);
+    }
+
+    [Fact]
+    public void ForecastFrameFiles_AreNamedByRunAndMinute()
+    {
+        var run = new DateTime(2026, 10, 27, 1, 0, 0, DateTimeKind.Utc);
+        Assert.Equal("hrrr-metro-202610270100-f0045.png", RadarService.ForecastFrameFileName("hrrr", RadarZoom.Metro, run, 45));
+        Assert.Equal("hrrr-state-202610270100-f1080.png", RadarService.ForecastFrameFileName("hrrr", RadarZoom.State, run, 1080));
     }
 
     // ---- The base map and the painted screen --------------------------------------------------
@@ -298,5 +431,19 @@ public class RadarTests
         var c = WeatherScreenRenderer.FileName(new ScreenRequest(WeatherScreenKind.Radar, places[0], places, config, Now, TimeZoneInfo.Utc, null, 1920, 1080, "x", frame with { TimeUtc = Now.AddMinutes(-12) }));
         Assert.NotEqual(a, b);
         Assert.NotEqual(a, c);
+
+        // The forecast screen: same map, "FORECAST RADAR" header, the run in the credit; its own cache key per run.
+        var run = new DateTime(2026, 10, 26, 21, 0, 0, DateTimeKind.Utc);
+        var forecast = new RadarFrameRequest("hrrr", "NOAA HRRR via Iowa Environmental Mesonet", "Forecast radar: NOAA HRRR, Iowa Environmental Mesonet", Now.AddMinutes(128), overlay, 12, 13, 8, run);
+        var forecastRequest = new ScreenRequest(WeatherScreenKind.ForecastRadar, places[0], places, config, Now, TimeZoneInfo.Utc, null, 1920, 1080, "Weather data by Open-Meteo.com", forecast);
+        painter.Paint(forecastRequest, Path.Combine(dir, "forecast-radar.png"));
+        Assert.True(new FileInfo(Path.Combine(dir, "forecast-radar.png")).Length > 40_000);
+        painter.Paint(new ScreenRequest(WeatherScreenKind.ForecastRadar, places[0], places, config, Now, TimeZoneInfo.Utc, null, 1920, 1080, "x"), Path.Combine(dir, "forecast-none.png"));
+        Assert.True(File.Exists(Path.Combine(dir, "forecast-none.png")));
+
+        var f1 = WeatherScreenRenderer.FileName(forecastRequest);
+        var f2 = WeatherScreenRenderer.FileName(forecastRequest with { Radar = forecast with { RunUtc = run.AddHours(1) } });
+        Assert.NotEqual(f1, f2);
+        Assert.NotEqual(f1, WeatherScreenRenderer.FileName(forecastRequest with { Kind = WeatherScreenKind.Radar }));
     }
 }

@@ -88,7 +88,7 @@ public sealed class WeatherController : ControllerBase
         }
 
         await _weather.RefreshAsync(station, ct).ConfigureAwait(false);
-        if (station.Weather.ShowRadar)
+        if (station.Weather.ShowRadar || station.Weather.ShowForecastRadar)
         {
             await _radar.RefreshAsync(station, ct).ConfigureAwait(false);
         }
@@ -138,6 +138,19 @@ public sealed class WeatherController : ControllerBase
             var frame = loop.Latest;
             radar = new RadarFrameRequest(loop.SourceId, loop.SourceName, loop.Attribution, frame.TimeUtc, frame.Path, loop.Frames.Count - 1, loop.Frames.Count, WebMercator.ZoomOf(loop.Zoom));
         }
+        else if (kind == WeatherScreenKind.ForecastRadar && place is not null)
+        {
+            var loop = _radar.GetForecast(place.Location.Id);
+            var frames = loop?.ForecastFrames(now, config.ForecastRadarHours, config.ForecastRadarStepMinutes) ?? Array.Empty<RadarFrame>();
+            if (loop is null || frames.Count == 0)
+            {
+                return NotFound(new ValidationErrorDto { Errors = new List<string> { "No forecast radar frames for " + place.Location.Name + " yet." } });
+            }
+
+            // The furthest frame: it shows where the forecast takes the rain, which is the point of the screen.
+            var frame = frames[^1];
+            radar = new RadarFrameRequest(loop.SourceId, loop.SourceName, loop.Attribution, frame.TimeUtc, frame.Path, frames.Count - 1, frames.Count, WebMercator.ZoomOf(loop.Zoom), loop.RunUtc);
+        }
 
         var w = Math.Clamp(width, 320, 1920);
         var h = w * 9 / 16;
@@ -158,12 +171,19 @@ public sealed class WeatherController : ControllerBase
             var report = _weather.Get(location.Id);
             var radarStatus = _radar.Status(location.Id);
             var loop = _radar.Get(location.Id);
+            var forecastStatus = _radar.ForecastStatus(location.Id);
+            var forecast = _radar.GetForecast(location.Id);
             dto.Locations.Add(new WeatherLocationStatusDto
             {
                 RadarSource = radarStatus.SourceName ?? loop?.SourceName,
                 RadarFrames = loop?.Frames.Count ?? 0,
                 RadarLatestUtc = loop?.Latest.TimeUtc,
                 RadarError = radarStatus.LastError,
+                ForecastRadarSource = forecastStatus.SourceName ?? forecast?.SourceName,
+                ForecastRadarFrames = forecast?.Frames.Count ?? 0,
+                ForecastRadarRunUtc = forecast?.RunUtc ?? forecastStatus.RunUtc,
+                ForecastRadarLatestUtc = forecast?.Latest.TimeUtc,
+                ForecastRadarError = forecastStatus.LastError,
                 LocationId = location.Id,
                 Name = location.Name,
                 Valid = location.IsValid,

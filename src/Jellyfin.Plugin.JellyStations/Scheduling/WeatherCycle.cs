@@ -18,7 +18,10 @@ public enum WeatherScreenKind
     Travel,
 
     /// <summary>The last three quarters of an hour of precipitation radar around one place, as a loop.</summary>
-    Radar
+    Radar,
+
+    /// <summary>Where the precipitation is forecast to go over the next hours around one place, as a loop.</summary>
+    ForecastRadar
 }
 
 /// <summary>One screen of the pass: which place (index into the station's list, -1 for all) and what.</summary>
@@ -45,9 +48,10 @@ public static class WeatherCycle
     /// <summary>
     /// The screens of one full pass for a station with <paramref name="locationCount"/> places. The radar screen
     /// follows current conditions for every place that has a radar loop (<paramref name="hasRadar"/>; null = all
-    /// of them), so a place outside any coverage simply skips it.
+    /// of them), so a place outside any coverage simply skips it; the forecast radar follows it the same way
+    /// (<paramref name="hasForecastRadar"/>).
     /// </summary>
-    public static IReadOnlyList<CycleScreen> Pass(WeatherConfig c, int locationCount, Func<int, bool>? hasRadar = null)
+    public static IReadOnlyList<CycleScreen> Pass(WeatherConfig c, int locationCount, Func<int, bool>? hasRadar = null, Func<int, bool>? hasForecastRadar = null)
     {
         var list = new List<CycleScreen>();
         for (var i = 0; i < locationCount; i++)
@@ -56,6 +60,11 @@ public static class WeatherCycle
             if (c.ShowRadar && (hasRadar?.Invoke(i) ?? true))
             {
                 list.Add(new CycleScreen(i, WeatherScreenKind.Radar));
+            }
+
+            if (c.ShowForecastRadar && (hasForecastRadar?.Invoke(i) ?? true))
+            {
+                list.Add(new CycleScreen(i, WeatherScreenKind.ForecastRadar));
             }
 
             if (c.ShowHourly)
@@ -94,14 +103,14 @@ public static class WeatherCycle
         return list;
     }
 
-    public static TimeSpan PassLength(WeatherConfig c, int locationCount, Func<int, bool>? hasRadar = null) => TimeSpan.FromSeconds((double)Pass(c, locationCount, hasRadar).Count * c.ScreenSeconds);
+    public static TimeSpan PassLength(WeatherConfig c, int locationCount, Func<int, bool>? hasRadar = null, Func<int, bool>? hasForecastRadar = null) => TimeSpan.FromSeconds((double)Pass(c, locationCount, hasRadar, hasForecastRadar).Count * c.ScreenSeconds);
 
     /// <summary>
     /// The screens on air from <paramref name="fromUtc"/> until <paramref name="toUtc"/>, in order, the first and
     /// last cut to the window. <paramref name="cycleStartUtc"/> is where passes are counted from when "on the 8s"
     /// is off (the guide entry's start).
     /// </summary>
-    public static IReadOnlyList<TimedScreen> Timeline(WeatherConfig c, int locationCount, DateTime fromUtc, DateTime toUtc, DateTime cycleStartUtc, TimeZoneInfo zone, Func<int, bool>? hasRadar = null)
+    public static IReadOnlyList<TimedScreen> Timeline(WeatherConfig c, int locationCount, DateTime fromUtc, DateTime toUtc, DateTime cycleStartUtc, TimeZoneInfo zone, Func<int, bool>? hasRadar = null, Func<int, bool>? hasForecastRadar = null)
     {
         var result = new List<TimedScreen>();
         if (locationCount <= 0 || toUtc <= fromUtc)
@@ -115,8 +124,8 @@ public static class WeatherCycle
         while (cursor < toUtc && guard++ < 10000)
         {
             var (frameStart, frameEnd, screens) = c.OnTheEights
-                ? EightsFrame(c, locationCount, cursor, zone, screen, hasRadar)
-                : PassFrame(c, locationCount, cursor, cycleStartUtc, screen, hasRadar);
+                ? EightsFrame(c, locationCount, cursor, zone, screen, hasRadar, hasForecastRadar)
+                : PassFrame(c, locationCount, cursor, cycleStartUtc, screen, hasRadar, hasForecastRadar);
 
             // Walk the frame's screens from the cursor.
             var t = frameStart;
@@ -158,9 +167,9 @@ public static class WeatherCycle
     }
 
     /// <summary>Without "on the 8s": the pass containing <paramref name="utc"/>, counted from the cycle start.</summary>
-    private static (DateTime Start, DateTime End, IReadOnlyList<CycleScreen> Screens) PassFrame(WeatherConfig c, int locationCount, DateTime utc, DateTime cycleStartUtc, TimeSpan screen, Func<int, bool>? hasRadar)
+    private static (DateTime Start, DateTime End, IReadOnlyList<CycleScreen> Screens) PassFrame(WeatherConfig c, int locationCount, DateTime utc, DateTime cycleStartUtc, TimeSpan screen, Func<int, bool>? hasRadar, Func<int, bool>? hasForecastRadar)
     {
-        var pass = Pass(c, locationCount, hasRadar);
+        var pass = Pass(c, locationCount, hasRadar, hasForecastRadar);
         var length = TimeSpan.FromTicks(screen.Ticks * pass.Count);
         var elapsed = utc.Ticks - cycleStartUtc.Ticks;
         var k = Padding.FloorDiv(elapsed, length.Ticks);
@@ -172,11 +181,11 @@ public static class WeatherCycle
     /// With "on the 8s": the ten-minute window containing <paramref name="utc"/> (station local minutes 08-18, 18-28,
     /// ...), filled with one full pass and then the short pass repeated until the window ends.
     /// </summary>
-    private static (DateTime Start, DateTime End, IReadOnlyList<CycleScreen> Screens) EightsFrame(WeatherConfig c, int locationCount, DateTime utc, TimeZoneInfo zone, TimeSpan screen, Func<int, bool>? hasRadar)
+    private static (DateTime Start, DateTime End, IReadOnlyList<CycleScreen> Screens) EightsFrame(WeatherConfig c, int locationCount, DateTime utc, TimeZoneInfo zone, TimeSpan screen, Func<int, bool>? hasRadar, Func<int, bool>? hasForecastRadar)
     {
         var windowStart = WindowStart(utc, zone);
         var windowEnd = windowStart + EightsWindow;
-        var screens = new List<CycleScreen>(Pass(c, locationCount, hasRadar));
+        var screens = new List<CycleScreen>(Pass(c, locationCount, hasRadar, hasForecastRadar));
         var shortPass = ShortPass(c, locationCount);
         var slots = (int)Math.Ceiling(EightsWindow.Ticks / (double)screen.Ticks);
         while (screens.Count < slots && shortPass.Count > 0)

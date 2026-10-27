@@ -232,6 +232,24 @@ towns) is [Natural Earth](https://www.naturalearthdata.com/) 1:10m data (public 
 and packed into the plugin (`dev/basemap/` has the build script), so nothing but the radar itself is
 fetched. The editor's forecast status shows the radar source, frame count and newest frame per place.
 
+### Forecast radar
+
+With **Show the forecast radar screen** (on by default) the local radar is followed by a **forecast
+radar** screen on the same map: where the model expects the rain and snow to go, from now out to a
+configurable **look-ahead** (1 to 18 hours, default 3) at a configurable **step** (15 or 30 minutes or
+an hour, default 15). The loop is kept to 25 frames, so a long look-ahead at a short step plays at
+the next step up (12 hours at 15 minutes plays at 30). The header says which time each frame is a
+forecast for and the map credits the model run it comes from.
+
+The frames are NOAA's **HRRR** model (High-Resolution Rapid Refresh: a new run every hour, forecast
+reflectivity every 15 minutes out to 18 hours), served as map tiles by the
+[Iowa Environmental Mesonet](https://mesonet.agron.iastate.edu/ogc/), so the screen is for places in
+the contiguous United States only; places elsewhere skip it. The plugin finds the newest published run
+by probing the last few hours, fetches the frames from now to the look-ahead plus two hours (so the loop
+stays whole until the next run is up), tops the window up as the clock moves, and keeps them under
+`data/JellyStations/weather/radar/<place>/forecast/`. The editor's forecast status shows the run, the
+frame count and how far out the frames reach; **Preview screen** shows the furthest frame.
+
 ### Music
 
 **Music** plays underneath from two kinds of source, which can be combined: items from your Jellyfin

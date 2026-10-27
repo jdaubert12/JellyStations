@@ -5,10 +5,13 @@ namespace Jellyfin.Plugin.JellyStations.Weather.Radar;
 /// <summary>One fetched radar frame: its time and the overlay PNG on disk.</summary>
 public sealed record RadarFrame(DateTime TimeUtc, string Path);
 
-/// <summary>The frames on hand for one place, oldest first, all from one source at one zoom.</summary>
+/// <summary>
+/// The frames on hand for one place, oldest first, all from one source at one zoom. A past loop's frames are
+/// observations; a forecast loop's (<see cref="RunUtc"/> set) are the valid times of one model run's forecasts.
+/// </summary>
 public sealed class RadarLoop
 {
-    public RadarLoop(string sourceId, string sourceName, string attribution, RadarZoom zoom, IReadOnlyList<RadarFrame> frames, DateTime fetchedUtc)
+    public RadarLoop(string sourceId, string sourceName, string attribution, RadarZoom zoom, IReadOnlyList<RadarFrame> frames, DateTime fetchedUtc, DateTime? runUtc = null)
     {
         SourceId = sourceId;
         SourceName = sourceName;
@@ -16,7 +19,13 @@ public sealed class RadarLoop
         Zoom = zoom;
         Frames = frames;
         FetchedUtc = fetchedUtc;
+        RunUtc = runUtc;
     }
+
+    /// <summary>The model run the forecast frames come from; null for a loop of observations.</summary>
+    public DateTime? RunUtc { get; }
+
+    public bool IsForecast => RunUtc is not null;
 
     public string SourceId { get; }
 
@@ -34,6 +43,26 @@ public sealed class RadarLoop
 
     /// <summary>Two frames at least: one frame is a still, not a loop.</summary>
     public bool IsPlayable => Frames.Count >= 2;
+
+    /// <summary>
+    /// The forecast frames to play now: the latest one valid at or before <paramref name="nowUtc"/> (within a
+    /// step of it) and then one per <paramref name="stepMinutes"/> out to <paramref name="hours"/> ahead, taken
+    /// from whatever minutes of the run are on hand. Empty for a loop of observations.
+    /// </summary>
+    public IReadOnlyList<RadarFrame> ForecastFrames(DateTime nowUtc, int hours, int stepMinutes)
+    {
+        if (RunUtc is not { } run || stepMinutes <= 0)
+        {
+            return Array.Empty<RadarFrame>();
+        }
+
+        var from = nowUtc.AddMinutes(-stepMinutes);
+        var to = nowUtc.AddMinutes(hours * 60);
+        return Frames
+            .Where(f => f.TimeUtc > from && f.TimeUtc <= to && ((long)(f.TimeUtc - run).TotalMinutes) % stepMinutes == 0)
+            .OrderBy(f => f.TimeUtc)
+            .ToList();
+    }
 }
 
 /// <summary>How radar fetching for one place is going.</summary>
@@ -51,6 +80,9 @@ public sealed class RadarFetchStatus
     public string? LastError { get; set; }
 
     public int Failures { get; set; }
+
+    /// <summary>The model run the forecast frames come from (forecast radar only).</summary>
+    public DateTime? RunUtc { get; set; }
 }
 
 /// <summary>

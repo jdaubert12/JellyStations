@@ -1988,6 +1988,9 @@
     w.ShowDaily = checked('#tvsWeatherDaily');
     w.ShowRadar = checked('#tvsWeatherRadar');
     w.RadarZoom = val('#tvsWeatherRadarZoom') || 'State';
+    w.ShowForecastRadar = checked('#tvsWeatherForecastRadar');
+    w.ForecastRadarHours = parseInt(val('#tvsWeatherForecastHours'), 10) || 3;
+    w.ForecastRadarStepMinutes = parseInt(val('#tvsWeatherForecastStep'), 10) || 15;
     w.ShowTravelCities = checked('#tvsWeatherTravel');
     w.ShowLogo = checked('#tvsWeatherLogo');
     w.GuideTitle = val('#tvsWeatherGuideTitle').trim() || null;
@@ -4458,12 +4461,12 @@
   // ---- Weather channel ---------------------------------------------------------------------
 
   const MUSIC_KINDS = ['Playlist', 'Album', 'Artist', 'MusicGenre', 'Audio'];
-  const WEATHER_SCREEN_LABEL = { Current: 'Current conditions', Hourly: 'Next 12 hours', Daily: '7-day forecast', Radar: 'Local radar', Travel: 'Travel cities' };
+  const WEATHER_SCREEN_LABEL = { Current: 'Current conditions', Hourly: 'Next 12 hours', Daily: '7-day forecast', Radar: 'Local radar', ForecastRadar: 'Forecast radar', Travel: 'Travel cities' };
 
   function defaultWeather() {
     return {
       Locations: [], Units: 'Imperial', TwentyFourHourClock: false, ScreenSeconds: 10, OnTheEights: false, Theme: 'Classic',
-      ShowLogo: true, ShowTravelCities: true, ShowHourly: true, ShowDaily: true, ShowRadar: true, RadarZoom: 'State', GuideTitle: null, GuideEntryMinutes: 60, StaleHours: 3,
+      ShowLogo: true, ShowTravelCities: true, ShowHourly: true, ShowDaily: true, ShowRadar: true, RadarZoom: 'State', ShowForecastRadar: true, ForecastRadarHours: 3, ForecastRadarStepMinutes: 15, GuideTitle: null, GuideEntryMinutes: 60, StaleHours: 3,
       Provider: 'open-meteo', MusicEnabled: true, MusicSources: [], MusicFolder: null, ShowMusicCredit: true, MusicVolumePercent: 100
     };
   }
@@ -4512,6 +4515,10 @@
     setChecked('#tvsWeatherRadar', w.ShowRadar !== false);
     setVal('#tvsWeatherRadarZoom', w.RadarZoom || 'State');
     show($('#tvsWeatherRadarZoomBox'), w.ShowRadar !== false);
+    setChecked('#tvsWeatherForecastRadar', w.ShowForecastRadar !== false);
+    setVal('#tvsWeatherForecastHours', String(w.ForecastRadarHours || 3));
+    setVal('#tvsWeatherForecastStep', String(w.ForecastRadarStepMinutes || 15));
+    show($('#tvsWeatherForecastRadarBox'), w.ShowForecastRadar !== false);
     setChecked('#tvsWeatherTravel', w.ShowTravelCities !== false);
     setChecked('#tvsWeatherLogo', w.ShowLogo !== false);
     setVal('#tvsWeatherGuideTitle', w.GuideTitle || '');
@@ -4761,7 +4768,7 @@
       return;
     }
     const table = el('table', { className: 'tvs-table' });
-    table.appendChild(el('thead', null, el('tr', null, [el('th', { text: 'Place' }), el('th', { text: 'Now' }), el('th', { text: 'Last fetched' }), el('th', { text: 'Radar' }), el('th', { text: '' })])));
+    table.appendChild(el('thead', null, el('tr', null, [el('th', { text: 'Place' }), el('th', { text: 'Now' }), el('th', { text: 'Last fetched' }), el('th', { text: 'Radar' }), el('th', { text: 'Forecast radar' }), el('th', { text: '' })])));
     const tbody = el('tbody');
     const metric = state.draft.Weather.Units === 'Metric';
     status.Locations.forEach(l => {
@@ -4783,17 +4790,26 @@
       } else if (state.draft.Weather.ShowRadar === false) {
         radar = 'off';
       }
+      let forecast = '—';
+      if (l.ForecastRadarFrames > 0) {
+        forecast = (l.ForecastRadarRunUtc ? fmtDateTime(l.ForecastRadarRunUtc) + ' run, ' : '') + l.ForecastRadarFrames + ' frames' + (l.ForecastRadarLatestUtc ? ', out to ' + fmtDateTime(l.ForecastRadarLatestUtc) : '');
+      } else if (l.ForecastRadarError) {
+        forecast = l.ForecastRadarError;
+      } else if (state.draft.Weather.ShowForecastRadar === false) {
+        forecast = 'off';
+      }
       tbody.appendChild(el('tr', null, [
         el('td', { text: l.Name }),
         el('td', { text: now }),
         el('td', { className: 'nowrap', text: l.LastSuccessUtc ? fmtDateTime(l.LastSuccessUtc) : 'never' }),
         el('td', { text: radar, title: l.RadarSource || '' }),
+        el('td', { text: forecast, title: l.ForecastRadarSource || '' }),
         el('td', { className: 'nowrap' }, [note, l.LastError ? el('span', { className: 'tvs-secondary', text: ' ' + l.LastError }) : null])
       ]));
     });
     table.appendChild(tbody);
     box.appendChild(table);
-    box.appendChild(el('div', { className: 'tvs-secondary', text: 'Forecasts are refreshed every 15 minutes and radar every 5 while the station is enabled. ' + (status.Attribution || '') }));
+    box.appendChild(el('div', { className: 'tvs-secondary', text: 'Forecasts are refreshed every 15 minutes, radar every 5 and the forecast radar as each hourly model run arrives, while the station is enabled. ' + (status.Attribution || '') }));
   }
 
   function refreshWeatherNow() {
@@ -4894,6 +4910,7 @@
     on('#tvsWeatherSearch', 'input', debounce(weatherSearch, 350));
     on('#tvsWeatherMusic', 'change', () => show($('#tvsWeatherMusicOptions'), checked('#tvsWeatherMusic')));
     on('#tvsWeatherRadar', 'change', () => show($('#tvsWeatherRadarZoomBox'), checked('#tvsWeatherRadar')));
+    on('#tvsWeatherForecastRadar', 'change', () => show($('#tvsWeatherForecastRadarBox'), checked('#tvsWeatherForecastRadar')));
     on('#tvsBtnWeatherRefresh', 'click', refreshWeatherNow);
     on('#tvsBtnWeatherPreview', 'click', previewWeatherScreen);
     on('#tvsAnchor', 'change', updateAnchorHint);

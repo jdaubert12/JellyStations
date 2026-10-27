@@ -49,6 +49,12 @@ public sealed class WeatherConfig
     public const int DefaultScreenSeconds = 10;
     public const int DefaultGuideEntryMinutes = 60;
     public const int DefaultStaleHours = 3;
+    public const int DefaultForecastRadarHours = 3;
+    public const int DefaultForecastRadarStepMinutes = 15;
+    public const int MaxForecastRadarHours = 18;
+
+    /// <summary>The most frames a forecast radar loop plays; a longer look-ahead at a short step is coarsened to fit.</summary>
+    public const int MaxForecastRadarFrames = 25;
     public const int MaxLocations = 8;
     public const string DefaultProvider = "open-meteo";
 
@@ -85,6 +91,18 @@ public sealed class WeatherConfig
 
     /// <summary>How much map the radar screen shows around the place.</summary>
     public RadarZoom RadarZoom { get; set; } = RadarZoom.State;
+
+    /// <summary>Show the forecast radar loop (NOAA HRRR model) for each place, after the local radar. Contiguous United States only.</summary>
+    public bool ShowForecastRadar { get; set; } = true;
+
+    /// <summary>How far ahead the forecast radar looks, 1-18 hours.</summary>
+    public int ForecastRadarHours { get; set; } = DefaultForecastRadarHours;
+
+    /// <summary>Minutes between forecast radar frames: 15, 30 or 60.</summary>
+    public int ForecastRadarStepMinutes { get; set; } = DefaultForecastRadarStepMinutes;
+
+    /// <summary>Frames in the forecast radar loop: now, then one per step out to the look-ahead.</summary>
+    public int ForecastRadarFrameCount => (ForecastRadarHours * 60 / Math.Max(1, ForecastRadarStepMinutes)) + 1;
 
     /// <summary>Guide entry title; "{places}" is replaced by the place names. Null = "Local weather: {places}".</summary>
     public string? GuideTitle { get; set; }
@@ -129,6 +147,12 @@ public sealed class WeatherConfig
         ScreenSeconds = Math.Clamp(ScreenSeconds, 4, 60);
         GuideEntryMinutes = Math.Clamp(GuideEntryMinutes, 15, 240);
         StaleHours = Math.Clamp(StaleHours, 1, 48);
+        ForecastRadarHours = Math.Clamp(ForecastRadarHours, 1, MaxForecastRadarHours);
+        ForecastRadarStepMinutes = ForecastRadarStepMinutes <= 15 ? 15 : ForecastRadarStepMinutes <= 30 ? 30 : 60;
+        while (ForecastRadarFrameCount > MaxForecastRadarFrames && ForecastRadarStepMinutes < 60)
+        {
+            ForecastRadarStepMinutes *= 2;
+        }
         Provider = string.IsNullOrWhiteSpace(Provider) ? DefaultProvider : Provider.Trim().ToLowerInvariant();
         GuideTitle = string.IsNullOrWhiteSpace(GuideTitle) ? null : GuideTitle.Trim();
         if (GuideTitle is { Length: > 120 })
