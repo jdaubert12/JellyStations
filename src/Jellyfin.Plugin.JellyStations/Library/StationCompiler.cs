@@ -79,12 +79,12 @@ public sealed class StationCompiler
                 break;
 
             case ScheduleMode.Weather:
-                if (_music is not null && station.Weather.MusicEnabled)
-                {
-                    compiled.Music = _music.Expand(station.Weather, compiled.Sources, compiled.Excluded);
-                }
-
                 break;
+        }
+
+        if (_music is not null && station.UsesWeather && station.Weather.MusicEnabled)
+        {
+            compiled.Music = _music.Expand(station.Weather, compiled.Sources, compiled.Excluded);
         }
 
         if (station.Bumpers?.Enabled == true && station.Bumpers.Sources.Count > 0)

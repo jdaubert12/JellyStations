@@ -86,6 +86,16 @@ public sealed class Station
 
     public string EffectiveCardText => string.IsNullOrWhiteSpace(CardText) ? DefaultCardText : CardText!;
 
+    /// <summary>True when the station's weather places are on the air: a weather channel, a weather time block, or weather in the breaks.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool UsesWeather => Mode == ScheduleMode.Weather || HasWeatherBreaks || HasWeatherBlocks;
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool HasWeatherBreaks => Mode != ScheduleMode.Weather && Bumpers?.Enabled == true && Bumpers.Weather?.Enabled == true;
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool HasWeatherBlocks => (Mode == ScheduleMode.Pool || Mode == ScheduleMode.Slots) && Slots?.Blocks?.Any(b => b.Kind == BlockKind.Weather) == true;
+
     public DateTime CreatedUtc { get; set; }
 
     public DateTime UpdatedUtc { get; set; }

@@ -161,8 +161,11 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
                     continue;
                 }
 
-                var start = ToUtc(date + block.StartLocal);
-                list.Add(new Occurrence(b, start, start + block.Duration));
+                foreach (var startLocal in block.StartsOfDay())
+                {
+                    var start = ToUtc(date + startLocal);
+                    list.Add(new Occurrence(b, start, start + block.Duration));
+                }
             }
         }
 
@@ -329,6 +332,13 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
     /// <summary>Fills a block occurrence; returns the instant covered, which exceeds <paramref name="end"/> only when the remainder stream overran.</summary>
     private DateTime FillBlock(List<ScheduleEntry> entries, WeekState state, SlotBlockInput block, DateTime start, DateTime end, DateTime overrunLimit)
     {
+        if (block.IsWeather)
+        {
+            // The weather screens run for the whole occurrence; the cycle starts at its start.
+            entries.Add(new ScheduleEntry(_input.StationId, _input.Revision, EntryKind.Weather, null, start, end, false, block.Name));
+            return end;
+        }
+
         var scope = "block:" + block.Id.ToString("N");
         var cursor = state.BlockCursor(block.Id);
         var reached = FillBlockItems(entries, block.Items, block.Order, cursor, scope, start, end, block.Overflow == SlotOverflow.TruncateLast, block.Name);

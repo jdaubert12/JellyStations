@@ -52,6 +52,7 @@ public sealed class WeatherConfig
     public const int DefaultForecastRadarHours = 3;
     public const int DefaultForecastRadarStepMinutes = 15;
     public const int MaxForecastRadarHours = 18;
+    public const int DefaultTitleCardSeconds = 3;
 
     /// <summary>The most frames a forecast radar loop plays; a longer look-ahead at a short step is coarsened to fit.</summary>
     public const int MaxForecastRadarFrames = 25;
@@ -85,6 +86,15 @@ public sealed class WeatherConfig
 
     /// <summary>Show the 7-day screen for each place.</summary>
     public bool ShowDaily { get; set; } = true;
+
+    /// <summary>Open each place with a short title card (its name and region) so the eye knows the channel moved on.</summary>
+    public bool ShowTitleCards { get; set; } = true;
+
+    /// <summary>How long the title card stays, 1-10 s.</summary>
+    public int TitleCardSeconds { get; set; } = DefaultTitleCardSeconds;
+
+    /// <summary>Show an alerts screen for a place while a watch, warning or advisory is in force for it (United States, from the National Weather Service). Places with no alert skip it.</summary>
+    public bool ShowAlerts { get; set; } = true;
 
     /// <summary>Show the local radar loop for each place (NEXRAD in the contiguous United States, RainViewer elsewhere).</summary>
     public bool ShowRadar { get; set; } = true;
@@ -128,6 +138,9 @@ public sealed class WeatherConfig
     /// <summary>Show "♫ title · artist" on the screens while a track plays.</summary>
     public bool ShowMusicCredit { get; set; } = true;
 
+    /// <summary>Bring every track to the same loudness (measured once per file in the background); the level below still applies on top.</summary>
+    public bool NormalizeMusic { get; set; } = true;
+
     /// <summary>Music level in percent (20-150); 100 = as recorded.</summary>
     public int MusicVolumePercent { get; set; } = 100;
 
@@ -147,6 +160,7 @@ public sealed class WeatherConfig
         ScreenSeconds = Math.Clamp(ScreenSeconds, 4, 60);
         GuideEntryMinutes = Math.Clamp(GuideEntryMinutes, 15, 240);
         StaleHours = Math.Clamp(StaleHours, 1, 48);
+        TitleCardSeconds = Math.Clamp(TitleCardSeconds, 1, 10);
         ForecastRadarHours = Math.Clamp(ForecastRadarHours, 1, MaxForecastRadarHours);
         ForecastRadarStepMinutes = ForecastRadarStepMinutes <= 15 ? 15 : ForecastRadarStepMinutes <= 30 ? 30 : 60;
         while (ForecastRadarFrameCount > MaxForecastRadarFrames && ForecastRadarStepMinutes < 60)

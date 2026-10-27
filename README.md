@@ -60,6 +60,14 @@ right before the next program, and a **post-roll** clip that opens the break aft
 its own sources, or from the bumper sources when it has none; both come out of the existing break, so
 programs still start on the grid, and a position is skipped quietly when no clip fits.
 
+**Local weather in the breaks** puts a short run of the [weather channel](#weather-channel)'s screens
+(title card, current conditions, radar, forecasts…) into every break that has at least 45 seconds of
+room, up to a length you set (1 to 10 minutes), either at the end of the break right before the next
+program (or its pre-roll ident) or at the start right after the program (or its post-roll clip). It
+stretches into whatever time the clips leave, so a break shorter than the length still gets weather,
+and clips and the card take the rest. The places, look and music come from the station's **Weather**
+section, which the editor shows while this is on; like a clip, weather in a break is not a guide entry.
+
 ### Logo
 
 A station **logo** appears in the guide and on station cards. It can also be drawn over the video as a
@@ -159,6 +167,16 @@ month or to the dates you want; list it above any regular block it should take o
 earlier block in the list wins when two coincide. Sequential blocks continue where the previous
 occurrence stopped, however far apart the occurrences are.
 
+Any block can also **repeat every N minutes** (5 or more) from its start time until a time of day or
+midnight, each repeat with the full duration; an earlier block in the list still wins where a repeat
+lands on another block.
+
+A block's **What plays** can be **Local weather** instead of programs: the occurrence is one run of the
+[weather channel](#weather-channel)'s screens, a real guide entry titled from the block name (or the
+Weather section's guide title), with the places, look and music from the station's **Weather**
+section, which the editor shows while such a block exists. "The weather at the top of every hour" is a
+5-minute weather block at 06:00 repeating every 60 minutes until 23:00.
+
 A time block can be saved as a **template** (bookmark button on the block) and added to any station
 from the dropdown next to "Add block". Templates are managed in Settings.
 
@@ -184,7 +202,10 @@ For each place the channel shows **current conditions** (big temperature, condit
 high and low, humidity, wind, gusts, pressure, cloud cover, sunrise and sunset), the **next 12
 hours** (hourly icons, temperatures, the chance of rain, snow, a mix or ice, and a temperature
 curve) and the **7-day forecast**, then a **travel cities** screen with every place at a glance.
-Screens cross-fade; each stays a configurable number of seconds (default 10). With **On the 8s** a
+Each place opens with a short **title card** (its name and region over a faint icon of its
+conditions; 3 seconds by default, 1 to 10, or off) so the eye knows the channel has moved on, and
+while a place has a weather alert in force an **alerts** screen comes before its current conditions
+(see below). Screens cross-fade; each stays a configurable number of seconds (default 10). With **On the 8s** a
 full pass starts at :08, :18, :28... and the rest of each ten minutes repeats current conditions,
 like the real format. Three colour themes (classic blue, dark, light), °F or °C with matching wind
 and pressure units, a 12 or 24-hour clock, and the station logo on every screen. The lower band
@@ -250,6 +271,25 @@ stays whole until the next run is up), tops the window up as the clock moves, an
 `data/JellyStations/weather/radar/<place>/forecast/`. The editor's forecast status shows the run, the
 frame count and how far out the frames reach; **Preview screen** shows the furthest frame.
 
+### Alerts
+
+With **Show an alerts screen** (on by default) a place that has a watch, warning, advisory or
+statement in force gets an **alerts** screen right after its title card: each alert in a panel with
+a colour bar for its severity (the NWS's extreme/severe/moderate/minor ramp), when it runs in the
+place's own time ("Until 4:00 PM", "From Thu 7:00 AM until Fri 1:00 AM"), the area it covers and as
+much of its text as fits, with the "WHAT... WHERE... WHEN..." bullets turned into headings. Up to
+three alerts fit a screen; any more are counted. The current, hourly and 7-day screens carry a
+one-line strip meanwhile ("Winter Storm Warning until Thu 4:00 PM · 1 more"). A place with nothing
+in force simply skips the screen, so most of the time the channel looks as it did.
+
+Alerts come from the [US National Weather Service API](https://www.weather.gov/documentation/services-web-api)
+(free, no key, public domain), which covers the United States and its territories; places elsewhere
+skip the screen, and the editor's forecast status says "not covered". Each place is checked every
+five minutes while the station is enabled and in season (failures back off up to 15 minutes), test
+and exercise messages and cancellations are dropped, and the last answer is kept under
+`data/JellyStations/weather/alerts/` so a restart has it. The status table shows the strongest alert
+and how many more; **Preview screen** can show the alerts screen and the title card.
+
 ### Music
 
 **Music** plays underneath from two kinds of source, which can be combined: items from your Jellyfin
@@ -261,6 +301,16 @@ every track has played, the same for every viewer and continuous across the plug
 boundaries, at a configurable level, with "Now playing: title – artist" drawn on the screens (switchable).
 Several folders can be listed, separated by `;`. New files in a folder are picked up when the
 station is recompiled (nightly, or **Refresh content**); with music off the channel is silent.
+
+**Level the music** (on by default) plays every track at the same loudness: each file is measured once
+in the background with ffmpeg's `loudnorm` analysis (a few seconds per track, one at a time, at low
+priority) and the answer is kept in `data/JellyStations/music-loudness.json` keyed by path, size and
+modification time; the track is then played with the gain that brings it to −18 LUFS, never pushing
+its true peak past −1 dB (a quiet, dynamic recording is raised only as far as its peak allows). Until a
+track has been measured it plays as recorded, so music starts at once and evens out as the
+measurements come in; the forecast status in the editor says how far they have got. The music level
+setting applies on top. Where one track ends and the next begins they fade out and in over half a
+second; the plugin's internal segment cuts stay seamless.
 
 ### Music packs
 

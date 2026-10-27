@@ -1,10 +1,12 @@
 using System.Net.Mime;
 using Jellyfin.Plugin.JellyStations.Api.Dto;
+using Jellyfin.Plugin.JellyStations.Library;
 using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Scheduling;
 using Jellyfin.Plugin.JellyStations.Services;
 using Jellyfin.Plugin.JellyStations.Storage;
 using Jellyfin.Plugin.JellyStations.Weather;
+using Jellyfin.Plugin.JellyStations.Weather.Alerts;
 using Jellyfin.Plugin.JellyStations.Weather.Radar;
 using Jellyfin.Plugin.JellyStations.Weather.Screens;
 using MediaBrowser.Common.Api;
@@ -23,14 +25,18 @@ public sealed class WeatherController : ControllerBase
 {
     private readonly WeatherService _weather;
     private readonly RadarService _radar;
+    private readonly AlertService _alerts;
+    private readonly MusicLoudnessService _loudness;
     private readonly StationService _stations;
     private readonly WeatherScreenRenderer _renderer;
     private readonly JellyStationsPaths _paths;
 
-    public WeatherController(WeatherService weather, RadarService radar, StationService stations, WeatherScreenRenderer renderer, JellyStationsPaths paths)
+    public WeatherController(WeatherService weather, RadarService radar, AlertService alerts, MusicLoudnessService loudness, StationService stations, WeatherScreenRenderer renderer, JellyStationsPaths paths)
     {
         _weather = weather;
         _radar = radar;
+        _alerts = alerts;
+        _loudness = loudness;
         _stations = stations;
         _renderer = renderer;
         _paths = paths;
@@ -93,6 +99,11 @@ public sealed class WeatherController : ControllerBase
             await _radar.RefreshAsync(station, ct).ConfigureAwait(false);
         }
 
+        if (station.Weather.ShowAlerts)
+        {
+            await _alerts.RefreshAsync(station, ct).ConfigureAwait(false);
+        }
+
         return Ok(BuildStatus(station));
     }
 
@@ -118,7 +129,8 @@ public sealed class WeatherController : ControllerBase
         var places = locations.Select(l =>
         {
             var report = _weather.Get(l.Id);
-            return new PlaceWeather(l, report, WeatherService.IsStale(report, config, now));
+            var alerts = config.ShowAlerts ? _alerts.Active(l.Id, now) : Array.Empty<WeatherAlert>();
+            return new PlaceWeather(l, report, WeatherService.IsStale(report, config, now), alerts, _alerts.Get(l.Id)?.Attribution);
         }).ToList();
         var place = kind == WeatherScreenKind.Travel ? null : places.Count == 0 ? null : places[Math.Clamp(location, 0, places.Count - 1)];
         if (kind != WeatherScreenKind.Travel && place is null)
@@ -173,8 +185,17 @@ public sealed class WeatherController : ControllerBase
             var loop = _radar.Get(location.Id);
             var forecastStatus = _radar.ForecastStatus(location.Id);
             var forecast = _radar.GetForecast(location.Id);
+            var alertStatus = _alerts.Status(location.Id);
+            var alerts = _alerts.Active(location.Id, now);
+            var offset = location.TimeZoneId is { } tz && TryOffset(tz, now) is { } o ? o : report?.UtcOffsetSeconds ?? 0;
             dto.Locations.Add(new WeatherLocationStatusDto
             {
+                AlertSource = alertStatus.SourceName ?? _alerts.Get(location.Id)?.SourceName,
+                AlertCount = alerts.Count,
+                AlertSummary = alerts.Count == 0 ? null : WeatherPainter.Summary(alerts, now, offset, station.Weather.TwentyFourHourClock),
+                AlertsCheckedUtc = alertStatus.LastSuccessUtc ?? _alerts.Get(location.Id)?.FetchedUtc,
+                AlertError = alertStatus.LastError,
+                AlertsNotCovered = alertStatus.NotCovered,
                 RadarSource = radarStatus.SourceName ?? loop?.SourceName,
                 RadarFrames = loop?.Frames.Count ?? 0,
                 RadarLatestUtc = loop?.Latest.TimeUtc,
@@ -199,6 +220,28 @@ public sealed class WeatherController : ControllerBase
             });
         }
 
+        var compiled = _stations.GetCompiled(station.Id);
+        if (compiled is not null)
+        {
+            var progress = _loudness.ProgressOf(compiled.Music);
+            dto.MusicTracks = progress.Total;
+            dto.MusicLevelled = progress.Measured;
+            dto.MusicUnmeasurable = progress.Failed;
+        }
+
+        dto.MusicLevelling = station.Weather.MusicEnabled && station.Weather.NormalizeMusic;
         return dto;
+    }
+
+    private static long? TryOffset(string timeZoneId, DateTime nowUtc)
+    {
+        try
+        {
+            return (long)TimeZoneInfo.FindSystemTimeZoneById(timeZoneId).GetUtcOffset(nowUtc).TotalSeconds;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 }

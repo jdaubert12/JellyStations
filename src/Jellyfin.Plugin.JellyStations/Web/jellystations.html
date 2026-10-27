@@ -22,6 +22,7 @@
       #JellyStationsPage .tvs-section > .fieldDescription:first-of-type { margin: 0 0 .9em; }
       #JellyStationsPage .tvs-grid2 { display: grid; grid-template-columns: 1fr 1fr; column-gap: 1.5em; }
       #JellyStationsPage .tvs-weather-mode [data-not-weather] { display: none !important; }
+      #JellyStationsPage .tvs-weather-aux [data-weather-only] { display: none !important; }
       #JellyStationsPage .tvs-weather-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .5em .8em; margin: .6em 0; }
       #JellyStationsPage .tvs-weather-tools select { width: auto; min-width: 9em; }
       #JellyStationsPage .tvs-grid2 > * { min-width: 0; }
@@ -539,6 +540,8 @@
 
             <!-- Weather channel -->
             <div id="tvsPanelWeather" class="tvs-panel tvs-hidden" data-steps="2">
+              <h3 class="sectionTitle" data-weather-aux>Weather</h3>
+              <div class="fieldDescription" data-weather-aux style="margin-bottom:.6em">This station is not a weather channel, but it puts the weather on the air in a weather time block or in its breaks. The places and the look below are what those show; the guide-entry settings of a weather channel do not apply.</div>
               <h4 class="tvs-subtitle">Places</h4>
               <div class="fieldDescription">The channel cycles through these in order: current conditions, the next twelve hours and the week ahead for each, then every place on one screen. Up to eight. Only each place's latitude and longitude is ever sent to the forecast provider.</div>
               <div id="tvsWeatherPlaces" class="paperList tvs-lineup"></div>
@@ -572,12 +575,12 @@
                   <input is="emby-input" id="tvsWeatherScreenSeconds" label="Seconds per screen" type="number" min="4" max="60" step="1">
                   <div class="fieldDescription">How long each screen stays before it cross-fades to the next. 8 to 12 reads well.</div>
                 </div>
-                <div class="inputContainer">
+                <div class="inputContainer" data-weather-only>
                   <input is="emby-input" id="tvsWeatherEntryMinutes" label="Guide entry length (minutes)" type="number" min="15" max="240" step="15">
                   <div class="fieldDescription">The guide shows one entry per this many minutes, on the hour. The screens keep cycling inside it.</div>
                 </div>
               </div>
-              <div class="checkboxContainer checkboxContainer-withDescription">
+              <div class="checkboxContainer checkboxContainer-withDescription" data-weather-only>
                 <label class="emby-checkbox-label">
                   <input is="emby-checkbox" type="checkbox" id="tvsWeatherEights">
                   <span>On the 8s: start a full pass at :08, :18, :28…</span>
@@ -589,6 +592,24 @@
                   <input is="emby-checkbox" type="checkbox" id="tvsWeatherClock24">
                   <span>24-hour clock</span>
                 </label>
+              </div>
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsWeatherTitleCards">
+                  <span>Open each place with a title card</span>
+                </label>
+                <div class="fieldDescription checkboxFieldDescription">A short card with the place's name and region before its screens, so the eye knows the channel has moved on.</div>
+              </div>
+              <div class="inputContainer" id="tvsWeatherTitleCardBox">
+                <input is="emby-input" id="tvsWeatherTitleCardSeconds" label="Title card seconds" type="number" min="1" max="10" step="1">
+                <div class="fieldDescription">How long the card stays. 3 is about right.</div>
+              </div>
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsWeatherAlerts">
+                  <span>Show an alerts screen while a place has a watch, warning or advisory</span>
+                </label>
+                <div class="fieldDescription checkboxFieldDescription">The alerts in force for the place, from the US National Weather Service (free, no key; United States and territories only, places elsewhere skip it), checked every five minutes while the station is on. The screen appears only while there is something to show, before the place's current conditions; the forecast screens carry a one-line strip meanwhile.</div>
               </div>
               <div class="checkboxContainer">
                 <label class="emby-checkbox-label">
@@ -695,6 +716,13 @@
                     </label>
                   </div>
                 </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                  <label class="emby-checkbox-label">
+                    <input is="emby-checkbox" type="checkbox" id="tvsWeatherNormalize">
+                    <span>Level the music: play every track at the same loudness</span>
+                  </label>
+                  <div class="fieldDescription checkboxFieldDescription">Each file is measured once in the background (ffmpeg, a few seconds per track) and brought to −18 LUFS with peaks kept under −1 dB; until it has been measured a track plays as recorded. The music level above applies on top. Tracks also fade out and in over half a second where one ends and the next begins.</div>
+                </div>
               </div>
 
               <h4 class="tvs-subtitle">Forecast status</h4>
@@ -702,6 +730,8 @@
               <div class="tvs-weather-tools" id="tvsWeatherStatusTools">
                 <button is="emby-button" type="button" id="tvsBtnWeatherRefresh" class="raised emby-button"><span>Fetch now</span></button>
                 <select is="emby-select" class="emby-select" id="tvsWeatherPreviewScreen" title="Which screen to preview">
+                  <option value="TitleCard">Title card</option>
+                  <option value="Alerts">Alerts</option>
                   <option value="Current">Current conditions</option>
                   <option value="Hourly">Next 12 hours</option>
                   <option value="Daily">7-day forecast</option>
@@ -713,7 +743,7 @@
                 <button is="emby-button" type="button" id="tvsBtnWeatherPreview" class="raised emby-button"><span>Preview screen</span></button>
               </div>
               <img id="tvsWeatherPreviewImg" class="tvs-hidden" alt="Weather screen preview" style="max-width:100%;border-radius:6px;margin-top:.5em">
-              <div class="fieldDescription">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0), free for non-commercial use; the attribution is drawn on every screen.</div>
+              <div class="fieldDescription">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0), free for non-commercial use; the attribution is drawn on every screen. Alerts from the <a href="https://www.weather.gov/documentation/services-web-api" target="_blank" rel="noopener">US National Weather Service</a> (public domain).</div>
             </div>
           </div>
 
@@ -805,6 +835,26 @@
                 <div class="fieldDescription checkboxFieldDescription">Opens every break. Pick sources below, or leave them empty to use the bumper sources above.</div>
               </div>
               <div id="tvsPostRollPicker"></div>
+              <div class="checkboxContainer checkboxContainer-withDescription">
+                <label class="emby-checkbox-label">
+                  <input is="emby-checkbox" type="checkbox" id="tvsBumperWeatherEnabled">
+                  <span>Local weather in the breaks</span>
+                </label>
+                <div class="fieldDescription checkboxFieldDescription">A short run of the weather screens (title card, current conditions, radar, forecasts…) in every break with at least 45 seconds of room, up to the length below; clips and the card take whatever is left around it. The places and the look come from the Weather section, which appears below while this is on. Weather in a break is not a guide entry, like a clip.</div>
+              </div>
+              <div id="tvsBumperWeatherOptions" class="tvs-grid2">
+                <div class="inputContainer">
+                  <input is="emby-input" id="tvsBumperWeatherMinutes" label="Up to this many minutes per break" type="number" min="1" max="10" step="1">
+                  <div class="fieldDescription">Set the break above to at least this, or rely on the padding grid, so there is room.</div>
+                </div>
+                <div class="selectContainer">
+                  <label class="selectLabel" for="tvsBumperWeatherPosition">Where in the break</label>
+                  <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsBumperWeatherPosition">
+                    <option value="BeforeProgram">At the end, right before the next program (or its pre-roll ident)</option>
+                    <option value="AfterProgram">At the start, right after the program (or its post-roll clip)</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
 

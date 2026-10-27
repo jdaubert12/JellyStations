@@ -5,8 +5,11 @@ using SkiaSharp;
 
 namespace Jellyfin.Plugin.JellyStations.Weather.Screens;
 
-/// <summary>One place with whatever report it has.</summary>
-public sealed record PlaceWeather(WeatherLocation Location, WeatherReport? Report, bool Stale);
+/// <summary>One place with whatever report it has, and the alerts in force for it (with the credit their source asks for).</summary>
+public sealed record PlaceWeather(WeatherLocation Location, WeatherReport? Report, bool Stale, IReadOnlyList<WeatherAlert>? Alerts = null, string? AlertAttribution = null)
+{
+    public IReadOnlyList<WeatherAlert> ActiveAlerts => Alerts ?? Array.Empty<WeatherAlert>();
+}
 
 /// <summary>Everything one screen is drawn from. Pure data, so a test can render a screen from a fixture.</summary>
 public sealed record ScreenRequest(
@@ -86,9 +89,19 @@ public sealed partial class WeatherPainter
         var ctx = new Ctx(canvas, t, width, r);
 
         Background(ctx);
-        Header(ctx);
+        if (r.Kind != WeatherScreenKind.TitleCard)
+        {
+            Header(ctx);
+        }
+
         switch (r.Kind)
         {
+            case WeatherScreenKind.TitleCard:
+                TitleCard(ctx);
+                break;
+            case WeatherScreenKind.Alerts:
+                Alerts(ctx);
+                break;
             case WeatherScreenKind.Current:
                 Current(ctx);
                 break;
@@ -187,6 +200,7 @@ public sealed partial class WeatherPainter
             WeatherScreenKind.Daily => "7-DAY FORECAST",
             WeatherScreenKind.Radar => "LOCAL RADAR",
             WeatherScreenKind.ForecastRadar => "FORECAST RADAR",
+            WeatherScreenKind.Alerts => place?.ActiveAlerts.Count > 1 ? "WEATHER ALERTS" : "WEATHER ALERT",
             _ => "AROUND THE MAP"
         };
         Text(x, label, x.W - 80, 78, 30, FontWeight.SemiBold, x.T.Text, SKTextAlign.Right);
@@ -203,6 +217,10 @@ public sealed partial class WeatherPainter
         else if (x.R.Kind == WeatherScreenKind.ForecastRadar && x.R.Radar is { } forecast)
         {
             under = "Forecast for " + Units.Clock(forecast.TimeUtc + (x.NowLocal - x.R.NowUtc), x.C.TwentyFourHourClock);
+        }
+        else if (x.R.Kind == WeatherScreenKind.Alerts && place?.ActiveAlerts.FirstOrDefault()?.Sender is { Length: > 0 } sender)
+        {
+            under = sender;
         }
         else if (x.R.Kind != WeatherScreenKind.Travel)
         {
@@ -328,6 +346,10 @@ public sealed partial class WeatherPainter
         {
             StaleBanner(x, rep);
         }
+        else
+        {
+            AlertStrip(x);
+        }
     }
 
     private void Hourly(Ctx x)
@@ -433,6 +455,10 @@ public sealed partial class WeatherPainter
         {
             StaleBanner(x, rep);
         }
+        else
+        {
+            AlertStrip(x);
+        }
     }
 
     private void Daily(Ctx x)
@@ -494,6 +520,10 @@ public sealed partial class WeatherPainter
         if (x.R.Place.Stale)
         {
             StaleBanner(x, rep);
+        }
+        else
+        {
+            AlertStrip(x);
         }
     }
 

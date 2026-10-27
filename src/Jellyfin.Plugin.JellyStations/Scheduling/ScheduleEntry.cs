@@ -2,7 +2,8 @@ using Jellyfin.Plugin.JellyStations.Models;
 
 namespace Jellyfin.Plugin.JellyStations.Scheduling;
 
-/// <summary>One occurrence on a station's timeline: a program or a slate (dead air with a card).</summary>
+/// <summary>One occurrence on a station's timeline: a program, a slate (dead air with a card), a bumper clip or a run of weather screens.</summary>
+/// <remarks><paramref name="InBreak"/> marks weather placed in a break between programs: it plays like a bumper and, like one, is not a guide entry.</remarks>
 public sealed record ScheduleEntry(
     Guid StationId,
     int Revision,
@@ -11,7 +12,8 @@ public sealed record ScheduleEntry(
     DateTime StartUtc,
     DateTime EndUtc,
     bool IsTruncated,
-    string? SourceLabel)
+    string? SourceLabel,
+    bool InBreak = false)
 {
     public TimeSpan Duration => EndUtc - StartUtc;
 

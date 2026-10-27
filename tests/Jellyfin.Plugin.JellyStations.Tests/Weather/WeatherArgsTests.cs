@@ -107,6 +107,31 @@ public class WeatherArgsTests
     }
 
     [Fact]
+    public void Music_IsLevelledByItsGain_AndFadedAtTrackBoundaries()
+    {
+        var seg = Segment(music: true);
+        var levelled = new WeatherSegment
+        {
+            StartUtc = seg.StartUtc,
+            EndUtc = seg.EndUtc,
+            Slides = seg.Slides,
+            Audio = new[]
+            {
+                new WeatherAudio("/music/a.mp3", 42.5, 18, GainDb: -6.3, FadeIn: false, FadeOut: true),
+                new WeatherAudio("/music/b.flac", 0, 12, GainDb: 0.02, FadeIn: true, FadeOut: false)
+            },
+            FontPath = seg.FontPath,
+            VolumePercent = 80
+        };
+        var f = Filter(FfmpegArgsBuilder.ForWeather(levelled, TimeSpan.Zero, Profile()));
+
+        // Gain after the user's level; the fade out ends exactly at the piece's end; a gain under 0.05 dB is left out.
+        Assert.Contains("[3:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=0.80,asetpts=PTS-STARTPTS,volume=-6.3dB,afade=t=out:st=17.4:d=0.6[a0]", f);
+        Assert.Contains("[4:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume=0.80,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.6[a1]", f);
+        Assert.Contains("[a0][a1]concat=n=2:v=0:a=1[ac]", f);
+    }
+
+    [Fact]
     public void OneSlide_HasNoCrossFade()
     {
         var f = Filter(FfmpegArgsBuilder.ForWeather(Segment(music: false, slides: 1), TimeSpan.Zero, Profile()));

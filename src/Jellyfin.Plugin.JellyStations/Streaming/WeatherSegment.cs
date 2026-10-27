@@ -10,8 +10,12 @@ namespace Jellyfin.Plugin.JellyStations.Streaming;
 /// </summary>
 public sealed record WeatherSlide(string Path, double Seconds, long ClockOffsetSeconds, bool IsSequence = false);
 
-/// <summary>A stretch of one audio file: seek to <see cref="InPoint"/> and play <see cref="Seconds"/>.</summary>
-public sealed record WeatherAudio(string Path, double InPoint, double Seconds);
+/// <summary>
+/// A stretch of one audio file: seek to <see cref="InPoint"/> and play <see cref="Seconds"/>, <see cref="GainDb"/>
+/// louder (its loudness correction), faded in at its start and out at its end when the track really starts or
+/// ends there rather than at a segment cut.
+/// </summary>
+public sealed record WeatherAudio(string Path, double InPoint, double Seconds, double GainDb = 0, bool FadeIn = false, bool FadeOut = false);
 
 /// <summary>A line of text shown over the band from <see cref="From"/> to <see cref="To"/> seconds into the segment.</summary>
 public sealed record WeatherCredit(string Text, double From, double To);

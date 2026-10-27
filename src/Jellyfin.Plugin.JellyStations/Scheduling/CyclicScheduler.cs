@@ -133,7 +133,7 @@ internal sealed class CyclicScheduler : IStationScheduler
             {
                 if (offset >= p.StartOffset && offset < p.EndOffset)
                 {
-                    return BumperFill.ToEntry(gap, p);
+                    return BumperFill.ToEntry(gap, p, _clips.WeatherLabel);
                 }
             }
         }

@@ -101,6 +101,15 @@ public sealed class WeatherScreenRenderer
         {
             sb.Append(p.Location.Id.ToString("N")).Append(':').Append(p.Location.Name).Append(':').Append(p.Location.Region).Append(':');
             sb.Append(p.Report?.FetchedUtc.Ticks ?? 0).Append(':').Append(p.Stale ? 1 : 0).Append(';');
+            foreach (var a in p.ActiveAlerts)
+            {
+                sb.Append("alert:").Append(a.Id).Append(':').Append(a.SentUtc?.Ticks ?? 0).Append(';');
+            }
+
+            if (p.AlertAttribution is not null)
+            {
+                sb.Append(p.AlertAttribution).Append(';');
+            }
         }
 
         if (r.Place is not null)

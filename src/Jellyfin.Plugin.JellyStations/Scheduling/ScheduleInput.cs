@@ -47,8 +47,17 @@ public sealed class ScheduleInput
     /// <summary>Clips, one of which opens every break right after a program; empty = no post-roll.</summary>
     public IReadOnlyList<PlayableItem> PostRoll { get; init; } = Array.Empty<PlayableItem>();
 
-    /// <summary>True when any clip can be placed in a break.</summary>
-    public bool HasBumpers => Bumpers.Count > 0 || PreRoll.Count > 0 || PostRoll.Count > 0;
+    /// <summary>The most weather one break gets (zero when weather in the breaks is off or the station has no place).</summary>
+    public TimeSpan WeatherBreak { get; init; }
+
+    /// <summary>True when the weather opens the break (after the post-roll) rather than closing it (before the pre-roll).</summary>
+    public bool WeatherBreakFirst { get; init; }
+
+    /// <summary>Guide/status title of the weather when it plays on an ordinary station.</summary>
+    public string? WeatherLabel { get; init; }
+
+    /// <summary>True when anything can be placed in a break: a clip, or the weather.</summary>
+    public bool HasBumpers => Bumpers.Count > 0 || PreRoll.Count > 0 || PostRoll.Count > 0 || WeatherBreak > TimeSpan.Zero;
 
     public IReadOnlyList<PlayableItem> Lineup { get; init; } = Array.Empty<PlayableItem>();
 
@@ -61,19 +70,24 @@ public sealed class ScheduleInput
 
     public PlayOrder FillerOrder { get; init; }
 
-    /// <summary>Weather channel settings; null unless the station is in Weather mode.</summary>
+    /// <summary>Weather settings; null unless the station puts weather on the air (Weather mode, a weather block or weather in the breaks).</summary>
     public WeatherConfig? Weather { get; init; }
 
-    /// <summary>Music tracks of a weather channel, in compile order.</summary>
+    /// <summary>Music tracks under the weather screens, in compile order.</summary>
     public IReadOnlyList<MusicTrack> Music { get; init; } = Array.Empty<MusicTrack>();
 
     public static ScheduleInput From(Station station, CompiledStation compiled)
     {
+        var usesWeather = station.UsesWeather && station.Weather.Locations.Any(l => l.IsValid);
+        var weatherTitle = WeatherScheduler.Title(station.Weather);
         var blocks = station.Slots.Blocks
             .Select(b => new SlotBlockInput
             {
                 Id = b.Id,
-                Name = string.IsNullOrWhiteSpace(b.Name) ? "Block" : b.Name,
+                Name = string.IsNullOrWhiteSpace(b.Name) ? (b.Kind == BlockKind.Weather ? weatherTitle : "Block") : b.Name,
+                IsWeather = b.Kind == BlockKind.Weather,
+                RepeatEvery = TimeSpan.FromMinutes(Math.Clamp(b.RepeatEveryMinutes, 0, 24 * 60)),
+                RepeatUntil = TimeSpan.TryParseExact(b.RepeatUntilLocal ?? string.Empty, @"hh\:mm", null, out var until) ? until : null,
                 Days = b.Days.Distinct().ToList(),
                 StartLocal = ParseTime(b.StartLocal),
                 Duration = TimeSpan.FromMinutes(Math.Clamp(b.DurationMinutes, 1, 24 * 60)),
@@ -119,8 +133,11 @@ public sealed class ScheduleInput
             Blocks = blocks,
             Filler = compiled.Filler,
             FillerOrder = station.Slots.Filler.Order,
-            Weather = station.Mode == ScheduleMode.Weather ? station.Weather : null,
-            Music = station.Mode == ScheduleMode.Weather ? compiled.Music : Array.Empty<MusicTrack>(),
+            Weather = station.UsesWeather ? station.Weather : null,
+            Music = station.UsesWeather ? compiled.Music : Array.Empty<MusicTrack>(),
+            WeatherBreak = usesWeather && station.HasWeatherBreaks ? TimeSpan.FromMinutes(Math.Clamp(station.Bumpers!.Weather.Minutes, 1, 10)) : TimeSpan.Zero,
+            WeatherBreakFirst = station.Bumpers?.Weather?.Position == BreakPosition.AfterProgram,
+            WeatherLabel = weatherTitle,
             Bumpers = station.Bumpers?.Enabled == true ? compiled.Bumpers : Array.Empty<PlayableItem>(),
             PreRoll = station.Bumpers?.Enabled == true && station.Bumpers.PreRoll?.Enabled == true ? compiled.PreRoll : Array.Empty<PlayableItem>(),
             PostRoll = station.Bumpers?.Enabled == true && station.Bumpers.PostRoll?.Enabled == true ? compiled.PostRoll : Array.Empty<PlayableItem>(),
@@ -192,6 +209,31 @@ public sealed class SlotBlockInput
 
     /// <summary>True when the block has an occurrence on this local date.</summary>
     public bool OccursOn(DateTime localDate) => RecurrenceRule.Occurs(this, localDate);
+
+    /// <summary>True when the block plays the station's weather screens instead of programs.</summary>
+    public bool IsWeather { get; init; }
+
+    /// <summary>Repeat the block this often after its start, until <see cref="RepeatUntil"/> or midnight; zero = once.</summary>
+    public TimeSpan RepeatEvery { get; init; }
+
+    /// <summary>Last start of the repeats (inclusive); null = midnight.</summary>
+    public TimeSpan? RepeatUntil { get; init; }
+
+    /// <summary>The start times of the block on a day it occurs: the start, then every repeat until the limit, all before midnight.</summary>
+    public IEnumerable<TimeSpan> StartsOfDay()
+    {
+        yield return StartLocal;
+        if (RepeatEvery <= TimeSpan.Zero)
+        {
+            yield break;
+        }
+
+        var limit = RepeatUntil is { } u && u > StartLocal ? u : TimeSpan.FromDays(1);
+        for (var t = StartLocal + RepeatEvery; t <= limit && t < TimeSpan.FromDays(1); t += RepeatEvery)
+        {
+            yield return t;
+        }
+    }
 
     public IReadOnlyList<PlayableItem> Items { get; init; } = Array.Empty<PlayableItem>();
 }

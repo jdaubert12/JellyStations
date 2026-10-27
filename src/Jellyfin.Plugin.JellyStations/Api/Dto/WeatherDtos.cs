@@ -26,6 +26,18 @@ public sealed class WeatherStatusDto
     public string Attribution { get; set; } = string.Empty;
 
     public List<WeatherLocationStatusDto> Locations { get; set; } = new();
+
+    /// <summary>Music tracks the station plays under the weather.</summary>
+    public int MusicTracks { get; set; }
+
+    /// <summary>Of those, how many have been measured for loudness levelling.</summary>
+    public int MusicLevelled { get; set; }
+
+    /// <summary>How many could not be measured (unreadable files play as recorded).</summary>
+    public int MusicUnmeasurable { get; set; }
+
+    /// <summary>True when the station levels its music.</summary>
+    public bool MusicLevelling { get; set; }
 }
 
 public sealed class WeatherLocationStatusDto
@@ -77,4 +89,20 @@ public sealed class WeatherLocationStatusDto
     public DateTime? ForecastRadarLatestUtc { get; set; }
 
     public string? ForecastRadarError { get; set; }
+
+    /// <summary>The alert source asked for the place; null when none covers it or nothing was fetched yet.</summary>
+    public string? AlertSource { get; set; }
+
+    /// <summary>Alerts in force now.</summary>
+    public int AlertCount { get; set; }
+
+    /// <summary>"Winter Storm Warning until Thu 4:00 PM · 1 more", or null when there is none.</summary>
+    public string? AlertSummary { get; set; }
+
+    public DateTime? AlertsCheckedUtc { get; set; }
+
+    public string? AlertError { get; set; }
+
+    /// <summary>The source said it does not cover the place, so the alerts screen is skipped for it.</summary>
+    public bool AlertsNotCovered { get; set; }
 }

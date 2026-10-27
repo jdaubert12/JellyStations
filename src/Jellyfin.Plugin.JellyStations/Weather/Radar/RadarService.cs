@@ -150,7 +150,7 @@ public sealed partial class RadarService : IDisposable
         try
         {
             var now = DateTime.UtcNow;
-            foreach (var station in _stations.GetAll().Where(s => s.Mode == ScheduleMode.Weather && s.Enabled && (s.Weather.ShowRadar || s.Weather.ShowForecastRadar) && SeasonWindows.IsActive(s, now)))
+            foreach (var station in _stations.GetAll().Where(s => s.UsesWeather && s.Enabled && (s.Weather.ShowRadar || s.Weather.ShowForecastRadar) && SeasonWindows.IsActive(s, now)))
             {
                 foreach (var location in station.Weather.Locations.Where(l => l.IsValid))
                 {

@@ -118,18 +118,76 @@ public sealed class DayForecast
     public DateTime? Sunset { get; set; }
 }
 
+/// <summary>
+/// A watch, warning, advisory or statement in force for a place, as the alert source reports it. Times are UTC;
+/// the screens show them in the place's zone.
+/// </summary>
 public sealed class WeatherAlert
 {
+    /// <summary>The source's id for the alert (an update of the same alert gets a new id).</summary>
+    public string Id { get; set; } = string.Empty;
+
+    /// <summary>"Winter Storm Warning", "Dense Fog Advisory"...</summary>
+    public string Event { get; set; } = string.Empty;
+
     public string Headline { get; set; } = string.Empty;
 
+    /// <summary>The body, paragraphs separated by a single newline, lines unwrapped.</summary>
     public string? Description { get; set; }
 
-    /// <summary>Minor, Moderate, Severe, Extreme (as the provider says).</summary>
+    /// <summary>What to do about it, when the source says.</summary>
+    public string? Instruction { get; set; }
+
+    /// <summary>Minor, Moderate, Severe, Extreme or Unknown (as the source says).</summary>
     public string? Severity { get; set; }
 
+    public string? Urgency { get; set; }
+
+    public string? Certainty { get; set; }
+
+    /// <summary>Who issued it ("NWS Boston/Norton MA").</summary>
+    public string? Sender { get; set; }
+
+    /// <summary>The areas it covers, as the source words them.</summary>
+    public string? Area { get; set; }
+
+    /// <summary>When this version of the alert was sent.</summary>
+    public DateTime? SentUtc { get; set; }
+
+    /// <summary>When the hazard begins (null = already, or unknown).</summary>
     public DateTime? StartUtc { get; set; }
 
+    /// <summary>When the hazard ends (null = unknown; the alert then runs until it expires).</summary>
     public DateTime? EndUtc { get; set; }
+
+    /// <summary>When the message itself lapses; a continuing hazard gets a fresh message before then.</summary>
+    public DateTime? ExpiresUtc { get; set; }
+
+    /// <summary>4 for Extreme down to 1 for Minor, 0 when unknown.</summary>
+    public int SeverityRank => Severity?.ToLowerInvariant() switch
+    {
+        "extreme" => 4,
+        "severe" => 3,
+        "moderate" => 2,
+        "minor" => 1,
+        _ => 0
+    };
+
+    /// <summary>Still worth showing at <paramref name="nowUtc"/>: neither ended nor expired. A hazard that has not started yet counts (a watch for tomorrow is news today).</summary>
+    public bool IsActive(DateTime nowUtc)
+    {
+        if (EndUtc is { } end && end <= nowUtc)
+        {
+            return false;
+        }
+
+        if (ExpiresUtc is { } expires && expires <= nowUtc)
+        {
+            return false;
+        }
+
+        return true;
+    }
 }
 
 /// <summary>A place found by the geocoding search.</summary>

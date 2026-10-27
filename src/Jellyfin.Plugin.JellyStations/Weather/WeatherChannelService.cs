@@ -1,9 +1,11 @@
 using System.Security.Cryptography;
 using System.Text;
+using Jellyfin.Plugin.JellyStations.Library;
 using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Scheduling;
 using Jellyfin.Plugin.JellyStations.Storage;
 using Jellyfin.Plugin.JellyStations.Streaming;
+using Jellyfin.Plugin.JellyStations.Weather.Alerts;
 using Jellyfin.Plugin.JellyStations.Weather.Radar;
 using Jellyfin.Plugin.JellyStations.Weather.Screens;
 using Microsoft.Extensions.Logging;
@@ -24,17 +26,21 @@ public sealed class WeatherChannelService
     private readonly CompiledStationRepository _compiled;
     private readonly WeatherService _weather;
     private readonly RadarService _radar;
+    private readonly AlertService _alerts;
+    private readonly MusicLoudnessService _loudness;
     private readonly WeatherScreenRenderer _renderer;
     private readonly WeatherAssets _assets;
     private readonly JellyStationsPaths _paths;
     private readonly ILogger<WeatherChannelService> _logger;
 
-    public WeatherChannelService(StationRepository stations, CompiledStationRepository compiled, WeatherService weather, RadarService radar, WeatherScreenRenderer renderer, WeatherAssets assets, JellyStationsPaths paths, ILogger<WeatherChannelService> logger)
+    public WeatherChannelService(StationRepository stations, CompiledStationRepository compiled, WeatherService weather, RadarService radar, AlertService alerts, MusicLoudnessService loudness, WeatherScreenRenderer renderer, WeatherAssets assets, JellyStationsPaths paths, ILogger<WeatherChannelService> logger)
     {
         _stations = stations;
         _compiled = compiled;
         _weather = weather;
         _radar = radar;
+        _alerts = alerts;
+        _loudness = loudness;
         _renderer = renderer;
         _assets = assets;
         _paths = paths;
@@ -45,7 +51,7 @@ public sealed class WeatherChannelService
     public WeatherSegment? BuildSegment(Guid stationId, DateTime nowUtc, ScheduleEntry entry, EncodingProfile profile)
     {
         var station = _stations.Get(stationId);
-        if (station is null || station.Mode != ScheduleMode.Weather)
+        if (station is null || !station.UsesWeather)
         {
             return null;
         }
@@ -61,7 +67,9 @@ public sealed class WeatherChannelService
         var loops = locations.Select(l => config.ShowRadar ? _radar.Get(l.Id) : null).ToList();
         var forecasts = locations.Select(l => config.ShowForecastRadar ? _radar.GetForecast(l.Id) : null).ToList();
         var forecastFrames = forecasts.Select(f => f?.ForecastFrames(nowUtc, config.ForecastRadarHours, config.ForecastRadarStepMinutes) ?? Array.Empty<RadarFrame>()).ToList();
-        var screens = WeatherCycle.Timeline(config, locations.Count, nowUtc, entry.EndUtc, entry.StartUtc, zone, i => loops[i] is { IsPlayable: true }, i => forecastFrames[i].Count >= 2);
+        var alerts = locations.Select(l => config.ShowAlerts ? _alerts.Active(l.Id, nowUtc) : Array.Empty<WeatherAlert>()).ToList();
+        var available = new CycleAvailability(i => loops[i] is { IsPlayable: true }, i => forecastFrames[i].Count >= 2, i => alerts[i].Count > 0);
+        var screens = WeatherCycle.Timeline(config, locations.Count, nowUtc, entry.EndUtc, entry.StartUtc, zone, available);
         if (screens.Count == 0)
         {
             return null;
@@ -82,10 +90,10 @@ public sealed class WeatherChannelService
         var segStart = kept[0].StartUtc;
         var segEnd = kept[^1].EndUtc;
 
-        var places = locations.Select(l =>
+        var places = locations.Select((l, i) =>
         {
             var report = _weather.Get(l.Id);
-            return new PlaceWeather(l, report, WeatherService.IsStale(report, config, nowUtc));
+            return new PlaceWeather(l, report, WeatherService.IsStale(report, config, nowUtc), alerts[i], _alerts.Get(l.Id)?.Attribution);
         }).ToList();
         var attribution = places.Select(p => p.Report?.Attribution).FirstOrDefault(a => !string.IsNullOrEmpty(a)) ?? _weather.Provider.Attribution;
         var logoPath = config.ShowLogo && !string.IsNullOrEmpty(station.LogoFileName) ? _paths.LogoFile(station.LogoFileName) : null;
@@ -133,7 +141,7 @@ public sealed class WeatherChannelService
                         continue;
                     }
 
-                    audio.Add(new WeatherAudio(piece.Track.Path, piece.InPoint.TotalSeconds, piece.Duration.TotalSeconds));
+                    audio.Add(AudioPiece(piece, config.NormalizeMusic ? _loudness.GainDb(piece.Track) : 0));
                     if (config.ShowMusicCredit)
                     {
                         var from = (piece.StartUtc - segStart).TotalSeconds;
@@ -155,6 +163,17 @@ public sealed class WeatherChannelService
             VolumePercent = config.MusicVolumePercent,
             Title = entry.Title
         };
+    }
+
+    /// <summary>
+    /// One music piece as ffmpeg plays it: levelled by its measured gain, faded in when the track really starts here
+    /// and out when it really ends here (never at a segment cut, which the next segment continues seamlessly).
+    /// </summary>
+    public static WeatherAudio AudioPiece(MusicPiece piece, double gainDb)
+    {
+        var fadeIn = piece.InPoint <= TimeSpan.Zero;
+        var fadeOut = piece.InPoint + piece.Duration >= TimeSpan.FromTicks(piece.Track.RuntimeTicks) - TimeSpan.FromMilliseconds(20);
+        return new WeatherAudio(piece.Track.Path, piece.InPoint.TotalSeconds, piece.Duration.TotalSeconds, gainDb, fadeIn, fadeOut);
     }
 
     /// <summary>

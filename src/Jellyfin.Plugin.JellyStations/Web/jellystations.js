@@ -1091,6 +1091,9 @@
       b.Overflow = b.Overflow || 'FillerRemainder';
       b.RemainderMayOverrun = !!b.RemainderMayOverrun;
       b.MaxStartDelayMinutes = Math.min(240, Math.max(0, parseInt(b.MaxStartDelayMinutes, 10) || 0));
+      b.Kind = b.Kind === 'Weather' ? 'Weather' : 'Content';
+      b.RepeatEveryMinutes = Math.min(1440, Math.max(0, parseInt(b.RepeatEveryMinutes, 10) || 0));
+      b.RepeatUntilLocal = parseHm(b.RepeatUntilLocal) === null ? '' : b.RepeatUntilLocal;
       normalizeRecurrence(b);
       b.StartLocal = b.StartLocal || '20:00';
       if (b.DurationMinutes === undefined || b.DurationMinutes === null) {
@@ -1124,6 +1127,10 @@
       roll.Sources = Array.isArray(roll.Sources) ? roll.Sources : [];
       roll.Sources.forEach(normalizeSource);
     });
+    const wb = s.Bumpers.Weather = s.Bumpers.Weather || {};
+    wb.Enabled = !!wb.Enabled;
+    wb.Minutes = Math.min(10, Math.max(1, parseInt(wb.Minutes, 10) || 2));
+    wb.Position = wb.Position === 'AfterProgram' ? 'AfterProgram' : 'BeforeProgram';
     s.CardText = s.CardText || null;
     s.LogoOverlay = s.LogoOverlay || {};
     s.LogoOverlay.Enabled = !!s.LogoOverlay.Enabled;
@@ -1376,6 +1383,10 @@
     setChecked('#tvsPostRollEnabled', !!d.Bumpers.PostRoll.Enabled);
     show($('#tvsPreRollPicker'), !!d.Bumpers.PreRoll.Enabled);
     show($('#tvsPostRollPicker'), !!d.Bumpers.PostRoll.Enabled);
+    setChecked('#tvsBumperWeatherEnabled', !!d.Bumpers.Weather.Enabled);
+    setVal('#tvsBumperWeatherMinutes', d.Bumpers.Weather.Minutes || 2);
+    setVal('#tvsBumperWeatherPosition', d.Bumpers.Weather.Position || 'BeforeProgram');
+    show($('#tvsBumperWeatherOptions'), !!d.Bumpers.Weather.Enabled);
     createPicker({
       container: $('#tvsPreRollPicker'),
       mode: 'sources',
@@ -1516,11 +1527,41 @@
     show($('#tvsPanelBlocks'), mode === 'Pool' || mode === 'Slots');
     show($('#tvsPanelSlots'), mode === 'Slots');
     show($('#tvsPanelLineup'), mode === 'Lineup');
-    show($('#tvsPanelWeather'), mode === 'Weather');
     $('#tvsViewEditor').classList.toggle('tvs-weather-mode', mode === 'Weather');
+    updateWeatherPanel();
     if (changed) {
       renderBlocks(); // block wording depends on the mode
     }
+  }
+
+  /** True when the draft as it stands in the form puts the weather on the air: a weather channel, a weather block or weather in the breaks. */
+  function usesWeatherLive() {
+    const mode = val('#tvsMode') || 'Pool';
+    if (mode === 'Weather') {
+      return true;
+    }
+    if (checked('#tvsBumpersEnabled') && checked('#tvsBumperWeatherEnabled')) {
+      return true;
+    }
+    return (mode === 'Pool' || mode === 'Slots') && (state.draft.Slots.Blocks || []).some(b => b.Kind === 'Weather');
+  }
+
+  function usesWeatherPayload(p) {
+    if (p.Mode === 'Weather') {
+      return true;
+    }
+    if (p.Bumpers && p.Bumpers.Enabled && p.Bumpers.Weather && p.Bumpers.Weather.Enabled) {
+      return true;
+    }
+    return (p.Mode === 'Pool' || p.Mode === 'Slots') && (p.Slots.Blocks || []).some(b => b.Kind === 'Weather');
+  }
+
+  /** Shows the Weather section when the station needs it; outside Weather mode the channel-only settings are hidden. */
+  function updateWeatherPanel() {
+    const mode = val('#tvsMode') || 'Pool';
+    show($('#tvsPanelWeather'), usesWeatherLive());
+    $('#tvsViewEditor').classList.toggle('tvs-weather-aux', mode !== 'Weather');
+    $all('#tvsPanelWeather [data-weather-aux]').forEach(e => show(e, mode !== 'Weather'));
   }
 
   /** What plays when a block has no content or hands time back: the pool in Pool mode, the filler otherwise. */
@@ -1970,6 +2011,9 @@
     d.Bumpers.MaxClipMinutes = Math.max(1, parseInt(val('#tvsBumperMax'), 10) || 5);
     d.Bumpers.PreRoll.Enabled = checked('#tvsPreRollEnabled');
     d.Bumpers.PostRoll.Enabled = checked('#tvsPostRollEnabled');
+    d.Bumpers.Weather.Enabled = checked('#tvsBumperWeatherEnabled');
+    d.Bumpers.Weather.Minutes = Math.min(10, Math.max(1, parseInt(val('#tvsBumperWeatherMinutes'), 10) || 2));
+    d.Bumpers.Weather.Position = val('#tvsBumperWeatherPosition') || 'BeforeProgram';
     d.Mode = val('#tvsMode') || 'Pool';
     d.Pool.Order = val('#tvsPoolOrder') || 'Shuffle';
     d.Pool.AvoidSameSeriesBackToBack = checked('#tvsPoolAvoid');
@@ -1984,6 +2028,9 @@
     w.GuideEntryMinutes = Math.min(240, Math.max(15, parseInt(val('#tvsWeatherEntryMinutes'), 10) || 60));
     w.OnTheEights = checked('#tvsWeatherEights');
     w.TwentyFourHourClock = checked('#tvsWeatherClock24');
+    w.ShowTitleCards = checked('#tvsWeatherTitleCards');
+    w.TitleCardSeconds = Math.min(10, Math.max(1, parseInt(val('#tvsWeatherTitleCardSeconds'), 10) || 3));
+    w.ShowAlerts = checked('#tvsWeatherAlerts');
     w.ShowHourly = checked('#tvsWeatherHourly');
     w.ShowDaily = checked('#tvsWeatherDaily');
     w.ShowRadar = checked('#tvsWeatherRadar');
@@ -1998,6 +2045,7 @@
     w.MusicFolder = val('#tvsWeatherMusicFolder').trim() || null;
     w.MusicVolumePercent = Math.min(150, Math.max(20, parseInt(val('#tvsWeatherVolume'), 10) || 100));
     w.ShowMusicCredit = checked('#tvsWeatherCredit');
+    w.NormalizeMusic = checked('#tvsWeatherNormalize');
     d.Encoding = checked('#tvsEncodingEnabled') && state.stationEncoding ? state.stationEncoding.get() : null;
     return toPayload(d);
   }
@@ -2047,8 +2095,8 @@
     if (p.Mode === 'Slots' && !p.Slots.Blocks.length && !p.Slots.Filler.Sources.length) {
       errors.push('Add at least one time block or some filler content.');
     }
-    if (p.Mode === 'Weather' && !(p.Weather.Locations || []).some(weatherPlaceValid)) {
-      errors.push('Add at least one place to the weather channel.');
+    if (usesWeatherPayload(p) && !(p.Weather.Locations || []).some(weatherPlaceValid)) {
+      errors.push(p.Mode === 'Weather' ? 'Add at least one place to the weather channel.' : 'Add at least one place in the Weather section for the weather block or breaks.');
     }
     if (p.Mode === 'Pool' || p.Mode === 'Slots') {
       p.Slots.Blocks.forEach((b, i) => {
@@ -2062,8 +2110,11 @@
         if (!(b.DurationMinutes > 0)) {
           errors.push(label + ' needs a duration greater than 0 minutes.');
         }
-        if (!b.Sources || !b.Sources.length) {
+        if (b.Kind !== 'Weather' && (!b.Sources || !b.Sources.length)) {
           errors.push(label + ' has no content.');
+        }
+        if (b.RepeatEveryMinutes && b.RepeatEveryMinutes < 5) {
+          errors.push(label + ': repeat every 5 minutes or more, or 0 for once.');
         }
       });
     }
@@ -2346,6 +2397,9 @@
       Overflow: 'FillerRemainder',
       RemainderMayOverrun: true,
       MaxStartDelayMinutes: 30,
+      Kind: 'Content',
+      RepeatEveryMinutes: 0,
+      RepeatUntilLocal: '',
       Recurrence: 'Weekly',
       IntervalWeeks: 2,
       RecurrenceStart: '',
@@ -2427,8 +2481,30 @@
       const endMin = (startMin + dur) % 1440;
       timeText += '–' + pad2(Math.floor(endMin / 60)) + ':' + pad2(endMin % 60) + (startMin + dur >= 1440 ? ' (+1d)' : '');
     }
+    if (b.RepeatEveryMinutes > 0) {
+      timeText += ', every ' + fmtDur(b.RepeatEveryMinutes * 60) + ' until ' + (b.RepeatUntilLocal || 'midnight');
+    }
     const sources = (b.Sources || []).length;
-    return dayText + ' · ' + timeText + ' · ' + fmtDur(dur * 60) + ' · ' + sources + ' source' + (sources === 1 ? '' : 's');
+    const what = b.Kind === 'Weather' ? 'local weather' : sources + ' source' + (sources === 1 ? '' : 's');
+    return dayText + ' · ' + timeText + ' · ' + fmtDur(dur * 60) + ' · ' + what;
+  }
+
+  /** Start minutes of a block on a day it occurs: its start, then every repeat until its limit or midnight. */
+  function blockStarts(b) {
+    const start = parseHm(b.StartLocal);
+    if (start === null) {
+      return [];
+    }
+    const starts = [start];
+    const every = parseInt(b.RepeatEveryMinutes, 10) || 0;
+    if (every >= 5) {
+      const until = parseHm(b.RepeatUntilLocal);
+      const limit = until !== null && until > start ? until : 1440;
+      for (let t = start + every; t <= limit && t < 1440; t += every) {
+        starts.push(t);
+      }
+    }
+    return starts;
   }
 
   function renderBlocks() {
@@ -2492,10 +2568,12 @@
         if (di < 0) {
           return;
         }
-        placeBlockRect(cols[di], start, Math.min(dur, 1440 - start), b, bi, false);
-        if (start + dur > 1440) {
-          placeBlockRect(cols[(di + 1) % 7], 0, Math.min(start + dur - 1440, 1440), b, bi, true);
-        }
+        blockStarts(b).forEach(s => {
+          placeBlockRect(cols[di], s, Math.min(dur, 1440 - s), b, bi, false);
+          if (s + dur > 1440) {
+            placeBlockRect(cols[(di + 1) % 7], 0, Math.min(s + dur - 1440, 1440), b, bi, true);
+          }
+        });
       });
     });
 
@@ -2685,14 +2763,19 @@
     const body = el('div', { className: 'tvs-card-body' });
     body.innerHTML =
       '<div class="tvs-grid2">' +
-        inputHtml(p + 'name', 'Block name', 'text', {}, 'Shown as the source label in the guide preview.') +
+        inputHtml(p + 'name', 'Block name', 'text', {}, 'Shown as the source label in the guide preview; for a weather block, its guide title (empty = the Weather section\'s guide title).') +
+        selectHtml(p + 'kind', 'What plays', [['Content', 'Programs from the sources below'], ['Weather', 'Local weather – the station\'s weather screens']], 'A weather block needs places in the Weather section, which appears while one exists.') +
         inputHtml(p + 'start', 'Start time (station local)', 'time', { step: 60 }) +
         inputHtml(p + 'dur', 'Duration (minutes)', 'number', { min: 1, max: 1440, step: 1 }) +
-        selectHtml(p + 'order', 'Play order', [['Sequential', 'Sequential – continue where the last occurrence left off'], ['Shuffle', 'Shuffle – re-rolled every occurrence'], ['ShuffleEpisodesInOrder', 'Shuffle shows, episodes in order – re-rolled every occurrence']]) +
-        selectHtml(p + 'overflow', 'When the next item does not fit', [['FillerRemainder', 'Hand the remainder to ' + betweenBlocksName()], ['TruncateLast', 'Play it anyway and cut it off at the block end']]) +
+        inputHtml(p + 'every', 'Repeat every (minutes; 0 = once)', 'number', { min: 0, max: 1440, step: 5 }, 'Each repeat has the full duration. "Local weather at the top of the hour" is a 5-minute weather block at 06:00 repeating every 60 minutes until 23:00.') +
+        inputHtml(p + 'until', 'Repeat until (station local; empty = midnight)', 'time', { step: 60 }) +
         inputHtml(p + 'delay', 'Start up to this many minutes late so the previous program can finish', 'number', { min: 0, max: 240, step: 5 }, '0 = start on time and cut the program. When the block starts late it keeps its full duration, unless another block follows.') +
       '</div>' +
-      '<label class="emby-checkbox-label tvs-block-overrun"><input type="checkbox" id="' + p + 'overrun"><span>When ' + betweenBlocksName() + ' takes the remainder, let its last program finish past the block end instead of cutting it (unless another block starts right then)</span></label>' +
+      '<div class="tvs-grid2" data-kind="Content">' +
+        selectHtml(p + 'order', 'Play order', [['Sequential', 'Sequential – continue where the last occurrence left off'], ['Shuffle', 'Shuffle – re-rolled every occurrence'], ['ShuffleEpisodesInOrder', 'Shuffle shows, episodes in order – re-rolled every occurrence']]) +
+        selectHtml(p + 'overflow', 'When the next item does not fit', [['FillerRemainder', 'Hand the remainder to ' + betweenBlocksName()], ['TruncateLast', 'Play it anyway and cut it off at the block end']]) +
+      '</div>' +
+      '<label class="emby-checkbox-label tvs-block-overrun" data-kind="Content"><input type="checkbox" id="' + p + 'overrun"><span>When ' + betweenBlocksName() + ' takes the remainder, let its last program finish past the block end instead of cutting it (unless another block starts right then)</span></label>' +
       '<div class="tvs-grid2">' +
         selectHtml(p + 'rec', 'Repeats', [['Weekly', 'Every week'], ['EveryNWeeks', 'Every N weeks'], ['WeeksOfMonth', 'Certain weeks of the month'], ['Dates', 'Only on specific dates']], 'Weeks run Monday to Sunday, so a Saturday-Sunday weekend stays together. An earlier block in the list wins when two blocks coincide.') +
       '</div>' +
@@ -2719,17 +2802,32 @@
           DAYS.map(d => '<label class="tvs-day"><input type="checkbox" data-day="' + d + '"><span>' + DAY_SHORT[d] + '</span></label>').join('') +
         '</div>' +
       '</div>' +
-      '<div class="tvs-days-label">Content</div>' +
-      '<div class="tvs-block-picker"></div>';
+      '<div data-kind="Content">' +
+        '<div class="tvs-days-label">Content</div>' +
+        '<div class="tvs-block-picker"></div>' +
+      '</div>';
 
     const q = id => body.querySelector('#' + p + id);
     q('name').value = b.Name || '';
     q('start').value = b.StartLocal || '';
     q('dur').value = b.DurationMinutes;
+    q('kind').value = b.Kind === 'Weather' ? 'Weather' : 'Content';
+    q('every').value = b.RepeatEveryMinutes || 0;
+    q('until').value = b.RepeatUntilLocal || '';
     q('order').value = b.Order || 'Sequential';
     q('overflow').value = b.Overflow || 'FillerRemainder';
     q('overrun').checked = !!b.RemainderMayOverrun;
     q('delay').value = b.MaxStartDelayMinutes || 0;
+    const showKindPanels = () => $all('[data-kind]', body).forEach(panel => show(panel, panel.getAttribute('data-kind') === (b.Kind || 'Content')));
+    showKindPanels();
+    q('kind').addEventListener('change', () => {
+      b.Kind = q('kind').value === 'Weather' ? 'Weather' : 'Content';
+      showKindPanels();
+      refreshHead();
+      updateWeatherPanel();
+    });
+    q('every').addEventListener('input', () => { b.RepeatEveryMinutes = Math.min(1440, Math.max(0, parseInt(q('every').value, 10) || 0)); refreshHead(); });
+    q('until').addEventListener('change', () => { b.RepeatUntilLocal = parseHm(q('until').value) === null ? '' : q('until').value; refreshHead(); });
     normalizeRecurrence(b);
     q('rec').value = b.Recurrence;
     q('interval').value = b.IntervalWeeks;
@@ -2915,7 +3013,7 @@
       if (b.Recurrence === 'WeeksOfMonth' && !(b.WeeksOfMonth || []).length) {
         warnings.push(label + ' has no week of the month chosen and will never air.');
       }
-      if (!(b.Sources || []).length) {
+      if (b.Kind !== 'Weather' && !(b.Sources || []).length) {
         warnings.push(label + ' has no content and will play ' + betweenBlocksName() + ' instead.');
       }
     });
@@ -4461,13 +4559,13 @@
   // ---- Weather channel ---------------------------------------------------------------------
 
   const MUSIC_KINDS = ['Playlist', 'Album', 'Artist', 'MusicGenre', 'Audio'];
-  const WEATHER_SCREEN_LABEL = { Current: 'Current conditions', Hourly: 'Next 12 hours', Daily: '7-day forecast', Radar: 'Local radar', ForecastRadar: 'Forecast radar', Travel: 'Travel cities' };
+  const WEATHER_SCREEN_LABEL = { TitleCard: 'Title card', Alerts: 'Alerts', Current: 'Current conditions', Hourly: 'Next 12 hours', Daily: '7-day forecast', Radar: 'Local radar', ForecastRadar: 'Forecast radar', Travel: 'Travel cities' };
 
   function defaultWeather() {
     return {
       Locations: [], Units: 'Imperial', TwentyFourHourClock: false, ScreenSeconds: 10, OnTheEights: false, Theme: 'Classic',
-      ShowLogo: true, ShowTravelCities: true, ShowHourly: true, ShowDaily: true, ShowRadar: true, RadarZoom: 'State', ShowForecastRadar: true, ForecastRadarHours: 3, ForecastRadarStepMinutes: 15, GuideTitle: null, GuideEntryMinutes: 60, StaleHours: 3,
-      Provider: 'open-meteo', MusicEnabled: true, MusicSources: [], MusicFolder: null, ShowMusicCredit: true, MusicVolumePercent: 100
+      ShowLogo: true, ShowTravelCities: true, ShowTitleCards: true, TitleCardSeconds: 3, ShowAlerts: true, ShowHourly: true, ShowDaily: true, ShowRadar: true, RadarZoom: 'State', ShowForecastRadar: true, ForecastRadarHours: 3, ForecastRadarStepMinutes: 15, GuideTitle: null, GuideEntryMinutes: 60, StaleHours: 3,
+      Provider: 'open-meteo', MusicEnabled: true, MusicSources: [], MusicFolder: null, ShowMusicCredit: true, MusicVolumePercent: 100, NormalizeMusic: true
     };
   }
 
@@ -4490,10 +4588,12 @@
     w.MusicSources = Array.isArray(w.MusicSources) ? w.MusicSources : [];
     w.MusicSources.forEach(normalizeSource);
     w.ScreenSeconds = Math.min(60, Math.max(4, parseInt(w.ScreenSeconds, 10) || 10));
+    w.TitleCardSeconds = Math.min(10, Math.max(1, parseInt(w.TitleCardSeconds, 10) || 3));
     w.GuideEntryMinutes = Math.min(240, Math.max(15, parseInt(w.GuideEntryMinutes, 10) || 60));
     w.MusicVolumePercent = Math.min(150, Math.max(20, parseInt(w.MusicVolumePercent, 10) || 100));
     w.MusicEnabled = w.MusicEnabled !== false;
     w.ShowMusicCredit = w.ShowMusicCredit !== false;
+    w.NormalizeMusic = w.NormalizeMusic !== false;
     return w;
   }
 
@@ -4510,6 +4610,10 @@
     setVal('#tvsWeatherEntryMinutes', w.GuideEntryMinutes);
     setChecked('#tvsWeatherEights', !!w.OnTheEights);
     setChecked('#tvsWeatherClock24', !!w.TwentyFourHourClock);
+    setChecked('#tvsWeatherTitleCards', w.ShowTitleCards !== false);
+    setVal('#tvsWeatherTitleCardSeconds', w.TitleCardSeconds || 3);
+    show($('#tvsWeatherTitleCardBox'), w.ShowTitleCards !== false);
+    setChecked('#tvsWeatherAlerts', w.ShowAlerts !== false);
     setChecked('#tvsWeatherHourly', w.ShowHourly !== false);
     setChecked('#tvsWeatherDaily', w.ShowDaily !== false);
     setChecked('#tvsWeatherRadar', w.ShowRadar !== false);
@@ -4527,6 +4631,7 @@
     setVal('#tvsWeatherMusicFolder', w.MusicFolder || '');
     setVal('#tvsWeatherVolume', w.MusicVolumePercent);
     setChecked('#tvsWeatherCredit', w.ShowMusicCredit !== false);
+    setChecked('#tvsWeatherNormalize', w.NormalizeMusic !== false);
     loadMusicPacks();
     createPicker({
       container: $('#tvsMusicPicker'),
@@ -4768,7 +4873,7 @@
       return;
     }
     const table = el('table', { className: 'tvs-table' });
-    table.appendChild(el('thead', null, el('tr', null, [el('th', { text: 'Place' }), el('th', { text: 'Now' }), el('th', { text: 'Last fetched' }), el('th', { text: 'Radar' }), el('th', { text: 'Forecast radar' }), el('th', { text: '' })])));
+    table.appendChild(el('thead', null, el('tr', null, [el('th', { text: 'Place' }), el('th', { text: 'Now' }), el('th', { text: 'Last fetched' }), el('th', { text: 'Alerts' }), el('th', { text: 'Radar' }), el('th', { text: 'Forecast radar' }), el('th', { text: '' })])));
     const tbody = el('tbody');
     const metric = state.draft.Weather.Units === 'Metric';
     status.Locations.forEach(l => {
@@ -4798,10 +4903,27 @@
       } else if (state.draft.Weather.ShowForecastRadar === false) {
         forecast = 'off';
       }
+      let alerts = '—';
+      let alertTitle = l.AlertSource || '';
+      if (l.AlertCount > 0) {
+        alerts = l.AlertSummary || (l.AlertCount + ' active');
+        alertTitle = (l.AlertSource || '') + (l.AlertsCheckedUtc ? ', checked ' + fmtDateTime(l.AlertsCheckedUtc) : '');
+      } else if (state.draft.Weather.ShowAlerts === false) {
+        alerts = 'off';
+      } else if (l.AlertsNotCovered) {
+        alerts = 'not covered';
+        alertTitle = l.AlertError || 'No alert source covers this place; the screen is skipped for it.';
+      } else if (l.AlertError) {
+        alerts = l.AlertError;
+      } else if (l.AlertsCheckedUtc) {
+        alerts = 'none';
+        alertTitle = (l.AlertSource || '') + ', checked ' + fmtDateTime(l.AlertsCheckedUtc);
+      }
       tbody.appendChild(el('tr', null, [
         el('td', { text: l.Name }),
         el('td', { text: now }),
         el('td', { className: 'nowrap', text: l.LastSuccessUtc ? fmtDateTime(l.LastSuccessUtc) : 'never' }),
+        el('td', { text: alerts, title: alertTitle }),
         el('td', { text: radar, title: l.RadarSource || '' }),
         el('td', { text: forecast, title: l.ForecastRadarSource || '' }),
         el('td', { className: 'nowrap' }, [note, l.LastError ? el('span', { className: 'tvs-secondary', text: ' ' + l.LastError }) : null])
@@ -4809,7 +4931,13 @@
     });
     table.appendChild(tbody);
     box.appendChild(table);
-    box.appendChild(el('div', { className: 'tvs-secondary', text: 'Forecasts are refreshed every 15 minutes, radar every 5 and the forecast radar as each hourly model run arrives, while the station is enabled. ' + (status.Attribution || '') }));
+    if (status.MusicLevelling && status.MusicTracks > 0) {
+      const pending = status.MusicTracks - status.MusicLevelled - (status.MusicUnmeasurable || 0);
+      box.appendChild(el('div', { className: 'tvs-secondary', text: 'Music levelling: ' + status.MusicLevelled + ' of ' + status.MusicTracks + ' track' + (status.MusicTracks === 1 ? '' : 's') + ' measured' +
+        (status.MusicUnmeasurable ? ', ' + status.MusicUnmeasurable + ' could not be read (played as recorded)' : '') +
+        (pending > 0 ? '; the rest are measured in the background, a few seconds each, and play as recorded meanwhile.' : '.') }));
+    }
+    box.appendChild(el('div', { className: 'tvs-secondary', text: 'Forecasts are refreshed every 15 minutes, alerts and radar every 5 and the forecast radar as each hourly model run arrives, while the station is enabled. ' + (status.Attribution || '') }));
   }
 
   function refreshWeatherNow() {
@@ -4843,7 +4971,8 @@
     on('#tvsBtnEmptySuggest', 'click', () => openSuggestions(false));
     on('#tvsBtnPresetsBack', 'click', () => showView('list'));
     on('#tvsBtnSuggestPreset', 'click', openPresets);
-    on('#tvsBumpersEnabled', 'change', () => show($('#tvsBumperOptions'), checked('#tvsBumpersEnabled')));
+    on('#tvsBumpersEnabled', 'change', () => { show($('#tvsBumperOptions'), checked('#tvsBumpersEnabled')); updateWeatherPanel(); });
+    on('#tvsBumperWeatherEnabled', 'change', () => { show($('#tvsBumperWeatherOptions'), checked('#tvsBumperWeatherEnabled')); updateWeatherPanel(); });
     on('#tvsPreRollEnabled', 'change', () => show($('#tvsPreRollPicker'), checked('#tvsPreRollEnabled')));
     on('#tvsPostRollEnabled', 'change', () => show($('#tvsPostRollPicker'), checked('#tvsPostRollEnabled')));
     on('#tvsBtnContent', 'click', loadContent);
@@ -4910,6 +5039,7 @@
     on('#tvsWeatherSearch', 'input', debounce(weatherSearch, 350));
     on('#tvsWeatherMusic', 'change', () => show($('#tvsWeatherMusicOptions'), checked('#tvsWeatherMusic')));
     on('#tvsWeatherRadar', 'change', () => show($('#tvsWeatherRadarZoomBox'), checked('#tvsWeatherRadar')));
+    on('#tvsWeatherTitleCards', 'change', () => show($('#tvsWeatherTitleCardBox'), checked('#tvsWeatherTitleCards')));
     on('#tvsWeatherForecastRadar', 'change', () => show($('#tvsWeatherForecastRadarBox'), checked('#tvsWeatherForecastRadar')));
     on('#tvsBtnWeatherRefresh', 'click', refreshWeatherNow);
     on('#tvsBtnWeatherPreview', 'click', previewWeatherScreen);

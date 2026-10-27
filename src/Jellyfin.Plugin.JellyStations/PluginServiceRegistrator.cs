@@ -25,6 +25,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
 
         serviceCollection.AddSingleton<LibraryContentResolver>();
         serviceCollection.AddSingleton<MusicFolderScanner>();
+        serviceCollection.AddSingleton<MusicLoudnessService>();
         serviceCollection.AddSingleton<MusicResolver>();
         serviceCollection.AddSingleton<StationCompiler>();
 
@@ -36,6 +37,8 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<Weather.Radar.IRadarSource, Weather.Radar.RainViewerSource>();
         serviceCollection.AddSingleton<Weather.Radar.IForecastRadarSource, Weather.Radar.HrrrSource>();
         serviceCollection.AddSingleton<Weather.Radar.RadarService>();
+        serviceCollection.AddSingleton<Weather.Alerts.IAlertSource, Weather.Alerts.NwsAlertSource>();
+        serviceCollection.AddSingleton<Weather.Alerts.AlertService>();
         serviceCollection.AddSingleton(sp => new WeatherAssets(sp.GetRequiredService<JellyStationsPaths>().AssetsDir));
         serviceCollection.AddSingleton<WeatherPainter>();
         serviceCollection.AddSingleton<WeatherScreenRenderer>();

@@ -1,6 +1,7 @@
 using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Scheduling;
 using Jellyfin.Plugin.JellyStations.Weather;
+using Jellyfin.Plugin.JellyStations.Weather.Alerts;
 using Jellyfin.Plugin.JellyStations.Weather.Screens;
 using Xunit;
 
@@ -35,10 +36,11 @@ public class WeatherPainterTests : IDisposable
         london.Current.TemperatureC = -3;
         london.Current.WeatherCode = 73;
         london.Current.IsDay = false;
+        var alerts = NwsAlertSource.Parse(OpenMeteoParserTests.Fixture("nws-alerts.json"));
         return new List<PlaceWeather>
         {
-            new(new WeatherLocation { Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001"), Name = "Boston", Region = "Massachusetts, United States", Latitude = 42.36, Longitude = -71.06 }, boston, false),
-            new(new WeatherLocation { Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000002"), Name = "Denver", Region = "Colorado, United States", Latitude = 39.74, Longitude = -104.99 }, denver, false),
+            new(new WeatherLocation { Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000001"), Name = "Boston", Region = "Massachusetts, United States", Latitude = 42.36, Longitude = -71.06 }, boston, false, new[] { alerts[1] }, "Alerts: US National Weather Service"),
+            new(new WeatherLocation { Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000002"), Name = "Denver", Region = "Colorado, United States", Latitude = 39.74, Longitude = -104.99 }, denver, false, alerts, "Alerts: US National Weather Service"),
             new(new WeatherLocation { Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000003"), Name = "London", Region = "England, United Kingdom", Latitude = 51.5, Longitude = -0.12 }, london, true),
             new(new WeatherLocation { Id = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000004"), Name = "Nome", Region = "Alaska", Latitude = 64.5, Longitude = -165.4 }, null, true)
         };
@@ -60,6 +62,15 @@ public class WeatherPainterTests : IDisposable
     [InlineData(WeatherScreenKind.Current, 2, WeatherTheme.Light)]
     [InlineData(WeatherScreenKind.Daily, 2, WeatherTheme.Light)]
     [InlineData(WeatherScreenKind.Current, 3, WeatherTheme.Classic)]
+    [InlineData(WeatherScreenKind.TitleCard, 0, WeatherTheme.Classic)]
+    [InlineData(WeatherScreenKind.TitleCard, 2, WeatherTheme.Light)]
+    [InlineData(WeatherScreenKind.TitleCard, 3, WeatherTheme.Dark)]
+    [InlineData(WeatherScreenKind.Alerts, 0, WeatherTheme.Classic)]
+    [InlineData(WeatherScreenKind.Alerts, 1, WeatherTheme.Dark)]
+    [InlineData(WeatherScreenKind.Alerts, 1, WeatherTheme.Light)]
+    [InlineData(WeatherScreenKind.Alerts, 2, WeatherTheme.Classic)]
+    [InlineData(WeatherScreenKind.Hourly, 1, WeatherTheme.Classic)]
+    [InlineData(WeatherScreenKind.Daily, 1, WeatherTheme.Classic)]
     public void Paints_EveryScreenKind(WeatherScreenKind kind, int place, WeatherTheme theme)
     {
         var painter = new WeatherPainter(_assets);
@@ -74,6 +85,22 @@ public class WeatherPainterTests : IDisposable
         var header = File.ReadAllBytes(path).Take(8).ToArray();
         Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }, header);
         Keep(path);
+    }
+
+    [Fact]
+    public void FileName_ChangesWithTheAlerts()
+    {
+        var places = Places();
+        var config = new WeatherConfig { ShowLogo = false };
+        string Name(PlaceWeather p, WeatherScreenKind kind) => WeatherScreenRenderer.FileName(new ScreenRequest(kind, p, places, config, Now, TimeZoneInfo.Utc, null, 1920, 1080, "x"));
+
+        var with = Name(places[1], WeatherScreenKind.Current);
+        var without = Name(places[1] with { Alerts = null }, WeatherScreenKind.Current);
+        var fewer = Name(places[1] with { Alerts = places[1].ActiveAlerts.Take(1).ToList() }, WeatherScreenKind.Current);
+        Assert.NotEqual(with, without);
+        Assert.NotEqual(with, fewer);
+        Assert.Equal(with, Name(places[1], WeatherScreenKind.Current));
+        Assert.StartsWith("aaaaaaaa-titlecard-", Name(places[0], WeatherScreenKind.TitleCard), StringComparison.Ordinal);
     }
 
     [Fact]

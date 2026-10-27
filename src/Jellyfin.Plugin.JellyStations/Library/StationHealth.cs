@@ -55,6 +55,11 @@ public static class StationHealth
             return dto;
         }
 
+        if (station.UsesWeather)
+        {
+            WeatherWarnings(station, compiled, dto);
+        }
+
         if (compiled.TotalItemCount == 0)
         {
             dto.Warnings.Add("No playable items: the station shows a card until content is added.");
@@ -83,7 +88,9 @@ public static class StationHealth
         var places = w.Locations.Count(l => l.IsValid);
         if (places == 0)
         {
-            dto.Warnings.Add("No places: the channel shows a card until a place is added.");
+            dto.Warnings.Add(station.Mode == ScheduleMode.Weather
+                ? "No places: the channel shows a card until a place is added."
+                : "No places: the weather block and breaks show a card until a place is added in the Weather section.");
         }
 
         dto.MusicHours = Math.Round(compiled.Music.Sum(t => (double)t.RuntimeTicks) / TimeSpan.TicksPerHour, 1);

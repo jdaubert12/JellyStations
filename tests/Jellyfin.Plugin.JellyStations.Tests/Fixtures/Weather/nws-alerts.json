@@ -1,0 +1,287 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.dcf89ab75879440c0bad39689676acf44c528022.001.1",
+   "type": "Feature",
+   "geometry": null,
+   "properties": {
+    "id": "urn:oid:2.49.0.1.840.0.dcf89ab75879440c0bad39689676acf44c528022.001.1",
+    "areaDesc": "South Slopes of the Western Brooks Range; Noatak Valley",
+    "sent": "2026-10-27T04:00:00-08:00",
+    "effective": "2026-10-27T04:00:00-08:00",
+    "onset": "2026-10-27T10:00:00-08:00",
+    "expires": "2026-10-27T16:00:00-08:00",
+    "ends": "2026-10-29T16:00:00-08:00",
+    "status": "Actual",
+    "messageType": "Alert",
+    "category": "Met",
+    "severity": "Severe",
+    "certainty": "Likely",
+    "urgency": "Expected",
+    "event": "Winter Storm Warning",
+    "sender": "w-nws.webmaster@noaa.gov",
+    "senderName": "NWS Fairbanks AK",
+    "headline": "Winter Storm Warning issued October 27 at 4:00AM AKDT until October 29 at 4:00PM AKDT by NWS Fairbanks AK",
+    "description": "* WHAT...Heavy snow expected. Total snow accumulations between 6 and\n18 inches. Winds gusting as high as 35 mph.\n\n* WHERE...Red Dog Mine and the South Slopes of the Western Brooks\nRange.\n\n* WHEN...From 10 AM this morning to 4 PM AKDT Thursday.\n\n* IMPACTS...Travel could be very difficult. Areas of blowing snow\ncould significantly reduce visibility.\n\n* ADDITIONAL DETAILS...Mostly rain is expected below 800 feet. The\nheaviest precipitation is expected Tuesday and Wednesday. Some rain\nis possible near Red Dog Mine Tuesday. The heaviest snow is\nexpected Wednesday. Temperatures cool Wednesday into Thursday.",
+    "instruction": "If you must travel, keep an extra flashlight, food, and water in your\nvehicle in case of an emergency.",
+    "response": "Prepare",
+    "note": null,
+    "scope": "Public",
+    "code": "IPAWSv1.0",
+    "language": "en-US",
+    "web": "http://www.weather.gov",
+    "eventCode": {
+     "SAME": [
+      "WSW"
+     ],
+     "NationalWeatherService": [
+      "WSW"
+     ]
+    }
+   }
+  },
+  {
+   "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.8e6e34faacb5e71642cecc2411f93304586f99a8.001.1",
+   "type": "Feature",
+   "geometry": null,
+   "properties": {
+    "id": "urn:oid:2.49.0.1.840.0.8e6e34faacb5e71642cecc2411f93304586f99a8.001.1",
+    "areaDesc": "Presidio, TX",
+    "sent": "2026-10-27T10:02:00-05:00",
+    "effective": "2026-10-27T10:02:00-05:00",
+    "onset": "2026-10-27T10:02:00-05:00",
+    "expires": "2026-10-27T15:00:00-05:00",
+    "ends": "2026-10-27T15:00:00-05:00",
+    "status": "Actual",
+    "messageType": "Alert",
+    "category": "Met",
+    "severity": "Severe",
+    "certainty": "Observed",
+    "urgency": "Immediate",
+    "event": "Flood Warning",
+    "sender": "w-nws.webmaster@noaa.gov",
+    "senderName": "NWS Midland/Odessa TX",
+    "headline": "Flood Warning issued October 27 at 10:02AM CDT until October 27 at 3:00PM CDT by NWS Midland/Odessa TX",
+    "description": "...The Flood Warning continues for the following rivers in Texas...\n\nRio Grande at Rio Grande at Presidio Vehicle Bridge affecting\nPresidio County.\n\nFor the Rio Grande...including Rio Grande above Rio Conchos near\nPresidio,  Texas, Test Forecast Point A, Rio Grande at Presidio\nVehicle Bridge, Rio Grande below Rio Conchos near Presidio,  Texas,\nRio Grande near Castolon,  Texas, Rio Grande at Johnson Ranch near\nCastolon,  Texas, Rio Grande at Rio Grande Village,  BBNP,  Texas,\nRio Grande near Dryden,  Texas, Terlingua Creek near Terlingua,\nTexas...Minor flooding is forecast.\n\n* WHAT...Major flooding is occurring and minor flooding is forecast.\n\n* WHERE...Rio Grande at Rio Grande at Presidio Vehicle Bridge.\n\n* WHEN...Until this afternoon.\n\n* IMPACTS...At 12.0 feet, the river reaches bankfull, after which the\nflood plain between the levees begins to flood.  No damage is\nexpected. At 15.5 feet, the river reaches minor flood stage, and\nflooding between the levees occurs.  No damage to structures is\nexpected. At 20.0 feet, the river reaches moderate flood stage,\ninundating the plain between the levees.  Erosion of the levees is\nlikely.  Water may seep through the levees, flooding adjacent\nfarmland. At 22.9 feet, the river reaches major flood stage.  While\nwater remains between the levees at Presidio, areas downstream may\nexperience significant flooding.  FM 170 downstream of Presidio\nwill flood in low spots.  Farmland along the river will be\ninundated. At 25.0 feet, the river remains between the levees at\nPresidio, although continued flows at this level could cause damage\nto the levees.  FM 170 downstream will likely be flooded and\nimpassable in spots.  Farmland around the river will continue to\ninundate. At 25.8 feet, the river reaches record stage for the\nperiod of record (1978).  A higher stage was reached in 1932, but\nthe exact stage is unknown.  FM 170 will be flooded downstream of\nPresidio.  Farmland around the river will remain inundated. At 28.2\nfeet, the river reaches record stage for the period of record\n(1978).  A higher stage was reached in 1932, but the exact stage is\nunknown.  FM 170 remains flooded downstream of Presidio.  Farmland\nadjacent to the river remains inundated. At 30.0 feet, The top of\nthe levee is reached, and water will begin to overtop the levees.\nMajor flooding of Presidio and surrounding farmland is likely.\n\n* ADDITIONAL DETAILS...\n- At 3:30 PM CDT Monday the stage was 42.1 feet (12.8 meters).\n- Bankfull stage is 12.0 feet (3.7 meters).\n- Recent Activity...The maximum river stage in the 24 hours ending\nat 3:30 PM CDT Monday was 42.1 feet (12.8 meters).\n- Forecast...The river is expected to fall below flood stage early\nthis morning and continue falling to 4.1 feet (1.2 meters)\nSaturday evening.\n- Flood stage is 15.5 feet (4.7 meters).\n- Flood History...This crest compares to a previous crest of 28.2\nfeet (8.6 meters) on 09/16/2008.\n- http://www.weather.gov/safety/flood",
+    "instruction": "Motorists should not attempt to drive around barricades or drive cars\nthrough flooded areas.\n\nCaution is urged when walking near riverbanks.\n\nAdditional information is available at www.weather.gov.\n\nThe next statement will be issued this afternoon at 300 PM CDT.",
+    "response": "Avoid",
+    "note": null,
+    "scope": "Public",
+    "code": "IPAWSv1.0",
+    "language": "en-US",
+    "web": "http://www.weather.gov",
+    "eventCode": {
+     "SAME": [
+      "FLS"
+     ],
+     "NationalWeatherService": [
+      "FLW"
+     ]
+    }
+   }
+  },
+  {
+   "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.1665ee3ebd3f3a0b20b8f6c4b341abae4b3cebc8.001.1",
+   "type": "Feature",
+   "geometry": null,
+   "properties": {
+    "id": "urn:oid:2.49.0.1.840.0.1665ee3ebd3f3a0b20b8f6c4b341abae4b3cebc8.001.1",
+    "areaDesc": "Anchorage",
+    "sent": "2026-10-27T07:02:00-08:00",
+    "effective": "2026-10-27T07:02:00-08:00",
+    "onset": "2026-10-27T07:02:00-08:00",
+    "expires": "2026-10-27T12:00:00-08:00",
+    "ends": "2026-10-27T12:00:00-08:00",
+    "status": "Actual",
+    "messageType": "Alert",
+    "category": "Met",
+    "severity": "Moderate",
+    "certainty": "Likely",
+    "urgency": "Expected",
+    "event": "Dense Fog Advisory",
+    "sender": "w-nws.webmaster@noaa.gov",
+    "senderName": "NWS Anchorage AK",
+    "headline": "Dense Fog Advisory issued October 27 at 7:02AM AKDT until October 27 at 12:00PM AKDT by NWS Anchorage AK",
+    "description": "* WHAT...Visibility one quarter mile or less in dense fog. Slick\nroads due to black ice.\n\n* WHERE...Anchorage.\n\n* WHEN...Until noon AKDT today.\n\n* IMPACTS...Hazardous driving conditions due to low visibility. Below\nfreezing temperatures may lead to frost on bridges and roadways.",
+    "instruction": "A dense fog advisory means visibilities will frequently be reduced to\nless than one quarter mile. If driving, slow down, use your\nheadlights, and leave plenty of distance ahead of you.",
+    "response": "Execute",
+    "note": null,
+    "scope": "Public",
+    "code": "IPAWSv1.0",
+    "language": "en-US",
+    "web": "http://www.weather.gov",
+    "eventCode": {
+     "SAME": [
+      "NWS"
+     ],
+     "NationalWeatherService": [
+      "FGY"
+     ]
+    }
+   }
+  },
+  {
+   "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.2af2891b08a1e2e3e161aa04cf976f12edf0be5a.002.1",
+   "type": "Feature",
+   "geometry": null,
+   "properties": {
+    "id": "urn:oid:2.49.0.1.840.0.2af2891b08a1e2e3e161aa04cf976f12edf0be5a.002.1",
+    "areaDesc": "Converse County Lower Elevations; North Snowy Range Foothills",
+    "sent": "2026-10-27T08:45:00-06:00",
+    "effective": "2026-10-27T08:45:00-06:00",
+    "onset": "2026-10-27T08:45:00-06:00",
+    "expires": "2026-10-27T12:00:00-06:00",
+    "ends": "2026-10-27T12:00:00-06:00",
+    "status": "Actual",
+    "messageType": "Update",
+    "category": "Met",
+    "severity": "Severe",
+    "certainty": "Possible",
+    "urgency": "Future",
+    "event": "High Wind Watch",
+    "sender": "w-nws.webmaster@noaa.gov",
+    "senderName": "NWS Cheyenne WY",
+    "headline": "High Wind Watch issued October 27 at 8:45AM MDT until October 27 at 12:00PM MDT by NWS Cheyenne WY",
+    "description": "* WHAT...Southwest winds 30 to 40 mph with gusts up to 60 mph\npossible. Wind gusts between 50 to 55 mph are more likely.\n\n* WHERE...North Snowy Range Foothills including Arlington and Elk\nMountain along Interstate 80, and Converse County Lower Elevations.\n\n* WHEN...Until noon MDT today.\n\n* IMPACTS...Mainly to transportation. Strong cross winds will be\nhazardous to light weight or high profile vehicles, including\ncampers and tractor trailers.",
+    "instruction": "A High Wind Watch means there is the potential for a hazardous high\nwind event. Sustained wind speeds of at least 40 MPH or gusts of 58\nMPH or stronger may occur. Continue to monitor the latest forecasts.",
+    "response": "Prepare",
+    "note": null,
+    "scope": "Public",
+    "code": "IPAWSv1.0",
+    "language": "en-US",
+    "web": "http://www.weather.gov",
+    "eventCode": {
+     "SAME": [
+      "HWA"
+     ],
+     "NationalWeatherService": [
+      "HWA"
+     ]
+    }
+   }
+  },
+  {
+   "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.2becc4bc10d33eda96eaf312c15ad35f9d427141.001.1",
+   "type": "Feature",
+   "geometry": null,
+   "properties": {
+    "id": "urn:oid:2.49.0.1.840.0.2becc4bc10d33eda96eaf312c15ad35f9d427141.001.1",
+    "areaDesc": "Fairbanks Metro Area",
+    "sent": "2026-10-27T06:19:00-08:00",
+    "effective": "2026-10-27T06:19:00-08:00",
+    "onset": "2026-10-27T06:19:00-08:00",
+    "expires": "2026-10-27T15:00:00-08:00",
+    "ends": null,
+    "status": "Actual",
+    "messageType": "Alert",
+    "category": "Met",
+    "severity": "Moderate",
+    "certainty": "Observed",
+    "urgency": "Expected",
+    "event": "Special Weather Statement",
+    "sender": "w-nws.webmaster@noaa.gov",
+    "senderName": "NWS Fairbanks AK",
+    "headline": "Special Weather Statement issued October 27 at 6:19AM AKDT by NWS Fairbanks AK",
+    "description": "Between 4 and 7 inches of heavy, wet, snow fell across the\nFairbanks Metro Area Monday. Warming temperatures Monday evening\nhave caused portions of that snowfall to melt creating many slushy\nareas of melting snow and pooling water. Overnight low\ntemperatures Tuesday night into Wednesday morning are expected to\nfall into the upper teens to low 20s which will allow much of this\nslush to refreeze. Slick surfaces are very likely Wednesday\nmorning as wet surfaces and small water puddles freeze. Areas of\nheavy, wet snow will also refreeze giving the slush a sturdier,\nmore ice like texture. Travel may be impacted, especially during\nthe Wednesday morning commute.\n\nAdditional rain and snow showers are expected overnight Wednesday\ninto Thursday with much lighter accumulations than Monday. Less\nthan an inch of new snow is possible with only a few hundredths of\nan inch of liquid equivalent expected.",
+    "instruction": null,
+    "response": "Execute",
+    "note": null,
+    "scope": "Public",
+    "code": "IPAWSv1.0",
+    "language": "en-US",
+    "web": "http://www.weather.gov",
+    "eventCode": {
+     "SAME": [
+      "SPS"
+     ],
+     "NationalWeatherService": [
+      "SPS"
+     ]
+    }
+   }
+  },
+  {
+   "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.1665ee3ebd3f3a0b20b8f6c4b341abae4b3cebc8.001.1",
+   "type": "Feature",
+   "geometry": null,
+   "properties": {
+    "id": "urn:oid:2.49.0.1.840.0.1665ee3ebd3f3a0b20b8f6c4b341abae4b3cebc8.001.1-cancel",
+    "areaDesc": "Anchorage",
+    "sent": "2026-10-27T07:02:00-08:00",
+    "effective": "2026-10-27T07:02:00-08:00",
+    "onset": "2026-10-27T07:02:00-08:00",
+    "expires": "2026-10-27T12:00:00-08:00",
+    "ends": "2026-10-27T12:00:00-08:00",
+    "status": "Actual",
+    "messageType": "Cancel",
+    "category": "Met",
+    "severity": "Moderate",
+    "certainty": "Likely",
+    "urgency": "Expected",
+    "event": "Wind Advisory",
+    "sender": "w-nws.webmaster@noaa.gov",
+    "senderName": "NWS Anchorage AK",
+    "headline": "Dense Fog Advisory issued October 27 at 7:02AM AKDT until October 27 at 12:00PM AKDT by NWS Anchorage AK",
+    "description": "* WHAT...Visibility one quarter mile or less in dense fog. Slick\nroads due to black ice.\n\n* WHERE...Anchorage.\n\n* WHEN...Until noon AKDT today.\n\n* IMPACTS...Hazardous driving conditions due to low visibility. Below\nfreezing temperatures may lead to frost on bridges and roadways.",
+    "instruction": "A dense fog advisory means visibilities will frequently be reduced to\nless than one quarter mile. If driving, slow down, use your\nheadlights, and leave plenty of distance ahead of you.",
+    "response": "Execute",
+    "note": null,
+    "scope": "Public",
+    "code": "IPAWSv1.0",
+    "language": "en-US",
+    "web": "http://www.weather.gov",
+    "eventCode": {
+     "SAME": [
+      "NWS"
+     ],
+     "NationalWeatherService": [
+      "FGY"
+     ]
+    }
+   }
+  },
+  {
+   "id": "https://api.weather.gov/alerts/urn:oid:2.49.0.1.840.0.2af2891b08a1e2e3e161aa04cf976f12edf0be5a.002.1",
+   "type": "Feature",
+   "geometry": null,
+   "properties": {
+    "id": "urn:oid:2.49.0.1.840.0.2af2891b08a1e2e3e161aa04cf976f12edf0be5a.002.1-test",
+    "areaDesc": "Converse County Lower Elevations; North Snowy Range Foothills",
+    "sent": "2026-10-27T08:45:00-06:00",
+    "effective": "2026-10-27T08:45:00-06:00",
+    "onset": "2026-10-27T08:45:00-06:00",
+    "expires": "2026-10-27T12:00:00-06:00",
+    "ends": "2026-10-27T12:00:00-06:00",
+    "status": "Test",
+    "messageType": "Update",
+    "category": "Met",
+    "severity": "Extreme",
+    "certainty": "Possible",
+    "urgency": "Future",
+    "event": "Tornado Warning",
+    "sender": "w-nws.webmaster@noaa.gov",
+    "senderName": "NWS Cheyenne WY",
+    "headline": "High Wind Watch issued October 27 at 8:45AM MDT until October 27 at 12:00PM MDT by NWS Cheyenne WY",
+    "description": "* WHAT...Southwest winds 30 to 40 mph with gusts up to 60 mph\npossible. Wind gusts between 50 to 55 mph are more likely.\n\n* WHERE...North Snowy Range Foothills including Arlington and Elk\nMountain along Interstate 80, and Converse County Lower Elevations.\n\n* WHEN...Until noon MDT today.\n\n* IMPACTS...Mainly to transportation. Strong cross winds will be\nhazardous to light weight or high profile vehicles, including\ncampers and tractor trailers.",
+    "instruction": "A High Wind Watch means there is the potential for a hazardous high\nwind event. Sustained wind speeds of at least 40 MPH or gusts of 58\nMPH or stronger may occur. Continue to monitor the latest forecasts.",
+    "response": "Prepare",
+    "note": null,
+    "scope": "Public",
+    "code": "IPAWSv1.0",
+    "language": "en-US",
+    "web": "http://www.weather.gov",
+    "eventCode": {
+     "SAME": [
+      "HWA"
+     ],
+     "NationalWeatherService": [
+      "HWA"
+     ]
+    }
+   }
+  }
+ ],
+ "title": "Current watches, warnings, and advisories for 64.84 N, 147.72 W",
+ "updated": "2026-10-27T15:02:59+00:00"
+}

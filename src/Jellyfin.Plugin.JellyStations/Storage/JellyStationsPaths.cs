@@ -37,6 +37,7 @@ public sealed class JellyStationsPaths
         AssetsDir = Path.Combine(Root, "assets");
         SettingsFile = Path.Combine(Root, "settings.json");
         MusicIndexFile = Path.Combine(Root, "music-index.json");
+        MusicLoudnessFile = Path.Combine(Root, "music-loudness.json");
     }
 
     /// <summary>Cached weather reports and the rendered weather screens, per place and station.</summary>
@@ -51,6 +52,9 @@ public sealed class JellyStationsPaths
     /// <summary>Probed durations and tags of music folder files, keyed by path.</summary>
     public string MusicIndexFile { get; }
 
+    /// <summary>Loudness measurements of music files, keyed by path.</summary>
+    public string MusicLoudnessFile { get; }
+
     public string WeatherReportFile(Guid locationId) => Path.Combine(WeatherDir, "reports", locationId.ToString("N") + ".json");
 
     public string WeatherScreensDir(Guid stationId) => Path.Combine(WeatherDir, "screens", stationId.ToString("N"));
@@ -59,6 +63,9 @@ public sealed class JellyStationsPaths
     public string RadarDir(Guid locationId) => Path.Combine(WeatherDir, "radar", locationId.ToString("N"));
 
     public string ForecastRadarDir(Guid locationId) => Path.Combine(RadarDir(locationId), "forecast");
+
+    /// <summary>The alerts last fetched for a place, so a restart has them until the next poll.</summary>
+    public string AlertFile(Guid locationId) => Path.Combine(WeatherDir, "alerts", locationId.ToString("N") + ".json");
 
     /// <summary>A folder name under <see cref="MusicDir"/>, or an absolute path, as the person typed it.</summary>
     public string ResolveMusicFolder(string folder)

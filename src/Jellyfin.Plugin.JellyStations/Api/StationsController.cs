@@ -71,7 +71,7 @@ public sealed class StationsController : ControllerBase
     private List<ScheduleEntryDto> NextPrograms(Guid stationId, DateTime now)
     {
         var upcoming = _resolver.Enumerate(stationId, now, now.AddHours(12))
-            .Where(e => e.StartUtc > now && e.Kind != EntryKind.Bumper)
+            .Where(e => e.StartUtc > now && e.Kind != EntryKind.Bumper && !e.InBreak)
             .ToList();
         var programs = upcoming.Where(e => e.Kind == EntryKind.Program).Take(2).ToList();
         if (programs.Count == 0 && upcoming.Count > 0)

@@ -3,7 +3,7 @@
 Working plan for scheduling and curation features. Phase 1 is the agreed next three steps, in order.
 Later phases are candidates, roughly ordered by payoff per effort; reorder freely.
 Phase 7 (smarter stations: embeddings, watch history, optional local model) is the current plan.
-Phase 8 (weather channel) steps 1-6 shipped in 1.14.0.0 (2026-10-23); step 7 polish is open.
+Phase 8 (weather channel) steps 1-6 shipped in 1.14.0.0 (2026-10-23); radar 1.18.0.0 and forecast radar 1.19.0.0 (2026-10-26); step 7: alerts screen (NWS), title cards, music levelling (loudnorm), weather time blocks (with block repeats) and weather in the breaks on ordinary stations built 2026-10-27 as 1.20.0.0; almanac still open.
 
 Conventions for every step:
 
@@ -412,7 +412,27 @@ small add if someone asks.
 
 ---
 
-## Phase 8 — Weather channel — steps 1-6 DONE 2026-10-23 (1.14.0.0)
+## Phase 8 — Weather channel — steps 1-6 DONE 2026-10-23 (1.14.0.0); radar 1.18/1.19 (2026-10-26); alerts + title cards 1.20.0.0 (2026-10-27)
+
+**2026-10-27 (1.20.0.0):** the alerts screen and the title card from step 7 are built. Alerts come
+from the NWS `alerts/active?point=` endpoint through `Weather/Alerts/NwsAlertSource.cs` (an
+`IAlertSource`; a second source can be added for another country) and `AlertService` polls every
+five minutes like the radar; `WeatherCycle` takes a `CycleAvailability` (radar, forecast radar,
+alerts per place) and the title card is the one screen with its own length, so the timeline is now
+summed per screen rather than counted. Travel cities, themes and cross-fades shipped in 1.14; radar
+(1.18) and forecast radar (1.19) replaced the "not planned" below.
+
+**2026-10-27, later (still 1.20.0.0):** the rest of step 7 except the almanac. Music levelling is a
+background `MusicLoudnessService` (one `loudnorm` analysis per file, `music-loudness.json`, gain to
+-18 LUFS capped by the true peak at -1 dBTP, 0 dB until measured) applied per piece in the weather
+audio graph as `volume=<gain>dB`, plus `afade` out/in at real track boundaries (not at segment cuts).
+Weather on ordinary stations reuses the Weather-mode machinery unchanged: `Station.UsesWeather`
+gates the pollers, the music compile, validation and the editor's Weather section; a `BlockKind.Weather`
+time block becomes one `EntryKind.Weather` entry per occurrence (blocks also gained `RepeatEveryMinutes`
+/ `RepeatUntilLocal`, so a 5-minute weather block can repeat hourly), and `BumperConfig.Weather` makes
+`BumperFill` place a weather piece (up to N minutes, elastic, min 45 s, head or tail of the break) that
+`ToEntry` turns into a Weather entry flagged `InBreak`, which the guide and "next" lists skip like a clip.
+Still open: almanac (needs a normals source; Open-Meteo has none).
 
 Shipped as planned below with these differences. The **starter pack** is not a zip on the plugin's
 release but a manifest (`Assets/music-packs.json`) of thirty Kevin MacLeod pieces (CC BY 4.0) with

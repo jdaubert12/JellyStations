@@ -125,7 +125,7 @@ public sealed class WeatherService : IDisposable
         try
         {
             var now = DateTime.UtcNow;
-            foreach (var station in _stations.GetAll().Where(s => s.Mode == ScheduleMode.Weather && s.Enabled && SeasonWindows.IsActive(s, now)))
+            foreach (var station in _stations.GetAll().Where(s => s.UsesWeather && s.Enabled && SeasonWindows.IsActive(s, now)))
             {
                 foreach (var location in station.Weather.Locations.Where(l => l.IsValid))
                 {

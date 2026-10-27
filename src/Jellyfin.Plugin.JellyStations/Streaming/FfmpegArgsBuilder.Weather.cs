@@ -167,13 +167,33 @@ public static partial class FfmpegArgsBuilder
     }
 
     /// <summary>The audio half of the graph: every piece resampled to 48 kHz stereo, levelled, concatenated and cut to the segment, ending in [a].</summary>
+    /// <summary>The fade at a real track boundary (out of one track, into the next).</summary>
+    public const double TrackFadeSeconds = 0.6;
+
     public static string WeatherAudioGraph(WeatherSegment seg, int firstInput)
     {
         var sb = new StringBuilder();
         var volume = (Math.Clamp(seg.VolumePercent, 20, 150) / 100.0).ToString("0.00", CultureInfo.InvariantCulture);
         for (var i = 0; i < seg.Audio.Count; i++)
         {
-            sb.Append(CultureInfo.InvariantCulture, $"[{firstInput + i}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume={volume},asetpts=PTS-STARTPTS[a{i}];");
+            var a = seg.Audio[i];
+            sb.Append(CultureInfo.InvariantCulture, $"[{firstInput + i}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,volume={volume},asetpts=PTS-STARTPTS");
+            if (Math.Abs(a.GainDb) >= 0.05)
+            {
+                sb.Append(CultureInfo.InvariantCulture, $",volume={a.GainDb.ToString("0.0", CultureInfo.InvariantCulture)}dB");
+            }
+
+            if (a.FadeIn && a.Seconds > TrackFadeSeconds)
+            {
+                sb.Append(CultureInfo.InvariantCulture, $",afade=t=in:st=0:d={N(TrackFadeSeconds)}");
+            }
+
+            if (a.FadeOut && a.Seconds > TrackFadeSeconds)
+            {
+                sb.Append(CultureInfo.InvariantCulture, $",afade=t=out:st={N(a.Seconds - TrackFadeSeconds)}:d={N(TrackFadeSeconds)}");
+            }
+
+            sb.Append(CultureInfo.InvariantCulture, $"[a{i}];");
         }
 
         var inputs = string.Concat(Enumerable.Range(0, seg.Audio.Count).Select(i => "[a" + i + "]"));

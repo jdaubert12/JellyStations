@@ -96,6 +96,29 @@ public sealed class SlotBlock
 
     /// <summary>For <see cref="BlockRecurrence.Dates"/>: local dates ("yyyy-MM-dd") the block occurs on; <see cref="Days"/> is ignored.</summary>
     public List<string> Dates { get; set; } = new();
+
+    /// <summary>What the block plays: programs from its sources, or the station's weather screens.</summary>
+    public BlockKind Kind { get; set; } = BlockKind.Content;
+
+    /// <summary>
+    /// Repeat the block every this many minutes after its start time, each occurrence with the full duration, until
+    /// <see cref="RepeatUntilLocal"/> (or midnight). 0 = once. "Local weather at the top of every hour" is a
+    /// 5-minute weather block at 06:00 repeating every 60 minutes until 23:00.
+    /// </summary>
+    public int RepeatEveryMinutes { get; set; }
+
+    /// <summary>Last start time of the repeats, "HH:mm" (inclusive); null or empty = until midnight.</summary>
+    public string? RepeatUntilLocal { get; set; }
+}
+
+/// <summary>What a time block plays.</summary>
+public enum BlockKind
+{
+    /// <summary>Programs from the block's sources.</summary>
+    Content,
+
+    /// <summary>The station's weather screens (places and look from the Weather section).</summary>
+    Weather
 }
 
 /// <summary>How often a block's listed days recur.</summary>
@@ -153,6 +176,35 @@ public sealed class BumperConfig
 
     /// <summary>A clip played right after every program, at the head of the break that follows it.</summary>
     public BumperRollConfig PostRoll { get; set; } = new();
+
+    /// <summary>The station's weather screens as a bumper in every break that has room.</summary>
+    public WeatherBreakConfig Weather { get; set; } = new();
+}
+
+/// <summary>
+/// Local weather in the breaks: a short run of the weather screens (places and look from the station's Weather
+/// section) placed in every break with room for it, before the pre-roll ident or right after the post-roll clip.
+/// It stretches to whatever time is left in the break up to its length, so a break shorter than the length still
+/// gets weather when it has at least <see cref="Scheduling.BumperFill.MinWeatherSeconds"/> seconds.
+/// </summary>
+public sealed class WeatherBreakConfig
+{
+    public bool Enabled { get; set; }
+
+    /// <summary>The most weather one break gets, 1-10 minutes.</summary>
+    public int Minutes { get; set; } = 2;
+
+    public BreakPosition Position { get; set; } = BreakPosition.BeforeProgram;
+}
+
+/// <summary>Where the weather sits in a break.</summary>
+public enum BreakPosition
+{
+    /// <summary>At the tail of the break, right before the next program (or its pre-roll ident).</summary>
+    BeforeProgram,
+
+    /// <summary>At the head of the break, right after the program (or its post-roll clip).</summary>
+    AfterProgram
 }
 
 /// <summary>

@@ -110,7 +110,7 @@ public sealed class JellyStationsLiveTvService : ILiveTvService, ISupportsDirect
 
         foreach (var entry in entries)
         {
-            if (entry.Kind == EntryKind.Weather)
+            if (entry.Kind == EntryKind.Weather && !entry.InBreak)
             {
                 current = WeatherProgram(channelId, entry, logo);
                 programs.Add(current);
@@ -119,7 +119,7 @@ public sealed class JellyStationsLiveTvService : ILiveTvService, ISupportsDirect
 
             if (entry.Kind != EntryKind.Program || entry.Item is null)
             {
-                // Cards and bumper clips are not guide entries; they extend whatever aired before them.
+                // Cards, bumper clips and weather in a break are not guide entries; they extend whatever aired before them.
                 if (current is not null)
                 {
                     current.EndDate = entry.EndUtc;

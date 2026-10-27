@@ -672,11 +672,11 @@ public sealed class StationService
             errors.Add("Add at least one time slot block or filler source.");
         }
 
-        if (s.Mode == ScheduleMode.Weather)
+        if (s.UsesWeather)
         {
             if (!s.Weather.Locations.Any(l => l.IsValid))
             {
-                errors.Add("Add at least one place to the weather channel.");
+                errors.Add(s.Mode == ScheduleMode.Weather ? "Add at least one place to the weather channel." : "Add at least one place in the Weather section for the weather block or breaks.");
             }
 
             foreach (var l in s.Weather.Locations.Where(l => !l.IsValid))
@@ -721,11 +721,26 @@ public sealed class StationService
                     errors.Add($"{label}: start time must be HH:mm.");
                 }
 
-                if (b.Sources.Count == 0)
+                if (b.Sources.Count == 0 && b.Kind != BlockKind.Weather)
                 {
                     errors.Add($"{label}: add at least one content source.");
                 }
+
+                if (b.RepeatEveryMinutes != 0 && (b.RepeatEveryMinutes < 5 || b.RepeatEveryMinutes > 1440))
+                {
+                    errors.Add($"{label}: repeat every 5 to 1440 minutes, or 0 for once.");
+                }
+
+                if (!string.IsNullOrWhiteSpace(b.RepeatUntilLocal) && !TimeSpan.TryParseExact(b.RepeatUntilLocal, @"hh\:mm", CultureInfo.InvariantCulture, out _))
+                {
+                    errors.Add($"{label}: repeat until must be HH:mm.");
+                }
             }
+        }
+
+        if (s.Bumpers?.Weather is { Enabled: true } wb && (wb.Minutes < 1 || wb.Minutes > 10))
+        {
+            errors.Add("Weather in the breaks: 1 to 10 minutes.");
         }
 
         if (s.Encoding is not null)

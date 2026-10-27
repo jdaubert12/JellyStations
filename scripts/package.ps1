@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.19.0.0"
+$version = "1.20.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Forecast radar on the weather channel. After the local radar each place now gets a forecast radar screen on the same map: where NOAA's HRRR model (a new run every hour, 15-minute steps out to 18 hours) expects the rain and snow to go, from now out to a configurable look-ahead (1 to 18 hours, default 3) at a configurable step (15 or 30 minutes or an hour, default 15); the loop is kept to 25 frames, so a long look-ahead at a short step plays at the next step up. The header names the time each frame is a forecast for and the map credits the model run. Tiles come from the Iowa Environmental Mesonet, so the screen is for places in the contiguous United States only; other places skip it. The plugin finds the newest published run by probing, fetches the frames from now to the look-ahead plus two hours, tops the window up as the clock moves, and caches them under data/JellyStations/weather/radar/<place>/forecast. The editor gets the checkbox, the look-ahead and step selects, a Forecast radar column in the forecast status, Fetch now and Preview screen for it. Existing weather stations get the screen; untick Show the forecast radar screen to go back."
+    changelog = "Alerts and title cards on the weather channel. While a place has a watch, warning or advisory in force, the channel shows an alerts screen for it before its current conditions: each alert with its severity colour, when it runs (in the place's own time), the area it covers and as much of its text as fits, up to three alerts per screen with the rest counted; the current, hourly and 7-day screens carry a one-line strip meanwhile. Alerts come from the US National Weather Service's free API (no key; United States and territories only, places elsewhere skip the screen), are checked every five minutes while the station is on and cached under data/JellyStations/weather/alerts. Each place now opens with a short title card (its name and region over a faint icon of its conditions, 3 seconds by default, 1 to 10) so the eye knows the channel has moved on. Both are on by default, with checkboxes in the editor; the forecast status gets an Alerts column and Preview screen can show both screens. Weather on ordinary stations: a time block can now play the local weather instead of programs (What plays: Local weather), and any block can repeat every N minutes until a time, so ""the weather at the top of every hour"" is a 5-minute weather block at 06:00 repeating every 60 minutes; the bumpers section gains Local weather in the breaks, a short run of the weather screens (up to a set length, before or after the clips) in every break with at least 45 seconds of room. Both use the station's Weather section, which appears in the editor when needed. Music levelling: every weather music track is measured once in the background (ffmpeg loudnorm) and played at -18 LUFS with peaks under -1 dB, on by default, with a status line in the editor; tracks fade out and in at their boundaries."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

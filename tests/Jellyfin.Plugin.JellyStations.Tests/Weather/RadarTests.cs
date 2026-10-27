@@ -209,7 +209,7 @@ public class RadarTests
     [Fact]
     public void Cycle_PutsRadarRightAfterCurrentConditions_OnlyWherePlacesHaveIt()
     {
-        var config = new WeatherConfig { ShowRadar = true, ShowForecastRadar = false };
+        var config = new WeatherConfig { ShowRadar = true, ShowForecastRadar = false, ShowTitleCards = false };
 
         var all = WeatherCycle.Pass(config, 2);
         Assert.Equal(9, all.Count);
@@ -222,7 +222,7 @@ public class RadarTests
         Assert.Single(second, s => s.Kind == WeatherScreenKind.Radar);
         Assert.Equal(1, second.Single(s => s.Kind == WeatherScreenKind.Radar).LocationIndex);
 
-        Assert.Equal(7, WeatherCycle.Pass(new WeatherConfig { ShowRadar = false, ShowForecastRadar = false }, 2).Count);
+        Assert.Equal(7, WeatherCycle.Pass(new WeatherConfig { ShowRadar = false, ShowForecastRadar = false, ShowTitleCards = false }, 2).Count);
         Assert.DoesNotContain(WeatherCycle.ShortPass(config, 2), s => s.Kind == WeatherScreenKind.Radar);
 
         var timeline = WeatherCycle.Timeline(config, 1, Now, Now.AddSeconds(40), Now, TimeZoneInfo.Utc, _ => true);
@@ -232,7 +232,7 @@ public class RadarTests
     [Fact]
     public void Cycle_PutsForecastRadarAfterTheRadar_OnlyWherePlacesHaveIt()
     {
-        var config = new WeatherConfig { ShowRadar = true, ShowForecastRadar = true };
+        var config = new WeatherConfig { ShowRadar = true, ShowForecastRadar = true, ShowTitleCards = false };
 
         var all = WeatherCycle.Pass(config, 2);
         Assert.Equal(11, all.Count);
@@ -244,7 +244,7 @@ public class RadarTests
         Assert.Equal(0, mixed.Single(s => s.Kind == WeatherScreenKind.ForecastRadar).LocationIndex);
 
         // Forecast without the past loop still sits right after current conditions.
-        var forecastOnly = WeatherCycle.Pass(new WeatherConfig { ShowRadar = false, ShowForecastRadar = true }, 1);
+        var forecastOnly = WeatherCycle.Pass(new WeatherConfig { ShowRadar = false, ShowForecastRadar = true, ShowTitleCards = false }, 1);
         Assert.Equal(new[] { WeatherScreenKind.Current, WeatherScreenKind.ForecastRadar, WeatherScreenKind.Hourly, WeatherScreenKind.Daily }, forecastOnly.Select(s => s.Kind));
         Assert.DoesNotContain(WeatherCycle.ShortPass(config, 2), s => s.Kind == WeatherScreenKind.ForecastRadar);
 

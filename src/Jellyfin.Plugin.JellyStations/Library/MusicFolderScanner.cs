@@ -187,7 +187,8 @@ public sealed class MusicFolderScanner
         return null;
     }
 
-    private string FfmpegPath()
+    /// <summary>The ffmpeg in use: the settings override, else Jellyfin's.</summary>
+    public string FfmpegPath()
     {
         var o = _settings.Get().FfmpegPathOverride;
         return string.IsNullOrWhiteSpace(o) ? _mediaEncoder.EncoderPath : o;
