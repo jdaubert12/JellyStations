@@ -1,9 +1,12 @@
 using System.Net.Mime;
+using System.Text.Json;
+using Jellyfin.Extensions.Json;
 using Jellyfin.Plugin.JellyStations.Api.Dto;
 using Jellyfin.Plugin.JellyStations.Library;
 using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Scheduling;
 using Jellyfin.Plugin.JellyStations.Services;
+using Jellyfin.Plugin.JellyStations.Storage;
 using Jellyfin.Plugin.JellyStations.Streaming;
 using MediaBrowser.Common.Api;
 using Microsoft.AspNetCore.Authorization;
@@ -22,13 +25,15 @@ public sealed class StationsController : ControllerBase
     private readonly IScheduleResolver _resolver;
     private readonly StreamSessionManager _sessions;
     private readonly StationImportResolver _importResolver;
+    private readonly SettingsRepository _settings;
 
-    public StationsController(StationService stations, IScheduleResolver resolver, StreamSessionManager sessions, StationImportResolver importResolver)
+    public StationsController(StationService stations, IScheduleResolver resolver, StreamSessionManager sessions, StationImportResolver importResolver, SettingsRepository settings)
     {
         _importResolver = importResolver;
         _stations = stations;
         _resolver = resolver;
         _sessions = sessions;
+        _settings = settings;
     }
 
     [HttpGet]
@@ -82,24 +87,43 @@ public sealed class StationsController : ControllerBase
         return programs.Select(e => Map.Entry(e, null)).ToList();
     }
 
-    /// <summary>All station definitions as a JSON array suitable for backup or for POST Import.</summary>
+    /// <summary>
+    /// Every station plus the saved station and block templates, as one JSON document suitable for backup or for
+    /// POST Import. Built-in station templates are not included.
+    /// </summary>
     [HttpGet("Export")]
-    public ActionResult<IEnumerable<Station>> Export()
+    public ActionResult<StationExportDocument> Export()
     {
-        return Ok(_stations.GetAll().OrderBy(s => s.ChannelNumber, StringComparer.OrdinalIgnoreCase).ToList());
+        var settings = _settings.Get();
+        return Ok(new StationExportDocument
+        {
+            Stations = _stations.GetAll().OrderBy(s => s.ChannelNumber, StringComparer.OrdinalIgnoreCase).ToList(),
+            StationTemplates = (settings.StationTemplates ?? new List<StationTemplate>()).Select(StationTemplates.Clone).ToList(),
+            BlockTemplates = settings.BlockTemplates ?? new List<SlotBlock>()
+        });
     }
 
     /// <summary>
-    /// Imports station definitions. Each station is matched to an existing one by id, then by name, and updated;
-    /// unmatched stations are created. Item references whose ids are unknown on this server are matched by the
-    /// display name stored beside them; what cannot be matched is dropped and reported. Logos are not part of the import.
+    /// Imports an export document, or a bare array of stations (the pre-1.21 export and the example files). Each
+    /// station is matched to an existing one by id, then by name, and updated; unmatched stations are created. Item
+    /// references whose ids are unknown on this server are matched by the display name stored beside them; what
+    /// cannot be matched is dropped and reported. Templates replace the saved ones with the same name or id. Logos
+    /// are not part of the import.
     /// </summary>
     [HttpPost("Import")]
-    public ActionResult<ImportResultDto> Import([FromBody] List<Station> stations)
+    public ActionResult<ImportResultDto> Import([FromBody] JsonElement body)
     {
+        // Jellyfin's options: they read the dash-less Guids its own serializer writes (the export file) as well as plain ones.
+        var document = StationExportDocument.Parse(body, JsonDefaults.Options);
+        if (document is null)
+        {
+            return BadRequest(new ValidationErrorDto { Errors = { "The file is not a station export: expected a JSON array of stations or an export document." } });
+        }
+
         var result = new ImportResultDto();
+        ImportTemplates(document, result);
         var existing = _stations.GetAll();
-        foreach (var draft in stations)
+        foreach (var draft in document.Stations)
         {
             var name = draft.Name ?? "(unnamed)";
             try
@@ -133,6 +157,73 @@ public sealed class StationsController : ControllerBase
         }
 
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Saved templates from the document replace the stored ones with the same name or id. Item references in a
+    /// station template's bumper clips and blocks go through the same by-name matching as a station's.
+    /// </summary>
+    private void ImportTemplates(StationExportDocument document, ImportResultDto result)
+    {
+        if (document.StationTemplates.Count == 0 && document.BlockTemplates.Count == 0)
+        {
+            return;
+        }
+
+        var settings = _settings.Get();
+        var stationTemplates = settings.StationTemplates ??= new List<StationTemplate>();
+        foreach (var template in document.StationTemplates)
+        {
+            var name = string.IsNullOrWhiteSpace(template.Name) ? "(unnamed template)" : template.Name.Trim();
+            if (string.IsNullOrWhiteSpace(template.Name))
+            {
+                result.Errors.Add(name + ": a station template needs a name.");
+                continue;
+            }
+
+            try
+            {
+                var resolution = _importResolver.Resolve(template.Settings ??= new Station());
+                result.Resolved.AddRange(resolution.Resolved.Select(r => "template " + name + ": " + r));
+                result.Unmatched.AddRange(resolution.Unmatched.Select(r => "template " + name + ": " + r));
+                StationTemplatesController.Upsert(stationTemplates, template);
+                result.StationTemplates.Add(name);
+            }
+            catch (Exception ex)
+            {
+                result.Errors.Add("template " + name + ": " + ex.Message);
+            }
+        }
+
+        settings.StationTemplates = stationTemplates.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+        var blockTemplates = settings.BlockTemplates ??= new List<SlotBlock>();
+        foreach (var block in document.BlockTemplates)
+        {
+            if (string.IsNullOrWhiteSpace(block.Name))
+            {
+                result.Errors.Add("(unnamed block template): a block template needs a name.");
+                continue;
+            }
+
+            block.Name = block.Name.Trim();
+            block.Days ??= new List<DayOfWeek>();
+            block.Sources ??= new List<ContentSource>();
+            if (block.Id == Guid.Empty)
+            {
+                block.Id = Guid.NewGuid();
+            }
+
+            var resolution = _importResolver.Resolve(new Station { Slots = new SlotsConfig { Blocks = new List<SlotBlock> { block } } });
+            result.Resolved.AddRange(resolution.Resolved.Select(r => "block template " + block.Name + ": " + r));
+            result.Unmatched.AddRange(resolution.Unmatched.Select(r => "block template " + block.Name + ": " + r));
+            blockTemplates.RemoveAll(t => string.Equals(t.Name, block.Name, StringComparison.OrdinalIgnoreCase) || t.Id == block.Id);
+            blockTemplates.Add(block);
+            result.BlockTemplates.Add(block.Name);
+        }
+
+        settings.BlockTemplates = blockTemplates.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        _settings.Save(settings);
     }
 
     [HttpGet("{id}")]

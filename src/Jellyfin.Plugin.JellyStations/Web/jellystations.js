@@ -40,26 +40,8 @@
     Lineup: 'Exactly the items you pick, in your order, looping forever. Good for a fixed marathon or a hand-built evening.',
     Weather: 'Current conditions, the next twelve hours and the week ahead for a few places, drawn by the plugin as full-screen graphics with a live clock, cycling over music. Forecasts come from Open-Meteo, a free service; only each place\'s coordinates are sent.'
   };
-  /** Starting points for "New station": each fills in the schedule settings; the person adds the content. */
-  const PRESETS = [
-    { key: 'shuffle', icon: 'shuffle', name: 'Shuffle a collection', desc: 'Pick any shows and movies; they play around the clock, reshuffled each round, never the same show or film twice in a row.', next: 'Next: add shows and movies.', apply: () => {} },
-    { key: 'kids', icon: 'child_care', name: 'Kids channel', desc: 'Cartoons and family shows all day, rated G or below. Each show plays two or three episodes in order before switching.', next: 'Next: add the shows. Whatever you add is limited to G unless you change it.', sourceDefaults: { MaxRating: 'G', AllowUnrated: false },
-      apply: d => { d.Pool.Order = 'ShuffleEpisodesInOrder'; d.Pool.MarathonMin = 2; d.Pool.MarathonMax = 3; d.PaddingByLength = true; d.PaddingGridMinutes = 0; } },
-    { key: 'movies', icon: 'movie', name: 'Movie night', desc: 'Films in two-hour slots, shuffled, and a film rests at least eight hours before it plays again. Nothing above PG-13 before 8 pm.', next: 'Next: add a genre, a collection or single films.', sourceDefaults: { ItemKinds: ['Movie'] },
-      apply: d => { d.PaddingByLength = true; d.PaddingGridMinutes = 0; d.Pool.CooldownHours = 8; d.Pool.DaypartRules = [{ StartLocal: '06:00', EndLocal: '20:00', MaxRating: 'PG-13', AllowUnrated: true }]; } },
-    { key: 'reruns', icon: 'tv', name: 'Comfort reruns', desc: 'A few favourite shows in half-hour and hour slots. A random show comes up, always on its next episode.', next: 'Next: add the shows.', sourceDefaults: { ItemKinds: ['Episode'] },
-      apply: d => { d.Pool.Order = 'ShuffleEpisodesInOrder'; d.PaddingByLength = true; d.PaddingGridMinutes = 0; } },
-    { key: 'holiday', icon: 'ac_unit', name: 'Holiday channel', desc: 'Seasonal films and specials. The channel only appears in the guide from late November to early January.', next: 'Next: add the holiday titles. The excluded tags from Settings are off here so holiday-tagged items stay in.',
-      apply: d => { d.PaddingByLength = true; d.PaddingGridMinutes = 0; d.ActiveWindows = [Object.assign({}, SEASON_PRESETS.holidays)]; d.UseGlobalExcludedTags = false; } },
-    { key: 'marathon', icon: 'playlist_play', name: 'One show, start to finish', desc: 'One series from the first episode in order, around the clock, then again from the start.', next: 'Next: add the show.',
-      apply: d => { d.Pool.Order = 'Sequential'; d.Pool.AvoidSameSeriesBackToBack = false; d.PaddingByLength = true; d.PaddingGridMinutes = 0; } },
-    { key: 'weekly', icon: 'event', name: 'Weekly schedule', desc: 'Blocks at fixed times each week, say cartoons on weekday mornings and a film on Friday night, with filler in between.', next: 'Next: add blocks and the filler.',
-      apply: d => { d.Mode = 'Slots'; d.PaddingGridMinutes = 15; } },
-    { key: 'list', icon: 'format_list_numbered', name: 'Play a fixed list', desc: 'Exactly the items you pick, in your order, looping forever.', next: 'Next: add items in order.',
-      apply: d => { d.Mode = 'Lineup'; } },
-    { key: 'weather', icon: 'wb_sunny', name: 'Weather channel', desc: 'Local forecasts for a few places, like the cable weather channel: current conditions, the hours ahead and the week, over music, with a live clock.', next: 'Next: add places and some music.',
-      apply: d => { d.Mode = 'Weather'; d.Name = d.Name || 'Weather'; } }
-  ];
+  /** Material icon on a New station card when the template names none (saved templates). */
+  const TEMPLATE_DEFAULT_ICON = 'bookmark';
   const BLOCKS_HELP = {
     Pool: 'Optional. A block takes over at a fixed time on the days you pick and plays its own content; the shuffle carries on whenever no block is on. Times are in the station\'s time zone; family hours do not apply inside a block.',
     Slots: 'Each block plays its own content at a fixed time on the days you pick (station time zone). The filler plays whenever no block is on.'
@@ -108,7 +90,8 @@
     sourceDefaults: null, // filters the preset applies to every source added to the pool
     settings: null,       // GlobalSettings as last loaded in the settings view
     suggestions: [],
-    blockTemplates: []
+    blockTemplates: [],
+    stationTemplates: [] // saved + built-in, as GET StationTemplates lists them
   };
 
   // ------------------------------------------------------------------------------------------
@@ -759,16 +742,18 @@
   }
 
   function exportStations() {
-    api('GET', 'Stations/Export').then(list => {
+    api('GET', 'Stations/Export').then(doc => {
       const stamp = new Date().toISOString().slice(0, 10);
-      const blob = new Blob([JSON.stringify(list, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'jellystations-stations-' + stamp + '.json';
       document.body.appendChild(a);
       a.click();
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
-      toast('Exported ' + list.length + ' station' + (list.length === 1 ? '' : 's') + '.');
+      const stations = (doc.Stations || []).length;
+      const templates = (doc.StationTemplates || []).length + (doc.BlockTemplates || []).length;
+      toast('Exported ' + stations + ' station' + (stations === 1 ? '' : 's') + (templates ? ' and ' + templates + ' template' + (templates === 1 ? '' : 's') : '') + '.');
     }).catch(err => alertErrors(err, 'Export failed'));
   }
 
@@ -786,12 +771,15 @@
         toast('That file is not valid JSON.');
         return;
       }
-      const list = Array.isArray(parsed) ? parsed : [parsed];
+      // An export document ({ Stations, StationTemplates, BlockTemplates }), a bare array of stations, or one station.
+      const body = Array.isArray(parsed) || (parsed && Array.isArray(parsed.Stations)) ? parsed : [parsed];
       loading(true);
-      api('POST', 'Stations/Import', list).then(res => {
+      api('POST', 'Stations/Import', body).then(res => {
         const parts = [];
         if (res.Created.length) { parts.push('created ' + res.Created.length); }
         if (res.Updated.length) { parts.push('updated ' + res.Updated.length); }
+        const templates = (res.StationTemplates || []).length + (res.BlockTemplates || []).length;
+        if (templates) { parts.push(templates + ' template' + (templates === 1 ? '' : 's')); }
         if (res.Errors.length) { parts.push(res.Errors.length + ' failed'); }
         const resolved = res.Resolved || [];
         const unmatched = res.Unmatched || [];
@@ -962,6 +950,7 @@
     container.appendChild(iconButton('refresh', 'Restart stream', () => restartStream(s)));
     container.appendChild(iconButton('restart_alt', 'Start schedule from now', () => reanchorStation(s)));
     container.appendChild(iconButton('edit', 'Edit', () => openEditor(s.Id)));
+    container.appendChild(iconButton('content_copy', 'Duplicate (a new station with the same settings and content)', () => duplicateStation(s)));
     container.appendChild(iconButton('delete', 'Delete', () => renderStationActions(container, s, true)));
   }
 
@@ -1295,17 +1284,115 @@
     return { select: select, fill: fill, known: () => known };
   }
 
-  /** The "New station" page: one card per preset. */
+  /** The "New station" page: one card per template, the saved ones first, then the built-in presets. */
   function openPresets() {
-    const box = clear($('#tvsPresetList'));
-    PRESETS.forEach(p => {
-      box.appendChild(el('button', { type: 'button', className: 'tvs-preset', onClick: () => openEditor(null, p) }, [
-        el('div', { className: 'tvs-preset-head' }, [el('span', { className: 'material-icons ' + p.icon, 'aria-hidden': 'true' }), el('span', { text: p.name })]),
-        el('div', { className: 'tvs-preset-desc', text: p.desc }),
-        el('div', { className: 'tvs-preset-next', text: p.next })
-      ]));
+    loading(true);
+    loadStationTemplates().then(() => {
+      const box = clear($('#tvsPresetList'));
+      state.stationTemplates.forEach(t => {
+        const desc = t.Description || (t.BuiltIn ? '' : templateSummary(t));
+        const children = [
+          el('div', { className: 'tvs-preset-head' }, [el('span', { className: 'material-icons ' + (t.Icon || TEMPLATE_DEFAULT_ICON), 'aria-hidden': 'true' }), el('span', { text: t.Name })]),
+          el('div', { className: 'tvs-preset-desc', text: desc })
+        ];
+        if (t.NextStep) {
+          children.push(el('div', { className: 'tvs-preset-next', text: t.NextStep }));
+        } else if (!t.BuiltIn) {
+          children.push(el('div', { className: 'tvs-preset-next', text: 'Saved template. Next: add the content.' }));
+        }
+        box.appendChild(el('button', { type: 'button', className: 'tvs-preset', onClick: () => openEditor(null, t) }, children));
+      });
+      showView('presets');
+    }).then(() => loading(false));
+  }
+
+  function loadStationTemplates() {
+    return api('GET', 'StationTemplates').then(list => {
+      state.stationTemplates = Array.isArray(list) ? list : [];
+    }).catch(err => {
+      state.stationTemplates = [];
+      alertErrors(err, 'Could not load the station templates');
     });
-    showView('presets');
+  }
+
+  /** One line on what a saved template sets, for its card and the Settings list. */
+  function templateSummary(t) {
+    const s = t.Settings || {};
+    const parts = [MODE_LABEL[s.Mode] || s.Mode || 'Shuffle'];
+    const blocks = (s.Slots && s.Slots.Blocks) || [];
+    if (blocks.length) {
+      parts.push(blocks.length + ' time block' + (blocks.length === 1 ? '' : 's'));
+    }
+    if (s.Pool && s.Pool.DaypartRules && s.Pool.DaypartRules.length) {
+      parts.push('family hours');
+    }
+    if (s.PaddingByLength) {
+      parts.push('padded by length');
+    } else if (s.PaddingGridMinutes > 0) {
+      parts.push(s.PaddingGridMinutes + '-minute grid');
+    }
+    if (s.Bumpers && s.Bumpers.Enabled) {
+      parts.push('bumpers');
+    }
+    if (s.ActiveWindows && s.ActiveWindows.length) {
+      parts.push('seasonal');
+    }
+    if (s.Encoding) {
+      parts.push('own encoding');
+    }
+    if (s.LogoOverlay && s.LogoOverlay.Enabled) {
+      parts.push('logo bug');
+    }
+    if (s.UpNextCard && s.UpNextCard.Enabled) {
+      parts.push('up next card');
+    }
+    return parts.join(' · ');
+  }
+
+  /**
+   * A new draft from a template: a deep copy of its settings (already content-free on the server) under a fresh
+   * identity: next channel number, the browser's time zone unless the template names one, no logo yet.
+   */
+  function draftFromTemplate(t) {
+    const d = normalizeStation(JSON.parse(JSON.stringify(t.Settings || {})));
+    const base = newDraft();
+    d.Id = ZERO_GUID;
+    d.Name = t.DefaultName || '';
+    d.ChannelNumber = base.ChannelNumber;
+    d.CallSign = null;
+    d.Enabled = true;
+    d.LogoFileName = null;
+    d.TimeZoneId = d.TimeZoneId || base.TimeZoneId;
+    d.AnchorUtc = null;
+    d.Revision = 1;
+    delete d.CreatedUtc;
+    delete d.UpdatedUtc;
+    d.LogoOverlay = d.LogoOverlay || base.LogoOverlay;
+    d.UpNextCard = d.UpNextCard || base.UpNextCard;
+    (d.Slots.Blocks || []).forEach(b => { delete b.Id; });
+    return d;
+  }
+
+  /** A draft that copies an existing station, content included: everything but its identity and logo file. */
+  function duplicateStation(summary) {
+    loading(true);
+    api('GET', 'Stations/' + summary.Id).then(detail => {
+      const d = normalizeStation(detail.Station);
+      d.Id = ZERO_GUID;
+      d.Name = (d.Name || 'Station') + ' (copy)';
+      d.ChannelNumber = nextChannelNumber();
+      d.LogoFileName = null;
+      d.AnchorUtc = null;
+      d.Revision = 1;
+      delete d.CreatedUtc;
+      delete d.UpdatedUtc;
+      (d.Slots.Blocks || []).forEach(b => { delete b.Id; });
+      ((d.Weather && d.Weather.Locations) || []).forEach(l => { delete l.Id; });
+      const logo = summary.HasLogo
+        ? fetch(logoUrl(summary.Id)).then(r => (r.ok ? r.blob() : null)).catch(() => null)
+        : Promise.resolve(null);
+      return logo.then(blob => openEditorWith(d, null, null, blob));
+    }).catch(err => alertErrors(err, 'Could not copy the station')).then(() => loading(false));
   }
 
   /** Filters a preset wants on every source added to the pool (rating cap, movies or episodes only). */
@@ -1323,28 +1410,85 @@
     }
   }
 
-  function openEditor(id, preset) {
+  function openEditor(id, template) {
     loading(true);
     const detailPromise = id ? api('GET', 'Stations/' + id) : Promise.resolve(null);
     Promise.all([loadTimeZones(), detailPromise]).then(results => {
       const detail = results[1];
       state.detail = detail;
-      state.draft = detail ? normalizeStation(detail.Station) : newDraft();
-      state.presetName = null;
-      state.sourceDefaults = null;
-      if (!detail && preset) {
-        preset.apply(state.draft);
-        state.presetName = preset.name;
-        state.sourceDefaults = preset.sourceDefaults || null;
+      if (detail) {
+        openEditorWith(normalizeStation(detail.Station), null, null, null);
+      } else if (template) {
+        const defaults = template.SourceDefaults;
+        openEditorWith(draftFromTemplate(template), template.Name, defaults && (defaults.MaxRating || (defaults.ItemKinds || []).length) ? defaults : null, null, template.LogoColor);
+      } else {
+        openEditorWith(newDraft(), null, null, null);
       }
+    }).catch(err => alertErrors(err, 'Could not open station')).then(() => loading(false));
+  }
+
+  /** Shows the editor for a draft (an existing station, a template's draft, or a copy). */
+  function openEditorWith(draft, presetName, sourceDefaults, pendingLogo, logoColor) {
+    return loadTimeZones().then(() => {
+      state.draft = draft;
+      state.presetName = presetName || null;
+      state.sourceDefaults = sourceDefaults || null;
       state.runtimes = {};
       state.expandedBlocks = {};
-      state.pendingLogo = null;
+      state.pendingLogo = pendingLogo || null;
       state.logoLook = 0;
       renderEditor();
+      if (logoColor && /^#[0-9a-f]{6}$/i.test(logoColor)) {
+        const picker = $('#tvsLogoColor');
+        picker.value = logoColor;
+        picker.dataset.picked = '1';
+        setChecked('#tvsLogoAutoColor', false);
+        picker.disabled = false;
+      }
+      renderSaveAsTemplate(false);
       showStep(rememberedEditorView() === 'all' ? 'all' : '1');
       showView('editor');
-    }).catch(err => alertErrors(err, 'Could not open station')).then(() => loading(false));
+    });
+  }
+
+  // ---- Save as template ---------------------------------------------------------------------
+
+  /** The inline form under the General section: a name box that appears on "Save as template". */
+  function renderSaveAsTemplate(open) {
+    const form = $('#tvsTemplateForm');
+    const button = $('#tvsBtnSaveTemplate');
+    if (!form || !button) {
+      return;
+    }
+    show(form, open);
+    show(button, !open);
+    if (open) {
+      const name = $('#tvsTemplateName');
+      name.value = (val('#tvsName') || '').trim();
+      name.focus();
+    }
+  }
+
+  function saveStationTemplate() {
+    const name = val('#tvsTemplateName').trim();
+    if (!name) {
+      toast('Give the template a name.');
+      return;
+    }
+    const settings = readDraft();
+    const picker = $('#tvsLogoColor');
+    const payload = {
+      Name: name,
+      Settings: settings,
+      LogoColor: picker && picker.dataset.picked && !checked('#tvsLogoAutoColor') ? picker.value : null
+    };
+    const shadowed = state.stationTemplates.some(t => t.BuiltIn && t.Name.toLowerCase() === name.toLowerCase());
+    loading(true);
+    api('POST', 'StationTemplates', payload).then(list => {
+      state.stationTemplates = Array.isArray(list) ? list : [];
+      renderSaveAsTemplate(false);
+      toast('Template “' + name + '” saved' + (shadowed ? ' in place of the built-in preset' : '') + '. Find it under New station.');
+    }).catch(err => alertErrors(err, 'Could not save the template')).then(() => loading(false));
   }
 
   function isNewDraft() {
@@ -3084,6 +3228,28 @@
     }).catch(err => alertErrors(err, 'Could not save template'));
   }
 
+  function renderSettingsStationTemplates(templates) {
+    const list = clear($('#tvsStationTemplateList'));
+    show($('#tvsStationTemplateEmpty'), !templates.length);
+    templates.forEach(t => {
+      const row = el('div', { className: 'listItem' }, [
+        el('span', { className: 'material-icons listItemIcon ' + (t.Icon || TEMPLATE_DEFAULT_ICON), 'aria-hidden': 'true' }),
+        el('div', { className: 'listItemBody two-line' }, [
+          el('div', { className: 'listItemBodyText', text: t.Name }),
+          el('div', { className: 'listItemBodyText secondary', text: t.Description || templateSummary(t) })
+        ])
+      ]);
+      row.appendChild(iconButton('delete', 'Delete template', () => {
+        api('DELETE', 'StationTemplates/' + t.Id).then(() => {
+          state.settings.StationTemplates = (state.settings.StationTemplates || []).filter(x => x.Id !== t.Id);
+          renderSettingsStationTemplates(state.settings.StationTemplates);
+          toast('Template deleted.');
+        }).catch(err => alertErrors(err, 'Could not delete template'));
+      }));
+      list.appendChild(row);
+    });
+  }
+
   function renderSettingsTemplates(templates) {
     const list = clear($('#tvsTemplateList'));
     show($('#tvsTemplateEmpty'), !templates.length);
@@ -4136,6 +4302,7 @@
     setChecked('#tvsShowLogo', s.ShowLogoOnSlate !== false);
     setVal('#tvsGlobalExcludedTags', Array.isArray(s.ExcludedTags) ? s.ExcludedTags.join(', ') : '');
     renderSettingsTemplates(Array.isArray(s.BlockTemplates) ? s.BlockTemplates : []);
+    renderSettingsStationTemplates(Array.isArray(s.StationTemplates) ? s.StationTemplates : []);
   }
 
   function saveSettings() {
@@ -4149,8 +4316,8 @@
       SlateBackgroundColor: val('#tvsSlateColor') || '#101010',
       ShowTextOnSlate: checked('#tvsShowText'),
       ShowLogoOnSlate: checked('#tvsShowLogo'),
-      ExcludedTags: parseTagList(val('#tvsGlobalExcludedTags')),
-      BlockTemplates: (state.settings && state.settings.BlockTemplates) || []
+      ExcludedTags: parseTagList(val('#tvsGlobalExcludedTags'))
+      // Block and station templates are kept server side; PUT Settings leaves them as they are.
     };
     const errors = [];
     if (isNaN(payload.LingerSeconds)) {
@@ -5021,6 +5188,13 @@
       }
     });
     on('#tvsBtnGenerateLogo', 'click', generateLogo);
+    on('#tvsBtnSaveTemplate', 'click', () => renderSaveAsTemplate(true));
+    on('#tvsBtnTemplateCancel', 'click', () => renderSaveAsTemplate(false));
+    on('#tvsBtnTemplateSave', 'click', saveStationTemplate);
+    on('#tvsTemplateName', 'keydown', ev => {
+      if (ev.key === 'Enter') { ev.preventDefault(); saveStationTemplate(); }
+      if (ev.key === 'Escape') { renderSaveAsTemplate(false); }
+    });
     on('#tvsBtnLogoAnotherLook', 'click', () => {
       state.logoLook = (state.logoLook || 0) + 1;
       generateLogo();

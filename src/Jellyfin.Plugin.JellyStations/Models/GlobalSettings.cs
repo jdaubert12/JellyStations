@@ -35,4 +35,7 @@ public sealed class GlobalSettings
 
     /// <summary>Saved time blocks (days, time, sources, order) that can be added to any station.</summary>
     public List<SlotBlock> BlockTemplates { get; set; } = new();
+
+    /// <summary>Station templates saved from a station editor (everything but the content). The built-in presets are not stored.</summary>
+    public List<StationTemplate> StationTemplates { get; set; } = new();
 }

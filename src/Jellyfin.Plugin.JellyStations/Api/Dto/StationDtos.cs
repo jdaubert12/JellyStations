@@ -99,6 +99,12 @@ public sealed class ImportResultDto
 
     /// <summary>Item references that could not be matched and were dropped from the imported station.</summary>
     public List<string> Unmatched { get; set; } = new();
+
+    /// <summary>Station templates created or replaced, by name.</summary>
+    public List<string> StationTemplates { get; set; } = new();
+
+    /// <summary>Block templates created or replaced, by name.</summary>
+    public List<string> BlockTemplates { get; set; } = new();
 }
 
 public sealed class StationSummaryDto

@@ -277,7 +277,7 @@
             <h2 class="sectionTitle">New station</h2>
             <button is="emby-button" type="button" id="tvsBtnPresetsBack" class="raised emby-button"><span>Back to list</span></button>
           </div>
-          <div class="fieldDescription">Pick the kind of channel you want. The preset fills in the schedule settings; you add the shows and movies on the next page and can change anything later.</div>
+          <div class="fieldDescription">Pick the kind of channel you want. A template fills in the schedule settings and the look; you add the shows and movies on the next page and can change anything later. Your own templates, saved from any station editor with “Save as template”, come first.</div>
           <div id="tvsPresetList" class="tvs-presets"></div>
         </div>
 
@@ -326,6 +326,15 @@
                 <span>Refresh content nightly</span>
               </label>
               <div class="fieldDescription checkboxFieldDescription">Re-scan the library every night so newly added movies and episodes join this channel automatically.</div>
+            </div>
+            <div class="tvs-inline" style="margin-top:.6em">
+              <button is="emby-button" type="button" id="tvsBtnSaveTemplate" class="raised emby-button"><span>Save as template</span></button>
+              <div id="tvsTemplateForm" class="tvs-inline tvs-hidden">
+                <input is="emby-input" id="tvsTemplateName" type="text" placeholder="Template name" autocomplete="off" style="width:16em">
+                <button is="emby-button" type="button" id="tvsBtnTemplateSave" class="raised button-submit emby-button"><span>Save template</span></button>
+                <button is="emby-button" type="button" id="tvsBtnTemplateCancel" class="raised emby-button"><span>Cancel</span></button>
+              </div>
+              <span class="tvs-secondary">Keeps everything but the content (mode, order, padding, family hours, time blocks without their shows, bumpers, weather look, logo color, encoding, up-next card) as a starting point under New station. Saving under a preset's name replaces that preset.</span>
             </div>
           </div>
 
@@ -951,6 +960,13 @@
             <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">tune</span>Default encoding</h3>
             <div class="fieldDescription">Every program on every station is normalized to this profile so the stream never changes format mid-air. Stations can override it individually.</div>
             <div id="tvsSettingsEncoding"></div>
+          </div>
+
+          <div class="verticalSection tvs-section">
+            <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">bookmark_added</span>Station templates</h3>
+            <div class="fieldDescription">Stations saved without their content with “Save as template” in a station editor. They appear first under New station, before the built-in presets; one saved under a preset's name takes its place. Templates travel with Export and Import.</div>
+            <div id="tvsStationTemplateEmpty" class="tvs-secondary">No station templates saved yet.</div>
+            <div id="tvsStationTemplateList" class="paperList"></div>
           </div>
 
           <div class="verticalSection tvs-section">

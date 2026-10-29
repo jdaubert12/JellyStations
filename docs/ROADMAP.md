@@ -4,6 +4,7 @@ Working plan for scheduling and curation features. Phase 1 is the agreed next th
 Later phases are candidates, roughly ordered by payoff per effort; reorder freely.
 Phase 7 (smarter stations: embeddings, watch history, optional local model) is the current plan.
 Phase 8 (weather channel) steps 1-6 shipped in 1.14.0.0 (2026-10-23); radar 1.18.0.0 and forecast radar 1.19.0.0 (2026-10-26); step 7: alerts screen (NWS), title cards, music levelling (loudnorm), weather time blocks (with block repeats) and weather in the breaks on ordinary stations built 2026-10-27 as 1.20.0.0; almanac still open.
+Phase 9 (better suggestions and channel templates, planned 2026-10-27) is in progress: B1 station templates built 2026-10-28 as 1.21.0.0; A1 (finish what gets created) is next.
 
 Conventions for every step:
 
@@ -580,6 +581,79 @@ times, and the guide shows the hourly entries.
 Not planned: speech or a synthesized voice (the user asked for none; a local TTS could be a later
 option under Phase 7's rules), radar imagery (needs tiles from a map provider and a licence check),
 and any provider that needs the person's own paid key before the free ones have shown their limits.
+
+---
+
+## Phase 9 — better suggestions and channel templates
+
+From a 2026-10-27 review of what the suggester and the templates do today. Suggestions are nine fixed
+rules over the library analysis (`StationSuggester`: kids, family movies, genres, long series,
+franchises plus Franchise Nights, collections, decades, seasonal tags), shown as a flat tick list and
+created server side with the next channel number: no logo, no bumpers, no preview, and the only
+knob is the "small library" toggle. Templates are per-block only (`/JellyStations/BlockTemplates`,
+bookmark button, stored in settings), the nine "New station" presets are hard-coded in
+`jellystations.js` and only set schedule options, and the hand-built set under `examples/stations/`
+shows the combinations the rules cannot produce (sci-fi and fantasy movies, anime). The two features
+should meet in the middle: the suggester proposes a balanced set, templates give each station its
+look and its breaks.
+
+Recommended start: station templates with the presets moved server side (step B1, done 2026-10-28),
+then the created-station polish (step A1). Each is a day or two, touches no scheduler code, and
+together they make a "Build my lineup" page possible. A1 can now take a template id: the suggester's
+draft goes through `StationTemplates.ApplyTo` to pick up a look and its breaks.
+
+### A. Suggestions, in payoff order
+
+1. **Finish what gets created.** Suggested stations arrive bare. Draw the logo server side with
+   SkiaSharp (already linked since the weather channel) using the same seeded patterns as the
+   editor's canvas, apply the global bumper sources when a clip library is configured, and let the
+   page choose the time zone and the first channel number. "Edit before creating" opens the editor
+   with the draft, the way "Not on a channel" already does. Small.
+2. **Preview a day.** `POST /JellyStations/Schedule/Preview` already takes a station body, so each
+   suggestion row can expand to its next 24 hours before anyone commits. Small.
+3. **Smarter rules.** Split a genre into movies and TV when both clear the threshold; group several
+   mid-size sitcoms into one "Comfort reruns" station instead of one channel per show or nothing;
+   decade channels for TV; a documentary channel; an anime channel from the genre or tag; a studio
+   or network channel once the analyzer collects studios (Phase 7 step 4 adds the source kind);
+   flag items under a few minutes as bumper candidates and suggest a bumper source rather than a
+   station. Each rule is a pure function with tests. Small-medium.
+4. **Coverage aware.** Rank and badge suggestions by the hours no enabled station already plays
+   (reuse `LibraryCoverage`), hide ones whose content is fully covered instead of only matching on
+   the name, and offer a "Not on a channel" leftovers station. Small.
+5. **Near misses and thresholds.** Show "Horror: 6.5 h, needs 8" under the list, and put the
+   per-rule thresholds (`SuggestionThresholds`) in Settings in place of the single small-library
+   toggle. Small.
+6. **Theme channels and household weighting** are Phase 7 steps 1 and 2 (embeddings, watch
+   history); larger, and after the above.
+
+### B. Templates, in payoff order
+
+1. **Station templates — DONE 2026-10-28 (1.21.0.0).** `StationTemplate` (Models) is a `Station`
+   with the content stripped (`StationTemplates.StripContent`: ids, name, number, call sign, logo
+   file, time zone, anchor, pool/filler/block sources, lineup, excluded items, weather places and
+   music; bumper clips stay, they are the look) plus card text, icon, source defaults, default name
+   and logo color. The nine presets are `StationTemplates.BuiltIn` with fixed ids; saved ones live in
+   `GlobalSettings.StationTemplates` and shadow a preset of the same name (`Merge`).
+   `/JellyStations/StationTemplates` lists, saves (`Upsert` strips again), deletes and hands out a
+   draft (`{id}/Draft`); the page builds the draft itself from `Settings`. "Save as template" sits
+   under General on step 1; Settings lists the saved ones; `Stations/Export` is now a document
+   (`StationExportDocument`: stations + both template kinds, v2) and Import takes that or the old
+   array. "Duplicate" on the station row copies content and logo. 11 tests in
+   `StationTemplatesTests`. Still open: a card on the New station page for deleting a saved template
+   (Settings only for now).
+2. **Built-in block templates.** Ship a starter set alongside the saved ones: Saturday morning
+   cartoons, prime-time movie, late night, and "weather on the hour" (a 5-minute weather block
+   repeating every 60 minutes, which the block repeats from 1.20.0.0 make a one-liner). Small.
+3. **Week layouts.** A multi-block template that paints a whole broadcast week at once (morning
+   kids, daytime reruns, prime-time movie, late night), sources left empty or filled by the genre
+   rules from A3. This is the bridge between the two features: "Classic broadcast week" offered by
+   the suggester would be the single most useful first-run action. Medium.
+4. **Block templates without ids.** A block template keeps item ids today, which do not travel
+   between servers. A "sources optional" flag and title matching on apply, like import does, make
+   templates shareable. Small.
+
+Out of scope here: anything that needs a model (Phase 7) and anything that changes the timeline of
+an existing station; templates and suggestions only ever produce new drafts.
 
 ---
 

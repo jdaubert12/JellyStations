@@ -71,6 +71,9 @@ public sealed class SettingsController : ControllerBase
 
         settings.ExcludedTags = StationService.NormalizeTags(settings.ExcludedTags);
         var previous = _settings.Get();
+        // Templates have their own endpoints; the settings page never edits them.
+        settings.BlockTemplates = previous.BlockTemplates ?? new List<SlotBlock>();
+        settings.StationTemplates = previous.StationTemplates ?? new List<StationTemplate>();
         _settings.Save(settings);
         if (JsonFileStore.Serialize(previous.DefaultEncoding) != JsonFileStore.Serialize(settings.DefaultEncoding))
         {

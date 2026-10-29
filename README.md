@@ -10,7 +10,7 @@ joining whatever is airing right now, exactly like broadcast television.
 - [How it works](#how-it-works)
 - [Scheduling modes](#scheduling-modes)
 - [Station features](#station-features): bumpers and cards, logo, "Up next" card, content filters,
-  tags, family hours, seasonal stations, padding, block repeats, export and import
+  tags, family hours, seasonal stations, padding, block repeats, station templates, export and import
 - [Weather channel](#weather-channel): screens, forecasts, music, music packs
 - [HDR channels](#hdr-channels): an HDR10 station, what it needs, what clients get
 - [Requirements](#requirements)
@@ -180,14 +180,28 @@ section, which the editor shows while such a block exists. "The weather at the t
 A time block can be saved as a **template** (bookmark button on the block) and added to any station
 from the dropdown next to "Add block". Templates are managed in Settings.
 
+### Station templates
+
+**Save as template** (on the editor's first step) keeps everything about a station except its content:
+mode, order, padding, family hours, cooldown, time blocks with their days and times but without their
+shows, filler order, bumpers and their clips, the weather look (units, theme, screens, timings; not
+the places or the music), the logo color, the logo bug, the "Up next" card, the encoding profile, the
+seasonal windows, excluded tags, minimum runtime and the break card text. Saved templates appear first
+on the **New station** page, before the built-in presets (Shuffle a collection, Kids channel, Movie
+night, Comfort reruns, Holiday channel, One show start to finish, Weekly schedule, Play a fixed list,
+Weather channel), which are templates too, just not stored. Saving under a preset's name replaces that
+preset; deleting the saved one (Settings) brings the preset back. **Duplicate** on a station row opens
+a copy with the content and logo included, under the next channel number.
+
 ### Export and import
 
-**Export** downloads every station as a JSON file; **Import** creates or updates stations from such a
-file (matched by id, then by name), which makes station sets easy to back up, share, or hand-edit.
-Hand-picked items (movies, series, seasons, episodes, collections, playlists, libraries) are matched
-by title when their ids are unknown on the importing server, so a station file from another server,
-or one of the examples under `examples/stations/`, imports cleanly; anything that cannot be matched
-is dropped and listed.
+**Export** downloads every station plus the saved station and block templates as one JSON file;
+**Import** creates or updates stations from such a file (matched by id, then by name) and replaces
+templates with the same name, which makes station sets easy to back up, share, or hand-edit. A bare
+JSON array of stations, the pre-1.21 export format, still imports. Hand-picked items (movies, series,
+seasons, episodes, collections, playlists, libraries) are matched by title when their ids are unknown
+on the importing server, so a station file from another server, or one of the examples under
+`examples/stations/`, imports cleanly; anything that cannot be matched is dropped and listed.
 
 ## Weather channel
 
@@ -428,10 +442,11 @@ followed by `docker restart <container>` is enough.
 ### Your first station
 
 With no stations yet, the dashboard opens on **what your library could support**: tick the suggested
-channels and press **Create selected**. **New station** starts from a preset (Kids channel, Movie night,
-Comfort reruns, Holiday channel, One show start to finish, Weekly schedule, Play a fixed list, Weather
-channel, or a plain shuffle); the preset fills in the schedule settings, you add the shows and movies,
-and everything can be changed later.
+channels and press **Create selected**. **New station** starts from a template: a built-in preset (Kids
+channel, Movie night, Comfort reruns, Holiday channel, One show start to finish, Weekly schedule, Play a
+fixed list, Weather channel, or a plain shuffle) or one you saved from another station (see
+[Station templates](#station-templates)); it fills in the schedule settings and the look, you add the
+shows and movies, and everything can be changed later.
 
 1. Open **Dashboard > JellyStations > New station**.
 2. Give it a name and channel number, pick a mode, add content with the picker, and use
@@ -547,8 +562,9 @@ by title, genre, rating or library.
   encoding for nobody; the reader count tells the truth within seconds.
 - **Max concurrent sessions**: cap on simultaneously encoded stations.
 - **Slate**: color and whether to draw text / the station logo on break cards.
-- **Excluded tags** (plugin-wide) and **block templates** are managed here too; see
-  [Tags](#tags) and [Time block repeats and templates](#time-block-repeats-and-templates).
+- **Excluded tags** (plugin-wide), **station templates** and **block templates** are managed here too;
+  see [Tags](#tags), [Station templates](#station-templates) and
+  [Time block repeats and templates](#time-block-repeats-and-templates).
 
 ## Troubleshooting
 
@@ -610,6 +626,8 @@ usual Jellyfin API key or session token. The ones worth calling by hand:
 |---|---|
 | `GET /JellyStations/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises detected from shared title prefixes, decades, ratings, tags and libraries. The basis for station suggestions and the health report. |
 | `GET /JellyStations/Health` | Every station that needs attention, as the Status page lists them. |
+| `GET /JellyStations/Stations/Export`, `POST /JellyStations/Stations/Import` | The stations plus the saved station and block templates as one document; import takes that document or a bare array of stations. |
+| `GET /JellyStations/StationTemplates`, `GET .../{id}/Draft`, `POST`, `DELETE .../{id}` | Saved station templates first, then the built-in presets; a fresh station draft from one; save (replaces by name or id); delete a saved one. |
 | `GET /JellyStations/Hardware` | Jellyfin's transcoding setting, what the default profile resolves to, the `/dev/dri` nodes and this ffmpeg build's hwaccels, encoders and filters. |
 | `POST /JellyStations/Hardware/Test` | Runs a station's current program through the real chain at full speed and reports the decoder and the speed relative to real time. |
 | `GET /JellyStations/Weather/Search?q=` | Place search (Open-Meteo geocoding). |
