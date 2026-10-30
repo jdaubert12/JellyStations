@@ -8,7 +8,7 @@ namespace Jellyfin.Plugin.JellyStations.Tests.Scheduling;
 public class WeeklySlotSchedulerTests
 {
     private static readonly Guid BlockId = Guid.Parse("22222222-2222-2222-2222-222222222222");
-    private static readonly TimeZoneInfo NewYork = WeeklySlotScheduler.ResolveTimeZone("America/New_York");
+    private static readonly TimeZoneInfo NewYork = TimeZones.Resolve("America/New_York");
 
     private static SlotBlock WeekdayBlock(string start = "20:00", int minutes = 60, PlayOrder order = PlayOrder.Sequential, SlotOverflow overflow = SlotOverflow.FillerRemainder)
     {

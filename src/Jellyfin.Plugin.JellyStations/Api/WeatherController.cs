@@ -66,56 +66,56 @@ public sealed class WeatherController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(StatusCodes.Status502BadGateway, new ValidationErrorDto { Errors = new List<string> { "Place search failed: " + ex.Message } });
+            return StatusCode(StatusCodes.Status502BadGateway, ValidationErrorDto.Of("Place search failed: " + ex.Message));
         }
     }
 
-    /// <summary>How each place of a station is doing: last fetch, last success, the current temperature.</summary>
+    /// <summary>
+    /// How each place of a station is doing: last fetch, last success, the current temperature. For an ordinary
+    /// station with a weather block or weather in the breaks, the places are its weather channel's.
+    /// </summary>
     [HttpGet("Status/{stationId}")]
     public ActionResult<WeatherStatusDto> Status(Guid stationId)
     {
-        var station = _stations.Get(stationId);
-        if (station is null)
+        if (ResolveChannel(stationId, out _, out var channel) is { } failure)
         {
-            return NotFound();
+            return failure;
         }
 
-        return Ok(BuildStatus(station));
+        return Ok(BuildStatus(channel));
     }
 
-    /// <summary>Fetches every place of a station now and returns the new status.</summary>
+    /// <summary>Fetches every place of a station's weather channel now and returns the new status.</summary>
     [HttpPost("Refresh/{stationId}")]
     public async Task<ActionResult<WeatherStatusDto>> Refresh(Guid stationId, CancellationToken ct)
     {
-        var station = _stations.Get(stationId);
-        if (station is null)
+        if (ResolveChannel(stationId, out _, out var channel) is { } failure)
         {
-            return NotFound();
+            return failure;
         }
 
-        await _weather.RefreshAsync(station, ct).ConfigureAwait(false);
-        if (station.Weather.ShowRadar || station.Weather.ShowForecastRadar)
+        await _weather.RefreshAsync(channel, ct).ConfigureAwait(false);
+        if (channel.Weather.ShowRadar || channel.Weather.ShowForecastRadar)
         {
-            await _radar.RefreshAsync(station, ct).ConfigureAwait(false);
+            await _radar.RefreshAsync(channel, ct).ConfigureAwait(false);
         }
 
-        if (station.Weather.ShowAlerts)
+        if (channel.Weather.ShowAlerts)
         {
-            await _alerts.RefreshAsync(station, ct).ConfigureAwait(false);
+            await _alerts.RefreshAsync(channel, ct).ConfigureAwait(false);
         }
 
-        return Ok(BuildStatus(station));
+        return Ok(BuildStatus(channel));
     }
 
-    /// <summary>One screen as it would air right now, as a PNG, for the editor's preview.</summary>
+    /// <summary>One screen as it would air right now on the station, as a PNG, for the editor's preview (an ordinary station shows its weather channel's places with its own logo).</summary>
     [HttpGet("Preview/{stationId}")]
     [Produces("image/png")]
     public ActionResult Preview(Guid stationId, [FromQuery] string screen = "Current", [FromQuery] int location = 0, [FromQuery] int width = 1280)
     {
-        var station = _stations.Get(stationId);
-        if (station is null)
+        if (ResolveChannel(stationId, out var station, out var channel) is { } failure)
         {
-            return NotFound();
+            return failure;
         }
 
         if (!Enum.TryParse<WeatherScreenKind>(screen, true, out var kind))
@@ -123,7 +123,7 @@ public sealed class WeatherController : ControllerBase
             kind = WeatherScreenKind.Current;
         }
 
-        var config = station.Weather;
+        var config = channel.Weather;
         var locations = config.Locations.Where(l => l.IsValid).ToList();
         var now = DateTime.UtcNow;
         var places = locations.Select(l =>
@@ -135,7 +135,7 @@ public sealed class WeatherController : ControllerBase
         var place = kind == WeatherScreenKind.Travel ? null : places.Count == 0 ? null : places[Math.Clamp(location, 0, places.Count - 1)];
         if (kind != WeatherScreenKind.Travel && place is null)
         {
-            return NotFound(new ValidationErrorDto { Errors = new List<string> { "The station has no places yet." } });
+            return NotFound(ValidationErrorDto.Of("The station has no places yet."));
         }
 
         RadarFrameRequest? radar = null;
@@ -144,7 +144,7 @@ public sealed class WeatherController : ControllerBase
             var loop = _radar.Get(place.Location.Id);
             if (loop is null)
             {
-                return NotFound(new ValidationErrorDto { Errors = new List<string> { "No radar frames for " + place.Location.Name + " yet." } });
+                return NotFound(ValidationErrorDto.Of("No radar frames for " + place.Location.Name + " yet."));
             }
 
             var frame = loop.Latest;
@@ -156,7 +156,7 @@ public sealed class WeatherController : ControllerBase
             var frames = loop?.ForecastFrames(now, config.ForecastRadarHours, config.ForecastRadarStepMinutes) ?? Array.Empty<RadarFrame>();
             if (loop is null || frames.Count == 0)
             {
-                return NotFound(new ValidationErrorDto { Errors = new List<string> { "No forecast radar frames for " + place.Location.Name + " yet." } });
+                return NotFound(ValidationErrorDto.Of("No forecast radar frames for " + place.Location.Name + " yet."));
             }
 
             // The furthest frame: it shows where the forecast takes the rain, which is the point of the screen.
@@ -168,15 +168,48 @@ public sealed class WeatherController : ControllerBase
         var h = w * 9 / 16;
         var attribution = places.Select(p => p.Report?.Attribution).FirstOrDefault(a => !string.IsNullOrEmpty(a)) ?? _weather.Provider.Attribution;
         var logo = config.ShowLogo && !string.IsNullOrEmpty(station.LogoFileName) ? _paths.LogoFile(station.LogoFileName) : null;
-        var request = new ScreenRequest(kind, place, places, config, now, WeeklySlotScheduler.ResolveTimeZone(station.TimeZoneId), logo, w, h, attribution, radar);
+        var request = new ScreenRequest(kind, place, places, config, now, TimeZones.Resolve(station.TimeZoneId), logo, w, h, attribution, radar);
         var path = _renderer.Render(station.Id, request);
         return PhysicalFile(path, "image/png");
+    }
+
+    /// <summary>
+    /// The station and the weather channel whose places it shows, or the result to answer with instead: 404 for an
+    /// unknown station, 404 with an explanation when it has no weather channel.
+    /// </summary>
+    private ActionResult? ResolveChannel(Guid stationId, out Station station, out Station channel)
+    {
+        station = null!;
+        channel = null!;
+        if (_stations.Get(stationId) is not { } found)
+        {
+            return NotFound();
+        }
+
+        station = found;
+        if (_stations.WeatherChannelFor(found) is not { } weatherChannel)
+        {
+            return NotFound(ValidationErrorDto.Of("The station has no weather channel to show: create one first, then pick it in the Weather section."));
+        }
+
+        channel = weatherChannel;
+        return null;
     }
 
     private WeatherStatusDto BuildStatus(Station station)
     {
         var now = DateTime.UtcNow;
-        var dto = new WeatherStatusDto { StationId = station.Id, Provider = _weather.Provider.Id, Attribution = _weather.Provider.Attribution };
+        var dto = new WeatherStatusDto
+        {
+            StationId = station.Id,
+            StationName = station.Name,
+            Units = station.Weather.Units,
+            ShowAlerts = station.Weather.ShowAlerts,
+            ShowRadar = station.Weather.ShowRadar,
+            ShowForecastRadar = station.Weather.ShowForecastRadar,
+            Provider = _weather.Provider.Id,
+            Attribution = _weather.Provider.Attribution
+        };
         foreach (var location in station.Weather.Locations)
         {
             var status = _weather.Status(location.Id);
@@ -187,7 +220,7 @@ public sealed class WeatherController : ControllerBase
             var forecast = _radar.GetForecast(location.Id);
             var alertStatus = _alerts.Status(location.Id);
             var alerts = _alerts.Active(location.Id, now);
-            var offset = location.TimeZoneId is { } tz && TryOffset(tz, now) is { } o ? o : report?.UtcOffsetSeconds ?? 0;
+            var offset = TimeZones.TryFind(location.TimeZoneId) is { } zone ? (long)zone.GetUtcOffset(now).TotalSeconds : report?.UtcOffsetSeconds ?? 0;
             dto.Locations.Add(new WeatherLocationStatusDto
             {
                 AlertSource = alertStatus.SourceName ?? _alerts.Get(location.Id)?.SourceName,
@@ -231,17 +264,5 @@ public sealed class WeatherController : ControllerBase
 
         dto.MusicLevelling = station.Weather.MusicEnabled && station.Weather.NormalizeMusic;
         return dto;
-    }
-
-    private static long? TryOffset(string timeZoneId, DateTime nowUtc)
-    {
-        try
-        {
-            return (long)TimeZoneInfo.FindSystemTimeZoneById(timeZoneId).GetUtcOffset(nowUtc).TotalSeconds;
-        }
-        catch (Exception)
-        {
-            return null;
-        }
     }
 }

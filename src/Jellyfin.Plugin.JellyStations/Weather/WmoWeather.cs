@@ -67,25 +67,26 @@ public static class WmoWeather
         _ => "Unknown"
     };
 
-    /// <summary>Short form for narrow columns ("Showers" rather than "Heavy showers").</summary>
-    public static string Short(int code) => code switch
+    /// <summary>Short form for narrow columns ("Showers" rather than "Heavy showers"): one word or two per icon.</summary>
+    public static string Short(int code) => Icon(code) switch
     {
-        0 or 1 => "Clear",
-        2 => "Partly cloudy",
-        3 => "Cloudy",
-        45 or 48 => "Fog",
-        51 or 53 or 55 => "Drizzle",
-        56 or 57 or 66 or 67 => "Freezing rain",
-        61 or 63 => "Rain",
-        65 => "Heavy rain",
-        71 or 73 or 77 => "Snow",
-        75 => "Heavy snow",
-        80 or 81 or 82 => "Showers",
-        85 or 86 => "Snow showers",
-        95 or 96 or 99 => "Storms",
+        WeatherIcon.Clear => "Clear",
+        WeatherIcon.PartlyCloudy => "Partly cloudy",
+        WeatherIcon.Cloudy => "Cloudy",
+        WeatherIcon.Fog => "Fog",
+        WeatherIcon.Drizzle => "Drizzle",
+        WeatherIcon.FreezingRain => "Freezing rain",
+        WeatherIcon.Rain => "Rain",
+        WeatherIcon.HeavyRain => "Heavy rain",
+        WeatherIcon.Snow => "Snow",
+        WeatherIcon.HeavySnow => "Heavy snow",
+        WeatherIcon.Showers => "Showers",
+        WeatherIcon.SnowShowers => "Snow showers",
+        WeatherIcon.Thunderstorm => "Storms",
         _ => "—"
     };
 
+    /// <summary>The icon for a code; codes that share an icon also share their <see cref="Short"/> word.</summary>
     public static WeatherIcon Icon(int code) => code switch
     {
         0 or 1 => WeatherIcon.Clear,
@@ -150,14 +151,12 @@ public static class WmoWeather
         _ => "rain"
     };
 
-    /// <summary>Codes that mean precipitation is falling right now.</summary>
-    public static bool IsPrecipitation(int code) => code >= 51 && code != 77 || code == 77;
+    private static readonly string[] CompassPoints = { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW" };
 
     /// <summary>The 16-point compass name for a wind direction.</summary>
     public static string Compass(int degrees)
     {
-        var names = new[] { "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW" };
         var d = ((degrees % 360) + 360) % 360;
-        return names[(int)Math.Round(d / 22.5) % 16];
+        return CompassPoints[(int)Math.Round(d / 22.5) % 16];
     }
 }

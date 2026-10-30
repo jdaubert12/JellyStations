@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Net.Http.Headers;
-using System.Reflection;
 using System.Text.Json;
 using Jellyfin.Plugin.JellyStations.Models;
 using Microsoft.Extensions.Logging;
@@ -62,35 +60,14 @@ public sealed class OpenMeteoProvider : IWeatherProvider
 
     private async Task<string> GetStringAsync(string url, CancellationToken ct)
     {
-        using var client = _http.CreateClient("JellyStations.Weather");
-        client.Timeout = TimeSpan.FromSeconds(20);
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.UserAgent.Clear();
-        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Jellyfin-JellyStations", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0"));
-        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("(+https://github.com/jdaubert12/JellyStations)"));
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
+        var reply = await WeatherHttp.GetStringAsync(_http, "JellyStations.Weather", TimeSpan.FromSeconds(20), url, ct, "application/json").ConfigureAwait(false);
+        if (!reply.IsSuccessStatusCode)
         {
-            var reason = TryReadReason(body) ?? response.ReasonPhrase ?? string.Empty;
-            throw new HttpRequestException($"Open-Meteo answered {(int)response.StatusCode} {reason}".Trim(), null, response.StatusCode);
+            var reason = WeatherHttp.TryReadJsonString(reply.Body, "reason") ?? reply.ReasonPhrase ?? string.Empty;
+            throw new HttpRequestException($"Open-Meteo answered {(int)reply.StatusCode} {reason}".Trim(), null, reply.StatusCode);
         }
 
-        return body;
-    }
-
-    private static string? TryReadReason(string body)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(body);
-            return doc.RootElement.TryGetProperty("reason", out var r) ? r.GetString() : null;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
+        return reply.Body;
     }
 
     /// <summary>Turns a forecast response into a report. Pure, so it is tested against recorded replies.</summary>
@@ -106,7 +83,7 @@ public sealed class OpenMeteoProvider : IWeatherProvider
         var report = new WeatherReport
         {
             FetchedUtc = fetchedUtc,
-            TimeZoneId = root.TryGetProperty("timezone", out var tz) ? tz.GetString() : null,
+            TimeZoneId = root.StringOrNull("timezone"),
             UtcOffsetSeconds = root.TryGetProperty("utc_offset_seconds", out var off) ? off.GetInt32() : 0
         };
 
@@ -114,19 +91,19 @@ public sealed class OpenMeteoProvider : IWeatherProvider
         {
             report.Current = new CurrentConditions
             {
-                TemperatureC = Num(cur, "temperature_2m"),
-                FeelsLikeC = cur.TryGetProperty("apparent_temperature", out _) ? Num(cur, "apparent_temperature") : Num(cur, "temperature_2m"),
-                HumidityPercent = (int)Math.Round(Num(cur, "relative_humidity_2m")),
-                WindKmh = Num(cur, "wind_speed_10m"),
-                GustKmh = Num(cur, "wind_gusts_10m"),
-                WindDirectionDegrees = (int)Math.Round(Num(cur, "wind_direction_10m")),
-                PressureHpa = Num(cur, "pressure_msl"),
-                PrecipitationMm = Num(cur, "precipitation"),
-                CloudCoverPercent = (int)Math.Round(Num(cur, "cloud_cover")),
-                WeatherCode = (int)Math.Round(Num(cur, "weather_code")),
+                TemperatureC = cur.NumberOrZero("temperature_2m"),
+                FeelsLikeC = cur.TryGetProperty("apparent_temperature", out _) ? cur.NumberOrZero("apparent_temperature") : cur.NumberOrZero("temperature_2m"),
+                HumidityPercent = (int)Math.Round(cur.NumberOrZero("relative_humidity_2m")),
+                WindKmh = cur.NumberOrZero("wind_speed_10m"),
+                GustKmh = cur.NumberOrZero("wind_gusts_10m"),
+                WindDirectionDegrees = (int)Math.Round(cur.NumberOrZero("wind_direction_10m")),
+                PressureHpa = cur.NumberOrZero("pressure_msl"),
+                PrecipitationMm = cur.NumberOrZero("precipitation"),
+                CloudCoverPercent = (int)Math.Round(cur.NumberOrZero("cloud_cover")),
+                WeatherCode = (int)Math.Round(cur.NumberOrZero("weather_code")),
                 IsDay = !cur.TryGetProperty("is_day", out var isDay) || isDay.ValueKind != JsonValueKind.Number || isDay.GetInt32() != 0
             };
-            var observedLocal = LocalTime(cur, "time");
+            var observedLocal = ParseLocal(cur.StringOrNull("time"));
             report.ObservedUtc = observedLocal.HasValue ? DateTime.SpecifyKind(observedLocal.Value.AddSeconds(-report.UtcOffsetSeconds), DateTimeKind.Utc) : fetchedUtc;
         }
         else
@@ -136,13 +113,13 @@ public sealed class OpenMeteoProvider : IWeatherProvider
 
         if (root.TryGetProperty("hourly", out var hourly) && hourly.TryGetProperty("time", out var hTimes))
         {
-            var temps = Array(hourly, "temperature_2m");
-            var probs = Array(hourly, "precipitation_probability");
-            var rains = Array(hourly, "rain");
-            var showers = Array(hourly, "showers");
-            var snows = Array(hourly, "snowfall");
-            var codes = Array(hourly, "weather_code");
-            var days = Array(hourly, "is_day");
+            var temps = hourly.NumberArray("temperature_2m");
+            var probs = hourly.NumberArray("precipitation_probability");
+            var rains = hourly.NumberArray("rain");
+            var showers = hourly.NumberArray("showers");
+            var snows = hourly.NumberArray("snowfall");
+            var codes = hourly.NumberArray("weather_code");
+            var days = hourly.NumberArray("is_day");
             var i = 0;
             foreach (var t in hTimes.EnumerateArray())
             {
@@ -167,17 +144,17 @@ public sealed class OpenMeteoProvider : IWeatherProvider
 
         if (root.TryGetProperty("daily", out var daily) && daily.TryGetProperty("time", out var dTimes))
         {
-            var codes = Array(daily, "weather_code");
-            var highs = Array(daily, "temperature_2m_max");
-            var lows = Array(daily, "temperature_2m_min");
-            var probs = Array(daily, "precipitation_probability_max");
-            var sums = Array(daily, "precipitation_sum");
-            var rainSums = Array(daily, "rain_sum");
-            var showerSums = Array(daily, "showers_sum");
-            var snowSums = Array(daily, "snowfall_sum");
-            var winds = Array(daily, "wind_speed_10m_max");
-            var rises = StringArray(daily, "sunrise");
-            var sets = StringArray(daily, "sunset");
+            var codes = daily.NumberArray("weather_code");
+            var highs = daily.NumberArray("temperature_2m_max");
+            var lows = daily.NumberArray("temperature_2m_min");
+            var probs = daily.NumberArray("precipitation_probability_max");
+            var sums = daily.NumberArray("precipitation_sum");
+            var rainSums = daily.NumberArray("rain_sum");
+            var showerSums = daily.NumberArray("showers_sum");
+            var snowSums = daily.NumberArray("snowfall_sum");
+            var winds = daily.NumberArray("wind_speed_10m_max");
+            var rises = daily.StringArray("sunrise");
+            var sets = daily.StringArray("sunset");
             var i = 0;
             foreach (var t in dTimes.EnumerateArray())
             {
@@ -218,7 +195,7 @@ public sealed class OpenMeteoProvider : IWeatherProvider
 
         foreach (var r in results.EnumerateArray())
         {
-            var name = r.TryGetProperty("name", out var n) ? n.GetString() : null;
+            var name = r.StringOrNull("name");
             if (string.IsNullOrWhiteSpace(name))
             {
                 continue;
@@ -226,45 +203,19 @@ public sealed class OpenMeteoProvider : IWeatherProvider
 
             list.Add(new GeocodeResult(
                 name,
-                r.TryGetProperty("admin1", out var a1) ? a1.GetString() : null,
-                r.TryGetProperty("country", out var c) ? c.GetString() : null,
-                Num(r, "latitude"),
-                Num(r, "longitude"),
-                r.TryGetProperty("timezone", out var tz) ? tz.GetString() : null,
+                r.StringOrNull("admin1"),
+                r.StringOrNull("country"),
+                r.NumberOrZero("latitude"),
+                r.NumberOrZero("longitude"),
+                r.StringOrNull("timezone"),
                 r.TryGetProperty("population", out var p) && p.ValueKind == JsonValueKind.Number ? p.GetInt64() : null));
         }
 
         return list;
     }
 
-    private static double Num(JsonElement e, string name)
-        => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number ? v.GetDouble() : 0;
-
-    private static List<double?>? Array(JsonElement e, string name)
-    {
-        if (!e.TryGetProperty(name, out var arr) || arr.ValueKind != JsonValueKind.Array)
-        {
-            return null;
-        }
-
-        return arr.EnumerateArray().Select(x => x.ValueKind == JsonValueKind.Number ? x.GetDouble() : (double?)null).ToList();
-    }
-
-    private static List<string?>? StringArray(JsonElement e, string name)
-    {
-        if (!e.TryGetProperty(name, out var arr) || arr.ValueKind != JsonValueKind.Array)
-        {
-            return null;
-        }
-
-        return arr.EnumerateArray().Select(x => x.ValueKind == JsonValueKind.String ? x.GetString() : null).ToList();
-    }
-
     private static double At(List<double?>? list, int i, double fallback = 0)
         => list is not null && i < list.Count && list[i].HasValue ? list[i]!.Value : fallback;
-
-    private static DateTime? LocalTime(JsonElement e, string name)
-        => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? ParseLocal(v.GetString()) : null;
 
     /// <summary>Open-Meteo's local times are "2026-10-23T17:30" or "2026-10-23", no offset.</summary>
     public static DateTime? ParseLocal(string? text)

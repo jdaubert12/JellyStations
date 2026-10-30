@@ -9,7 +9,7 @@ namespace Jellyfin.Plugin.JellyStations.Tests.Scheduling;
 public class WeatherOnStationsTests
 {
     private static readonly Guid BlockId = Guid.Parse("33333333-3333-3333-3333-333333333333");
-    private static readonly TimeZoneInfo NewYork = WeeklySlotScheduler.ResolveTimeZone("America/New_York");
+    private static readonly TimeZoneInfo NewYork = TimeZones.Resolve("America/New_York");
 
     private static WeatherConfig Places(int count = 1)
     {
@@ -168,20 +168,20 @@ public class WeatherOnStationsTests
         station.Bumpers = new BumperConfig { Enabled = true, Weather = new WeatherBreakConfig { Enabled = true, Minutes = 3, Position = BreakPosition.AfterProgram } };
         var compiled = new CompiledStation { StationId = station.Id, Revision = 1, Pool = pool };
 
-        var noPlace = ScheduleInput.From(station, compiled);
+        var noPlace = ScheduleInput.From(station, compiled, station.Weather);
         Assert.Equal(TimeSpan.Zero, noPlace.WeatherBreak);
         Assert.False(noPlace.HasBumpers);
         Assert.NotNull(noPlace.Weather); // the station still "uses" weather, so the settings travel
 
         station.Weather = Places();
-        var input = ScheduleInput.From(station, compiled);
+        var input = ScheduleInput.From(station, compiled, station.Weather);
         Assert.Equal(TimeSpan.FromMinutes(3), input.WeatherBreak);
         Assert.True(input.WeatherBreakFirst);
         Assert.Equal("Weather now: Boston", input.WeatherLabel);
         Assert.True(input.HasBumpers);
 
         station.Bumpers.Enabled = false;
-        Assert.Equal(TimeSpan.Zero, ScheduleInput.From(station, compiled).WeatherBreak);
+        Assert.Equal(TimeSpan.Zero, ScheduleInput.From(station, compiled, station.Weather).WeatherBreak);
     }
 
     [Fact]
@@ -238,7 +238,7 @@ public class WeatherOnStationsTests
         var station = Items.PoolStation(pool, PlayOrder.Sequential, grid: 15);
         station.Weather = Places();
         station.Bumpers = new BumperConfig { Enabled = true, BreakMinutes = 0, Weather = new WeatherBreakConfig { Enabled = true, Minutes = 2 } };
-        var input = ScheduleInput.From(station, new CompiledStation { StationId = station.Id, Revision = 1, Pool = pool, Bumpers = Clips() });
+        var input = ScheduleInput.From(station, new CompiledStation { StationId = station.Id, Revision = 1, Pool = pool, Bumpers = Clips() }, station.Weather);
 
         var entries = ScheduleResolver.EnumerateInput(input, Items.Anchor, Items.Anchor.AddHours(6));
         for (var i = 1; i < entries.Count; i++)
@@ -273,7 +273,7 @@ public class WeatherOnStationsTests
         var station = Items.PoolStation(pool, PlayOrder.Sequential, grid: 0);
         station.Weather = Places(2);
         station.Bumpers = new BumperConfig { Enabled = true, BreakMinutes = 3, Weather = new WeatherBreakConfig { Enabled = true, Minutes = 5, Position = BreakPosition.AfterProgram } };
-        var input = ScheduleInput.From(station, new CompiledStation { StationId = station.Id, Revision = 1, Pool = pool });
+        var input = ScheduleInput.From(station, new CompiledStation { StationId = station.Id, Revision = 1, Pool = pool }, station.Weather);
         Assert.True(input.HasBumpers);
 
         var entries = ScheduleResolver.EnumerateInput(input, Items.Anchor, Items.Anchor.AddHours(4));
@@ -314,7 +314,7 @@ public class WeatherOnStationsTests
             Weather = Places()
         };
         var compiled = new CompiledStation { StationId = station.Id, Revision = 1, Filler = Items.SeriesRun("Cartoons", 30, 11) };
-        return ScheduleInput.From(station, compiled);
+        return ScheduleInput.From(station, compiled, station.Weather);
     }
 
     [Fact]

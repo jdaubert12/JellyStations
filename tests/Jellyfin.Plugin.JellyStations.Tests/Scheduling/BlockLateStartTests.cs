@@ -10,7 +10,7 @@ public class BlockLateStartTests
 {
     private static readonly Guid MovieBlockId = Guid.Parse("88888888-8888-8888-8888-888888888888");
     private static readonly Guid LateBlockId = Guid.Parse("99999999-9999-9999-9999-999999999999");
-    private static readonly TimeZoneInfo NewYork = WeeklySlotScheduler.ResolveTimeZone("America/New_York");
+    private static readonly TimeZoneInfo NewYork = TimeZones.Resolve("America/New_York");
     private static readonly List<DayOfWeek> EveryDay = Enum.GetValues<DayOfWeek>().ToList();
 
     private static SlotBlock Block(Guid id, string name, string start, int minutes, int delay) => new()

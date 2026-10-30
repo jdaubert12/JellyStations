@@ -60,15 +60,7 @@ public sealed class MusicResolver
                 }
             }
 
-            expansions.Add(new SourceExpansion
-            {
-                Section = "Music",
-                Label = SourceExpansion.Describe(source),
-                Kind = source.Kind,
-                Found = found,
-                Kept = kept,
-                AlreadyListed = alreadyListed
-            });
+            expansions.Add(SourceExpansion.For("Music", source, found, kept, alreadyListed));
         }
 
         foreach (var name in Folders(config.MusicFolder))

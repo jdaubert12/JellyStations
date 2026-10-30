@@ -65,7 +65,7 @@ public sealed class StationTemplatesController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(template.Name))
         {
-            return BadRequest(new ValidationErrorDto { Errors = { "Give the template a name." } });
+            return BadRequest(ValidationErrorDto.Of("Give the template a name."));
         }
 
         var settings = _settings.Get();
@@ -82,7 +82,7 @@ public sealed class StationTemplatesController : ControllerBase
     {
         if (StationTemplates.BuiltIn.Any(b => b.Id == id))
         {
-            return BadRequest(new ValidationErrorDto { Errors = { "Built-in templates cannot be deleted. Save your own under the same name to replace it." } });
+            return BadRequest(ValidationErrorDto.Of("Built-in templates cannot be deleted. Save your own under the same name to replace it."));
         }
 
         var settings = _settings.Get();
@@ -98,10 +98,10 @@ public sealed class StationTemplatesController : ControllerBase
     {
         var clean = StationTemplates.FromStation(template.Settings ?? new Station(), template.Name);
         clean.Id = template.Id == Guid.Empty ? Guid.NewGuid() : template.Id;
-        clean.Description = string.IsNullOrWhiteSpace(template.Description) ? null : template.Description.Trim();
-        clean.Icon = string.IsNullOrWhiteSpace(template.Icon) ? null : template.Icon.Trim();
-        clean.NextStep = string.IsNullOrWhiteSpace(template.NextStep) ? null : template.NextStep.Trim();
-        clean.DefaultName = string.IsNullOrWhiteSpace(template.DefaultName) ? null : template.DefaultName.Trim();
+        clean.Description = Text.TrimOrNull(template.Description);
+        clean.Icon = Text.TrimOrNull(template.Icon);
+        clean.NextStep = Text.TrimOrNull(template.NextStep);
+        clean.DefaultName = Text.TrimOrNull(template.DefaultName);
         clean.LogoColor = template.LogoColor is { Length: 7 } color && color[0] == '#' ? color.ToLowerInvariant() : null;
         clean.SourceDefaults = template.SourceDefaults;
         clean.CreatedUtc = template.CreatedUtc == default ? DateTime.UtcNow : template.CreatedUtc;

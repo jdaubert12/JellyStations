@@ -94,20 +94,8 @@ public sealed class SubtitleExtractor
             string? lastError = null;
             var started = DateTime.UtcNow;
             using var proc = ProcessRunner.Start(_ffmpegPath, args, line => lastError = line.Trim());
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeout.CancelAfter(Timeout);
-            try
+            if (!await proc.WaitForExitAsync(Timeout, ct).ConfigureAwait(false))
             {
-                await proc.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                proc.Kill();
-                if (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-
                 lastError = "took longer than " + Timeout.TotalMinutes.ToString("0", CultureInfo.InvariantCulture) + " minutes";
             }
 

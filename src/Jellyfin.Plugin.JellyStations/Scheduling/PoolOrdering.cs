@@ -48,20 +48,11 @@ internal static class PoolOrdering
         {
             var prev = MarathonOrder.BuildRuns(items, order, marathonMin, marathonMax, avoidRepeats, seed(k - 1));
             var prevKey = KeyOf(items[prev[^1][^1]]);
-            if (MarathonOrder.KeyOfRun(runs[0], items) == prevKey)
-            {
-                for (var j = 1; j < runs.Count; j++)
-                {
-                    if (MarathonOrder.TrySwap(runs, items, 0, j, prevKey))
-                    {
-                        break;
-                    }
-                }
 
-                if (order == PlayOrder.ShuffleEpisodesInOrder)
-                {
-                    MarathonOrder.KeepRunOrder(runs, items);
-                }
+            // Unlike the plain order, runs are re-sorted only when the seam needed repair.
+            if (Adjacency.FixSeam(runs, run => MarathonOrder.KeyOfRun(run, items), prevKey) && order == PlayOrder.ShuffleEpisodesInOrder)
+            {
+                MarathonOrder.KeepRunOrder(runs, items);
             }
         }
 
@@ -75,17 +66,7 @@ internal static class PoolOrdering
         if (avoidRepeats && shuffle && items.Count > 2)
         {
             var prevLast = BuildOrder(items, shuffle, avoidRepeats, seed, k - 1);
-            var prevKey = KeyOf(items[prevLast[^1]]);
-            if (KeyOf(items[result[0]]) == prevKey)
-            {
-                for (var j = 1; j < result.Length; j++)
-                {
-                    if (TrySwap(result, items, 0, j, prevKey))
-                    {
-                        break;
-                    }
-                }
-            }
+            Adjacency.FixSeam(result, i => KeyOf(items[i]), KeyOf(items[prevLast[^1]]));
         }
 
         if (order == PlayOrder.ShuffleEpisodesInOrder)
@@ -106,50 +87,9 @@ internal static class PoolOrdering
 
         if (avoidRepeats && shuffle && items.Count > 2)
         {
-            for (var i = 1; i < order.Length; i++)
-            {
-                if (!Violation(order, items, i, null))
-                {
-                    continue;
-                }
-
-                var done = false;
-                for (var j = i + 1; j < order.Length && !done; j++)
-                {
-                    done = TrySwap(order, items, i, j, null);
-                }
-
-                for (var j = 0; j < i - 1 && !done; j++)
-                {
-                    done = TrySwap(order, items, i, j, null);
-                }
-            }
+            Adjacency.Spread(order, i => KeyOf(items[i]));
         }
 
         return order;
-    }
-
-    /// <summary>True if the item at idx is the same series or movie as its predecessor (or as beforeStart for idx 0).</summary>
-    private static bool Violation(int[] order, IReadOnlyList<PlayableItem> items, int idx, string? beforeStart)
-    {
-        var key = KeyOf(items[order[idx]]);
-        var prev = idx == 0 ? beforeStart : KeyOf(items[order[idx - 1]]);
-        return prev == key;
-    }
-
-    /// <summary>Swaps a and b if doing so introduces no adjacency violation around either position; reverts otherwise.</summary>
-    private static bool TrySwap(int[] order, IReadOnlyList<PlayableItem> items, int a, int b, string? beforeStart)
-    {
-        (order[a], order[b]) = (order[b], order[a]);
-        foreach (var idx in new[] { a, a + 1, b, b + 1 })
-        {
-            if (idx >= 0 && idx < order.Length && Violation(order, items, idx, beforeStart))
-            {
-                (order[a], order[b]) = (order[b], order[a]);
-                return false;
-            }
-        }
-
-        return true;
     }
 }

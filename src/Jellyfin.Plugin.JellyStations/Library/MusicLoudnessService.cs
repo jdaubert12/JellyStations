@@ -340,10 +340,10 @@ public sealed class MusicLoudnessService : IDisposable
         return double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : null;
     }
 
-    /// <summary>Every track of every enabled station that levels its music, in station order.</summary>
+    /// <summary>Every track of every weather channel on the air (itself or through another station) that levels its music, in station order.</summary>
     private IEnumerable<MusicTrack> Tracks()
     {
-        foreach (var station in _stations.GetAll().Where(s => s.Enabled && s.UsesWeather && s.Weather.MusicEnabled && s.Weather.NormalizeMusic))
+        foreach (var station in Weather.WeatherSources.InUse(_stations.GetAll(), DateTime.UtcNow).Where(s => s.Weather.MusicEnabled && s.Weather.NormalizeMusic))
         {
             var compiled = _compiled.Get(station.Id);
             if (compiled is null)

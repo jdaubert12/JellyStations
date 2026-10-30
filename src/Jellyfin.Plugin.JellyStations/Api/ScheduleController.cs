@@ -48,7 +48,7 @@ public sealed class ScheduleController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(new ValidationErrorDto { Errors = { ex.Message } });
+            return BadRequest(ValidationErrorDto.Of(ex.Message));
         }
     }
 
@@ -63,7 +63,7 @@ public sealed class ScheduleController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(new ValidationErrorDto { Errors = { ex.Message } });
+            return BadRequest(ValidationErrorDto.Of(ex.Message));
         }
     }
 
@@ -80,7 +80,7 @@ public sealed class ScheduleController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(new ValidationErrorDto { Errors = { ex.Message } });
+            return BadRequest(ValidationErrorDto.Of(ex.Message));
         }
     }
 }

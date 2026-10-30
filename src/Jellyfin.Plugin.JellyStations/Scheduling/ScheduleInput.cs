@@ -76,10 +76,16 @@ public sealed class ScheduleInput
     /// <summary>Music tracks under the weather screens, in compile order.</summary>
     public IReadOnlyList<MusicTrack> Music { get; init; } = Array.Empty<MusicTrack>();
 
-    public static ScheduleInput From(Station station, CompiledStation compiled)
+    /// <summary>
+    /// Builds the scheduler's input. <paramref name="weather"/> is the weather the station airs (its own on a
+    /// weather channel, the chosen weather channel's on an ordinary station, see <c>WeatherSources.ConfigFor</c>);
+    /// null means a weather channel's own settings, or no weather at all on an ordinary station.
+    /// </summary>
+    public static ScheduleInput From(Station station, CompiledStation compiled, WeatherConfig? weather = null)
     {
-        var usesWeather = station.UsesWeather && station.Weather.Locations.Any(l => l.IsValid);
-        var weatherTitle = WeatherScheduler.Title(station.Weather);
+        var config = weather ?? (station.Mode == ScheduleMode.Weather ? station.Weather : null);
+        var usesWeather = station.UsesWeather && config is not null && config.Locations.Any(l => l.IsValid);
+        var weatherTitle = WeatherScheduler.Title(config ?? station.Weather);
         var blocks = station.Slots.Blocks
             .Select(b => new SlotBlockInput
             {
@@ -97,7 +103,7 @@ public sealed class ScheduleInput
                 MaxStartDelay = TimeSpan.FromMinutes(Math.Clamp(b.MaxStartDelayMinutes, 0, 240)),
                 Recurrence = b.Recurrence,
                 IntervalWeeks = Math.Clamp(b.IntervalWeeks, 1, 52),
-                RecurrenceStart = RecurrenceRule.ParseDate(b.RecurrenceStart) ?? RecurrenceRule.MondayOf(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(station.AnchorUtc, DateTimeKind.Utc), WeeklySlotScheduler.ResolveTimeZone(station.TimeZoneId ?? "UTC")).Date),
+                RecurrenceStart = RecurrenceRule.ParseDate(b.RecurrenceStart) ?? RecurrenceRule.MondayOf(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(station.AnchorUtc, DateTimeKind.Utc), TimeZones.Resolve(station.TimeZoneId)).Date),
                 WeeksOfMonth = (b.WeeksOfMonth ?? new List<int>()).Where(w => w is >= 1 and <= 5).Distinct().ToList(),
                 Dates = (b.Dates ?? new List<string>()).Select(RecurrenceRule.ParseDate).Where(d => d.HasValue).Select(d => d!.Value).ToHashSet(),
                 Items = compiled.Blocks.TryGetValue(b.Id, out var items) ? items : new List<PlayableItem>()
@@ -133,17 +139,37 @@ public sealed class ScheduleInput
             Blocks = blocks,
             Filler = compiled.Filler,
             FillerOrder = station.Slots.Filler.Order,
-            Weather = station.UsesWeather ? station.Weather : null,
-            Music = station.UsesWeather ? compiled.Music : Array.Empty<MusicTrack>(),
+            Weather = station.UsesWeather ? config : null,
+            Music = station.Mode == ScheduleMode.Weather ? compiled.Music : Array.Empty<MusicTrack>(),
             WeatherBreak = usesWeather && station.HasWeatherBreaks ? TimeSpan.FromMinutes(Math.Clamp(station.Bumpers!.Weather.Minutes, 1, 10)) : TimeSpan.Zero,
             WeatherBreakFirst = station.Bumpers?.Weather?.Position == BreakPosition.AfterProgram,
             WeatherLabel = weatherTitle,
             Bumpers = station.Bumpers?.Enabled == true ? compiled.Bumpers : Array.Empty<PlayableItem>(),
             PreRoll = station.Bumpers?.Enabled == true && station.Bumpers.PreRoll?.Enabled == true ? compiled.PreRoll : Array.Empty<PlayableItem>(),
             PostRoll = station.Bumpers?.Enabled == true && station.Bumpers.PostRoll?.Enabled == true ? compiled.PostRoll : Array.Empty<PlayableItem>(),
-            Break = station.Bumpers?.Enabled == true ? TimeSpan.FromMinutes(Math.Clamp(station.Bumpers.BreakMinutes, 0, 30)) : TimeSpan.Zero
+            Break = BreakFor(station)
         };
     }
+
+    /// <summary>
+    /// The input for a saved station as it airs: its last compile (or an empty one) and the weather it shows. Shared by
+    /// the live stream's resolver and the editor's preview so the two never drift. Null when there is no such station.
+    /// </summary>
+    public static ScheduleInput? ForStation(Guid id, Storage.StationRepository stations, Storage.CompiledStationRepository compiled)
+    {
+        var station = stations.Get(id);
+        if (station is null)
+        {
+            return null;
+        }
+
+        var snapshot = compiled.Get(id) ?? new CompiledStation { StationId = id, Revision = station.Revision };
+        return From(station, snapshot, global::Jellyfin.Plugin.JellyStations.Weather.WeatherSources.ConfigFor(station, stations.GetAll()));
+    }
+
+    /// <summary>The bumper break added to every program's padded slot, zero when bumpers are off.</summary>
+    public static TimeSpan BreakFor(Station station) =>
+        station.Bumpers?.Enabled == true ? TimeSpan.FromMinutes(Math.Clamp(station.Bumpers.BreakMinutes, 0, 30)) : TimeSpan.Zero;
 
     public static TimeSpan ParseTime(string? hhmm)
     {

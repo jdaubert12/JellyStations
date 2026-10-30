@@ -21,7 +21,8 @@ public sealed class WeatherScreenRenderer
     private readonly JellyStationsPaths _paths;
     private readonly ILogger<WeatherScreenRenderer> _logger;
     private readonly object _lock = new();
-    private DateTime _lastSweepUtc;
+    /// <summary>Last sweep per screens folder. Guarded by <see cref="_lock"/>. One stamp for all stations would let a busy station starve the others' folders.</summary>
+    private readonly Dictionary<string, DateTime> _lastSweepUtc = new(StringComparer.Ordinal);
 
     public WeatherScreenRenderer(WeatherPainter painter, JellyStationsPaths paths, ILogger<WeatherScreenRenderer> logger)
     {
@@ -133,12 +134,12 @@ public sealed class WeatherScreenRenderer
     private void Sweep(string dir)
     {
         var now = DateTime.UtcNow;
-        if (now - _lastSweepUtc < TimeSpan.FromMinutes(10))
+        if (_lastSweepUtc.TryGetValue(dir, out var last) && now - last < TimeSpan.FromMinutes(10))
         {
             return;
         }
 
-        _lastSweepUtc = now;
+        _lastSweepUtc[dir] = now;
         try
         {
             foreach (var file in Directory.EnumerateFiles(dir).Where(f => f.EndsWith(".png", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)))

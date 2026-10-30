@@ -8,7 +8,7 @@ namespace Jellyfin.Plugin.JellyStations.Tests.Scheduling;
 public class BlockRecurrenceTests
 {
     private static readonly Guid BlockId = Guid.Parse("44444444-4444-4444-4444-444444444444");
-    private static readonly TimeZoneInfo NewYork = WeeklySlotScheduler.ResolveTimeZone("America/New_York");
+    private static readonly TimeZoneInfo NewYork = TimeZones.Resolve("America/New_York");
 
     private static DateTime LocalToUtc(int y, int m, int d, int h, int min)
         => TimeZoneInfo.ConvertTimeToUtc(new DateTime(y, m, d, h, min, 0, DateTimeKind.Unspecified), NewYork);

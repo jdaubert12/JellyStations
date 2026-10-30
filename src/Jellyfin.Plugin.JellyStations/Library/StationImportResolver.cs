@@ -158,16 +158,13 @@ public sealed class StationImportResolver
         try
         {
             var parsed = SourceNameMatcher.Parse(kind, displayName);
+            if (ByName(kind) is { } itemKind)
+            {
+                return SourceNameMatcher.Pick(Query(itemKind, parsed.Name), parsed);
+            }
+
             switch (kind)
             {
-                case SourceKind.Movie:
-                    return SourceNameMatcher.Pick(Query(BaseItemKind.Movie, parsed.Name), parsed);
-                case SourceKind.Series:
-                    return SourceNameMatcher.Pick(Query(BaseItemKind.Series, parsed.Name), parsed);
-                case SourceKind.BoxSet:
-                    return SourceNameMatcher.Pick(Query(BaseItemKind.BoxSet, parsed.Name), parsed);
-                case SourceKind.Playlist:
-                    return SourceNameMatcher.Pick(Query(BaseItemKind.Playlist, parsed.Name), parsed);
                 case SourceKind.Library:
                     return SourceNameMatcher.Pick(
                         _libraryManager.GetVirtualFolders().Where(v => Guid.TryParse(v.ItemId, out _)).Select(v => new NameCandidate(Guid.Parse(v.ItemId), v.Name)),
@@ -185,6 +182,16 @@ public sealed class StationImportResolver
             return null;
         }
     }
+
+    /// <summary>The Jellyfin item kind for a source kind that is found by a plain name query, else null.</summary>
+    private static BaseItemKind? ByName(SourceKind kind) => kind switch
+    {
+        SourceKind.Movie => BaseItemKind.Movie,
+        SourceKind.Series => BaseItemKind.Series,
+        SourceKind.BoxSet => BaseItemKind.BoxSet,
+        SourceKind.Playlist => BaseItemKind.Playlist,
+        _ => null
+    };
 
     private Guid? FindSeason(ParsedSourceName parsed)
     {

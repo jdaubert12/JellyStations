@@ -67,12 +67,7 @@ public static partial class FfmpegArgsBuilder
         }
         else
         {
-            args.Add("-f");
-            args.Add("lavfi");
-            args.Add("-t");
-            args.Add(Sec(TimeSpan.FromSeconds(seg.TotalSeconds)));
-            args.Add("-i");
-            args.Add("anullsrc=r=48000:cl=stereo");
+            AddSilenceInput(args, TimeSpan.FromSeconds(seg.TotalSeconds));
         }
 
         var filter = new StringBuilder();
@@ -82,17 +77,7 @@ public static partial class FfmpegArgsBuilder
             filter.Append(';').Append(WeatherAudioGraph(seg, audioStart));
         }
 
-        args.Add("-filter_complex");
-        args.Add(filter.ToString());
-        args.Add("-map");
-        args.Add("[v]");
-        args.Add("-map");
-        args.Add(hasMusic ? "[a]" : audioStart.ToString(CultureInfo.InvariantCulture) + ":a");
-        if (!p.IsVaapiEncoder)
-        {
-            args.Add("-pix_fmt");
-            args.Add(OutputPixelFormat(p));
-        }
+        AddGraphStreams(args, p, filter.ToString(), "v", hasMusic ? "[a]" : audioStart.ToString(CultureInfo.InvariantCulture) + ":a");
 
         Output(args, p, tsOffset, audioFromGraph: hasMusic);
         return args;
@@ -143,7 +128,7 @@ public static partial class FfmpegArgsBuilder
         var step = 0;
         foreach (var (clockOffset, list) in windows)
         {
-            var enable = string.Join("+", Merge(list).Select(w => "between(t," + N(w.From) + "," + N(w.To) + ")"));
+            var enable = string.Join("+", Merge(list).Select(w => Between(w.From, w.To)));
             sb.Append(CultureInfo.InvariantCulture, $"[{current}]drawtext=fontfile={font}:fontsize={Px(WeatherPainter.ClockSize, scale)}:fontcolor=white:x={Px(WeatherPainter.ClockX, scale)}:y={Px(WeatherPainter.ClockY, scale)}:text='%{{pts\\:gmtime\\:{clockOffset}\\:{clockFormat}}}':enable='{enable}'[c{step}];");
             current = "c" + step;
             step++;
@@ -157,7 +142,7 @@ public static partial class FfmpegArgsBuilder
                 continue;
             }
 
-            sb.Append(CultureInfo.InvariantCulture, $"[{current}]drawtext=fontfile={font}:fontsize={Px(WeatherPainter.CreditSize, scale)}:fontcolor=white@0.85:x=(w-text_w)/2:y={Px(WeatherPainter.CreditY, scale)}:text='{EscapeDrawText(credit.Text)}':enable='between(t,{N(credit.From)},{N(credit.To)})'[m{step}];");
+            sb.Append(CultureInfo.InvariantCulture, $"[{current}]drawtext=fontfile={font}:fontsize={Px(WeatherPainter.CreditSize, scale)}:fontcolor=white@0.85:x=(w-text_w)/2:y={Px(WeatherPainter.CreditY, scale)}:text='{EscapeDrawText(credit.Text)}':enable='{Between(credit.From, credit.To)}'[m{step}];");
             current = "m" + step;
             step++;
         }
@@ -166,10 +151,10 @@ public static partial class FfmpegArgsBuilder
         return sb.ToString();
     }
 
-    /// <summary>The audio half of the graph: every piece resampled to 48 kHz stereo, levelled, concatenated and cut to the segment, ending in [a].</summary>
     /// <summary>The fade at a real track boundary (out of one track, into the next).</summary>
     public const double TrackFadeSeconds = 0.6;
 
+    /// <summary>The audio half of the graph: every piece resampled to 48 kHz stereo, levelled, concatenated and cut to the segment, ending in [a].</summary>
     public static string WeatherAudioGraph(WeatherSegment seg, int firstInput)
     {
         var sb = new StringBuilder();
@@ -221,8 +206,6 @@ public static partial class FfmpegArgsBuilder
     }
 
     private static string Px(float grid, double scale) => Math.Max(1, (int)Math.Round(grid * scale)).ToString(CultureInfo.InvariantCulture);
-
-    private static string N(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
 
     /// <summary>A file path as a filter option value: colons and backslashes escaped, no quoting needed.</summary>
     internal static string EscapeFilterPath(string path)

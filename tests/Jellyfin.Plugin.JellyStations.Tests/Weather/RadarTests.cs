@@ -217,7 +217,7 @@ public class RadarTests
         Assert.Equal(1, all[5].LocationIndex);
         Assert.Equal(WeatherScreenKind.Radar, all[5].Kind);
 
-        var second = WeatherCycle.Pass(config, 2, i => i == 1);
+        var second = WeatherCycle.Pass(config, 2, new CycleAvailability(i => i == 1));
         Assert.Equal(8, second.Count);
         Assert.Single(second, s => s.Kind == WeatherScreenKind.Radar);
         Assert.Equal(1, second.Single(s => s.Kind == WeatherScreenKind.Radar).LocationIndex);
@@ -225,7 +225,7 @@ public class RadarTests
         Assert.Equal(7, WeatherCycle.Pass(new WeatherConfig { ShowRadar = false, ShowForecastRadar = false, ShowTitleCards = false }, 2).Count);
         Assert.DoesNotContain(WeatherCycle.ShortPass(config, 2), s => s.Kind == WeatherScreenKind.Radar);
 
-        var timeline = WeatherCycle.Timeline(config, 1, Now, Now.AddSeconds(40), Now, TimeZoneInfo.Utc, _ => true);
+        var timeline = WeatherCycle.Timeline(config, 1, Now, Now.AddSeconds(40), Now, TimeZoneInfo.Utc, new CycleAvailability(_ => true));
         Assert.Equal(WeatherScreenKind.Radar, timeline[1].Screen.Kind);
     }
 
@@ -239,7 +239,7 @@ public class RadarTests
         Assert.Equal(new[] { WeatherScreenKind.Current, WeatherScreenKind.Radar, WeatherScreenKind.ForecastRadar, WeatherScreenKind.Hourly, WeatherScreenKind.Daily }, all.Take(5).Select(s => s.Kind));
 
         // Tokyo (index 1) has a past loop from RainViewer but no HRRR forecast.
-        var mixed = WeatherCycle.Pass(config, 2, _ => true, i => i == 0);
+        var mixed = WeatherCycle.Pass(config, 2, new CycleAvailability(_ => true, i => i == 0));
         Assert.Equal(10, mixed.Count);
         Assert.Equal(0, mixed.Single(s => s.Kind == WeatherScreenKind.ForecastRadar).LocationIndex);
 
@@ -248,7 +248,7 @@ public class RadarTests
         Assert.Equal(new[] { WeatherScreenKind.Current, WeatherScreenKind.ForecastRadar, WeatherScreenKind.Hourly, WeatherScreenKind.Daily }, forecastOnly.Select(s => s.Kind));
         Assert.DoesNotContain(WeatherCycle.ShortPass(config, 2), s => s.Kind == WeatherScreenKind.ForecastRadar);
 
-        var timeline = WeatherCycle.Timeline(config, 1, Now, Now.AddSeconds(40), Now, TimeZoneInfo.Utc, _ => false, _ => true);
+        var timeline = WeatherCycle.Timeline(config, 1, Now, Now.AddSeconds(40), Now, TimeZoneInfo.Utc, new CycleAvailability(_ => false, _ => true));
         Assert.Equal(WeatherScreenKind.ForecastRadar, timeline[1].Screen.Kind);
     }
 

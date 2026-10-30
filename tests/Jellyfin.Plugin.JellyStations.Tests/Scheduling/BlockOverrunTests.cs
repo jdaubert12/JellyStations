@@ -10,7 +10,7 @@ public class BlockOverrunTests
 {
     private static readonly Guid MovieBlockId = Guid.Parse("66666666-6666-6666-6666-666666666666");
     private static readonly Guid LateBlockId = Guid.Parse("77777777-7777-7777-7777-777777777777");
-    private static readonly TimeZoneInfo NewYork = WeeklySlotScheduler.ResolveTimeZone("America/New_York");
+    private static readonly TimeZoneInfo NewYork = TimeZones.Resolve("America/New_York");
     private static readonly List<DayOfWeek> EveryDay = Enum.GetValues<DayOfWeek>().ToList();
 
     private static SlotBlock Block(Guid id, string name, string start, int minutes, bool overrun) => new()

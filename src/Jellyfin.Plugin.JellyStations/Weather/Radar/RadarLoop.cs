@@ -66,20 +66,10 @@ public sealed class RadarLoop
 }
 
 /// <summary>How radar fetching for one place is going.</summary>
-public sealed class RadarFetchStatus
+public sealed class RadarFetchStatus : FetchStatus
 {
-    public Guid LocationId { get; set; }
-
     /// <summary>The source that covers the place, or null when none does.</summary>
     public string? SourceName { get; set; }
-
-    public DateTime? LastAttemptUtc { get; set; }
-
-    public DateTime? LastSuccessUtc { get; set; }
-
-    public string? LastError { get; set; }
-
-    public int Failures { get; set; }
 
     /// <summary>The model run the forecast frames come from (forecast radar only).</summary>
     public DateTime? RunUtc { get; set; }

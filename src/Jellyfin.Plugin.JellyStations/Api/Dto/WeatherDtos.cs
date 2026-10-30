@@ -1,3 +1,5 @@
+using Jellyfin.Plugin.JellyStations.Models;
+
 namespace Jellyfin.Plugin.JellyStations.Api.Dto;
 
 /// <summary>A place the geocoding search found.</summary>
@@ -19,7 +21,18 @@ public sealed class WeatherPlaceDto
 
 public sealed class WeatherStatusDto
 {
+    /// <summary>The weather channel the places belong to (the station itself, or the channel an ordinary station shows).</summary>
     public Guid StationId { get; set; }
+
+    public string StationName { get; set; } = string.Empty;
+
+    public WeatherUnits Units { get; set; }
+
+    public bool ShowAlerts { get; set; }
+
+    public bool ShowRadar { get; set; }
+
+    public bool ShowForecastRadar { get; set; }
 
     public string Provider { get; set; } = string.Empty;
 

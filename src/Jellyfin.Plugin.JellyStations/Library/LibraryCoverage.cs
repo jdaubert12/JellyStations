@@ -1,4 +1,5 @@
 using Jellyfin.Plugin.JellyStations.Api.Dto;
+using static Jellyfin.Plugin.JellyStations.Library.LibraryFacts;
 
 namespace Jellyfin.Plugin.JellyStations.Library;
 
@@ -58,17 +59,18 @@ public static class LibraryCoverage
 
             var hours = missing.Sum(e => HoursOf(e.RuntimeTicks));
             missingHours += hours;
+            var summary = SummarizeSeries(episodes);
             result.Series.Add(new UncoveredSeriesDto
             {
                 Id = g.Key,
-                Name = episodes.Select(e => e.SeriesName).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? string.Empty,
-                Year = episodes.Select(e => e.Year).Where(y => y.HasValue).Min(),
-                Rating = episodes.Select(e => RatingLadder.Normalize(e.Rating)).Where(r => r is not null).GroupBy(r => r).OrderByDescending(x => x.Count()).Select(x => x.Key).FirstOrDefault(),
-                Genres = episodes.SelectMany(e => e.Genres).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
+                Name = summary.Name,
+                Year = summary.Year,
+                Rating = summary.Rating,
+                Genres = summary.Genres,
                 Episodes = episodes.Count,
                 EpisodesOnChannels = episodes.Count - missing.Count,
                 Hours = Math.Round(hours, 1),
-                LibraryName = episodes.Select(e => e.LibraryName).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n))
+                LibraryName = summary.LibraryName
             });
         }
 
@@ -83,6 +85,4 @@ public static class LibraryCoverage
             .ToList();
         return result;
     }
-
-    private static double HoursOf(long ticks) => ticks / (double)TimeSpan.TicksPerHour;
 }

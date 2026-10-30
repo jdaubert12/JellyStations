@@ -10,12 +10,19 @@ internal static class EpisodeOrder
     /// series, but are refilled with its episodes sorted by season and episode (specials last). Movies and
     /// items without a series are untouched, so adjacency rules applied before this call still hold.
     /// </summary>
-    public static void Apply(int[] order, IReadOnlyList<PlayableItem> items)
+    public static void Apply(int[] order, IReadOnlyList<PlayableItem> items) => Reorder(order, items, i => i);
+
+    /// <summary>
+    /// Rewrites <paramref name="slots"/> in place: for each series (read from the item each element leads with),
+    /// the positions it occupies keep playing that series, but their elements are re-ranked by the play order of
+    /// their lead items (see <see cref="Sorted"/>). Elements without a series are untouched.
+    /// </summary>
+    public static void Reorder<T>(IList<T> slots, IReadOnlyList<PlayableItem> items, Func<T, int> leadItem)
     {
         var positions = new Dictionary<Guid, List<int>>();
-        for (var p = 0; p < order.Length; p++)
+        for (var p = 0; p < slots.Count; p++)
         {
-            var series = items[order[p]].SeriesId;
+            var series = items[leadItem(slots[p])].SeriesId;
             if (series is null)
             {
                 continue;
@@ -30,17 +37,18 @@ internal static class EpisodeOrder
             list.Add(p);
         }
 
-        foreach (var slots in positions.Values)
+        foreach (var held in positions.Values)
         {
-            if (slots.Count < 2)
+            if (held.Count < 2)
             {
                 continue;
             }
 
-            var episodes = Sorted(slots.Select(p => order[p]), items);
-            for (var j = 0; j < slots.Count; j++)
+            var rank = Sorted(held.Select(p => leadItem(slots[p])), items).Select((idx, r) => (idx, r)).ToDictionary(t => t.idx, t => t.r);
+            var ordered = held.Select(p => slots[p]).OrderBy(e => rank[leadItem(e)]).ToList();
+            for (var j = 0; j < held.Count; j++)
             {
-                order[slots[j]] = episodes[j];
+                slots[held[j]] = ordered[j];
             }
         }
     }

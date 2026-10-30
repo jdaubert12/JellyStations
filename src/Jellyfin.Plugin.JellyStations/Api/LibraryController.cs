@@ -86,7 +86,7 @@ public sealed class LibraryController : ControllerBase
             }
 
             channels++;
-            foreach (var item in Played(compiled))
+            foreach (var item in compiled.PlayedItems)
             {
                 onChannels.Add(item.ItemId);
             }
@@ -94,9 +94,4 @@ public sealed class LibraryController : ControllerBase
 
         return Ok(LibraryCoverage.Build(_analysis.Facts(refresh), onChannels, channels, DateTime.UtcNow));
     }
-
-    /// <summary>Everything a station plays: pool, lineup, filler and block content, plus its bumper and ident clips.</summary>
-    private static IEnumerable<PlayableItem> Played(CompiledStation compiled)
-        => compiled.Pool.Concat(compiled.Lineup).Concat(compiled.Filler).Concat(compiled.Blocks.Values.SelectMany(b => b))
-            .Concat(compiled.Bumpers).Concat(compiled.PreRoll).Concat(compiled.PostRoll);
 }

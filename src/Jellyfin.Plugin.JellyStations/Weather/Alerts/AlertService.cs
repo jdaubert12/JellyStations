@@ -24,20 +24,10 @@ public sealed class AlertSet
 }
 
 /// <summary>How the last alert fetches for one place went.</summary>
-public sealed class AlertFetchStatus
+public sealed class AlertFetchStatus : FetchStatus
 {
-    public Guid LocationId { get; set; }
-
     /// <summary>The source asked, or null when none covers the place.</summary>
     public string? SourceName { get; set; }
-
-    public DateTime? LastAttemptUtc { get; set; }
-
-    public DateTime? LastSuccessUtc { get; set; }
-
-    public string? LastError { get; set; }
-
-    public int Failures { get; set; }
 
     /// <summary>The source said it does not cover the place (at these coordinates); not asked again until they change.</summary>
     public bool NotCovered { get; set; }
@@ -54,54 +44,26 @@ public sealed class AlertFetchStatus
 /// disk so a restart has it, and tells the channel which places have something to show. Nothing is fetched for a
 /// station nobody enabled, and a place no source covers is left alone.
 /// </summary>
-public sealed class AlertService : IDisposable
+public sealed class AlertService : LocationPoller
 {
     /// <summary>Warnings can be issued at any minute; five minutes is the NWS's own suggested polling rate.</summary>
     public static readonly TimeSpan Interval = TimeSpan.FromMinutes(5);
 
-    private static readonly TimeSpan Tick = TimeSpan.FromSeconds(30);
-
-    private readonly StationRepository _stations;
     private readonly JellyStationsPaths _paths;
     private readonly IReadOnlyList<IAlertSource> _sources;
     private readonly ILogger<AlertService> _logger;
     private readonly ConcurrentDictionary<Guid, AlertSet> _sets = new();
     private readonly ConcurrentDictionary<Guid, AlertFetchStatus> _status = new();
-    private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly CancellationTokenSource _cts = new();
-    private Timer? _timer;
-    private int _disposed;
-    private int _ticking;
 
     public AlertService(StationRepository stations, JellyStationsPaths paths, IEnumerable<IAlertSource> sources, ILogger<AlertService> logger)
+        : base(stations, logger, "alerts", startDelay: TimeSpan.FromSeconds(4), nudgeDelay: TimeSpan.FromSeconds(2))
     {
-        _stations = stations;
         _paths = paths;
         _sources = sources.ToList();
         _logger = logger;
-        _stations.Changed += (_, _) => Nudge();
     }
 
     public IReadOnlyList<IAlertSource> Sources => _sources;
-
-    /// <summary>Starts polling. Called once by the hosted service.</summary>
-    public void Start()
-    {
-        _timer ??= new Timer(_ => _ = TickAsync(), null, TimeSpan.FromSeconds(4), Tick);
-    }
-
-    /// <summary>Polls soon (after a station was saved) rather than at the next regular tick.</summary>
-    public void Nudge()
-    {
-        try
-        {
-            _timer?.Change(TimeSpan.FromSeconds(2), Tick);
-        }
-        catch (ObjectDisposedException)
-        {
-            // Shutting down.
-        }
-    }
 
     /// <summary>The first source that claims the place, or null when none does.</summary>
     public IAlertSource? SourceFor(WeatherLocation location) => _sources.FirstOrDefault(s => s.Covers(location.Latitude, location.Longitude));
@@ -156,64 +118,22 @@ public sealed class AlertService : IDisposable
             return false;
         }
 
-        if (status.LastAttemptUtc is null)
-        {
-            var set = Get(location.Id);
-            return set is null || nowUtc - set.FetchedUtc >= Interval;
-        }
-
-        if (status.Failures > 0)
-        {
-            var backoff = TimeSpan.FromMinutes(Math.Min(15, Math.Pow(2, Math.Min(10, status.Failures - 1))));
-            return nowUtc - status.LastAttemptUtc.Value >= backoff;
-        }
-
-        return nowUtc - status.LastAttemptUtc.Value >= Interval;
+        return FetchBackoff.IsDue(status, () => Get(location.Id)?.FetchedUtc, Interval, nowUtc);
     }
 
-    private async Task TickAsync()
+    protected override bool Polls(Station station) => station.Weather.ShowAlerts;
+
+    protected override async Task PollAsync(Station station, WeatherLocation location, DateTime nowUtc, CancellationToken ct)
     {
-        if (Volatile.Read(ref _disposed) == 1 || Interlocked.Exchange(ref _ticking, 1) == 1)
+        if (IsDue(location, nowUtc))
         {
-            return;
-        }
-
-        try
-        {
-            var now = DateTime.UtcNow;
-            foreach (var station in _stations.GetAll().Where(s => s.UsesWeather && s.Enabled && s.Weather.ShowAlerts && SeasonWindows.IsActive(s, now)))
-            {
-                foreach (var location in station.Weather.Locations.Where(l => l.IsValid))
-                {
-                    if (_cts.IsCancellationRequested)
-                    {
-                        return;
-                    }
-
-                    if (IsDue(location, now))
-                    {
-                        await FetchAsync(station, location, _cts.Token).ConfigureAwait(false);
-                    }
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Shutting down.
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "JellyStations alerts: poll failed");
-        }
-        finally
-        {
-            Volatile.Write(ref _ticking, 0);
+            await FetchAsync(station, location, ct).ConfigureAwait(false);
         }
     }
 
     private async Task FetchAsync(Station station, WeatherLocation location, CancellationToken ct)
     {
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        await Gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var status = Status(location.Id);
@@ -240,9 +160,7 @@ public sealed class AlertService : IDisposable
                 var set = new AlertSet { SourceId = source.Id, SourceName = source.Name, Attribution = source.Attribution, FetchedUtc = now, Alerts = alerts.ToList() };
                 var before = Get(location.Id);
                 _sets[location.Id] = set;
-                status.LastSuccessUtc = now;
-                status.LastError = null;
-                status.Failures = 0;
+                status.MarkSuccess(now);
                 try
                 {
                     JsonFileStore.Write(_paths.AlertFile(location.Id), set);
@@ -272,28 +190,13 @@ public sealed class AlertService : IDisposable
             }
             catch (Exception ex)
             {
-                status.Failures++;
-                status.LastError = ex.Message;
+                status.MarkFailure(ex.Message);
                 _logger.LogWarning("JellyStations alerts [{Station}]: fetch for {Place} from {Source} failed ({Count} in a row): {Error}", station.Name, location.Name, source.Id, status.Failures, ex.Message);
             }
         }
         finally
         {
-            _gate.Release();
+            Gate.Release();
         }
-    }
-
-    /// <summary>Safe to call twice: the hosted service disposes on stop and the container disposes again on shutdown.</summary>
-    public void Dispose()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) == 1)
-        {
-            return;
-        }
-
-        _cts.Cancel();
-        _timer?.Dispose();
-        _cts.Dispose();
-        _gate.Dispose();
     }
 }

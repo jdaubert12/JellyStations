@@ -12,7 +12,7 @@ public sealed record TrackPreferences(string AudioLanguage, string? SubtitleLang
     /// <summary>A source's own choices, falling back to the station's audio language.</summary>
     public static TrackPreferences For(ContentSource source, string stationAudioLanguage) => new(
         string.IsNullOrWhiteSpace(source.AudioLanguage) ? stationAudioLanguage : source.AudioLanguage.Trim(),
-        string.IsNullOrWhiteSpace(source.SubtitleLanguage) ? null : source.SubtitleLanguage.Trim(),
+        Text.TrimOrNull(source.SubtitleLanguage),
         source.SubtitlesOnlyIfAudioMissing);
 }
 

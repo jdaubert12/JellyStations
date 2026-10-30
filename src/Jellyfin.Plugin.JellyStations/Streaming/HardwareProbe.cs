@@ -28,7 +28,7 @@ public sealed class FfmpegCapabilities
 }
 
 /// <summary>Result of one hardware check run.</summary>
-public sealed class HardwareTestResult
+public sealed record HardwareTestResult
 {
     public string RequestedDecoder { get; init; } = string.Empty;
 
@@ -70,22 +70,14 @@ public sealed class HardwareTestResult
 
     public bool Healthy => Problems.Count == 0;
 
-    public HardwareTestResult WithDecoderSkipped(string requested, string reason) => new()
+    /// <summary>This run reported as one where the plugin chose software decoding for the file: no hardware decoder was in use or fell back.</summary>
+    public HardwareTestResult WithDecoderSkipped(string requested, string reason) => this with
     {
         RequestedDecoder = requested,
-        Device = Device,
-        VideoEncoder = VideoEncoder,
-        File = File,
-        SourceVideo = SourceVideo,
         Decoder = "skipped",
         DecoderSkipReason = reason,
-        Encoder = Encoder,
-        ExitCode = ExitCode,
-        Speed = Speed,
-        Seconds = Seconds,
-        Command = Command,
-        Log = Log,
-        Problems = Problems
+        DecoderInUse = null,
+        DecoderFallback = null
     };
 }
 
@@ -371,20 +363,8 @@ public static class HardwareProbe
             }
         }, ct);
 
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeoutCts.CancelAfter(timeout);
-        try
+        if (!await proc.WaitForExitAsync(timeout, ct).ConfigureAwait(false))
         {
-            await proc.WaitForExitAsync(timeoutCts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            proc.Kill();
-            if (ct.IsCancellationRequested)
-            {
-                throw;
-            }
-
             lines.Enqueue("JellyStations: ffmpeg did not finish within " + timeout.TotalSeconds.ToString("0", CultureInfo.InvariantCulture) + " s and was stopped.");
         }
 

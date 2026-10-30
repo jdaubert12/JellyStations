@@ -1,13 +1,13 @@
 namespace Jellyfin.Plugin.JellyStations.Streaming;
 
-/// <summary>One rendered screen on the air for <see cref="Seconds"/>, with the clock it shows.</summary>
-/// <param name="Path">The PNG.</param>
-/// <param name="Seconds">How long it stays, including the cross-fade into the next one.</param>
-/// <param name="ClockOffsetSeconds">Unix seconds the clock shows at the start of the segment (segment start plus the place's UTC offset).</param>
 /// <summary>
-/// One screen on air for <paramref name="Seconds"/>: a PNG, or with <paramref name="IsSequence"/> a concat-demuxer
-/// list of PNG frames with durations (the radar loop), which must cover the screen's seconds plus the cross-fade.
+/// One screen on air for <paramref name="Seconds"/>, with the clock it shows: a PNG, or with <paramref name="IsSequence"/>
+/// a concat-demuxer list of PNG frames with durations (the radar loop), which must cover the screen's seconds plus the cross-fade.
 /// </summary>
+/// <param name="Path">The PNG, or the concat list of a sequence.</param>
+/// <param name="Seconds">How long it is on the air; the cross-fade into the next screen comes on top of this.</param>
+/// <param name="ClockOffsetSeconds">Unix seconds the clock shows at the start of the segment (segment start plus the place's UTC offset).</param>
+/// <param name="IsSequence">True when <paramref name="Path"/> is a concat-demuxer list rather than one PNG.</param>
 public sealed record WeatherSlide(string Path, double Seconds, long ClockOffsetSeconds, bool IsSequence = false);
 
 /// <summary>

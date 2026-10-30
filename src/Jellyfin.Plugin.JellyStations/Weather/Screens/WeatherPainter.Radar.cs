@@ -100,7 +100,7 @@ public sealed partial class WeatherPainter
         FrameClock(x, frame, rect, pal);
         Legend(x, rect, pal);
         var credit = frame.RunUtc is { } run
-            ? frame.SourceName + " \u00b7 " + Units.Clock(run + (x.NowLocal - x.R.NowUtc), x.C.TwentyFourHourClock) + " run"
+            ? frame.SourceName + " \u00b7 " + x.Clock(run) + " run"
             : frame.SourceName;
         HaloText(x, credit, rect.Right - 20, rect.Top + 36, 20, FontWeight.Regular, x.T.Text.WithAlpha(0xCC), pal.Halo, SKTextAlign.Right);
         x.Canvas.Restore();
@@ -201,16 +201,12 @@ public sealed partial class WeatherPainter
     /// <summary>The frame's time in a pill at the bottom-left of the map, with a dot per frame showing where the loop is.</summary>
     private void FrameClock(Ctx x, RadarFrameRequest frame, SKRect rect, RadarPalette pal)
     {
-        var local = frame.TimeUtc + (x.NowLocal - x.R.NowUtc);
-        var text = Units.Clock(local, x.C.TwentyFourHourClock);
+        var text = x.Clock(frame.TimeUtc);
         using var font = new SKFont(_assets.Typeface(FontWeight.SemiBold), 30);
         var textWidth = font.MeasureText(text);
         var dotsWidth = (frame.Count * 16f) + 8;
         var pill = new SKRect(rect.Left + 24, rect.Bottom - 24 - 58, rect.Left + 24 + 24 + textWidth + 20 + dotsWidth + 20, rect.Bottom - 24);
-        using (var paint = new SKPaint { IsAntialias = true, Color = pal.Pill })
-        {
-            x.Canvas.DrawRoundRect(pill, 14, 14, paint);
-        }
+        FillRoundRect(x, pill, 14, pal.Pill);
 
         Text(x, text, pill.Left + 24, pill.MidY + 11, 30, FontWeight.SemiBold, x.T.Text);
         var dx = pill.Left + 24 + textWidth + 20;
@@ -226,10 +222,7 @@ public sealed partial class WeatherPainter
     {
         const float barWidth = 300f;
         var pill = new SKRect(rect.Right - 24 - barWidth - 48, rect.Bottom - 24 - 58, rect.Right - 24, rect.Bottom - 24);
-        using (var paint = new SKPaint { IsAntialias = true, Color = pal.Pill })
-        {
-            x.Canvas.DrawRoundRect(pill, 14, 14, paint);
-        }
+        FillRoundRect(x, pill, 14, pal.Pill);
 
         var bar = new SKRect(pill.Left + 24, pill.MidY - 2, pill.Left + 24 + barWidth, pill.MidY + 12);
         using (var paint = new SKPaint { IsAntialias = true })

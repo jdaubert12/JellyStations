@@ -79,6 +79,8 @@
     settingsEncoding: null,
     statusTimer: null,
     coverage: null,       // CoverageDto for the "Not on a channel" page
+    content: null,        // PreviewItems result shown in the editor's content table
+    weatherStatusFor: undefined, // station whose forecast status the Weather section shows (undefined = not loaded yet)
     openLogs: {},         // session UniqueId -> bool
     deleteTimer: null,
     listTimer: null,
@@ -258,6 +260,47 @@
     }
   }
 
+  /** Shows a rejection's messages in an error box: the catch handler for forms that report inline. */
+  function showErrorsIn(box) {
+    return err => {
+      readErrors(err).then(messages => renderErrorBox(box, messages));
+    };
+  }
+
+  /** A yellow warning box: an optional bold heading over a list of messages. */
+  function renderWarnList(container, heading, messages) {
+    container.appendChild(el('div', { className: 'tvs-warn' }, [
+      heading ? el('strong', { text: heading }) : null,
+      el('ul', null, messages.map(m => el('li', { text: m })))
+    ]));
+  }
+
+  function tableHead(labels) {
+    return el('thead', null, el('tr', null, labels.map(label => el('th', { text: label }))));
+  }
+
+  function appendKv(list, label, value) {
+    list.appendChild(el('dt', { text: label }));
+    list.appendChild(el('dd', null, value));
+  }
+
+  /** A value from the browser's local storage, or null when storage is blocked. */
+  function readPref(key) {
+    try {
+      return window.localStorage.getItem(key);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writePref(key, value) {
+    try {
+      window.localStorage.setItem(key, value);
+    } catch (e) {
+      /* private mode or blocked storage: fine */
+    }
+  }
+
   function debounce(fn, ms) {
     let timer = null;
     return function () {
@@ -298,6 +341,58 @@
 
   function pad2(n) {
     return (n < 10 ? '0' : '') + n;
+  }
+
+  /** "1 station" / "3 stations". */
+  function plural(n, word) {
+    return n + ' ' + word + (n === 1 ? '' : 's');
+  }
+
+  /** "12 News" for a station or station summary: its number (when it has one), the separator, its name. */
+  function channelLabel(s, separator) {
+    return (s.ChannelNumber ? s.ChannelNumber + (separator || ' ') : '') + s.Name;
+  }
+
+  /** A local Date for a plain "2026-11-14" calendar date, or null. */
+  function parseIsoDate(text) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(text || ''));
+    return m ? new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)) : null;
+  }
+
+  /** An integer from a form or payload value, clamped to [min, max]; empty, invalid or 0 becomes the fallback. */
+  function clampInt(value, min, max, fallback) {
+    return Math.min(max, Math.max(min, parseInt(value, 10) || fallback));
+  }
+
+  /**
+   * Bounds and defaults of the station's numeric settings, shared by the normalizers (loaded stations) and readDraft
+   * (the form).
+   */
+  const LIMITS = {
+    cooldownHours: { min: 0, max: 168, def: 0 },
+    marathon: { min: 1, max: Infinity, def: 1 },
+    minRuntimeMinutes: { min: 0, max: Infinity, def: 0 },
+    bumperBreakMinutes: { min: 0, max: Infinity, def: 0 },
+    bumperMaxClipMinutes: { min: 1, max: Infinity, def: 5 },
+    weatherBreakMinutes: { min: 1, max: 10, def: 2 },
+    logoOpacity: { min: 10, max: 100, def: 70 },
+    logoHeightPercent: { min: 3, max: 25, def: 8 },
+    upNextShowSeconds: { min: 3, max: 60, def: 10 },
+    upNextHeightPercent: { min: 8, max: 30, def: 14 },
+    upNextOpacity: { min: 30, max: 100, def: 85 },
+    weatherScreenSeconds: { min: 4, max: 60, def: 10 },
+    weatherTitleCardSeconds: { min: 1, max: 10, def: 3 },
+    weatherGuideEntryMinutes: { min: 15, max: 240, def: 60 },
+    weatherVolumePercent: { min: 20, max: 150, def: 100 },
+    blockStartDelayMinutes: { min: 0, max: 240, def: 0 },
+    blockRepeatEveryMinutes: { min: 0, max: 1440, def: 0 },
+    blockIntervalWeeks: { min: 1, max: 52, def: 2 },
+    sourceWeight: { min: 1, max: 10, def: 1 }
+  };
+
+  /** clampInt with one of the LIMITS; `max` lowers the upper bound when another setting caps it. */
+  function clampTo(value, limit, max) {
+    return clampInt(value, limit.min, max === undefined ? limit.max : max, limit.def);
   }
 
   /** h:mm, with a day prefix once it passes 24 hours. */
@@ -516,6 +611,16 @@
     return ApiClient.ajax(options);
   }
 
+  /** A request whose response has no body (204). */
+  function apiNoBody(method, path) {
+    return api(method, path, undefined, undefined, true);
+  }
+
+  /** Restart / Stop / ClearError on a station's stream. */
+  function streamAction(stationId, action) {
+    return apiNoBody('POST', 'Stations/' + stationId + '/Stream/' + action);
+  }
+
   function httpMessage(status) {
     if (status === 401 || status === 403) {
       return 'Not authorized. You must be signed in as an administrator.';
@@ -573,7 +678,9 @@
   function alertErrors(err, title) {
     readErrors(err).then(messages => {
       try {
-        Dashboard.alert({ title: title || 'Error', message: messages.join('\n') });
+        // The dashboard's alert dialog treats the message as (sanitised) HTML, unlike the plain toast, so names that
+        // came back inside a server message (an imported station called "<b>x</b>") are escaped before they get there.
+        Dashboard.alert({ title: title || 'Error', message: messages.map(esc).join('\n') });
       } catch (e) {
         /* ignore */
       }
@@ -590,6 +697,12 @@
     } catch (e) {
       /* ignore */
     }
+  }
+
+  /** Runs `work` (which returns a promise) under the loading spinner; a failure is shown in an alert titled `errorTitle`. */
+  function withBusy(errorTitle, work) {
+    loading(true);
+    return work().catch(err => alertErrors(err, errorTitle)).then(() => loading(false));
   }
 
   // ------------------------------------------------------------------------------------------
@@ -753,7 +866,7 @@
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
       const stations = (doc.Stations || []).length;
       const templates = (doc.StationTemplates || []).length + (doc.BlockTemplates || []).length;
-      toast('Exported ' + stations + ' station' + (stations === 1 ? '' : 's') + (templates ? ' and ' + templates + ' template' + (templates === 1 ? '' : 's') : '') + '.');
+      toast('Exported ' + plural(stations, 'station') + (templates ? ' and ' + plural(templates, 'template') : '') + '.');
     }).catch(err => alertErrors(err, 'Export failed'));
   }
 
@@ -773,24 +886,27 @@
       }
       // An export document ({ Stations, StationTemplates, BlockTemplates }), a bare array of stations, or one station.
       const body = Array.isArray(parsed) || (parsed && Array.isArray(parsed.Stations)) ? parsed : [parsed];
-      loading(true);
-      api('POST', 'Stations/Import', body).then(res => {
+      withBusy('Import failed', () => api('POST', 'Stations/Import', body).then(res => {
         const parts = [];
         if (res.Created.length) { parts.push('created ' + res.Created.length); }
         if (res.Updated.length) { parts.push('updated ' + res.Updated.length); }
         const templates = (res.StationTemplates || []).length + (res.BlockTemplates || []).length;
-        if (templates) { parts.push(templates + ' template' + (templates === 1 ? '' : 's')); }
+        if (templates) { parts.push(plural(templates, 'template')); }
         if (res.Errors.length) { parts.push(res.Errors.length + ' failed'); }
         const resolved = res.Resolved || [];
         const unmatched = res.Unmatched || [];
-        if (resolved.length) { parts.push(resolved.length + ' source' + (resolved.length === 1 ? '' : 's') + ' matched by name'); }
+        const stripped = res.Stripped || [];
+        if (resolved.length) { parts.push(plural(resolved.length, 'source') + ' matched by name'); }
         if (unmatched.length) { parts.push(unmatched.length + ' not found'); }
+        if (stripped.length) { parts.push(plural(stripped.length, 'encoder setting') + ' cleared'); }
         toast('Import: ' + (parts.join(', ') || 'nothing to do') + '.');
-        if (res.Errors.length || unmatched.length) {
-          renderErrorBox($('#tvsListError'), res.Errors.concat(unmatched.map(u => 'Not found, dropped: ' + u)));
+        if (res.Errors.length || unmatched.length || stripped.length) {
+          renderErrorBox($('#tvsListError'), res.Errors
+            .concat(unmatched.map(u => 'Not found, dropped: ' + u))
+            .concat(stripped.map(s => 'Cleared on import (re-enter in the editor if wanted): ' + s)));
         }
         return loadStations();
-      }).catch(err => alertErrors(err, 'Import failed')).then(() => loading(false));
+      }));
     };
     reader.readAsText(file);
   }
@@ -807,9 +923,7 @@
         state.guidedStart = true;
         openSuggestions(false);
       }
-    }).catch(err => {
-      readErrors(err).then(messages => renderErrorBox($('#tvsListError'), messages));
-    }).then(() => loading(false));
+    }).catch(showErrorsIn($('#tvsListError'))).then(() => loading(false));
   }
 
   /** Keeps "Now", "Next" and the time left on the station rows current while the list is on screen. */
@@ -871,8 +985,8 @@
     body.appendChild(title);
 
     const meta = s.Mode === 'Weather'
-      ? [MODE_LABEL.Weather, s.LocationCount + (s.LocationCount === 1 ? ' place' : ' places'), s.MusicCount + (s.MusicCount === 1 ? ' track' : ' tracks')]
-      : [MODE_LABEL[s.Mode] || s.Mode, s.ItemCount + (s.ItemCount === 1 ? ' item' : ' items')];
+      ? [MODE_LABEL.Weather, plural(s.LocationCount, 'place'), plural(s.MusicCount, 'track')]
+      : [MODE_LABEL[s.Mode] || s.Mode, plural(s.ItemCount, 'item')];
     const metaLine = el('div', { className: 'listItemBodyText secondary' }, meta.join(' · '));
     const health = s.Health || null;
     const warn = (text, title) => {
@@ -889,7 +1003,7 @@
       }
       const empty = Array.isArray(health.EmptySources) ? health.EmptySources : [];
       if (empty.length) {
-        metaLine.appendChild(warn(empty.length + (empty.length === 1 ? ' empty source' : ' empty sources'), empty.join('\n')));
+        metaLine.appendChild(warn(plural(empty.length, 'empty source'), empty.join('\n')));
       }
     }
     body.appendChild(metaLine);
@@ -920,7 +1034,7 @@
         el('span', { className: 'material-icons warning', 'aria-hidden': 'true' }),
         el('span', { className: 'tvs-ellipsis', text: when + s.LastError, title: s.LastError }),
         iconButton('close', 'Dismiss this error', () => {
-          api('POST', 'Stations/' + s.Id + '/Stream/ClearError', undefined, undefined, true)
+          streamAction(s.Id, 'ClearError')
             .then(() => loadStations())
             .catch(err => alertErrors(err, 'Could not dismiss the error'));
         }, 'tvs-fault-dismiss')
@@ -955,46 +1069,40 @@
   }
 
   function deleteStation(s) {
-    loading(true);
-    api('DELETE', 'Stations/' + s.Id, undefined, undefined, true).then(() => {
+    withBusy('Could not delete station', () => apiNoBody('DELETE', 'Stations/' + s.Id).then(() => {
       toast('Deleted “' + s.Name + '”.');
       return loadStations();
-    }).catch(err => alertErrors(err, 'Could not delete station')).then(() => loading(false));
+    }));
   }
 
   function restartStream(s) {
-    api('POST', 'Stations/' + s.Id + '/Stream/Restart', undefined, undefined, true)
+    streamAction(s.Id, 'Restart')
       .then(() => toast('Stream restart requested for “' + s.Name + '”.'))
       .catch(err => alertErrors(err, 'Could not restart stream'));
   }
 
   function refreshGuide() {
-    loading(true);
-    api('POST', 'Guide/Refresh', undefined, undefined, true)
-      .then(() => toast('Live TV guide refresh requested.'))
-      .catch(err => alertErrors(err, 'Could not refresh guide'))
-      .then(() => loading(false));
+    withBusy('Could not refresh guide', () => apiNoBody('POST', 'Guide/Refresh')
+      .then(() => toast('Live TV guide refresh requested.')));
   }
 
   function recompileAll() {
-    loading(true);
-    api('POST', 'Stations/RecompileAll').then(result => {
+    withBusy('Refresh content failed', () => api('POST', 'Stations/RecompileAll').then(result => {
       const rows = result && Array.isArray(result.Stations) ? result.Stations : [];
       const changed = rows.filter(r => r.ContentChanged && !r.Error);
       const failed = rows.filter(r => r.Error);
-      const name = r => (r.ChannelNumber ? r.ChannelNumber + ' ' : '') + r.Name;
-      const lines = ['Refreshed ' + rows.length + ' station' + (rows.length === 1 ? '' : 's') + '.'];
+      const lines = ['Refreshed ' + plural(rows.length, 'station') + '.'];
       if (changed.length) {
-        lines.push(changed.length + ' changed content and the guide is refreshing: ' + changed.map(name).join(', ') + '.');
+        lines.push(changed.length + ' changed content and the guide is refreshing: ' + changed.map(r => channelLabel(r)).join(', ') + '.');
       } else {
         lines.push('No station changed content.');
       }
       if (failed.length) {
-        lines.push(failed.length + ' failed: ' + failed.map(r => name(r) + ' (' + r.Error + ')').join('; ') + '.');
+        lines.push(failed.length + ' failed: ' + failed.map(r => channelLabel(r) + ' (' + r.Error + ')').join('; ') + '.');
       }
       toast({ title: 'Refresh content', message: lines.join('\n') });
       return loadStations();
-    }).catch(err => alertErrors(err, 'Refresh content failed')).then(() => loading(false));
+    }));
   }
 
   // ------------------------------------------------------------------------------------------
@@ -1045,6 +1153,7 @@
       Slots: { Blocks: [], Filler: { Sources: [], Order: 'Shuffle' } },
       Lineup: { Items: [] },
       Weather: defaultWeather(),
+      WeatherSourceStationId: null,
       Encoding: null,
       AutoRecompileNightly: true,
       ActiveWindows: [],
@@ -1065,31 +1174,14 @@
     if (s.Pool.AvoidSameSeriesBackToBack === undefined) {
       s.Pool.AvoidSameSeriesBackToBack = true;
     }
-    s.Pool.CooldownHours = Math.min(168, Math.max(0, parseInt(s.Pool.CooldownHours, 10) || 0));
-    s.Pool.MarathonMin = Math.max(1, parseInt(s.Pool.MarathonMin, 10) || 1);
-    s.Pool.MarathonMax = Math.max(s.Pool.MarathonMin, parseInt(s.Pool.MarathonMax, 10) || 1);
+    s.Pool.CooldownHours = clampTo(s.Pool.CooldownHours, LIMITS.cooldownHours);
+    s.Pool.MarathonMin = clampTo(s.Pool.MarathonMin, LIMITS.marathon);
+    s.Pool.MarathonMax = clampInt(s.Pool.MarathonMax, s.Pool.MarathonMin, Infinity, LIMITS.marathon.def);
     s.Pool.DaypartRules = Array.isArray(s.Pool.DaypartRules) ? s.Pool.DaypartRules : [];
     s.Pool.Sources.forEach(normalizeSource);
     s.Slots = s.Slots || {};
     s.Slots.Blocks = s.Slots.Blocks || [];
-    s.Slots.Blocks.forEach(b => {
-      b.Days = b.Days || [];
-      b.Sources = b.Sources || [];
-      b.Sources.forEach(normalizeSource);
-      b.Order = b.Order || 'Sequential';
-      b.Overflow = b.Overflow || 'FillerRemainder';
-      b.RemainderMayOverrun = !!b.RemainderMayOverrun;
-      b.MaxStartDelayMinutes = Math.min(240, Math.max(0, parseInt(b.MaxStartDelayMinutes, 10) || 0));
-      b.Kind = b.Kind === 'Weather' ? 'Weather' : 'Content';
-      b.RepeatEveryMinutes = Math.min(1440, Math.max(0, parseInt(b.RepeatEveryMinutes, 10) || 0));
-      b.RepeatUntilLocal = parseHm(b.RepeatUntilLocal) === null ? '' : b.RepeatUntilLocal;
-      normalizeRecurrence(b);
-      b.StartLocal = b.StartLocal || '20:00';
-      if (b.DurationMinutes === undefined || b.DurationMinutes === null) {
-        b.DurationMinutes = 60;
-      }
-      b._key = 'b' + (++state.blockSeq);
-    });
+    s.Slots.Blocks.forEach(normalizeBlock);
     s.Slots.Filler = s.Slots.Filler || {};
     s.Slots.Filler.Sources = s.Slots.Filler.Sources || [];
     s.Slots.Filler.Sources.forEach(normalizeSource);
@@ -1097,19 +1189,20 @@
     s.Lineup = s.Lineup || {};
     s.Lineup.Items = s.Lineup.Items || [];
     s.Weather = normalizeWeather(s.Weather);
+    s.WeatherSourceStationId = s.WeatherSourceStationId && s.WeatherSourceStationId !== ZERO_GUID ? s.WeatherSourceStationId : null;
     s.Mode = s.Mode || 'Pool';
     s.ActiveWindows = Array.isArray(s.ActiveWindows) ? s.ActiveWindows : [];
     s.ExcludedItemIds = Array.isArray(s.ExcludedItemIds) ? s.ExcludedItemIds : [];
     s.ExcludedTags = Array.isArray(s.ExcludedTags) ? s.ExcludedTags : [];
     s.PaddingByLength = !!s.PaddingByLength;
     s.UseGlobalExcludedTags = s.UseGlobalExcludedTags !== false;
-    s.MinRuntimeMinutes = Math.max(0, parseInt(s.MinRuntimeMinutes, 10) || 0);
+    s.MinRuntimeMinutes = clampTo(s.MinRuntimeMinutes, LIMITS.minRuntimeMinutes);
     s.Bumpers = s.Bumpers || {};
     s.Bumpers.Enabled = !!s.Bumpers.Enabled;
     s.Bumpers.Sources = Array.isArray(s.Bumpers.Sources) ? s.Bumpers.Sources : [];
     s.Bumpers.Sources.forEach(normalizeSource);
-    s.Bumpers.BreakMinutes = Math.max(0, parseInt(s.Bumpers.BreakMinutes, 10) || 0);
-    s.Bumpers.MaxClipMinutes = Math.max(1, parseInt(s.Bumpers.MaxClipMinutes, 10) || 5);
+    s.Bumpers.BreakMinutes = clampTo(s.Bumpers.BreakMinutes, LIMITS.bumperBreakMinutes);
+    s.Bumpers.MaxClipMinutes = clampTo(s.Bumpers.MaxClipMinutes, LIMITS.bumperMaxClipMinutes);
     ['PreRoll', 'PostRoll'].forEach(key => {
       const roll = s.Bumpers[key] = s.Bumpers[key] || {};
       roll.Enabled = !!roll.Enabled;
@@ -1118,26 +1211,53 @@
     });
     const wb = s.Bumpers.Weather = s.Bumpers.Weather || {};
     wb.Enabled = !!wb.Enabled;
-    wb.Minutes = Math.min(10, Math.max(1, parseInt(wb.Minutes, 10) || 2));
+    wb.Minutes = clampTo(wb.Minutes, LIMITS.weatherBreakMinutes);
     wb.Position = wb.Position === 'AfterProgram' ? 'AfterProgram' : 'BeforeProgram';
     s.CardText = s.CardText || null;
     s.LogoOverlay = s.LogoOverlay || {};
     s.LogoOverlay.Enabled = !!s.LogoOverlay.Enabled;
     s.LogoOverlay.Corner = s.LogoOverlay.Corner || 'TopRight';
-    s.LogoOverlay.Opacity = Math.min(100, Math.max(10, parseInt(s.LogoOverlay.Opacity, 10) || 70));
-    s.LogoOverlay.HeightPercent = Math.min(25, Math.max(3, parseInt(s.LogoOverlay.HeightPercent, 10) || 8));
+    s.LogoOverlay.Opacity = clampTo(s.LogoOverlay.Opacity, LIMITS.logoOpacity);
+    s.LogoOverlay.HeightPercent = clampTo(s.LogoOverlay.HeightPercent, LIMITS.logoHeightPercent);
     const card = s.UpNextCard = s.UpNextCard || {};
     card.Enabled = !!card.Enabled;
     card.Corner = card.Corner || 'BottomRight';
     card.Animation = ['None', 'Fade', 'Slide', 'FadeAndSlide'].indexOf(card.Animation) >= 0 ? card.Animation : 'Fade';
     card.LeadTimesSeconds = normalizeLeadTimes(card.LeadTimesSeconds);
-    card.ShowSeconds = Math.min(Math.min(60, Math.min.apply(null, card.LeadTimesSeconds)), Math.max(3, parseInt(card.ShowSeconds, 10) || 10));
-    card.HeightPercent = Math.min(30, Math.max(8, parseInt(card.HeightPercent, 10) || 14));
-    card.Opacity = Math.min(100, Math.max(30, parseInt(card.Opacity, 10) || 85));
+    card.ShowSeconds = clampUpNextShowSeconds(card.ShowSeconds, card.LeadTimesSeconds);
+    card.HeightPercent = clampTo(card.HeightPercent, LIMITS.upNextHeightPercent);
+    card.Opacity = clampTo(card.Opacity, LIMITS.upNextOpacity);
     card.ShowThumbnail = card.ShowThumbnail !== false;
     card.ShowTimes = card.ShowTimes !== false;
     card.TwentyFourHourClock = !!card.TwentyFourHourClock;
     return s;
+  }
+
+  /** How long the up next card shows: within its limits and never longer than the shortest lead time. */
+  function clampUpNextShowSeconds(value, leadTimes) {
+    const limit = LIMITS.upNextShowSeconds;
+    return clampTo(value, limit, Math.min(limit.max, Math.min.apply(null, leadTimes)));
+  }
+
+  /** Fills in and clamps a block loaded from the server or built from a template, and gives it a client key. */
+  function normalizeBlock(b) {
+    b.Days = b.Days || [];
+    b.Sources = b.Sources || [];
+    b.Sources.forEach(normalizeSource);
+    b.Order = b.Order || 'Sequential';
+    b.Overflow = b.Overflow || 'FillerRemainder';
+    b.RemainderMayOverrun = !!b.RemainderMayOverrun;
+    b.MaxStartDelayMinutes = clampTo(b.MaxStartDelayMinutes, LIMITS.blockStartDelayMinutes);
+    b.Kind = b.Kind === 'Weather' ? 'Weather' : 'Content';
+    b.RepeatEveryMinutes = clampTo(b.RepeatEveryMinutes, LIMITS.blockRepeatEveryMinutes);
+    b.RepeatUntilLocal = parseHm(b.RepeatUntilLocal) === null ? '' : b.RepeatUntilLocal;
+    normalizeRecurrence(b);
+    b.StartLocal = b.StartLocal || '20:00';
+    if (b.DurationMinutes === undefined || b.DurationMinutes === null) {
+      b.DurationMinutes = 60;
+    }
+    b._key = 'b' + (++state.blockSeq);
+    return b;
   }
 
   // Up next lead times: 5 s to 6 h each, distinct, largest first, at most eight; never empty.
@@ -1186,7 +1306,7 @@
   }
 
   function normalizeSource(src) {
-    src.Weight = Math.min(10, Math.max(1, parseInt(src.Weight, 10) || 1));
+    src.Weight = clampTo(src.Weight, LIMITS.sourceWeight);
     src.ItemKinds = Array.isArray(src.ItemKinds) ? src.ItemKinds : [];
     if (src.SeasonFrom !== undefined && src.SeasonFrom !== null && !(src.SeasonFrom > 0)) { src.SeasonFrom = null; }
     if (src.SeasonTo !== undefined && src.SeasonTo !== null && !(src.SeasonTo > 0)) { src.SeasonTo = null; }
@@ -1269,11 +1389,9 @@
    */
   function languageSelect(current, noneText, onChange) {
     const select = el('select', { className: 'emby-select' }, [el('option', { value: '', text: noneText })]);
-    let known = [];
     function fill(list) {
-      known = list;
       while (select.options.length > 1) { select.remove(1); }
-      list.forEach(l => select.appendChild(el('option', { value: l.Code, text: l.Name + ' (' + l.Code + ')' + (l.Files ? ' · ' + l.Files + ' file' + (l.Files === 1 ? '' : 's') : '') })));
+      list.forEach(l => select.appendChild(el('option', { value: l.Code, text: l.Name + ' (' + l.Code + ')' + (l.Files ? ' · ' + plural(l.Files, 'file') : '') })));
       if (current && !list.some(l => l.Code === current)) {
         select.appendChild(el('option', { value: current, text: current }));
       }
@@ -1281,7 +1399,7 @@
     }
     fill(COMMON_LANGUAGES.map(c => ({ Code: c[0], Name: c[1], Files: 0 })));
     select.addEventListener('change', () => { current = select.value || null; onChange(current); });
-    return { select: select, fill: fill, known: () => known };
+    return { select: select, fill: fill };
   }
 
   /** The "New station" page: one card per template, the saved ones first, then the built-in presets. */
@@ -1321,7 +1439,7 @@
     const parts = [MODE_LABEL[s.Mode] || s.Mode || 'Shuffle'];
     const blocks = (s.Slots && s.Slots.Blocks) || [];
     if (blocks.length) {
-      parts.push(blocks.length + ' time block' + (blocks.length === 1 ? '' : 's'));
+      parts.push(plural(blocks.length, 'time block'));
     }
     if (s.Pool && s.Pool.DaypartRules && s.Pool.DaypartRules.length) {
       parts.push('family hours');
@@ -1354,45 +1472,41 @@
    * identity: next channel number, the browser's time zone unless the template names one, no logo yet.
    */
   function draftFromTemplate(t) {
-    const d = normalizeStation(JSON.parse(JSON.stringify(t.Settings || {})));
+    const d = resetIdentity(normalizeStation(JSON.parse(JSON.stringify(t.Settings || {}))));
     const base = newDraft();
-    d.Id = ZERO_GUID;
     d.Name = t.DefaultName || '';
-    d.ChannelNumber = base.ChannelNumber;
     d.CallSign = null;
     d.Enabled = true;
-    d.LogoFileName = null;
     d.TimeZoneId = d.TimeZoneId || base.TimeZoneId;
+    d.LogoOverlay = d.LogoOverlay || base.LogoOverlay;
+    d.UpNextCard = d.UpNextCard || base.UpNextCard;
+    return d;
+  }
+
+  /** Turns a normalized station into a new, unsaved one: no id, the next channel number, no logo file, a fresh schedule. */
+  function resetIdentity(d) {
+    d.Id = ZERO_GUID;
+    d.ChannelNumber = nextChannelNumber();
+    d.LogoFileName = null;
     d.AnchorUtc = null;
     d.Revision = 1;
     delete d.CreatedUtc;
     delete d.UpdatedUtc;
-    d.LogoOverlay = d.LogoOverlay || base.LogoOverlay;
-    d.UpNextCard = d.UpNextCard || base.UpNextCard;
     (d.Slots.Blocks || []).forEach(b => { delete b.Id; });
     return d;
   }
 
   /** A draft that copies an existing station, content included: everything but its identity and logo file. */
   function duplicateStation(summary) {
-    loading(true);
-    api('GET', 'Stations/' + summary.Id).then(detail => {
-      const d = normalizeStation(detail.Station);
-      d.Id = ZERO_GUID;
+    withBusy('Could not copy the station', () => api('GET', 'Stations/' + summary.Id).then(detail => {
+      const d = resetIdentity(normalizeStation(detail.Station));
       d.Name = (d.Name || 'Station') + ' (copy)';
-      d.ChannelNumber = nextChannelNumber();
-      d.LogoFileName = null;
-      d.AnchorUtc = null;
-      d.Revision = 1;
-      delete d.CreatedUtc;
-      delete d.UpdatedUtc;
-      (d.Slots.Blocks || []).forEach(b => { delete b.Id; });
       ((d.Weather && d.Weather.Locations) || []).forEach(l => { delete l.Id; });
       const logo = summary.HasLogo
         ? fetch(logoUrl(summary.Id)).then(r => (r.ok ? r.blob() : null)).catch(() => null)
         : Promise.resolve(null);
       return logo.then(blob => openEditorWith(d, null, null, blob));
-    }).catch(err => alertErrors(err, 'Could not copy the station')).then(() => loading(false));
+    }));
   }
 
   /** Filters a preset wants on every source added to the pool (rating cap, movies or episodes only). */
@@ -1411,9 +1525,7 @@
   }
 
   function openEditor(id, template) {
-    loading(true);
-    const detailPromise = id ? api('GET', 'Stations/' + id) : Promise.resolve(null);
-    Promise.all([loadTimeZones(), detailPromise]).then(results => {
+    withBusy('Could not open station', () => Promise.all([loadTimeZones(), id ? api('GET', 'Stations/' + id) : null]).then(results => {
       const detail = results[1];
       state.detail = detail;
       if (detail) {
@@ -1424,7 +1536,7 @@
       } else {
         openEditorWith(newDraft(), null, null, null);
       }
-    }).catch(err => alertErrors(err, 'Could not open station')).then(() => loading(false));
+    }));
   }
 
   /** Shows the editor for a draft (an existing station, a template's draft, or a copy). */
@@ -1446,7 +1558,7 @@
         picker.disabled = false;
       }
       renderSaveAsTemplate(false);
-      showStep(rememberedEditorView() === 'all' ? 'all' : '1');
+      showStep(readPref('tvsEditorView') === 'all' ? 'all' : '1');
       showView('editor');
     });
   }
@@ -1483,16 +1595,38 @@
       LogoColor: picker && picker.dataset.picked && !checked('#tvsLogoAutoColor') ? picker.value : null
     };
     const shadowed = state.stationTemplates.some(t => t.BuiltIn && t.Name.toLowerCase() === name.toLowerCase());
-    loading(true);
-    api('POST', 'StationTemplates', payload).then(list => {
+    withBusy('Could not save the template', () => api('POST', 'StationTemplates', payload).then(list => {
       state.stationTemplates = Array.isArray(list) ? list : [];
       renderSaveAsTemplate(false);
       toast('Template “' + name + '” saved' + (shadowed ? ' in place of the built-in preset' : '') + '. Find it under New station.');
-    }).catch(err => alertErrors(err, 'Could not save the template')).then(() => loading(false));
+    }));
   }
 
   function isNewDraft() {
     return !state.draft || !state.draft.Id || state.draft.Id === ZERO_GUID;
+  }
+
+  /** Editor checkboxes that reveal a panel of further options while ticked: checkbox -> panel. */
+  const REVEALS = {
+    '#tvsBumpersEnabled': '#tvsBumperOptions',
+    '#tvsBumperWeatherEnabled': '#tvsBumperWeatherOptions',
+    '#tvsPreRollEnabled': '#tvsPreRollPicker',
+    '#tvsPostRollEnabled': '#tvsPostRollPicker',
+    '#tvsOverlayEnabled': '#tvsOverlayOptions',
+    '#tvsUpNextEnabled': '#tvsUpNextOptions',
+    '#tvsEncodingEnabled': '#tvsStationEncoding',
+    '#tvsWeatherTitleCards': '#tvsWeatherTitleCardBox',
+    '#tvsWeatherRadar': '#tvsWeatherRadarZoomBox',
+    '#tvsWeatherForecastRadar': '#tvsWeatherForecastRadarBox',
+    '#tvsWeatherMusic': '#tvsWeatherMusicOptions'
+  };
+
+  function syncReveal(checkbox) {
+    show($(REVEALS[checkbox]), checked(checkbox));
+  }
+
+  function syncReveals() {
+    Object.keys(REVEALS).forEach(syncReveal);
   }
 
   function renderEditor() {
@@ -1515,36 +1649,14 @@
     setChecked('#tvsBumpersEnabled', !!d.Bumpers.Enabled);
     setVal('#tvsBumperBreak', d.Bumpers.BreakMinutes || 0);
     setVal('#tvsBumperMax', d.Bumpers.MaxClipMinutes || 5);
-    show($('#tvsBumperOptions'), !!d.Bumpers.Enabled);
-    createPicker({
-      container: $('#tvsBumperPicker'),
-      mode: 'sources',
-      getSources: () => state.draft.Bumpers.Sources,
-      onAdd: source => state.draft.Bumpers.Sources.push(source),
-      onRemove: index => state.draft.Bumpers.Sources.splice(index, 1)
-    });
+    sourcesPicker($('#tvsBumperPicker'), () => state.draft.Bumpers.Sources);
     setChecked('#tvsPreRollEnabled', !!d.Bumpers.PreRoll.Enabled);
     setChecked('#tvsPostRollEnabled', !!d.Bumpers.PostRoll.Enabled);
-    show($('#tvsPreRollPicker'), !!d.Bumpers.PreRoll.Enabled);
-    show($('#tvsPostRollPicker'), !!d.Bumpers.PostRoll.Enabled);
     setChecked('#tvsBumperWeatherEnabled', !!d.Bumpers.Weather.Enabled);
     setVal('#tvsBumperWeatherMinutes', d.Bumpers.Weather.Minutes || 2);
     setVal('#tvsBumperWeatherPosition', d.Bumpers.Weather.Position || 'BeforeProgram');
-    show($('#tvsBumperWeatherOptions'), !!d.Bumpers.Weather.Enabled);
-    createPicker({
-      container: $('#tvsPreRollPicker'),
-      mode: 'sources',
-      getSources: () => state.draft.Bumpers.PreRoll.Sources,
-      onAdd: source => state.draft.Bumpers.PreRoll.Sources.push(source),
-      onRemove: index => state.draft.Bumpers.PreRoll.Sources.splice(index, 1)
-    });
-    createPicker({
-      container: $('#tvsPostRollPicker'),
-      mode: 'sources',
-      getSources: () => state.draft.Bumpers.PostRoll.Sources,
-      onAdd: source => state.draft.Bumpers.PostRoll.Sources.push(source),
-      onRemove: index => state.draft.Bumpers.PostRoll.Sources.splice(index, 1)
-    });
+    sourcesPicker($('#tvsPreRollPicker'), () => state.draft.Bumpers.PreRoll.Sources);
+    sourcesPicker($('#tvsPostRollPicker'), () => state.draft.Bumpers.PostRoll.Sources);
     renderSeasonRows();
     renderWeatherPanel();
     state.content = null;
@@ -1572,14 +1684,13 @@
 
     // Logo
     delete $('#tvsLogoColor').dataset.picked;
-    setChecked('#tvsLogoAutoColor', autoLogoColor());
+    setChecked('#tvsLogoAutoColor', readPref('tvsLogoAutoColor') === '1');
     suggestLogoColor();
     renderLogo();
     setChecked('#tvsOverlayEnabled', !!d.LogoOverlay.Enabled);
     setVal('#tvsOverlayCorner', d.LogoOverlay.Corner);
     setVal('#tvsOverlayOpacity', d.LogoOverlay.Opacity);
     setVal('#tvsOverlaySize', d.LogoOverlay.HeightPercent);
-    show($('#tvsOverlayOptions'), !!d.LogoOverlay.Enabled);
     setChecked('#tvsUpNextEnabled', !!d.UpNextCard.Enabled);
     setVal('#tvsUpNextCorner', d.UpNextCard.Corner);
     setVal('#tvsUpNextAnimation', d.UpNextCard.Animation || 'Fade');
@@ -1590,7 +1701,6 @@
     setChecked('#tvsUpNextThumb', d.UpNextCard.ShowThumbnail);
     setChecked('#tvsUpNextTimes', d.UpNextCard.ShowTimes);
     setChecked('#tvsUpNextClock24', d.UpNextCard.TwentyFourHourClock);
-    show($('#tvsUpNextOptions'), !!d.UpNextCard.Enabled);
 
     // Mode panels
     setVal('#tvsPoolOrder', d.Pool.Order);
@@ -1602,20 +1712,10 @@
     setVal('#tvsFillerOrder', d.Slots.Filler.Order);
     updateModePanels();
 
-    createPicker({
-      container: $('#tvsPoolPicker'),
-      mode: 'sources',
-      getSources: () => state.draft.Pool.Sources,
-      onAdd: source => { applySourceDefaults(source); state.draft.Pool.Sources.push(source); },
-      onRemove: index => state.draft.Pool.Sources.splice(index, 1)
+    sourcesPicker($('#tvsPoolPicker'), () => state.draft.Pool.Sources, {
+      onAdd: source => { applySourceDefaults(source); state.draft.Pool.Sources.push(source); }
     });
-    createPicker({
-      container: $('#tvsFillerPicker'),
-      mode: 'sources',
-      getSources: () => state.draft.Slots.Filler.Sources,
-      onAdd: source => state.draft.Slots.Filler.Sources.push(source),
-      onRemove: index => state.draft.Slots.Filler.Sources.splice(index, 1)
-    });
+    sourcesPicker($('#tvsFillerPicker'), () => state.draft.Slots.Filler.Sources);
     createPicker({
       container: $('#tvsLineupPicker'),
       mode: 'items',
@@ -1636,10 +1736,9 @@
     if (!state.stationEncoding) {
       state.stationEncoding = createEncodingForm($('#tvsStationEncoding'), 'tvsStEnc');
     }
-    const hasEncoding = !!d.Encoding;
-    setChecked('#tvsEncodingEnabled', hasEncoding);
+    setChecked('#tvsEncodingEnabled', !!d.Encoding);
     state.stationEncoding.set(d.Encoding || defaultEncoding());
-    show($('#tvsStationEncoding'), hasEncoding);
+    syncReveals();
 
     renderExcluded();
     clear($('#tvsPreview'));
@@ -1660,8 +1759,12 @@
     }
   }
 
+  function formMode() {
+    return val('#tvsMode') || 'Pool';
+  }
+
   function updateModePanels() {
-    const mode = val('#tvsMode') || 'Pool';
+    const mode = formMode();
     const changed = state.draft.Mode !== mode;
     state.draft.Mode = mode;
     $('#tvsModeHelp').textContent = MODE_HELP[mode] || '';
@@ -1680,16 +1783,14 @@
 
   /** True when the draft as it stands in the form puts the weather on the air: a weather channel, a weather block or weather in the breaks. */
   function usesWeatherLive() {
-    const mode = val('#tvsMode') || 'Pool';
-    if (mode === 'Weather') {
-      return true;
-    }
-    if (checked('#tvsBumpersEnabled') && checked('#tvsBumperWeatherEnabled')) {
-      return true;
-    }
-    return (mode === 'Pool' || mode === 'Slots') && (state.draft.Slots.Blocks || []).some(b => b.Kind === 'Weather');
+    return usesWeatherPayload({
+      Mode: formMode(),
+      Bumpers: { Enabled: checked('#tvsBumpersEnabled'), Weather: { Enabled: checked('#tvsBumperWeatherEnabled') } },
+      Slots: state.draft.Slots
+    });
   }
 
+  /** The same question for a station payload or draft. */
   function usesWeatherPayload(p) {
     if (p.Mode === 'Weather') {
       return true;
@@ -1700,12 +1801,52 @@
     return (p.Mode === 'Pool' || p.Mode === 'Slots') && (p.Slots.Blocks || []).some(b => b.Kind === 'Weather');
   }
 
-  /** Shows the Weather section when the station needs it; outside Weather mode the channel-only settings are hidden. */
+  /**
+   * Shows the Weather section when the station needs it. A weather channel edits its places, look and music
+   * there; an ordinary station only picks the weather channel whose weather its block and breaks show.
+   */
   function updateWeatherPanel() {
-    const mode = val('#tvsMode') || 'Pool';
+    const mode = formMode();
     show($('#tvsPanelWeather'), usesWeatherLive());
     $('#tvsViewEditor').classList.toggle('tvs-weather-aux', mode !== 'Weather');
     $all('#tvsPanelWeather [data-weather-aux]').forEach(e => show(e, mode !== 'Weather'));
+    if (mode !== 'Weather') {
+      renderWeatherSourceSelect();
+    }
+    const statusFor = usesWeatherLive() ? weatherStatusStationId() : null;
+    if (statusFor !== state.weatherStatusFor) {
+      state.weatherStatusFor = statusFor;
+      renderWeatherStatus(null);
+      loadWeatherStatus();
+    }
+  }
+
+  /** The saved weather channels other than the draft itself, in channel order. */
+  function weatherChannels() {
+    return (state.stations || []).filter(s => s.Mode === 'Weather' && (!state.draft || s.Id !== state.draft.Id)).sort(channelSort);
+  }
+
+  /** Fills the weather-channel dropdown of an ordinary station, keeping the draft's choice (or the first channel). */
+  function renderWeatherSourceSelect() {
+    const select = $('#tvsWeatherSource');
+    const channels = weatherChannels();
+    const wanted = state.draft.WeatherSourceStationId || select.value || null;
+    const chosen = channels.some(s => s.Id === wanted) ? wanted : (channels.length ? channels[0].Id : null);
+    clear(select);
+    channels.forEach(s => select.appendChild(el('option', { value: s.Id, text: channelLabel(s, ' · ') + (s.LocationCount ? ' (' + plural(s.LocationCount, 'place') + ')' : ' (no places yet)') })));
+    if (chosen) {
+      select.value = chosen;
+    }
+    show($('#tvsWeatherSourceBox'), channels.length > 0);
+    show($('#tvsWeatherSourceNone'), channels.length === 0);
+  }
+
+  /** Whose forecast status the Weather section shows: the saved weather channel itself, or the channel an ordinary station picked; null when there is nothing to show yet. */
+  function weatherStatusStationId() {
+    if (formMode() === 'Weather') {
+      return isNewDraft() ? null : state.draft.Id;
+    }
+    return val('#tvsWeatherSource') || null;
   }
 
   /** What plays when a block has no content or hands time back: the pool in Pool mode, the filler otherwise. */
@@ -1723,7 +1864,7 @@
     file.disabled = isNew;
     const hasLogo = !isNew && !!state.draft.LogoFileName;
     if (hasLogo) {
-      img.src = logoUrl(state.draft.Id) + '&v=' + Date.now();
+      img.src = logoUrl(state.draft.Id);
     } else if (state.pendingLogo) {
       img.src = URL.createObjectURL(state.pendingLogo);
     } else {
@@ -1741,26 +1882,10 @@
 
   const STEP_TITLES = { 1: 'Name and look', 2: 'What plays', 3: 'When' };
 
-  function rememberedEditorView() {
-    try {
-      return window.localStorage.getItem('tvsEditorView') || '';
-    } catch (e) {
-      return '';
-    }
-  }
-
-  function rememberEditorView(view) {
-    try {
-      window.localStorage.setItem('tvsEditorView', view);
-    } catch (e) {
-      /* private mode or blocked storage: fine */
-    }
-  }
-
   /** Shows one step of the editor ('1', '2', '3') or everything ('all'); sections carry data-steps. */
   function showStep(step) {
     state.editorStep = step;
-    rememberEditorView(step === 'all' ? 'all' : 'steps');
+    writePref('tvsEditorView', step === 'all' ? 'all' : 'steps');
     $all('#tvsViewEditor [data-steps]').forEach(node => {
       const steps = (node.getAttribute('data-steps') || '').split(' ');
       node.classList.toggle('tvs-step-hidden', step !== 'all' && steps.indexOf(step) < 0);
@@ -1820,22 +1945,6 @@
   function colorForSeed(seedText) {
     const rnd = seededRandom(hashText(seedText));
     return hslToHex(Math.floor(rnd() * 360), 45 + Math.floor(rnd() * 35), 28 + Math.floor(rnd() * 20));
-  }
-
-  function autoLogoColor() {
-    try {
-      return window.localStorage.getItem('tvsLogoAutoColor') === '1';
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function rememberAutoLogoColor(on) {
-    try {
-      window.localStorage.setItem('tvsLogoAutoColor', on ? '1' : '0');
-    } catch (e) {
-      /* ignore */
-    }
   }
 
   /** Puts the suggested color in the picker: from the whole seed when "Pick the color too" is on, else from the name until the person picks one. */
@@ -2135,45 +2244,45 @@
     d.CardText = val('#tvsCardText').trim() || null;
     d.LogoOverlay.Enabled = checked('#tvsOverlayEnabled');
     d.LogoOverlay.Corner = val('#tvsOverlayCorner') || 'TopRight';
-    d.LogoOverlay.Opacity = Math.min(100, Math.max(10, parseInt(val('#tvsOverlayOpacity'), 10) || 70));
-    d.LogoOverlay.HeightPercent = Math.min(25, Math.max(3, parseInt(val('#tvsOverlaySize'), 10) || 8));
+    d.LogoOverlay.Opacity = clampTo(val('#tvsOverlayOpacity'), LIMITS.logoOpacity);
+    d.LogoOverlay.HeightPercent = clampTo(val('#tvsOverlaySize'), LIMITS.logoHeightPercent);
     d.UpNextCard.Enabled = checked('#tvsUpNextEnabled');
     d.UpNextCard.Corner = val('#tvsUpNextCorner') || 'BottomRight';
     d.UpNextCard.Animation = val('#tvsUpNextAnimation') || 'Fade';
     d.UpNextCard.LeadTimesSeconds = parseLeadTimes(val('#tvsUpNextBefore'));
-    d.UpNextCard.ShowSeconds = Math.min(Math.min(60, Math.min.apply(null, d.UpNextCard.LeadTimesSeconds)), Math.max(3, parseInt(val('#tvsUpNextShow'), 10) || 10));
-    d.UpNextCard.HeightPercent = Math.min(30, Math.max(8, parseInt(val('#tvsUpNextSize'), 10) || 14));
-    d.UpNextCard.Opacity = Math.min(100, Math.max(30, parseInt(val('#tvsUpNextOpacity'), 10) || 85));
+    d.UpNextCard.ShowSeconds = clampUpNextShowSeconds(val('#tvsUpNextShow'), d.UpNextCard.LeadTimesSeconds);
+    d.UpNextCard.HeightPercent = clampTo(val('#tvsUpNextSize'), LIMITS.upNextHeightPercent);
+    d.UpNextCard.Opacity = clampTo(val('#tvsUpNextOpacity'), LIMITS.upNextOpacity);
     d.UpNextCard.ShowThumbnail = checked('#tvsUpNextThumb');
     d.UpNextCard.ShowTimes = checked('#tvsUpNextTimes');
     d.UpNextCard.TwentyFourHourClock = checked('#tvsUpNextClock24');
     d.ExcludedTags = parseTagList(val('#tvsExcludedTags'));
     d.UseGlobalExcludedTags = checked('#tvsUseGlobalTags');
-    d.MinRuntimeMinutes = Math.max(0, parseInt(val('#tvsMinRuntime'), 10) || 0);
+    d.MinRuntimeMinutes = clampTo(val('#tvsMinRuntime'), LIMITS.minRuntimeMinutes);
     d.Bumpers.Enabled = checked('#tvsBumpersEnabled');
-    d.Bumpers.BreakMinutes = Math.max(0, parseInt(val('#tvsBumperBreak'), 10) || 0);
-    d.Bumpers.MaxClipMinutes = Math.max(1, parseInt(val('#tvsBumperMax'), 10) || 5);
+    d.Bumpers.BreakMinutes = clampTo(val('#tvsBumperBreak'), LIMITS.bumperBreakMinutes);
+    d.Bumpers.MaxClipMinutes = clampTo(val('#tvsBumperMax'), LIMITS.bumperMaxClipMinutes);
     d.Bumpers.PreRoll.Enabled = checked('#tvsPreRollEnabled');
     d.Bumpers.PostRoll.Enabled = checked('#tvsPostRollEnabled');
     d.Bumpers.Weather.Enabled = checked('#tvsBumperWeatherEnabled');
-    d.Bumpers.Weather.Minutes = Math.min(10, Math.max(1, parseInt(val('#tvsBumperWeatherMinutes'), 10) || 2));
+    d.Bumpers.Weather.Minutes = clampTo(val('#tvsBumperWeatherMinutes'), LIMITS.weatherBreakMinutes);
     d.Bumpers.Weather.Position = val('#tvsBumperWeatherPosition') || 'BeforeProgram';
-    d.Mode = val('#tvsMode') || 'Pool';
+    d.Mode = formMode();
     d.Pool.Order = val('#tvsPoolOrder') || 'Shuffle';
     d.Pool.AvoidSameSeriesBackToBack = checked('#tvsPoolAvoid');
-    d.Pool.CooldownHours = Math.min(168, Math.max(0, parseInt(val('#tvsPoolCooldown'), 10) || 0));
-    d.Pool.MarathonMin = Math.max(1, parseInt(val('#tvsMarathonMin'), 10) || 1);
-    d.Pool.MarathonMax = Math.max(d.Pool.MarathonMin, parseInt(val('#tvsMarathonMax'), 10) || 1);
+    d.Pool.CooldownHours = clampTo(val('#tvsPoolCooldown'), LIMITS.cooldownHours);
+    d.Pool.MarathonMin = clampTo(val('#tvsMarathonMin'), LIMITS.marathon);
+    d.Pool.MarathonMax = clampInt(val('#tvsMarathonMax'), d.Pool.MarathonMin, Infinity, LIMITS.marathon.def);
     d.Slots.Filler.Order = val('#tvsFillerOrder') || 'Shuffle';
     const w = d.Weather;
     w.Units = val('#tvsWeatherUnits') || 'Imperial';
     w.Theme = val('#tvsWeatherTheme') || 'Classic';
-    w.ScreenSeconds = Math.min(60, Math.max(4, parseInt(val('#tvsWeatherScreenSeconds'), 10) || 10));
-    w.GuideEntryMinutes = Math.min(240, Math.max(15, parseInt(val('#tvsWeatherEntryMinutes'), 10) || 60));
+    w.ScreenSeconds = clampTo(val('#tvsWeatherScreenSeconds'), LIMITS.weatherScreenSeconds);
+    w.GuideEntryMinutes = clampTo(val('#tvsWeatherEntryMinutes'), LIMITS.weatherGuideEntryMinutes);
     w.OnTheEights = checked('#tvsWeatherEights');
     w.TwentyFourHourClock = checked('#tvsWeatherClock24');
     w.ShowTitleCards = checked('#tvsWeatherTitleCards');
-    w.TitleCardSeconds = Math.min(10, Math.max(1, parseInt(val('#tvsWeatherTitleCardSeconds'), 10) || 3));
+    w.TitleCardSeconds = clampTo(val('#tvsWeatherTitleCardSeconds'), LIMITS.weatherTitleCardSeconds);
     w.ShowAlerts = checked('#tvsWeatherAlerts');
     w.ShowHourly = checked('#tvsWeatherHourly');
     w.ShowDaily = checked('#tvsWeatherDaily');
@@ -2187,9 +2296,10 @@
     w.GuideTitle = val('#tvsWeatherGuideTitle').trim() || null;
     w.MusicEnabled = checked('#tvsWeatherMusic');
     w.MusicFolder = val('#tvsWeatherMusicFolder').trim() || null;
-    w.MusicVolumePercent = Math.min(150, Math.max(20, parseInt(val('#tvsWeatherVolume'), 10) || 100));
+    w.MusicVolumePercent = clampTo(val('#tvsWeatherVolume'), LIMITS.weatherVolumePercent);
     w.ShowMusicCredit = checked('#tvsWeatherCredit');
     w.NormalizeMusic = checked('#tvsWeatherNormalize');
+    d.WeatherSourceStationId = d.Mode === 'Weather' ? null : (val('#tvsWeatherSource') || null);
     d.Encoding = checked('#tvsEncodingEnabled') && state.stationEncoding ? state.stationEncoding.get() : null;
     return toPayload(d);
   }
@@ -2239,12 +2349,15 @@
     if (p.Mode === 'Slots' && !p.Slots.Blocks.length && !p.Slots.Filler.Sources.length) {
       errors.push('Add at least one time block or some filler content.');
     }
-    if (usesWeatherPayload(p) && !(p.Weather.Locations || []).some(weatherPlaceValid)) {
-      errors.push(p.Mode === 'Weather' ? 'Add at least one place to the weather channel.' : 'Add at least one place in the Weather section for the weather block or breaks.');
+    if (p.Mode === 'Weather' && !(p.Weather.Locations || []).some(weatherPlaceValid)) {
+      errors.push('Add at least one place to the weather channel.');
+    }
+    if (p.Mode !== 'Weather' && usesWeatherPayload(p) && !weatherChannels().length) {
+      errors.push('The weather block or the weather in the breaks needs a weather channel: create one first (New station, Weather channel), then pick it in the Weather section.');
     }
     if (p.Mode === 'Pool' || p.Mode === 'Slots') {
       p.Slots.Blocks.forEach((b, i) => {
-        const label = b.Name ? '“' + b.Name + '”' : 'Block ' + (i + 1);
+        const label = blockLabel(b, i);
         if (!b.Days || !b.Days.length) {
           errors.push(label + ' has no days selected.');
         }
@@ -2293,7 +2406,7 @@
         after = uploadLogoTo(saved.Id, logo, 'logo.png').catch(err => alertErrors(err, 'Station saved, but the logo could not be uploaded'));
       }
       if (refreshGuideAfter) {
-        after = api('POST', 'Guide/Refresh', undefined, undefined, true)
+        after = apiNoBody('POST', 'Guide/Refresh')
           .then(() => toast('Saved “' + name + '” and requested a guide refresh.'))
           .catch(err => alertErrors(err, 'Station saved, but the guide refresh failed'));
       } else {
@@ -2303,9 +2416,7 @@
         showView('list');
         return loadStations();
       });
-    }).catch(err => {
-      readErrors(err).then(messages => renderErrorBox(box, messages));
-    }).then(() => loading(false));
+    }).catch(showErrorsIn(box)).then(() => loading(false));
   }
 
   function recompileStation() {
@@ -2313,8 +2424,7 @@
       return;
     }
     const id = state.draft.Id;
-    loading(true);
-    api('POST', 'Stations/' + id + '/Recompile').then(result => {
+    withBusy('Refresh content failed', () => api('POST', 'Stations/' + id + '/Recompile').then(result => {
       if (state.detail) {
         state.detail.Compiled = result;
       }
@@ -2325,7 +2435,7 @@
       const excluded = result && result.Excluded ? result.Excluded.length : 0;
       toast('Refreshed: ' + (result ? result.ItemCount : 0) + ' items, ' + excluded + ' excluded.' +
         (result && result.ContentChanged ? ' Content changed – revision ' + result.Revision + '.' : ' Content unchanged.'));
-    }).catch(err => alertErrors(err, 'Refresh content failed')).then(() => loading(false));
+    }));
   }
 
   function renderExcluded() {
@@ -2366,12 +2476,7 @@
       state.content = res;
       renderContent();
     }).catch(err => {
-      readErrors(err).then(messages => {
-        clear(container);
-        const warn = el('div', { className: 'tvs-warn' }, [el('strong', { text: 'Could not load content: ' })]);
-        warn.appendChild(el('ul', null, messages.map(m => el('li', { text: m }))));
-        container.appendChild(warn);
-      });
+      readErrors(err).then(messages => renderWarnList(clear(container), 'Could not load content: ', messages));
     });
   }
 
@@ -2407,7 +2512,7 @@
     });
     const excludedNow = res.Items.filter(r => isExcluded(r.ItemId)).length;
     const sources = Object.keys(res.BySource || {}).map(k => k + ' ' + res.BySource[k]).join(' · ');
-    summary.textContent = res.Total + ' item' + (res.Total === 1 ? '' : 's') + ' · ' + res.UniqueHours + ' h of unique content'
+    summary.textContent = plural(res.Total, 'item') + ' · ' + res.UniqueHours + ' h of unique content'
       + (res.CycleHours !== null && res.CycleHours !== undefined ? ' · ' + res.CycleHours + ' h per cycle' : '')
       + (excludedNow ? ' · ' + excludedNow + ' excluded' : '') + (sources ? ' · ' + sources : '')
       + (res.Total > res.Items.length ? ' · showing first ' + res.Items.length : '');
@@ -2416,10 +2521,7 @@
       return;
     }
     const table = el('table', { className: 'tvs-table' });
-    table.appendChild(el('thead', null, el('tr', null, [
-      el('th', { text: 'Title' }), el('th', { text: 'Year' }), el('th', { text: 'Rating' }), el('th', { text: 'Length' }),
-      el('th', { text: 'Genres' }), el('th', { text: 'Source' }), el('th', { text: '' })
-    ])));
+    table.appendChild(tableHead(['Title', 'Year', 'Rating', 'Length', 'Genres', 'Source', '']));
     const tbody = el('tbody');
     rows.forEach(r => {
       const excluded = isExcluded(r.ItemId) || !!r.ExcludedByRule;
@@ -2455,12 +2557,7 @@
     api('POST', 'Schedule/Preview', payload, { hours: hours }).then(entries => {
       renderSchedule(container, Array.isArray(entries) ? entries : [], hours);
     }).catch(err => {
-      readErrors(err).then(messages => {
-        clear(container);
-        const warn = el('div', { className: 'tvs-warn' }, [el('strong', { text: 'Preview failed: ' })]);
-        warn.appendChild(el('ul', null, messages.map(m => el('li', { text: m }))));
-        container.appendChild(warn);
-      });
+      readErrors(err).then(messages => renderWarnList(clear(container), 'Preview failed: ', messages));
     });
   }
 
@@ -2472,10 +2569,7 @@
     }
     const now = Date.now();
     const table = el('table', { className: 'tvs-table' });
-    table.appendChild(el('thead', null, el('tr', null, [
-      el('th', { text: 'Start' }), el('th', { text: 'End' }), el('th', { text: 'Length' }),
-      el('th', { text: 'Program' }), el('th', { text: 'Source' })
-    ])));
+    table.appendChild(tableHead(['Start', 'End', 'Length', 'Program', 'Source']));
     const tbody = el('tbody');
     let lastDay = null;
     let programs = 0;
@@ -2521,7 +2615,7 @@
       ]));
     });
     table.appendChild(tbody);
-    container.appendChild(el('div', { className: 'tvs-info', text: programs + ' program' + (programs === 1 ? '' : 's') + (slates ? ', ' + slates + ' station break' + (slates === 1 ? '' : 's') : '') + ' in the next ' + hours + ' hours.' }));
+    container.appendChild(el('div', { className: 'tvs-info', text: plural(programs, 'program') + (slates ? ', ' + plural(slates, 'station break') : '') + ' in the next ' + hours + ' hours.' }));
     container.appendChild(table);
   }
 
@@ -2555,7 +2649,7 @@
   /** Clamps the recurrence fields of a block or template in place. */
   function normalizeRecurrence(b) {
     b.Recurrence = RECURRENCES.indexOf(b.Recurrence) >= 0 ? b.Recurrence : 'Weekly';
-    b.IntervalWeeks = Math.min(52, Math.max(1, parseInt(b.IntervalWeeks, 10) || 2));
+    b.IntervalWeeks = clampTo(b.IntervalWeeks, LIMITS.blockIntervalWeeks);
     b.RecurrenceStart = isIsoDate(b.RecurrenceStart) ? b.RecurrenceStart : '';
     b.WeeksOfMonth = (Array.isArray(b.WeeksOfMonth) ? b.WeeksOfMonth : []).map(w => parseInt(w, 10)).filter(w => w >= 1 && w <= 5).filter((w, i, a) => a.indexOf(w) === i).sort();
     b.Dates = (Array.isArray(b.Dates) ? b.Dates : []).filter(isIsoDate).filter((d, i, a) => a.indexOf(d) === i).sort();
@@ -2568,11 +2662,13 @@
 
   /** "Nov 14, 2026" from "2026-11-14", read as a plain calendar date. */
   function fmtIsoDate(iso) {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
-    if (!m) {
-      return iso || '';
-    }
-    return new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)).toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+    const date = parseIsoDate(iso);
+    return date ? date.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' }) : iso || '';
+  }
+
+  /** “Name” in quotes, or "Block 3" for an unnamed block, for messages about it. */
+  function blockLabel(b, index) {
+    return b.Name ? '“' + b.Name + '”' : 'Block ' + (index + 1);
   }
 
   function todayIso() {
@@ -2629,7 +2725,7 @@
       timeText += ', every ' + fmtDur(b.RepeatEveryMinutes * 60) + ' until ' + (b.RepeatUntilLocal || 'midnight');
     }
     const sources = (b.Sources || []).length;
-    const what = b.Kind === 'Weather' ? 'local weather' : sources + ' source' + (sources === 1 ? '' : 's');
+    const what = b.Kind === 'Weather' ? 'local weather' : plural(sources, 'source');
     return dayText + ' · ' + timeText + ' · ' + fmtDur(dur * 60) + ' · ' + what;
   }
 
@@ -2672,8 +2768,8 @@
       return b.Days || [];
     }
     return (b.Dates || []).map(d => {
-      const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
-      return m ? DAYS[(new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)).getDay() + 6) % 7] : null;
+      const date = parseIsoDate(d);
+      return date ? DAYS[(date.getDay() + 6) % 7] : null;
     }).filter((d, i, a) => d && a.indexOf(d) === i);
   }
 
@@ -2842,73 +2938,100 @@
     if (!p.moved) {
       rows = Math.min(2, GRID_ROWS - r0);
     }
-    const templateId = val('#tvsBlockTemplateSelect');
-    const template = state.blockTemplates.find(t => t.Id === templateId);
-    const block = template ? blockFromTemplate(template) : newBlock();
+    const block = newBlockFromSelectedTemplate();
     block.Days = DAYS.slice(c0, c1 + 1);
     block.StartLocal = pad2(Math.floor(r0 / 2)) + ':' + (r0 % 2 ? '30' : '00');
     block.DurationMinutes = rows * 30;
     if (block.Recurrence === 'Dates') {
       block.Recurrence = 'Weekly';
     }
+    addExpandedBlock(block);
+    openBlockCard(state.draft.Slots.Blocks.length - 1);
+  }
+
+  /** A new block from the template picked in the Add block dropdown, or a blank one. */
+  function newBlockFromSelectedTemplate() {
+    const templateId = val('#tvsBlockTemplateSelect');
+    const template = state.blockTemplates.find(t => t.Id === templateId);
+    return template ? blockFromTemplate(template) : newBlock();
+  }
+
+  /** Appends a block to the draft with its card open, and resets the template dropdown. */
+  function addExpandedBlock(block) {
     state.draft.Slots.Blocks.push(block);
     state.expandedBlocks[block._key] = true;
     setVal('#tvsBlockTemplateSelect', '');
     renderBlocks();
-    openBlockCard(state.draft.Slots.Blocks.length - 1);
   }
 
   function blockCard(b, index) {
-    const blocks = state.draft.Slots.Blocks;
     const open = !!state.expandedBlocks[b._key];
     const card = el('div', { className: 'tvs-card' + (open ? ' open' : '') });
-
-    const titleBox = el('div', { className: 'title' }, [
-      el('div', { className: 'name tvs-ellipsis', text: b.Name || 'Untitled block' }),
-      el('div', { className: 'tvs-secondary tvs-ellipsis', text: blockSummary(b) })
-    ]);
-    const head = el('div', { className: 'tvs-card-head' }, [
-      el('span', { className: 'material-icons expand_more', 'aria-hidden': 'true' }),
-      titleBox
-    ]);
-    head.addEventListener('click', () => {
-      state.expandedBlocks[b._key] = !state.expandedBlocks[b._key];
-      renderBlocks();
-    });
-    const stop = fn => ev => {
-      ev.stopPropagation();
-      fn();
-    };
-    head.appendChild(iconButton('arrow_upward', 'Move up', stop(() => {
-      if (index > 0) {
-        blocks.splice(index - 1, 0, blocks.splice(index, 1)[0]);
-        renderBlocks();
-      }
-    })));
-    head.appendChild(iconButton('arrow_downward', 'Move down', stop(() => {
-      if (index < blocks.length - 1) {
-        blocks.splice(index + 1, 0, blocks.splice(index, 1)[0]);
-        renderBlocks();
-      }
-    })));
-    head.appendChild(iconButton('bookmark', 'Save as template (under the block name)', stop(() => saveBlockTemplate(b))));
-    head.appendChild(iconButton('delete', 'Remove block', stop(() => {
-      blocks.splice(index, 1);
-      delete state.expandedBlocks[b._key];
-      renderBlocks();
-    })));
-    card.appendChild(head);
-
+    const head = blockCardHead(b, index);
+    card.appendChild(head.node);
     if (!open) {
       return card;
     }
 
+    const refreshHead = () => {
+      head.titleBox.firstChild.textContent = b.Name || 'Untitled block';
+      head.titleBox.lastChild.textContent = blockSummary(b);
+      renderBlockWarnings();
+      renderWeekGrid();
+    };
     const p = 'tvsBlk' + index + '_';
     const body = el('div', { className: 'tvs-card-body' });
-    body.innerHTML =
-      '<div class="tvs-grid2">' +
+    body.innerHTML = blockCardBodyHtml(p);
+    const q = id => body.querySelector('#' + p + id);
+    wireBlockFields(body, b, q, refreshHead);
+    wireBlockRecurrence(body, b, q, refreshHead);
+    sourcesPicker(body.querySelector('.tvs-block-picker'), () => b.Sources, {
+      onAdd: source => { b.Sources.push(source); refreshHead(); },
+      onRemove: i => { b.Sources.splice(i, 1); refreshHead(); }
+    });
+
+    card.appendChild(body);
+    return card;
+  }
+
+  /** The always-visible head of a block card: name and summary (click to expand), move, save as template, remove. */
+  function blockCardHead(b, index) {
+    const titleBox = el('div', { className: 'title' }, [
+      el('div', { className: 'name tvs-ellipsis', text: b.Name || 'Untitled block' }),
+      el('div', { className: 'tvs-secondary tvs-ellipsis', text: blockSummary(b) })
+    ]);
+    const node = el('div', { className: 'tvs-card-head' }, [
+      el('span', { className: 'material-icons expand_more', 'aria-hidden': 'true' }),
+      titleBox
+    ]);
+    node.addEventListener('click', () => {
+      state.expandedBlocks[b._key] = !state.expandedBlocks[b._key];
+      renderBlocks();
+    });
+    // The buttons sit inside the clickable head, so their clicks must not also toggle the card.
+    const stop = fn => ev => {
+      ev.stopPropagation();
+      fn();
+    };
+    const buttons = reorderButtons(state.draft.Slots.Blocks, index, renderBlocks, {
+      wrap: stop,
+      removeTitle: 'Remove block',
+      onRemove: () => { delete state.expandedBlocks[b._key]; }
+    });
+    appendChildren(node, [
+      buttons.up,
+      buttons.down,
+      iconButton('bookmark', 'Save as template (under the block name)', stop(() => saveBlockTemplate(b))),
+      buttons.remove
+    ]);
+    return { node: node, titleBox: titleBox };
+  }
+
+  /** The form inside an open block card; every id starts with the card's prefix `p`. */
+  function blockCardBodyHtml(p) {
+    return '<div class="tvs-grid2">' +
         inputHtml(p + 'name', 'Block name', 'text', {}, 'Shown as the source label in the guide preview; for a weather block, its guide title (empty = the Weather section\'s guide title).') +
-        selectHtml(p + 'kind', 'What plays', [['Content', 'Programs from the sources below'], ['Weather', 'Local weather – the station\'s weather screens']], 'A weather block needs places in the Weather section, which appears while one exists.') +
+        selectHtml(p + 'kind', 'What plays', [['Content', 'Programs from the sources below'], ['Weather', 'Local weather – the station\'s weather screens']], 'A weather block shows a weather channel\'s places, look and music; pick the channel in the Weather section, which appears while such a block exists.') +
         inputHtml(p + 'start', 'Start time (station local)', 'time', { step: 60 }) +
         inputHtml(p + 'dur', 'Duration (minutes)', 'number', { min: 1, max: 1440, step: 1 }) +
         inputHtml(p + 'every', 'Repeat every (minutes; 0 = once)', 'number', { min: 0, max: 1440, step: 5 }, 'Each repeat has the full duration. "Local weather at the top of the hour" is a 5-minute weather block at 06:00 repeating every 60 minutes until 23:00.') +
@@ -2950,8 +3073,10 @@
         '<div class="tvs-days-label">Content</div>' +
         '<div class="tvs-block-picker"></div>' +
       '</div>';
+  }
 
-    const q = id => body.querySelector('#' + p + id);
+  /** Name, kind, times, play order and the other plain fields of a block card. */
+  function wireBlockFields(body, b, q, refreshHead) {
     q('name').value = b.Name || '';
     q('start').value = b.StartLocal || '';
     q('dur').value = b.DurationMinutes;
@@ -2970,19 +3095,24 @@
       refreshHead();
       updateWeatherPanel();
     });
-    q('every').addEventListener('input', () => { b.RepeatEveryMinutes = Math.min(1440, Math.max(0, parseInt(q('every').value, 10) || 0)); refreshHead(); });
+    q('every').addEventListener('input', () => { b.RepeatEveryMinutes = clampTo(q('every').value, LIMITS.blockRepeatEveryMinutes); refreshHead(); });
     q('until').addEventListener('change', () => { b.RepeatUntilLocal = parseHm(q('until').value) === null ? '' : q('until').value; refreshHead(); });
+    q('name').addEventListener('input', () => { b.Name = q('name').value; refreshHead(); });
+    q('start').addEventListener('change', () => { b.StartLocal = q('start').value; refreshHead(); });
+    q('dur').addEventListener('input', () => { b.DurationMinutes = parseInt(q('dur').value, 10) || 0; refreshHead(); });
+    q('order').addEventListener('change', () => { b.Order = q('order').value; });
+    q('overflow').addEventListener('change', () => { b.Overflow = q('overflow').value; });
+    q('overrun').addEventListener('change', () => { b.RemainderMayOverrun = q('overrun').checked; });
+    q('delay').addEventListener('input', () => { b.MaxStartDelayMinutes = clampTo(q('delay').value, LIMITS.blockStartDelayMinutes); });
+  }
+
+  /** When a block occurs: the repeat rule, its interval, weeks of the month, dates and days. */
+  function wireBlockRecurrence(body, b, q, refreshHead) {
     normalizeRecurrence(b);
     q('rec').value = b.Recurrence;
     q('interval').value = b.IntervalWeeks;
     q('recstart').value = b.RecurrenceStart;
 
-    const refreshHead = () => {
-      titleBox.firstChild.textContent = b.Name || 'Untitled block';
-      titleBox.lastChild.textContent = blockSummary(b);
-      renderBlockWarnings();
-      renderWeekGrid();
-    };
     const showRecurrencePanels = () => {
       $all('[data-rec]', body).forEach(panel => show(panel, panel.getAttribute('data-rec') === b.Recurrence));
       show(body.querySelector('[data-rec-days]'), b.Recurrence !== 'Dates');
@@ -3016,7 +3146,11 @@
       showRecurrencePanels();
       refreshHead();
     });
-    q('interval').addEventListener('input', () => { b.IntervalWeeks = Math.min(52, Math.max(1, parseInt(q('interval').value, 10) || 1)); refreshHead(); });
+    // While typing, an emptied box counts as every week (1); a loaded block without a value gets the default (2).
+    q('interval').addEventListener('input', () => {
+      b.IntervalWeeks = clampInt(q('interval').value, LIMITS.blockIntervalWeeks.min, LIMITS.blockIntervalWeeks.max, 1);
+      refreshHead();
+    });
     q('recstart').addEventListener('change', () => { b.RecurrenceStart = isIsoDate(q('recstart').value) ? q('recstart').value : ''; refreshHead(); });
     const addDate = () => {
       const d = q('date').value;
@@ -3038,57 +3172,58 @@
         addDate();
       }
     });
-    $all('input[data-week]', body).forEach(cb => {
-      const week = parseInt(cb.getAttribute('data-week'), 10);
-      cb.checked = b.WeeksOfMonth.indexOf(week) >= 0;
+    wireCheckSet(body, 'data-week', [1, 2, 3, 4, 5], () => b.WeeksOfMonth, weeks => { b.WeeksOfMonth = weeks; }, refreshHead);
+    wireCheckSet(body, 'data-day', DAYS, () => b.Days || [], days => { b.Days = days; }, refreshHead);
+  }
+
+  /**
+   * Ticks a set of toggle checkboxes (input[attr] inside chip labels) from a list, and writes the list back in
+   * `values` order whenever one changes.
+   */
+  function wireCheckSet(root, attr, values, getList, setList, onChange) {
+    $all('input[' + attr + ']', root).forEach(cb => {
+      const raw = cb.getAttribute(attr);
+      const value = values.find(v => String(v) === raw);
+      cb.checked = getList().indexOf(value) >= 0;
       cb.parentNode.classList.toggle('active', cb.checked);
       cb.addEventListener('change', () => {
-        const set = new Set(b.WeeksOfMonth);
+        const selected = new Set(getList());
         if (cb.checked) {
-          set.add(week);
+          selected.add(value);
         } else {
-          set.delete(week);
+          selected.delete(value);
         }
-        b.WeeksOfMonth = [1, 2, 3, 4, 5].filter(w => set.has(w));
+        setList(values.filter(v => selected.has(v)));
         cb.parentNode.classList.toggle('active', cb.checked);
-        refreshHead();
+        onChange();
       });
     });
-    q('name').addEventListener('input', () => { b.Name = q('name').value; refreshHead(); });
-    q('start').addEventListener('change', () => { b.StartLocal = q('start').value; refreshHead(); });
-    q('dur').addEventListener('input', () => { b.DurationMinutes = parseInt(q('dur').value, 10) || 0; refreshHead(); });
-    q('order').addEventListener('change', () => { b.Order = q('order').value; });
-    q('overflow').addEventListener('change', () => { b.Overflow = q('overflow').value; });
-    q('overrun').addEventListener('change', () => { b.RemainderMayOverrun = q('overrun').checked; });
-    q('delay').addEventListener('input', () => { b.MaxStartDelayMinutes = Math.min(240, Math.max(0, parseInt(q('delay').value, 10) || 0)); });
+  }
 
-    $all('input[data-day]', body).forEach(cb => {
-      const day = cb.getAttribute('data-day');
-      cb.checked = (b.Days || []).indexOf(day) >= 0;
-      cb.parentNode.classList.toggle('active', cb.checked);
-      cb.addEventListener('change', () => {
-        const set = new Set(b.Days || []);
-        if (cb.checked) {
-          set.add(day);
-        } else {
-          set.delete(day);
+  /**
+   * Up / down / remove buttons for a row of an ordered list; each change re-renders the list. `opts` may set the
+   * button titles, wrap the click handlers (e.g. to stop propagation) and add an onRemove step.
+   */
+  function reorderButtons(list, index, rerender, opts) {
+    const o = opts || {};
+    const wrap = o.wrap || (fn => fn);
+    const moveTo = target => wrap(() => {
+      if (target >= 0 && target < list.length) {
+        list.splice(target, 0, list.splice(index, 1)[0]);
+        rerender();
+      }
+    });
+    return {
+      up: iconButton('arrow_upward', o.upTitle || 'Move up', moveTo(index - 1)),
+      down: iconButton('arrow_downward', o.downTitle || 'Move down', moveTo(index + 1)),
+      remove: iconButton('delete', o.removeTitle || 'Remove', wrap(() => {
+        list.splice(index, 1);
+        if (o.onRemove) {
+          o.onRemove();
         }
-        b.Days = DAYS.filter(d => set.has(d));
-        cb.parentNode.classList.toggle('active', cb.checked);
-        refreshHead();
-      });
-    });
-
-    createPicker({
-      container: body.querySelector('.tvs-block-picker'),
-      mode: 'sources',
-      getSources: () => b.Sources,
-      onAdd: source => { b.Sources.push(source); refreshHead(); },
-      onRemove: i => { b.Sources.splice(i, 1); refreshHead(); }
-    });
-
-    card.appendChild(body);
-    return card;
+        rerender();
+      }))
+    };
   }
 
   /** Finds blocks whose weekly occurrences overlap (wrapping across midnight and the week end). */
@@ -3101,10 +3236,7 @@
       if (start === null || dur <= 0) {
         return;
       }
-      const days = b.Recurrence === 'Dates'
-        ? (b.Dates || []).map(d => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d); return m ? DAYS[(new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10)).getDay() + 6) % 7] : null; }).filter((d, i, a) => d && a.indexOf(d) === i)
-        : (b.Days || []);
-      days.forEach(day => {
+      blockDays(b).forEach(day => {
         const di = DAYS.indexOf(day);
         if (di >= 0) {
           occurrences.push({ bi: bi, day: day, start: di * 1440 + start, end: di * 1440 + start + dur });
@@ -3146,7 +3278,7 @@
     const blocks = state.draft.Slots.Blocks;
     const warnings = computeBlockOverlaps(blocks);
     blocks.forEach((b, i) => {
-      const label = b.Name ? '“' + b.Name + '”' : 'Block ' + (i + 1);
+      const label = blockLabel(b, i);
       if (b.Recurrence === 'Dates') {
         if (!(b.Dates || []).length) {
           warnings.push(label + ' has no dates and will never air.');
@@ -3161,10 +3293,9 @@
         warnings.push(label + ' has no content and will play ' + betweenBlocksName() + ' instead.');
       }
     });
-    if (!warnings.length) {
-      return;
+    if (warnings.length) {
+      renderWarnList(box, null, warnings);
     }
-    box.appendChild(el('div', { className: 'tvs-warn' }, el('ul', null, warnings.map(w => el('li', { text: w })))));
   }
 
   // ------------------------------------------------------------------------------------------
@@ -3191,26 +3322,25 @@
   }
 
   function blockFromTemplate(t) {
-    const block = {
-      _key: 'b' + (++state.blockSeq),
+    return normalizeBlock({
       Name: t.Name || '',
       Days: (t.Days || []).slice(),
-      StartLocal: t.StartLocal || '20:00',
+      StartLocal: t.StartLocal,
       DurationMinutes: parseInt(t.DurationMinutes, 10) || 60,
       Sources: JSON.parse(JSON.stringify(t.Sources || [])),
-      Order: t.Order || 'Sequential',
-      Overflow: t.Overflow || 'FillerRemainder',
-      RemainderMayOverrun: !!t.RemainderMayOverrun,
-      MaxStartDelayMinutes: Math.min(240, Math.max(0, parseInt(t.MaxStartDelayMinutes, 10) || 0)),
+      Order: t.Order,
+      Overflow: t.Overflow,
+      RemainderMayOverrun: t.RemainderMayOverrun,
+      MaxStartDelayMinutes: t.MaxStartDelayMinutes,
+      Kind: t.Kind,
+      RepeatEveryMinutes: t.RepeatEveryMinutes,
+      RepeatUntilLocal: t.RepeatUntilLocal,
       Recurrence: t.Recurrence,
       IntervalWeeks: t.IntervalWeeks,
       RecurrenceStart: t.RecurrenceStart,
       WeeksOfMonth: (t.WeeksOfMonth || []).slice(),
       Dates: (t.Dates || []).slice()
-    };
-    normalizeRecurrence(block);
-    block.Sources.forEach(normalizeSource);
-    return block;
+    });
   }
 
   function saveBlockTemplate(b) {
@@ -3228,43 +3358,40 @@
     }).catch(err => alertErrors(err, 'Could not save template'));
   }
 
-  function renderSettingsStationTemplates(templates) {
-    const list = clear($('#tvsStationTemplateList'));
-    show($('#tvsStationTemplateEmpty'), !templates.length);
-    templates.forEach(t => {
-      const row = el('div', { className: 'listItem' }, [
-        el('span', { className: 'material-icons listItemIcon ' + (t.Icon || TEMPLATE_DEFAULT_ICON), 'aria-hidden': 'true' }),
-        el('div', { className: 'listItemBody two-line' }, [
-          el('div', { className: 'listItemBodyText', text: t.Name }),
-          el('div', { className: 'listItemBodyText secondary', text: t.Description || templateSummary(t) })
-        ])
-      ]);
-      row.appendChild(iconButton('delete', 'Delete template', () => {
-        api('DELETE', 'StationTemplates/' + t.Id).then(() => {
-          state.settings.StationTemplates = (state.settings.StationTemplates || []).filter(x => x.Id !== t.Id);
-          renderSettingsStationTemplates(state.settings.StationTemplates);
-          toast('Template deleted.');
-        }).catch(err => alertErrors(err, 'Could not delete template'));
-      }));
-      list.appendChild(row);
-    });
-  }
+  /** The two template lists in Settings, keyed by their GlobalSettings property (which is also their API path). */
+  const TEMPLATE_LISTS = {
+    StationTemplates: {
+      list: '#tvsStationTemplateList',
+      empty: '#tvsStationTemplateEmpty',
+      icon: t => t.Icon || TEMPLATE_DEFAULT_ICON,
+      summary: t => t.Description || templateSummary(t),
+      emptyResponse: false
+    },
+    BlockTemplates: {
+      list: '#tvsTemplateList',
+      empty: '#tvsTemplateEmpty',
+      icon: () => 'bookmark',
+      summary: t => blockSummary(t) + ' · ' + (t.Order || 'Sequential'),
+      emptyResponse: true
+    }
+  };
 
-  function renderSettingsTemplates(templates) {
-    const list = clear($('#tvsTemplateList'));
-    show($('#tvsTemplateEmpty'), !templates.length);
+  function renderTemplateRows(key, templates) {
+    const config = TEMPLATE_LISTS[key];
+    const list = clear($(config.list));
+    show($(config.empty), !templates.length);
     templates.forEach(t => {
       const row = el('div', { className: 'listItem' }, [
-        el('span', { className: 'material-icons listItemIcon bookmark', 'aria-hidden': 'true' }),
+        el('span', { className: 'material-icons listItemIcon ' + config.icon(t), 'aria-hidden': 'true' }),
         el('div', { className: 'listItemBody two-line' }, [
           el('div', { className: 'listItemBodyText', text: t.Name }),
-          el('div', { className: 'listItemBodyText secondary', text: blockSummary(t) + ' · ' + (t.Order || 'Sequential') })
+          el('div', { className: 'listItemBodyText secondary', text: config.summary(t) })
         ])
       ]);
       row.appendChild(iconButton('delete', 'Delete template', () => {
-        api('DELETE', 'BlockTemplates/' + t.Id, null, null, true).then(() => {
-          state.settings.BlockTemplates = (state.settings.BlockTemplates || []).filter(x => x.Id !== t.Id);
-          renderSettingsTemplates(state.settings.BlockTemplates);
+        api('DELETE', key + '/' + t.Id, null, null, config.emptyResponse).then(() => {
+          state.settings[key] = (state.settings[key] || []).filter(x => x.Id !== t.Id);
+          renderTemplateRows(key, state.settings[key]);
           toast('Template deleted.');
         }).catch(err => alertErrors(err, 'Could not delete template'));
       }));
@@ -3277,13 +3404,17 @@
   // ------------------------------------------------------------------------------------------
 
   function openSuggestions(refresh) {
-    loading(true);
-    api('GET', 'Suggestions', null, suggestQuery(refresh)).then(list => {
-      state.suggestions = Array.isArray(list) ? list : [];
+    withBusy('Could not build suggestions', () => fetchSuggestions(refresh).then(() => {
       show($('#tvsSuggestWelcome'), state.stations.length === 0);
       renderSuggestions();
       showView('suggest');
-    }).catch(err => alertErrors(err, 'Could not build suggestions')).then(() => loading(false));
+    }));
+  }
+
+  function fetchSuggestions(refresh) {
+    return api('GET', 'Suggestions', null, suggestQuery(refresh)).then(list => {
+      state.suggestions = Array.isArray(list) ? list : [];
+    });
   }
 
   /** Query for the suggestions endpoint: optional re-scan and the lowered thresholds for small libraries. */
@@ -3342,19 +3473,18 @@
     if (!keys.length) {
       return;
     }
-    loading(true);
     const q = suggestQuery(false);
-    api('POST', 'Suggestions/Create', { Keys: keys, TimeZoneId: guessTimeZone(), MinHours: q.minHours || null, MinEpisodes: q.minEpisodes || null }).then(res => {
+    const body = { Keys: keys, TimeZoneId: guessTimeZone(), MinHours: q.minHours || null, MinEpisodes: q.minEpisodes || null };
+    withBusy('Could not create stations', () => api('POST', 'Suggestions/Create', body).then(res => {
       const parts = [];
       if (res.Created.length) { parts.push('created ' + res.Created.length); }
       if (res.Errors.length) { parts.push(res.Errors.length + ' failed'); }
       toast('Suggestions: ' + (parts.join(', ') || 'nothing to do') + '.');
-      return loadStations().then(() => api('GET', 'Suggestions', null, suggestQuery(false))).then(list => {
-        state.suggestions = Array.isArray(list) ? list : [];
+      return loadStations().then(() => fetchSuggestions(false)).then(() => {
         renderSuggestions();
         renderErrorBox($('#tvsSuggestError'), res.Errors.length ? res.Errors : null);
       });
-    }).catch(err => alertErrors(err, 'Could not create stations')).then(() => loading(false));
+    }));
   }
 
   // ------------------------------------------------------------------------------------------
@@ -3362,20 +3492,15 @@
   // ------------------------------------------------------------------------------------------
 
   function openCoverage(refresh) {
-    loading(true);
     const q = { includeDisabled: checked('#tvsCoverageDisabled') };
     if (refresh) {
       q.refresh = true;
     }
-    api('GET', 'Library/Coverage', null, q).then(c => {
+    withBusy('Could not compare the library with the channels', () => api('GET', 'Library/Coverage', null, q).then(c => {
       state.coverage = c;
       renderCoverage();
       showView('coverage');
-    }).catch(err => alertErrors(err, 'Could not compare the library with the channels')).then(() => loading(false));
-  }
-
-  function plural(n, word) {
-    return n + ' ' + word + (n === 1 ? '' : 's');
+    }));
   }
 
   function renderCoverage() {
@@ -3471,7 +3596,7 @@
     const current = select.value;
     clear(select);
     select.appendChild(el('option', { value: '', text: state.stations.length ? 'Choose a channel…' : 'No channels yet' }));
-    state.stations.forEach(s => select.appendChild(el('option', { value: s.Id, text: (s.ChannelNumber ? s.ChannelNumber + ' ' : '') + s.Name })));
+    state.stations.forEach(s => select.appendChild(el('option', { value: s.Id, text: channelLabel(s) })));
     select.value = current;
     updateCoverageCount();
   }
@@ -3499,15 +3624,13 @@
     if (!sources.length) {
       return;
     }
-    openEditor(null, {
-      name: null,
-      apply: d => {
-        d.Pool.Sources = sources;
-        d.PaddingByLength = true;
-        d.PaddingGridMinutes = 0;
-      }
-    });
-    toast(plural(sources.length, 'title') + ' added; name the channel and save.');
+    const draft = newDraft();
+    draft.Pool.Sources = sources;
+    draft.PaddingByLength = true;
+    draft.PaddingGridMinutes = 0;
+    state.detail = null;
+    withBusy('Could not open station', () => openEditorWith(draft, null, null, null)
+      .then(() => toast(plural(sources.length, 'title') + ' added; name the channel and save.')));
   }
 
   /** Appends the ticked titles to an existing station: its pool, its filler (Slots) or its lineup (Lineup). */
@@ -3517,8 +3640,7 @@
     if (!sources.length || !id) {
       return;
     }
-    loading(true);
-    api('GET', 'Stations/' + id).then(detail => {
+    withBusy('Could not add to the channel', () => api('GET', 'Stations/' + id).then(detail => {
       const s = detail.Station;
       let added = 0;
       if (s.Mode === 'Lineup') {
@@ -3548,7 +3670,7 @@
         toast(plural(added, 'title') + ' added to ' + s.Name + '.');
         return loadStations().then(() => openCoverage(false));
       });
-    }).catch(err => alertErrors(err, 'Could not add to the channel')).then(() => loading(false));
+    }));
   }
 
   // ------------------------------------------------------------------------------------------
@@ -3580,28 +3702,16 @@
       } else {
         unknown++;
       }
+      const buttons = reorderButtons(items, index, renderLineup);
       const row = el('div', { className: 'listItem' }, [
         el('div', { className: 'tvs-index', text: String(index + 1) }),
         el('div', { className: 'listItemBody two-line' }, [
           el('div', { className: 'listItemBodyText tvs-ellipsis', text: item.DisplayName || item.ItemId }),
           el('div', { className: 'listItemBodyText secondary', text: typeof seconds === 'number' ? fmtDur(seconds) : (seconds === undefined ? 'Loading runtime…' : 'Runtime unknown') })
         ]),
-        iconButton('arrow_upward', 'Move up', () => {
-          if (index > 0) {
-            items.splice(index - 1, 0, items.splice(index, 1)[0]);
-            renderLineup();
-          }
-        }),
-        iconButton('arrow_downward', 'Move down', () => {
-          if (index < items.length - 1) {
-            items.splice(index + 1, 0, items.splice(index, 1)[0]);
-            renderLineup();
-          }
-        }),
-        iconButton('delete', 'Remove', () => {
-          items.splice(index, 1);
-          renderLineup();
-        })
+        buttons.up,
+        buttons.down,
+        buttons.remove
       ]);
       list.appendChild(row);
     });
@@ -3611,7 +3721,7 @@
       totalBox.textContent = '';
       return;
     }
-    let text = items.length + ' item' + (items.length === 1 ? '' : 's') + ' · loop length ' + fmtDur(total);
+    let text = plural(items.length, 'item') + ' · loop length ' + fmtDur(total);
     if (paddingGridMinutes() > 0) {
       text += ' before padding';
     }
@@ -3664,34 +3774,76 @@
 
   const pickerCache = { genres: null, tags: null, libraries: null };
 
-  function loadTags() {
-    if (pickerCache.tags) {
-      return Promise.resolve(pickerCache.tags);
+  /** A library list the picker needs, fetched once per page load. */
+  function cachedList(key, path) {
+    if (pickerCache[key]) {
+      return Promise.resolve(pickerCache[key]);
     }
-    return api('GET', 'Library/Tags').then(list => {
-      pickerCache.tags = Array.isArray(list) ? list : [];
-      return pickerCache.tags;
+    return api('GET', path).then(list => {
+      pickerCache[key] = Array.isArray(list) ? list : [];
+      return pickerCache[key];
     });
   }
 
-  function loadGenres() {
-    if (pickerCache.genres) {
-      return Promise.resolve(pickerCache.genres);
-    }
-    return api('GET', 'Library/Genres').then(list => {
-      pickerCache.genres = Array.isArray(list) ? list : [];
-      return pickerCache.genres;
-    });
+  /** Library names (genres, tags, libraries) whose name contains the lower-cased query. */
+  function filterByName(list, qLower) {
+    return list.filter(x => !qLower || String(x.Name).toLowerCase().indexOf(qLower) >= 0);
   }
 
-  function loadLibraries() {
-    if (pickerCache.libraries) {
-      return Promise.resolve(pickerCache.libraries);
+  /** A sources picker over a list of the draft; `getList` is called each time so it follows the current draft. */
+  function sourcesPicker(container, getList, extra) {
+    createPicker(Object.assign({
+      container: container,
+      mode: 'sources',
+      getSources: getList,
+      onAdd: source => getList().push(source),
+      onRemove: index => getList().splice(index, 1)
+    }, extra));
+  }
+
+  const SPECIAL_PLACEHOLDER = { Genre: 'Filter genres…', Tag: 'Filter tags…', Library: 'Filter libraries…' };
+
+  function thumbIcon(kind) {
+    switch (kind) {
+      case 'Movie': case 'Video': return 'movie';
+      case 'Series': case 'Season': case 'Episode': return 'tv';
+      case 'BoxSet': return 'collections';
+      case 'Playlist': return 'playlist_play';
+      case 'Genre': return 'theater_comedy';
+      case 'Tag': return 'label';
+      case 'Library': return 'folder';
+      case 'Album': return 'album';
+      case 'Artist': return 'person';
+      case 'MusicGenre': return 'music_note';
+      case 'Audio': return 'audiotrack';
+      default: return 'videocam';
     }
-    return api('GET', 'Library/Libraries').then(list => {
-      pickerCache.libraries = Array.isArray(list) ? list : [];
-      return pickerCache.libraries;
+  }
+
+  function toSource(item) {
+    if (item.special === 'Genre') {
+      return { Kind: 'Genre', Genre: item.Name, ItemKinds: [], Weight: 1, DisplayName: item.Name };
+    }
+    if (item.special === 'Tag') {
+      return { Kind: 'Tag', Tag: item.Name, ItemKinds: [], Weight: 1, DisplayName: item.Name };
+    }
+    if (item.special === 'Library') {
+      return { Kind: 'Library', ItemId: item.Id, ItemKinds: [], Weight: 1, DisplayName: item.Name };
+    }
+    return { Kind: mapSourceKind(item.Kind), ItemId: item.Id, ItemKinds: [], Weight: 1, DisplayName: itemDisplayName(item) };
+  }
+
+  /** A toggle chip (kind filter) that works with the mouse and the keyboard. */
+  function kindChip(label, active, onClick) {
+    const chip = el('span', { className: 'tvs-chip toggle' + (active ? ' active' : ''), text: label, role: 'button', tabindex: '0' });
+    chip.addEventListener('click', onClick);
+    chip.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        onClick();
+      }
     });
+    return chip;
   }
 
   function mapSourceKind(itemKind) {
@@ -3715,6 +3867,96 @@
       const list = Array.isArray(children) ? children : [];
       return Promise.all(list.map(c => expandToLeaves(c, depth + 1))).then(groups => [].concat.apply([], groups));
     });
+  }
+
+  /** Inline editor for one source: season range / specials, movies-shows filter, weight; `changed` runs after each edit, `done` closes it. */
+  function renderSourceEditor(source, changed, done) {
+    const box = el('div', { className: 'tvs-source-editor' });
+    const name = source.DisplayName || source.Genre || source.Tag || '';
+    box.appendChild(el('div', { className: 'title', text: 'Tune “' + name + '”' }));
+
+    function numberField(label, value, onChange) {
+      const input = el('input', { type: 'number', min: '1', max: '9999', step: '1', className: 'emby-input', placeholder: 'any' });
+      input.value = value || '';
+      input.addEventListener('change', () => {
+        const n = parseInt(input.value, 10);
+        onChange(n > 0 ? n : null);
+        changed();
+      });
+      return el('label', { className: 'f' }, [el('span', { text: label }), input]);
+    }
+
+    if (source.Kind === 'Series') {
+      box.appendChild(numberField('From season', source.SeasonFrom, n => { source.SeasonFrom = n; }));
+      box.appendChild(numberField('To season', source.SeasonTo, n => { source.SeasonTo = n; }));
+      const specials = el('input', { type: 'checkbox', className: 'emby-checkbox' });
+      specials.checked = !!source.ExcludeSpecials;
+      specials.addEventListener('change', () => { source.ExcludeSpecials = specials.checked; changed(); });
+      box.appendChild(el('label', { className: 'f row' }, [specials, el('span', { text: 'Skip specials (season 0)' })]));
+    }
+
+    if (hasKindFilter(source)) {
+      const select = el('select', { className: 'emby-select' }, [
+        el('option', { value: 'Both', text: 'Movies and shows' }),
+        el('option', { value: 'Movie', text: 'Movies only' }),
+        el('option', { value: 'Episode', text: 'Shows only' })
+      ]);
+      select.value = kindFilterValue(source);
+      select.addEventListener('change', () => {
+        source.ItemKinds = select.value === 'Both' ? [] : [select.value];
+        changed();
+      });
+      box.appendChild(el('label', { className: 'f' }, [el('span', { text: 'Content' }), select]));
+    }
+
+    if (hasTuningFilters(source)) {
+      const rating = el('select', { className: 'emby-select' }, RATING_CHOICES.map(c => el('option', { value: c[0], text: c[1] })));
+      rating.value = RATING_ALIAS[source.MaxRating] || source.MaxRating || '';
+      const unrated = el('input', { type: 'checkbox', className: 'emby-checkbox' });
+      unrated.checked = !!source.AllowUnrated;
+      const unratedLabel = el('label', { className: 'f row' }, [unrated, el('span', { text: 'Allow unrated' })]);
+      unratedLabel.hidden = !source.MaxRating;
+      rating.addEventListener('change', () => {
+        source.MaxRating = rating.value || null;
+        unratedLabel.hidden = !source.MaxRating;
+        changed();
+      });
+      unrated.addEventListener('change', () => { source.AllowUnrated = unrated.checked; changed(); });
+      box.appendChild(el('label', { className: 'f' }, [el('span', { text: 'Max rating' }), rating]));
+      box.appendChild(unratedLabel);
+      box.appendChild(numberField('From year', source.YearFrom, n => { source.YearFrom = n; }));
+      box.appendChild(numberField('To year', source.YearTo, n => { source.YearTo = n; }));
+    }
+
+    // Audio and subtitle tracks for this source's items: an anime series can play in Japanese with English
+    // subtitles burned in while the rest of the station keeps the station's language.
+    const audio = languageSelect(source.AudioLanguage, 'Station default', v => { source.AudioLanguage = v; changed(); });
+    const subs = languageSelect(source.SubtitleLanguage, 'Off', v => { source.SubtitleLanguage = v; onlyIfLabel.hidden = !v; changed(); });
+    const onlyIf = el('input', { type: 'checkbox', className: 'emby-checkbox' });
+    onlyIf.checked = !!source.SubtitlesOnlyIfAudioMissing;
+    onlyIf.addEventListener('change', () => { source.SubtitlesOnlyIfAudioMissing = onlyIf.checked; changed(); });
+    const onlyIfLabel = el('label', { className: 'f row' }, [onlyIf, el('span', { text: 'Only when the audio language is missing' })]);
+    onlyIfLabel.hidden = !source.SubtitleLanguage;
+    box.appendChild(el('label', { className: 'f', title: 'Which audio track to play when a file has more than one' }, [el('span', { text: 'Audio' }), audio.select]));
+    box.appendChild(el('label', { className: 'f', title: 'Subtitles drawn into the picture for every viewer' }, [el('span', { text: 'Subtitles' }), subs.select]));
+    box.appendChild(onlyIfLabel);
+    if (source.ItemId) {
+      api('GET', 'Library/Items/' + source.ItemId + '/Languages').then(found => {
+        if (found && Array.isArray(found.Audio) && found.Audio.length) { audio.fill(found.Audio); }
+        if (found && Array.isArray(found.Subtitles)) { subs.fill(found.Subtitles); }
+      }).catch(() => {});
+    }
+
+    const weight = el('select', { className: 'emby-select', title: 'How often this source appears compared with the others' });
+    for (let w = 1; w <= 10; w++) {
+      weight.appendChild(el('option', { value: String(w), text: w === 1 ? '×1 (normal)' : '×' + w }));
+    }
+    weight.value = String(source.Weight || 1);
+    weight.addEventListener('change', () => { source.Weight = parseInt(weight.value, 10) || 1; changed(); });
+    box.appendChild(el('label', { className: 'f' }, [el('span', { text: 'Weight' }), weight]));
+
+    box.appendChild(el('button', { type: 'button', className: 'raised button-submit emby-button', text: 'Done', onClick: done }));
+    return box;
   }
 
   /**
@@ -3754,18 +3996,6 @@
     container.appendChild(status);
     container.appendChild(results);
 
-    function kindChip(label, active, onClick) {
-      const chip = el('span', { className: 'tvs-chip toggle' + (active ? ' active' : ''), text: label, role: 'button', tabindex: '0' });
-      chip.addEventListener('click', onClick);
-      chip.addEventListener('keydown', ev => {
-        if (ev.key === 'Enter' || ev.key === ' ') {
-          ev.preventDefault();
-          onClick();
-        }
-      });
-      return chip;
-    }
-
     function renderKinds() {
       clear(kindRow);
       itemKinds.forEach(kind => {
@@ -3793,7 +4023,7 @@
             if (filter.special === null) {
               filter.kinds = itemKinds.slice();
             }
-            input.placeholder = filter.special === 'Genre' ? 'Filter genres…' : filter.special === 'Tag' ? 'Filter tags…' : filter.special === 'Library' ? 'Filter libraries…' : 'Search the library…';
+            input.placeholder = SPECIAL_PLACEHOLDER[filter.special] || 'Search the library…';
             renderKinds();
             search();
           }));
@@ -3877,7 +4107,10 @@
         chip.dataset.itemId = source.ItemId || '';
         chips.appendChild(chip);
         if (editing === index) {
-          chips.appendChild(renderSourceEditor(source));
+          chips.appendChild(renderSourceEditor(source, renderChips, () => {
+            editing = -1;
+            renderChips();
+          }));
         }
       });
       const picks = sources.filter(s => (s.Kind === 'Movie' || s.Kind === 'Episode') && s.ItemId).map(s => s.ItemId);
@@ -3892,96 +4125,6 @@
           chip.insertBefore(note, chip.querySelector('button'));
         });
       });
-    }
-
-    /** Inline editor for one source: season range / specials, movies-shows filter, weight. */
-    function renderSourceEditor(source) {
-      const box = el('div', { className: 'tvs-source-editor' });
-      const name = source.DisplayName || source.Genre || source.Tag || '';
-      box.appendChild(el('div', { className: 'title', text: 'Tune “' + name + '”' }));
-
-      function numberField(label, value, onChange) {
-        const input = el('input', { type: 'number', min: '1', max: '9999', step: '1', className: 'emby-input', placeholder: 'any' });
-        input.value = value || '';
-        input.addEventListener('change', () => {
-          const n = parseInt(input.value, 10);
-          onChange(n > 0 ? n : null);
-          renderChips();
-        });
-        return el('label', { className: 'f' }, [el('span', { text: label }), input]);
-      }
-
-      if (source.Kind === 'Series') {
-        box.appendChild(numberField('From season', source.SeasonFrom, n => { source.SeasonFrom = n; }));
-        box.appendChild(numberField('To season', source.SeasonTo, n => { source.SeasonTo = n; }));
-        const specials = el('input', { type: 'checkbox', className: 'emby-checkbox' });
-        specials.checked = !!source.ExcludeSpecials;
-        specials.addEventListener('change', () => { source.ExcludeSpecials = specials.checked; renderChips(); });
-        box.appendChild(el('label', { className: 'f row' }, [specials, el('span', { text: 'Skip specials (season 0)' })]));
-      }
-
-      if (hasKindFilter(source)) {
-        const select = el('select', { className: 'emby-select' }, [
-          el('option', { value: 'Both', text: 'Movies and shows' }),
-          el('option', { value: 'Movie', text: 'Movies only' }),
-          el('option', { value: 'Episode', text: 'Shows only' })
-        ]);
-        select.value = kindFilterValue(source);
-        select.addEventListener('change', () => {
-          source.ItemKinds = select.value === 'Both' ? [] : [select.value];
-          renderChips();
-        });
-        box.appendChild(el('label', { className: 'f' }, [el('span', { text: 'Content' }), select]));
-      }
-
-      if (hasTuningFilters(source)) {
-        const rating = el('select', { className: 'emby-select' }, RATING_CHOICES.map(c => el('option', { value: c[0], text: c[1] })));
-        rating.value = RATING_ALIAS[source.MaxRating] || source.MaxRating || '';
-        const unrated = el('input', { type: 'checkbox', className: 'emby-checkbox' });
-        unrated.checked = !!source.AllowUnrated;
-        const unratedLabel = el('label', { className: 'f row' }, [unrated, el('span', { text: 'Allow unrated' })]);
-        unratedLabel.hidden = !source.MaxRating;
-        rating.addEventListener('change', () => {
-          source.MaxRating = rating.value || null;
-          unratedLabel.hidden = !source.MaxRating;
-          renderChips();
-        });
-        unrated.addEventListener('change', () => { source.AllowUnrated = unrated.checked; renderChips(); });
-        box.appendChild(el('label', { className: 'f' }, [el('span', { text: 'Max rating' }), rating]));
-        box.appendChild(unratedLabel);
-        box.appendChild(numberField('From year', source.YearFrom, n => { source.YearFrom = n; }));
-        box.appendChild(numberField('To year', source.YearTo, n => { source.YearTo = n; }));
-      }
-
-      // Audio and subtitle tracks for this source's items: an anime series can play in Japanese with English
-      // subtitles burned in while the rest of the station keeps the station's language.
-      const audio = languageSelect(source.AudioLanguage, 'Station default', v => { source.AudioLanguage = v; renderChips(); });
-      const subs = languageSelect(source.SubtitleLanguage, 'Off', v => { source.SubtitleLanguage = v; onlyIfLabel.hidden = !v; renderChips(); });
-      const onlyIf = el('input', { type: 'checkbox', className: 'emby-checkbox' });
-      onlyIf.checked = !!source.SubtitlesOnlyIfAudioMissing;
-      onlyIf.addEventListener('change', () => { source.SubtitlesOnlyIfAudioMissing = onlyIf.checked; renderChips(); });
-      const onlyIfLabel = el('label', { className: 'f row' }, [onlyIf, el('span', { text: 'Only when the audio language is missing' })]);
-      onlyIfLabel.hidden = !source.SubtitleLanguage;
-      box.appendChild(el('label', { className: 'f', title: 'Which audio track to play when a file has more than one' }, [el('span', { text: 'Audio' }), audio.select]));
-      box.appendChild(el('label', { className: 'f', title: 'Subtitles drawn into the picture for every viewer' }, [el('span', { text: 'Subtitles' }), subs.select]));
-      box.appendChild(onlyIfLabel);
-      if (source.ItemId) {
-        api('GET', 'Library/Items/' + source.ItemId + '/Languages').then(found => {
-          if (found && Array.isArray(found.Audio) && found.Audio.length) { audio.fill(found.Audio); }
-          if (found && Array.isArray(found.Subtitles)) { subs.fill(found.Subtitles); }
-        }).catch(() => {});
-      }
-
-      const weight = el('select', { className: 'emby-select', title: 'How often this source appears compared with the others' });
-      for (let w = 1; w <= 10; w++) {
-        weight.appendChild(el('option', { value: String(w), text: w === 1 ? '×1 (normal)' : '×' + w }));
-      }
-      weight.value = String(source.Weight || 1);
-      weight.addEventListener('change', () => { source.Weight = parseInt(weight.value, 10) || 1; renderChips(); });
-      box.appendChild(el('label', { className: 'f' }, [el('span', { text: 'Weight' }), weight]));
-
-      box.appendChild(el('button', { type: 'button', className: 'raised button-submit emby-button', text: 'Done', onClick: () => { editing = -1; renderChips(); } }));
-      return box;
     }
 
     function isSelected(candidate) {
@@ -4000,16 +4143,13 @@
       status.textContent = 'Searching…';
       let promise;
       if (filter.special === 'Genre') {
-        promise = loadGenres().then(genres => genres
-          .filter(g => !qLower || String(g.Name).toLowerCase().indexOf(qLower) >= 0)
-          .map(g => ({ special: 'Genre', Id: 'genre:' + g.Name, Name: g.Name, Kind: 'Genre', meta: g.MovieCount + ' movie' + (g.MovieCount === 1 ? '' : 's') + ' · ' + g.EpisodeCount + ' episode' + (g.EpisodeCount === 1 ? '' : 's') })));
+        promise = cachedList('genres', 'Library/Genres').then(genres => filterByName(genres, qLower)
+          .map(g => ({ special: 'Genre', Id: 'genre:' + g.Name, Name: g.Name, Kind: 'Genre', meta: plural(g.MovieCount, 'movie') + ' · ' + plural(g.EpisodeCount, 'episode') })));
       } else if (filter.special === 'Tag') {
-        promise = loadTags().then(tags => tags
-          .filter(t => !qLower || String(t.Name).toLowerCase().indexOf(qLower) >= 0)
-          .map(t => ({ special: 'Tag', Id: 'tag:' + t.Name, Name: t.Name, Kind: 'Tag', meta: t.MovieCount + ' movie' + (t.MovieCount === 1 ? '' : 's') + ' · ' + t.SeriesCount + ' series' })));
+        promise = cachedList('tags', 'Library/Tags').then(tags => filterByName(tags, qLower)
+          .map(t => ({ special: 'Tag', Id: 'tag:' + t.Name, Name: t.Name, Kind: 'Tag', meta: plural(t.MovieCount, 'movie') + ' · ' + t.SeriesCount + ' series' })));
       } else if (filter.special === 'Library') {
-        promise = loadLibraries().then(libs => libs
-          .filter(l => !qLower || String(l.Name).toLowerCase().indexOf(qLower) >= 0)
+        promise = cachedList('libraries', 'Library/Libraries').then(libs => filterByName(libs, qLower)
           .map(l => ({ special: 'Library', Id: l.Id, Name: l.Name, Kind: 'Library', meta: l.CollectionType ? 'Type: ' + l.CollectionType : 'Mixed content' })));
       } else {
         promise = api('GET', 'Library/Search', undefined, { q: q, kinds: filter.kinds.join(','), limit: 50 })
@@ -4042,7 +4182,7 @@
         results.appendChild(el('div', { className: 'tvs-msg', text: searched ? 'No matches.' : '' }));
         return;
       }
-      status.textContent = list.length + ' result' + (list.length === 1 ? '' : 's') + (list.length >= 50 && !filter.special ? ' (showing the first 50 – refine your search)' : '');
+      status.textContent = plural(list.length, 'result') + (list.length >= 50 && !filter.special ? ' (showing the first 50 – refine your search)' : '');
       list.forEach(item => {
         const row = el('div', { className: 'tvs-result' });
         const url = item.special ? null : imageUrl(item);
@@ -4080,36 +4220,6 @@
       });
     }
 
-    function thumbIcon(kind) {
-      switch (kind) {
-        case 'Movie': case 'Video': return 'movie';
-        case 'Series': case 'Season': case 'Episode': return 'tv';
-        case 'BoxSet': return 'collections';
-        case 'Playlist': return 'playlist_play';
-        case 'Genre': return 'theater_comedy';
-        case 'Tag': return 'label';
-        case 'Library': return 'folder';
-        case 'Album': return 'album';
-        case 'Artist': return 'person';
-        case 'MusicGenre': return 'music_note';
-        case 'Audio': return 'audiotrack';
-        default: return 'videocam';
-      }
-    }
-
-    function toSource(item) {
-      if (item.special === 'Genre') {
-        return { Kind: 'Genre', Genre: item.Name, ItemKinds: [], Weight: 1, DisplayName: item.Name };
-      }
-      if (item.special === 'Tag') {
-        return { Kind: 'Tag', Tag: item.Name, ItemKinds: [], Weight: 1, DisplayName: item.Name };
-      }
-      if (item.special === 'Library') {
-        return { Kind: 'Library', ItemId: item.Id, ItemKinds: [], Weight: 1, DisplayName: item.Name };
-      }
-      return { Kind: mapSourceKind(item.Kind), ItemId: item.Id, ItemKinds: [], Weight: 1, DisplayName: itemDisplayName(item) };
-    }
-
     function add(item, button) {
       if (mode === 'sources') {
         const source = toSource(item);
@@ -4128,7 +4238,7 @@
           toast('“' + item.Name + '” contains no playable items.');
         } else {
           opts.onAddItems(leaves);
-          toast('Added ' + leaves.length + ' item' + (leaves.length === 1 ? '' : 's') + ' to the lineup.');
+          toast('Added ' + plural(leaves.length, 'item') + ' to the lineup.');
         }
       }).catch(err => alertErrors(err, 'Could not add items')).then(() => {
         button.disabled = false;
@@ -4151,7 +4261,6 @@
 
     renderKinds();
     renderChips();
-    return { refresh: () => { renderChips(); renderResults(lastResults); } };
   }
 
   // ------------------------------------------------------------------------------------------
@@ -4276,12 +4385,11 @@
   // ------------------------------------------------------------------------------------------
 
   function openSettings() {
-    loading(true);
-    api('GET', 'Settings').then(settings => {
+    withBusy('Could not load settings', () => api('GET', 'Settings').then(settings => {
       state.settings = settings || {};
       renderSettings(state.settings);
       showView('settings');
-    }).catch(err => alertErrors(err, 'Could not load settings')).then(() => loading(false));
+    }));
   }
 
   function renderSettings(s) {
@@ -4301,8 +4409,8 @@
     setChecked('#tvsShowText', s.ShowTextOnSlate !== false);
     setChecked('#tvsShowLogo', s.ShowLogoOnSlate !== false);
     setVal('#tvsGlobalExcludedTags', Array.isArray(s.ExcludedTags) ? s.ExcludedTags.join(', ') : '');
-    renderSettingsTemplates(Array.isArray(s.BlockTemplates) ? s.BlockTemplates : []);
-    renderSettingsStationTemplates(Array.isArray(s.StationTemplates) ? s.StationTemplates : []);
+    renderTemplateRows('BlockTemplates', Array.isArray(s.BlockTemplates) ? s.BlockTemplates : []);
+    renderTemplateRows('StationTemplates', Array.isArray(s.StationTemplates) ? s.StationTemplates : []);
   }
 
   function saveSettings() {
@@ -4343,9 +4451,7 @@
       toast('Settings saved.');
       showView('list');
       return loadStations();
-    }).catch(err => {
-      readErrors(err).then(messages => renderErrorBox(box, messages));
-    }).then(() => loading(false));
+    }).catch(showErrorsIn(box)).then(() => loading(false));
   }
 
   // ------------------------------------------------------------------------------------------
@@ -4388,10 +4494,7 @@
 
   function renderHardware(h) {
     const info = clear($('#tvsHardwareInfo'));
-    const kv = (label, valueNode) => {
-      info.appendChild(el('dt', { text: label }));
-      info.appendChild(el('dd', null, valueNode));
-    };
+    const kv = (label, value) => appendKv(info, label, value);
     const decoderLabel = kind => {
       const found = HW_DECODERS.find(o => o[0] === kind);
       return found ? found[1] : kind;
@@ -4427,7 +4530,7 @@
     clear(stationSelect);
     stationSelect.appendChild(el('option', { value: '', text: 'Any station with a playable file' }));
     state.stations.slice().sort(channelSort).forEach(s => {
-      stationSelect.appendChild(el('option', { value: s.Id, text: (s.ChannelNumber ? s.ChannelNumber + ' ' : '') + s.Name }));
+      stationSelect.appendChild(el('option', { value: s.Id, text: channelLabel(s) }));
     });
     if (keepStation && state.stations.some(s => s.Id === keepStation)) {
       stationSelect.value = keepStation;
@@ -4477,10 +4580,7 @@
       (r.Speed !== null && r.Speed !== undefined ? ' Ran at ' + Number(r.Speed).toFixed(2) + 'x real time.' : '') }));
     (r.Problems || []).forEach(problem => box.appendChild(el('div', { className: 'tvs-problem warn', text: problem })));
     const kv = el('dl', { className: 'tvs-kv' });
-    const add = (label, value) => {
-      kv.appendChild(el('dt', { text: label }));
-      kv.appendChild(el('dd', { text: value }));
-    };
+    const add = (label, value) => appendKv(kv, label, value);
     add('File', r.File || '');
     if (r.SourceVideo) {
       add('Source video', r.SourceVideo);
@@ -4525,9 +4625,7 @@
       renderStatus(results[0] || {});
       renderHealth(results[1] || {});
       $('#tvsStatusUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
-    }).catch(err => {
-      readErrors(err).then(messages => renderErrorBox($('#tvsStatusError'), messages));
-    }).then(() => {
+    }).catch(showErrorsIn($('#tvsStatusError'))).then(() => {
       if (showSpinner) {
         loading(false);
       }
@@ -4543,12 +4641,11 @@
       return;
     }
     const troubled = stations.filter(h => Array.isArray(h.Warnings) && h.Warnings.length);
-    const plural = stations.length === 1 ? '' : 's';
     if (!troubled.length) {
-      box.appendChild(el('div', { className: 'tvs-ok', text: 'âœ“ All ' + stations.length + ' station' + plural + ' look healthy: every source has items, each has a day or more of unique content, and nothing was skipped.' }));
+      box.appendChild(el('div', { className: 'tvs-ok', text: '✓ All ' + plural(stations.length, 'station') + ' look healthy: every source has items, each has a day or more of unique content, and nothing was skipped.' }));
       return;
     }
-    box.appendChild(el('div', { className: 'tvs-secondary', text: troubled.length + ' of ' + stations.length + ' station' + plural + ' need' + (troubled.length === 1 ? 's' : '') + ' attention.' }));
+    box.appendChild(el('div', { className: 'tvs-secondary', text: troubled.length + ' of ' + plural(stations.length, 'station') + ' need' + (troubled.length === 1 ? 's' : '') + ' attention.' }));
     troubled.forEach(h => {
       const head = el('div', { className: 'tvs-health-head' }, [
         el('span', { className: 'tvs-secondary', text: 'Ch ' + (h.ChannelNumber || '?') + '  ' }),
@@ -4572,19 +4669,15 @@
 
   /** Re-scans one station from the Health section and reloads the view. */
   function refreshStationContent(stationId, name) {
-    loading(true);
-    api('POST', 'Stations/' + stationId + '/Recompile').then(result => {
+    withBusy('Refresh content failed', () => api('POST', 'Stations/' + stationId + '/Recompile').then(result => {
       toast((name || 'Station') + ': ' + (result ? result.ItemCount : 0) + ' items after the scan.');
       return loadStatus(false);
-    }).catch(err => alertErrors(err, 'Refresh content failed')).then(() => loading(false));
+    }));
   }
 
   function renderStatus(s) {
     const info = clear($('#tvsStatusInfo'));
-    const kv = (label, valueNode) => {
-      info.appendChild(el('dt', { text: label }));
-      info.appendChild(el('dd', null, valueNode));
-    };
+    const kv = (label, value) => appendKv(info, label, value);
     kv('ffmpeg', [
       el('span', { text: s.FfmpegPath || '(not set)' }),
       ' ',
@@ -4603,10 +4696,7 @@
       return;
     }
     const table = el('table', { className: 'tvs-table' });
-    table.appendChild(el('thead', null, el('tr', null, [
-      el('th', { text: 'Station' }), el('th', { text: 'Viewers' }), el('th', { text: 'Readers' }), el('th', { text: 'Started' }),
-      el('th', { text: 'Streamed' }), el('th', { text: 'PID' }), el('th', { text: 'Now playing' }), el('th', { text: 'Encoder' }), el('th', { text: '' })
-    ])));
+    table.appendChild(tableHead(['Station', 'Viewers', 'Readers', 'Started', 'Streamed', 'PID', 'Now playing', 'Encoder', '']));
     const tbody = el('tbody');
     sessions.forEach(session => {
       const current = session.Current;
@@ -4625,12 +4715,12 @@
       const logCount = (session.RecentLog || []).length;
       const actions = el('td', { className: 'nowrap' }, [
         iconButton('refresh', 'Restart encoder', () => {
-          api('POST', 'Stations/' + session.StationId + '/Stream/Restart', undefined, undefined, true)
+          streamAction(session.StationId, 'Restart')
             .then(() => { toast('Restart requested.'); return loadStatus(false); })
             .catch(err => alertErrors(err, 'Could not restart'));
         }),
         iconButton('stop', 'Stop encoder', () => {
-          api('POST', 'Stations/' + session.StationId + '/Stream/Stop', undefined, undefined, true)
+          streamAction(session.StationId, 'Stop')
             .then(() => { toast('Stop requested.'); return loadStatus(false); })
             .catch(err => alertErrors(err, 'Could not stop'));
         }),
@@ -4754,10 +4844,10 @@
     }));
     w.MusicSources = Array.isArray(w.MusicSources) ? w.MusicSources : [];
     w.MusicSources.forEach(normalizeSource);
-    w.ScreenSeconds = Math.min(60, Math.max(4, parseInt(w.ScreenSeconds, 10) || 10));
-    w.TitleCardSeconds = Math.min(10, Math.max(1, parseInt(w.TitleCardSeconds, 10) || 3));
-    w.GuideEntryMinutes = Math.min(240, Math.max(15, parseInt(w.GuideEntryMinutes, 10) || 60));
-    w.MusicVolumePercent = Math.min(150, Math.max(20, parseInt(w.MusicVolumePercent, 10) || 100));
+    w.ScreenSeconds = clampTo(w.ScreenSeconds, LIMITS.weatherScreenSeconds);
+    w.TitleCardSeconds = clampTo(w.TitleCardSeconds, LIMITS.weatherTitleCardSeconds);
+    w.GuideEntryMinutes = clampTo(w.GuideEntryMinutes, LIMITS.weatherGuideEntryMinutes);
+    w.MusicVolumePercent = clampTo(w.MusicVolumePercent, LIMITS.weatherVolumePercent);
     w.MusicEnabled = w.MusicEnabled !== false;
     w.ShowMusicCredit = w.ShowMusicCredit !== false;
     w.NormalizeMusic = w.NormalizeMusic !== false;
@@ -4779,47 +4869,46 @@
     setChecked('#tvsWeatherClock24', !!w.TwentyFourHourClock);
     setChecked('#tvsWeatherTitleCards', w.ShowTitleCards !== false);
     setVal('#tvsWeatherTitleCardSeconds', w.TitleCardSeconds || 3);
-    show($('#tvsWeatherTitleCardBox'), w.ShowTitleCards !== false);
     setChecked('#tvsWeatherAlerts', w.ShowAlerts !== false);
     setChecked('#tvsWeatherHourly', w.ShowHourly !== false);
     setChecked('#tvsWeatherDaily', w.ShowDaily !== false);
     setChecked('#tvsWeatherRadar', w.ShowRadar !== false);
     setVal('#tvsWeatherRadarZoom', w.RadarZoom || 'State');
-    show($('#tvsWeatherRadarZoomBox'), w.ShowRadar !== false);
     setChecked('#tvsWeatherForecastRadar', w.ShowForecastRadar !== false);
     setVal('#tvsWeatherForecastHours', String(w.ForecastRadarHours || 3));
     setVal('#tvsWeatherForecastStep', String(w.ForecastRadarStepMinutes || 15));
-    show($('#tvsWeatherForecastRadarBox'), w.ShowForecastRadar !== false);
     setChecked('#tvsWeatherTravel', w.ShowTravelCities !== false);
     setChecked('#tvsWeatherLogo', w.ShowLogo !== false);
     setVal('#tvsWeatherGuideTitle', w.GuideTitle || '');
     setChecked('#tvsWeatherMusic', w.MusicEnabled !== false);
-    show($('#tvsWeatherMusicOptions'), w.MusicEnabled !== false);
     setVal('#tvsWeatherMusicFolder', w.MusicFolder || '');
     setVal('#tvsWeatherVolume', w.MusicVolumePercent);
     setChecked('#tvsWeatherCredit', w.ShowMusicCredit !== false);
     setChecked('#tvsWeatherNormalize', w.NormalizeMusic !== false);
     loadMusicPacks();
-    createPicker({
-      container: $('#tvsMusicPicker'),
-      mode: 'sources',
+    sourcesPicker($('#tvsMusicPicker'), () => state.draft.Weather.MusicSources, {
       kinds: MUSIC_KINDS,
       specials: false,
       tune: false,
       placeholder: 'Search playlists, albums, artists, music genres, tracks…',
-      emptyText: 'No music from the library yet. Search below and press Add, or name a folder underneath.',
-      getSources: () => state.draft.Weather.MusicSources,
-      onAdd: source => state.draft.Weather.MusicSources.push(source),
-      onRemove: index => state.draft.Weather.MusicSources.splice(index, 1)
+      emptyText: 'No music from the library yet. Search below and press Add, or name a folder underneath.'
     });
     $('#tvsWeatherSearch').value = '';
     $('#tvsWeatherSearchStatus').textContent = '';
     show($('#tvsWeatherSearchResults'), false);
     show($('#tvsWeatherPreviewImg'), false);
     renderWeatherPlaces();
-    renderWeatherStatus(null);
-    if (!isNewDraft() && state.draft.Mode === 'Weather') {
-      loadWeatherStatus();
+    renderWeatherBorrowers();
+    state.weatherStatusFor = undefined; // updateWeatherPanel (after the mode is set) picks the channel and loads its status
+  }
+
+  /** On a weather channel: which other stations air its weather in a block or in their breaks. */
+  function renderWeatherBorrowers() {
+    const box = clear($('#tvsWeatherBorrowers'));
+    const borrowers = isNewDraft() ? [] : (state.stations || []).filter(s => s.WeatherChannelId === state.draft.Id).sort(channelSort);
+    show(box, borrowers.length > 0);
+    if (borrowers.length) {
+      box.textContent = 'These places also air on ' + borrowers.map(s => s.Name).join(', ') + ' (weather block or breaks), with this look and music.';
     }
   }
 
@@ -4838,28 +4927,17 @@
       const meta = [l.Region, (l.Latitude || l.Longitude) ? l.Latitude.toFixed(2) + ', ' + l.Longitude.toFixed(2) : null, l.TimeZoneId].filter(Boolean).join(' · ');
       body.appendChild(el('div', { className: 'listItemBodyText secondary tvs-ellipsis', text: meta }));
       row.appendChild(body);
-      const actions = el('div', { className: 'tvs-station-actions' });
-      actions.appendChild(iconButton('arrow_upward', 'Earlier in the cycle', () => {
-        if (index > 0) {
-          w.Locations.splice(index - 1, 0, w.Locations.splice(index, 1)[0]);
-          renderWeatherPlaces();
-        }
-      }));
-      actions.appendChild(iconButton('arrow_downward', 'Later in the cycle', () => {
-        if (index < w.Locations.length - 1) {
-          w.Locations.splice(index + 1, 0, w.Locations.splice(index, 1)[0]);
-          renderWeatherPlaces();
-        }
-      }));
-      actions.appendChild(iconButton('delete', 'Remove', () => {
-        w.Locations.splice(index, 1);
-        renderWeatherPlaces();
-      }));
-      row.appendChild(actions);
+      const buttons = reorderButtons(w.Locations, index, renderWeatherPlaces, { upTitle: 'Earlier in the cycle', downTitle: 'Later in the cycle' });
+      row.appendChild(el('div', { className: 'tvs-station-actions' }, [buttons.up, buttons.down, buttons.remove]));
       list.appendChild(row);
     });
+    fillPreviewPlaces(w.Locations);
+  }
+
+  /** The place dropdown of the weather preview: one option per place, by position. */
+  function fillPreviewPlaces(places) {
     const placeSelect = clear($('#tvsWeatherPreviewPlace'));
-    w.Locations.forEach((l, index) => placeSelect.appendChild(el('option', { value: String(index), text: l.Name || ('Place ' + (index + 1)) })));
+    places.forEach((l, index) => placeSelect.appendChild(el('option', { value: String(index), text: l.Name || ('Place ' + (index + 1)) })));
   }
 
   let weatherSearchSeq = 0;
@@ -4882,7 +4960,7 @@
       clear(results);
       show(results, true);
       list = Array.isArray(list) ? list : [];
-      status.textContent = list.length ? list.length + ' place' + (list.length === 1 ? '' : 's') : '';
+      status.textContent = list.length ? plural(list.length, 'place') : '';
       if (!list.length) {
         results.appendChild(el('div', { className: 'tvs-msg', text: 'No places match.' }));
         return;
@@ -4956,14 +5034,14 @@
       const minutes = Math.round((p.TotalSeconds || 0) / 60);
       const meta = [
         p.Artist,
-        p.TrackCount + ' track' + (p.TrackCount === 1 ? '' : 's'),
+        plural(p.TrackCount, 'track'),
         minutes >= 60 ? Math.floor(minutes / 60) + ' h ' + (minutes % 60) + ' min' : minutes + ' min',
         p.TotalBytes ? fmtBytes(p.TotalBytes) : null,
         p.Licence
       ].filter(Boolean).join(' · ');
       body.appendChild(el('div', { className: 'listItemBodyText' }, [
         el('span', { text: p.Name }),
-        p.Installed ? badge(p.Manual ? p.Present + ' file' + (p.Present === 1 ? '' : 's') + ' in place' : 'Installed', 'on') : null,
+        p.Installed ? badge(p.Manual ? plural(p.Present, 'file') + ' in place' : 'Installed', 'on') : null,
         p.Running ? badge('Downloading ' + p.Downloaded + ' / ' + p.TrackCount, 'on') : null,
         !p.Running && p.Error ? badge(p.Error === 'Cancelled.' ? 'Cancelled' : 'Failed', 'warn', p.Error) : null,
         !p.Installed && !p.Running && !p.Error && !p.Manual && p.Present > 0 ? badge(p.Present + ' of ' + p.TrackCount + ' present', 'warn') : null
@@ -5000,7 +5078,7 @@
       }
       row.appendChild(actions);
 
-      const details = el('div', { className: 'tvs-pack-details tvs-secondary' + (p.Manual ? ' tvs-hidden' : ' tvs-hidden'), style: 'flex-basis:100%;padding:.4em 0 .2em 3.8em' });
+      const details = el('div', { className: 'tvs-pack-details tvs-secondary tvs-hidden', style: 'flex-basis:100%;padding:.4em 0 .2em 3.8em' });
       if (p.Manual) {
         details.appendChild(el('div', { text: 'Download the albums (a free account is needed there), then put the audio files into this folder on the server:' }));
         details.appendChild(el('div', null, el('code', { text: p.FolderPath })));
@@ -5022,27 +5100,42 @@
   }
 
   function loadWeatherStatus() {
-    if (isNewDraft()) {
+    const id = weatherStatusStationId();
+    if (!id) {
       return;
     }
-    api('GET', 'Weather/Status/' + state.draft.Id).then(renderWeatherStatus).catch(() => renderWeatherStatus(null));
+    api('GET', 'Weather/Status/' + id).then(status => {
+      if (weatherStatusStationId() === id) { // still the channel on show
+        renderWeatherStatus(status);
+      }
+    }).catch(() => renderWeatherStatus(null));
   }
 
   function renderWeatherStatus(status) {
     const box = clear($('#tvsWeatherStatus'));
-    show($('#tvsWeatherStatusTools'), !isNewDraft());
-    if (isNewDraft()) {
-      box.textContent = 'Save the station to start fetching forecasts.';
+    const id = weatherStatusStationId();
+    const borrowed = formMode() !== 'Weather';
+    show($('#tvsWeatherStatusTools'), !!id);
+    if (!id) {
+      box.textContent = borrowed ? (weatherChannels().length ? 'Pick a weather channel to see its forecasts.' : 'No weather channel yet.') : 'Save the station to start fetching forecasts.';
       return;
     }
     if (!status || !Array.isArray(status.Locations) || !status.Locations.length) {
       box.textContent = 'No forecasts fetched yet.';
       return;
     }
+    if (borrowed) {
+      if (status.StationName) {
+        box.appendChild(el('div', { className: 'tvs-secondary', text: 'The places of ' + status.StationName + ', fetched once for every station that shows them.' }));
+      }
+      // The preview picks among the channel's places (the server counts the placed ones only).
+      fillPreviewPlaces(status.Locations.filter(l => l.Valid));
+    }
     const table = el('table', { className: 'tvs-table' });
-    table.appendChild(el('thead', null, el('tr', null, [el('th', { text: 'Place' }), el('th', { text: 'Now' }), el('th', { text: 'Last fetched' }), el('th', { text: 'Alerts' }), el('th', { text: 'Radar' }), el('th', { text: 'Forecast radar' }), el('th', { text: '' })])));
+    table.appendChild(tableHead(['Place', 'Now', 'Last fetched', 'Alerts', 'Radar', 'Forecast radar', '']));
     const tbody = el('tbody');
-    const metric = state.draft.Weather.Units === 'Metric';
+    const look = borrowed ? status : state.draft.Weather; // a weather channel's own form may be unsaved; a borrowed one is what the server has
+    const metric = look.Units === 'Metric';
     status.Locations.forEach(l => {
       const temp = l.TemperatureC === null || l.TemperatureC === undefined ? '' : (metric ? Math.round(l.TemperatureC) + '°C' : Math.round(l.TemperatureC * 9 / 5 + 32) + '°F');
       const now = temp ? temp + (l.Conditions ? ', ' + l.Conditions.toLowerCase() : '') : '—';
@@ -5059,7 +5152,7 @@
         radar = (l.RadarSource ? l.RadarSource.replace(/ via .*$/, '') : 'Radar') + ', ' + l.RadarFrames + ' frames' + (l.RadarLatestUtc ? ', newest ' + fmtDateTime(l.RadarLatestUtc) : '');
       } else if (l.RadarError) {
         radar = l.RadarError;
-      } else if (state.draft.Weather.ShowRadar === false) {
+      } else if (look.ShowRadar === false) {
         radar = 'off';
       }
       let forecast = '—';
@@ -5067,7 +5160,7 @@
         forecast = (l.ForecastRadarRunUtc ? fmtDateTime(l.ForecastRadarRunUtc) + ' run, ' : '') + l.ForecastRadarFrames + ' frames' + (l.ForecastRadarLatestUtc ? ', out to ' + fmtDateTime(l.ForecastRadarLatestUtc) : '');
       } else if (l.ForecastRadarError) {
         forecast = l.ForecastRadarError;
-      } else if (state.draft.Weather.ShowForecastRadar === false) {
+      } else if (look.ShowForecastRadar === false) {
         forecast = 'off';
       }
       let alerts = '—';
@@ -5075,7 +5168,7 @@
       if (l.AlertCount > 0) {
         alerts = l.AlertSummary || (l.AlertCount + ' active');
         alertTitle = (l.AlertSource || '') + (l.AlertsCheckedUtc ? ', checked ' + fmtDateTime(l.AlertsCheckedUtc) : '');
-      } else if (state.draft.Weather.ShowAlerts === false) {
+      } else if (look.ShowAlerts === false) {
         alerts = 'off';
       } else if (l.AlertsNotCovered) {
         alerts = 'not covered';
@@ -5100,7 +5193,7 @@
     box.appendChild(table);
     if (status.MusicLevelling && status.MusicTracks > 0) {
       const pending = status.MusicTracks - status.MusicLevelled - (status.MusicUnmeasurable || 0);
-      box.appendChild(el('div', { className: 'tvs-secondary', text: 'Music levelling: ' + status.MusicLevelled + ' of ' + status.MusicTracks + ' track' + (status.MusicTracks === 1 ? '' : 's') + ' measured' +
+      box.appendChild(el('div', { className: 'tvs-secondary', text: 'Music levelling: ' + status.MusicLevelled + ' of ' + plural(status.MusicTracks, 'track') + ' measured' +
         (status.MusicUnmeasurable ? ', ' + status.MusicUnmeasurable + ' could not be read (played as recorded)' : '') +
         (pending > 0 ? '; the rest are measured in the background, a few seconds each, and play as recorded meanwhile.' : '.') }));
     }
@@ -5108,49 +5201,150 @@
   }
 
   function refreshWeatherNow() {
-    if (isNewDraft()) {
+    const id = weatherStatusStationId();
+    if (!id) {
       return;
     }
-    loading(true);
-    api('POST', 'Weather/Refresh/' + state.draft.Id).then(status => {
+    withBusy('Could not fetch forecasts', () => api('POST', 'Weather/Refresh/' + id).then(status => {
       renderWeatherStatus(status);
       toast('Forecasts fetched.');
-    }).catch(err => alertErrors(err, 'Could not fetch forecasts')).then(() => loading(false));
+    }));
   }
 
   function previewWeatherScreen() {
-    if (isNewDraft()) {
-      toast('Save the station first.');
+    // An ordinary station previews the weather channel it picked (so an unsaved choice shows; the channel's logo stands in for its own).
+    const id = weatherStatusStationId();
+    if (!id) {
+      toast(formMode() === 'Weather' ? 'Save the station first.' : 'Pick a weather channel first.');
       return;
     }
     const img = $('#tvsWeatherPreviewImg');
     const screen = val('#tvsWeatherPreviewScreen') || 'Current';
     const place = parseInt(val('#tvsWeatherPreviewPlace'), 10) || 0;
-    img.src = ApiClient.getUrl('JellyStations/Weather/Preview/' + state.draft.Id, { screen: screen, location: place, width: 1280, v: Date.now() });
+    img.src = ApiClient.getUrl('JellyStations/Weather/Preview/' + id, { screen: screen, location: place, width: 1280, v: Date.now() });
     img.alt = WEATHER_SCREEN_LABEL[screen] || screen;
     show(img, true);
   }
 
+  function backToList() {
+    showView('list');
+    loadStations();
+  }
+
   function wireHandlers() {
-    // List
+    wireListHandlers();
+    wireSuggestAndCoverageHandlers();
+    wireEditorHandlers();
+    wireSettingsHandlers();
+    wireStatusHandlers();
+  }
+
+  function wireListHandlers() {
     on('#tvsBtnNew', 'click', openPresets);
     on('#tvsBtnEmptyNew', 'click', openPresets);
     on('#tvsBtnEmptySuggest', 'click', () => openSuggestions(false));
     on('#tvsBtnPresetsBack', 'click', () => showView('list'));
+    on('#tvsBtnExport', 'click', exportStations);
+    on('#tvsBtnImport', 'click', () => { $('#tvsImportFile').value = ''; $('#tvsImportFile').click(); });
+    on('#tvsImportFile', 'change', importStationsFromFile);
+    on('#tvsBtnRecompileAll', 'click', recompileAll);
+    on('#tvsBtnRefreshGuide', 'click', refreshGuide);
+    on('#tvsBtnSettings', 'click', openSettings);
+    on('#tvsBtnStatus', 'click', openStatus);
+    on('#tvsBtnSuggest', 'click', () => openSuggestions(false));
+    on('#tvsBtnCoverage', 'click', () => openCoverage(false));
+  }
+
+  function wireSuggestAndCoverageHandlers() {
     on('#tvsBtnSuggestPreset', 'click', openPresets);
-    on('#tvsBumpersEnabled', 'change', () => { show($('#tvsBumperOptions'), checked('#tvsBumpersEnabled')); updateWeatherPanel(); });
-    on('#tvsBumperWeatherEnabled', 'change', () => { show($('#tvsBumperWeatherOptions'), checked('#tvsBumperWeatherEnabled')); updateWeatherPanel(); });
-    on('#tvsPreRollEnabled', 'change', () => show($('#tvsPreRollPicker'), checked('#tvsPreRollEnabled')));
-    on('#tvsPostRollEnabled', 'change', () => show($('#tvsPostRollPicker'), checked('#tvsPostRollEnabled')));
-    on('#tvsBtnContent', 'click', loadContent);
-    on('#tvsContentFilter', 'input', () => renderContent());
-    on('#tvsBtnAddDaypart', 'click', () => {
-      state.draft.Pool.DaypartRules.push({ StartLocal: '06:00', EndLocal: '20:00', MaxRating: 'PG', AllowUnrated: false });
-      renderDaypartRows();
+    on('#tvsBtnSuggestRefresh', 'click', () => openSuggestions(true));
+    on('#tvsSuggestSmall', 'change', () => openSuggestions(false));
+    on('#tvsBtnSuggestBack', 'click', () => showView('list'));
+    on('#tvsBtnSuggestCreate', 'click', createSelectedSuggestions);
+    on('#tvsSuggestList', 'change', updateSuggestCount);
+    on('#tvsBtnCoverageRefresh', 'click', () => openCoverage(true));
+    on('#tvsCoverageDisabled', 'change', () => openCoverage(false));
+    on('#tvsBtnCoverageBack', 'click', () => showView('list'));
+    on('#tvsBtnCoverageNew', 'click', newChannelFromCoverage);
+    on('#tvsBtnCoverageAdd', 'click', addCoverageToStation);
+    on('#tvsCoverageTarget', 'change', updateCoverageCount);
+    on('#tvsCoverageFilter', 'input', renderCoverage);
+  }
+
+  function wireEditorHandlers() {
+    on('#tvsBtnEditorBack', 'click', backToList);
+    on('#tvsBtnCancel', 'click', backToList);
+    on('#tvsBtnSave', 'click', () => saveStation(false));
+    on('#tvsBtnSaveTop', 'click', () => saveStation(false));
+    on('#tvsBtnSaveRefresh', 'click', () => saveStation(true));
+    on('#tvsBtnRecompile', 'click', recompileStation);
+    on('#tvsSteps', 'click', ev => {
+      const button = ev.target.closest ? ev.target.closest('.tvs-step') : null;
+      if (button) {
+        showStep(button.getAttribute('data-step'));
+      }
     });
+    Object.keys(REVEALS).forEach(checkbox => on(checkbox, 'change', () => syncReveal(checkbox)));
+    on('#tvsBumpersEnabled', 'change', updateWeatherPanel);
+    on('#tvsBumperWeatherEnabled', 'change', updateWeatherPanel);
+    on('#tvsMode', 'change', updateModePanels);
+
+    // Name and logo
+    on('#tvsName', 'input', () => {
+      if (!state.draft) {
+        return;
+      }
+      // A fresh color suggestion follows the name (and number, when seeded) until the person picks one.
+      suggestLogoColor();
+      if (!isNewDraft()) {
+        $('#tvsEditorTitle').textContent = 'Edit station – ' + val('#tvsName');
+      }
+    });
+    on('#tvsChannel', 'input', () => { if (state.draft) { suggestLogoColor(); } });
+    on('#tvsBtnGenerateLogo', 'click', generateLogo);
+    on('#tvsBtnLogoAnotherLook', 'click', () => {
+      state.logoLook = (state.logoLook || 0) + 1;
+      generateLogo();
+    });
+    on('#tvsLogoColor', 'input', () => { $('#tvsLogoColor').dataset.picked = '1'; });
+    on('#tvsLogoAutoColor', 'change', () => {
+      writePref('tvsLogoAutoColor', checked('#tvsLogoAutoColor') ? '1' : '0');
+      suggestLogoColor();
+    });
+    on('#tvsLogoFile', 'change', ev => {
+      const file = ev.target.files && ev.target.files[0];
+      if (file) {
+        uploadLogo(file);
+      }
+    });
+    on('#tvsBtnSaveTemplate', 'click', () => renderSaveAsTemplate(true));
+    on('#tvsBtnTemplateCancel', 'click', () => renderSaveAsTemplate(false));
+    on('#tvsBtnTemplateSave', 'click', saveStationTemplate);
+    on('#tvsTemplateName', 'keydown', ev => {
+      if (ev.key === 'Enter') { ev.preventDefault(); saveStationTemplate(); }
+      if (ev.key === 'Escape') { renderSaveAsTemplate(false); }
+    });
+
+    // Schedule anchor, padding, family hours, seasons, blocks
+    on('#tvsAnchor', 'change', updateAnchorHint);
+    on('#tvsAnchor', 'input', updateAnchorHint);
     on('#tvsBtnAnchorNow', 'click', () => {
       setVal('#tvsAnchor', toLocalInputValue(nowOnGrid(paddingGridMinutes()).toISOString()));
       updateAnchorHint();
+    });
+    on('#tvsBtnResetAnchor', 'click', () => {
+      setVal('#tvsAnchor', '');
+      state.draft.AnchorUtc = null;
+      updateAnchorHint();
+    });
+    on('#tvsPadding', 'change', () => {
+      if (state.draft) {
+        renderLineup();
+      }
+    });
+    on('#tvsBtnAddDaypart', 'click', () => {
+      state.draft.Pool.DaypartRules.push({ StartLocal: '06:00', EndLocal: '20:00', MaxRating: 'PG', AllowUnrated: false });
+      renderDaypartRows();
     });
     on('#tvsSeasonPreset', 'change', () => {
       const key = val('#tvsSeasonPreset');
@@ -5164,121 +5358,32 @@
       state.draft.ActiveWindows.push({ Label: '', StartMonth: 12, StartDay: 1, EndMonth: 12, EndDay: 31 });
       renderSeasonRows();
     });
-    on('#tvsBtnExport', 'click', exportStations);
-    on('#tvsBtnImport', 'click', () => { $('#tvsImportFile').value = ''; $('#tvsImportFile').click(); });
-    on('#tvsImportFile', 'change', importStationsFromFile);
-    on('#tvsBtnRecompileAll', 'click', recompileAll);
-    on('#tvsBtnRefreshGuide', 'click', refreshGuide);
-    on('#tvsBtnSettings', 'click', openSettings);
-    on('#tvsBtnStatus', 'click', openStatus);
+    on('#tvsBtnAddBlock', 'click', () => addExpandedBlock(newBlockFromSelectedTemplate()));
 
-    // Editor
-    const backToList = () => {
-      showView('list');
-      loadStations();
-    };
-    on('#tvsBtnEditorBack', 'click', backToList);
-    on('#tvsBtnCancel', 'click', backToList);
-    on('#tvsBtnSave', 'click', () => saveStation(false));
-    on('#tvsBtnSaveTop', 'click', () => saveStation(false));
-    on('#tvsSteps', 'click', ev => {
-      const button = ev.target.closest ? ev.target.closest('.tvs-step') : null;
-      if (button) {
-        showStep(button.getAttribute('data-step'));
-      }
-    });
-    on('#tvsBtnGenerateLogo', 'click', generateLogo);
-    on('#tvsBtnSaveTemplate', 'click', () => renderSaveAsTemplate(true));
-    on('#tvsBtnTemplateCancel', 'click', () => renderSaveAsTemplate(false));
-    on('#tvsBtnTemplateSave', 'click', saveStationTemplate);
-    on('#tvsTemplateName', 'keydown', ev => {
-      if (ev.key === 'Enter') { ev.preventDefault(); saveStationTemplate(); }
-      if (ev.key === 'Escape') { renderSaveAsTemplate(false); }
-    });
-    on('#tvsBtnLogoAnotherLook', 'click', () => {
-      state.logoLook = (state.logoLook || 0) + 1;
-      generateLogo();
-    });
-    // A fresh color suggestion follows the name (and number, when seeded) until the person picks one.
-    on('#tvsName', 'input', () => { if (state.draft) { suggestLogoColor(); } });
-    on('#tvsChannel', 'input', () => { if (state.draft) { suggestLogoColor(); } });
-    on('#tvsLogoColor', 'input', () => { $('#tvsLogoColor').dataset.picked = '1'; });
-    on('#tvsLogoAutoColor', 'change', () => {
-      rememberAutoLogoColor(checked('#tvsLogoAutoColor'));
-      suggestLogoColor();
-    });
-    on('#tvsBtnSaveRefresh', 'click', () => saveStation(true));
-    on('#tvsBtnRecompile', 'click', recompileStation);
-    on('#tvsMode', 'change', updateModePanels);
-    on('#tvsWeatherSearch', 'input', debounce(weatherSearch, 350));
-    on('#tvsWeatherMusic', 'change', () => show($('#tvsWeatherMusicOptions'), checked('#tvsWeatherMusic')));
-    on('#tvsWeatherRadar', 'change', () => show($('#tvsWeatherRadarZoomBox'), checked('#tvsWeatherRadar')));
-    on('#tvsWeatherTitleCards', 'change', () => show($('#tvsWeatherTitleCardBox'), checked('#tvsWeatherTitleCards')));
-    on('#tvsWeatherForecastRadar', 'change', () => show($('#tvsWeatherForecastRadarBox'), checked('#tvsWeatherForecastRadar')));
-    on('#tvsBtnWeatherRefresh', 'click', refreshWeatherNow);
-    on('#tvsBtnWeatherPreview', 'click', previewWeatherScreen);
-    on('#tvsAnchor', 'change', updateAnchorHint);
-    on('#tvsAnchor', 'input', updateAnchorHint);
-    on('#tvsBtnResetAnchor', 'click', () => {
-      setVal('#tvsAnchor', '');
-      state.draft.AnchorUtc = null;
-      updateAnchorHint();
-    });
-    on('#tvsPadding', 'change', () => {
-      if (state.draft) {
-        renderLineup();
-      }
-    });
-    on('#tvsName', 'input', () => {
-      if (state.draft && !isNewDraft()) {
-        $('#tvsEditorTitle').textContent = 'Edit station – ' + val('#tvsName');
-      }
-    });
-    on('#tvsEncodingEnabled', 'change', () => show($('#tvsStationEncoding'), checked('#tvsEncodingEnabled')));
-    on('#tvsOverlayEnabled', 'change', () => show($('#tvsOverlayOptions'), checked('#tvsOverlayEnabled')));
-    on('#tvsUpNextEnabled', 'change', () => show($('#tvsUpNextOptions'), checked('#tvsUpNextEnabled')));
-    on('#tvsBtnAddBlock', 'click', () => {
-      const templateId = val('#tvsBlockTemplateSelect');
-      const template = state.blockTemplates.find(t => t.Id === templateId);
-      const block = template ? blockFromTemplate(template) : newBlock();
-      state.draft.Slots.Blocks.push(block);
-      state.expandedBlocks[block._key] = true;
-      setVal('#tvsBlockTemplateSelect', '');
-      renderBlocks();
-    });
-    on('#tvsBtnSuggest', 'click', () => openSuggestions(false));
-    on('#tvsBtnCoverage', 'click', () => openCoverage(false));
-    on('#tvsBtnCoverageRefresh', 'click', () => openCoverage(true));
-    on('#tvsCoverageDisabled', 'change', () => openCoverage(false));
-    on('#tvsBtnCoverageBack', 'click', () => showView('list'));
-    on('#tvsBtnCoverageNew', 'click', newChannelFromCoverage);
-    on('#tvsBtnCoverageAdd', 'click', addCoverageToStation);
-    on('#tvsCoverageTarget', 'change', updateCoverageCount);
-    on('#tvsCoverageFilter', 'input', renderCoverage);
-    on('#tvsBtnSuggestRefresh', 'click', () => openSuggestions(true));
-    on('#tvsSuggestSmall', 'change', () => openSuggestions(false));
-    on('#tvsBtnSuggestBack', 'click', () => showView('list'));
-    on('#tvsBtnSuggestCreate', 'click', createSelectedSuggestions);
-    on('#tvsSuggestList', 'change', updateSuggestCount);
-    on('#tvsLogoFile', 'change', ev => {
-      const file = ev.target.files && ev.target.files[0];
-      if (file) {
-        uploadLogo(file);
-      }
-    });
+    // Content and previews
+    on('#tvsBtnContent', 'click', loadContent);
+    on('#tvsContentFilter', 'input', () => renderContent());
     $all('.tvs-preview-btn').forEach(button => {
       button.addEventListener('click', () => previewSchedule(parseInt(button.getAttribute('data-hours'), 10) || 24));
     });
 
-    // Settings
+    // Weather
+    on('#tvsWeatherSource', 'change', () => { state.draft.WeatherSourceStationId = val('#tvsWeatherSource') || null; updateWeatherPanel(); });
+    on('#tvsWeatherSearch', 'input', debounce(weatherSearch, 350));
+    on('#tvsBtnWeatherRefresh', 'click', refreshWeatherNow);
+    on('#tvsBtnWeatherPreview', 'click', previewWeatherScreen);
+  }
+
+  function wireSettingsHandlers() {
     on('#tvsBtnSettingsBack', 'click', backToList);
     on('#tvsBtnSettingsCancel', 'click', backToList);
     on('#tvsBtnSettingsSave', 'click', saveSettings);
     on('#tvsSlateColor', 'input', () => {
       $('#tvsSlateColorText').textContent = val('#tvsSlateColor');
     });
+  }
 
-    // Status
+  function wireStatusHandlers() {
     on('#tvsBtnStatusBack', 'click', backToList);
     on('#tvsBtnStatusRefresh', 'click', () => loadStatus(true));
     on('#tvsBtnHwTest', 'click', runHardwareTest);

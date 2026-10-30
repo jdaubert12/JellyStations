@@ -51,12 +51,7 @@ internal static class BumperFill
         public bool IsEmpty => Fill.Count == 0 && PreRoll.Count == 0 && PostRoll.Count == 0 && Weather <= TimeSpan.Zero;
 
         public static Clips From(ScheduleInput input) => new(input.Bumpers, input.PreRoll, input.PostRoll, input.WeatherBreak, input.WeatherBreakFirst, input.WeatherLabel);
-
-        public static Clips FillOnly(IReadOnlyList<PlayableItem> fill) => new(fill, Array.Empty<PlayableItem>(), Array.Empty<PlayableItem>());
     }
-
-    public static List<Piece> Plan(long gapTicks, IReadOnlyList<PlayableItem> clips, ulong seed)
-        => Plan(gapTicks, Clips.FillOnly(clips), seed);
 
     /// <param name="gapTicks">Length of the gap.</param>
     /// <param name="clips">What may be placed.</param>
@@ -177,9 +172,6 @@ internal static class BumperFill
     }
 
     /// <summary>Replaces every slate entry in a laid-out list with its planned clips plus any card remainder.</summary>
-    public static List<ScheduleEntry> Expand(List<ScheduleEntry> entries, IReadOnlyList<PlayableItem> clips, Func<ScheduleEntry, ulong> seed)
-        => Expand(entries, Clips.FillOnly(clips), seed);
-
     public static List<ScheduleEntry> Expand(List<ScheduleEntry> entries, Clips clips, Func<ScheduleEntry, ulong> seed)
     {
         if (clips.IsEmpty)

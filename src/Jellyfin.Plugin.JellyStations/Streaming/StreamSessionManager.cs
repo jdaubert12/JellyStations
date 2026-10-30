@@ -54,14 +54,11 @@ public sealed class StreamSessionManager : IDisposable
         _watchdog = new System.Threading.Timer(_ => SweepUnreadSessions(), null, WatchdogInterval, WatchdogInterval);
     }
 
-    public string FfmpegPath
-    {
-        get
-        {
-            var o = _settings.Get().FfmpegPathOverride;
-            return string.IsNullOrWhiteSpace(o) ? _mediaEncoder.EncoderPath : o;
-        }
-    }
+    public string FfmpegPath => ResolveFfmpegPath(_settings.Get().FfmpegPathOverride, _mediaEncoder.EncoderPath);
+
+    /// <summary>The ffmpeg to run: the settings override when there is one, else Jellyfin's own.</summary>
+    public static string ResolveFfmpegPath(string? overridePath, string jellyfinEncoderPath)
+        => string.IsNullOrWhiteSpace(overridePath) ? jellyfinEncoderPath : overridePath;
 
     public IReadOnlyCollection<StationStreamSession> Sessions => _sessions.Values.ToList();
 
@@ -80,11 +77,7 @@ public sealed class StreamSessionManager : IDisposable
         var created = false;
         try
         {
-            if (_lingers.TryRemove(station.Id, out var linger))
-            {
-                linger.Cancel();
-                linger.Dispose();
-            }
+            CancelLinger(station.Id);
 
             if (!_sessions.TryGetValue(station.Id, out session!) || session.IsDisposed)
             {
@@ -326,13 +319,19 @@ public sealed class StreamSessionManager : IDisposable
         });
     }
 
-    private void Remove(Guid stationId)
+    /// <summary>Stops a pending linger (the delayed stop after the last consumer left), if there is one.</summary>
+    private void CancelLinger(Guid stationId)
     {
         if (_lingers.TryRemove(stationId, out var linger))
         {
             linger.Cancel();
             linger.Dispose();
         }
+    }
+
+    private void Remove(Guid stationId)
+    {
+        CancelLinger(stationId);
 
         if (_sessions.TryRemove(stationId, out var session))
         {
@@ -365,6 +364,7 @@ public sealed class StreamSessionManager : IDisposable
     public static MediaSourceInfo BuildMediaSource(Station station, EncodingProfile profile)
     {
         var hdr = profile.IsHdrOutput;
+        var color = FfmpegArgsBuilder.OutputColor(hdr);
         var hevc = profile.IsHevcEncoder;
         // HEVC levels as ffprobe reports them (4.1 = 123, 5.1 = 153); H.264 "4.1" as 41.
         var level = hevc
@@ -416,9 +416,9 @@ public sealed class StreamSessionManager : IDisposable
                     Level = level,
                     PixelFormat = hdr ? "yuv420p10le" : "yuv420p",
                     BitDepth = hdr ? 10 : 8,
-                    ColorPrimaries = hdr ? "bt2020" : "bt709",
-                    ColorTransfer = hdr ? "smpte2084" : "bt709",
-                    ColorSpace = hdr ? "bt2020nc" : "bt709",
+                    ColorPrimaries = color.Primaries,
+                    ColorTransfer = color.Transfer,
+                    ColorSpace = color.Matrix,
                     ColorRange = "tv"
                 },
                 new()

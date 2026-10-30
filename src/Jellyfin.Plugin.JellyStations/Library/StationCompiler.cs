@@ -36,28 +36,24 @@ public sealed class StationCompiler
             compiled.Excluded,
             tags,
             compiled.TagExcluded,
-            (source, found, kept, alreadyListed) => compiled.Sources.Add(new SourceExpansion
-            {
-                Section = section,
-                Label = SourceExpansion.Describe(source),
-                Kind = source.Kind,
-                Found = found,
-                Kept = kept,
-                AlreadyListed = alreadyListed
-            }));
+            (source, found, kept, alreadyListed) => compiled.Sources.Add(SourceExpansion.For(section, source, found, kept, alreadyListed)));
+
+        // Programs: expanded, minus the station's excluded items, minus anything under the minimum runtime.
+        List<PlayableItem> Programs(List<ContentSource> sources, string section)
+            => DropShort(ApplyExclusions(Expand(sources, section), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
+
         void CompileBlocks()
         {
             foreach (var block in station.Slots.Blocks)
             {
-                var section = string.IsNullOrWhiteSpace(block.Name) ? "Block" : block.Name;
-                compiled.Blocks[block.Id] = DropShort(ApplyExclusions(Expand(block.Sources, section), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
+                compiled.Blocks[block.Id] = Programs(block.Sources, string.IsNullOrWhiteSpace(block.Name) ? "Block" : block.Name);
             }
         }
 
         switch (station.Mode)
         {
             case ScheduleMode.Pool:
-                compiled.Pool = DropShort(ApplyExclusions(Expand(station.Pool.Sources, "Pool"), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
+                compiled.Pool = Programs(station.Pool.Sources, "Pool");
                 CompileBlocks();
                 break;
 
@@ -75,31 +71,36 @@ public sealed class StationCompiler
 
             case ScheduleMode.Slots:
                 CompileBlocks();
-                compiled.Filler = DropShort(ApplyExclusions(Expand(station.Slots.Filler.Sources, "Filler"), excludedIds, compiled), station.MinRuntimeMinutes, compiled);
+                compiled.Filler = Programs(station.Slots.Filler.Sources, "Filler");
                 break;
 
             case ScheduleMode.Weather:
                 break;
         }
 
-        if (_music is not null && station.UsesWeather && station.Weather.MusicEnabled)
+        // Only a weather channel compiles music; an ordinary station's weather block or breaks play the channel's.
+        if (_music is not null && station.Mode == ScheduleMode.Weather && station.Weather.MusicEnabled)
         {
             compiled.Music = _music.Expand(station.Weather, compiled.Sources, compiled.Excluded);
         }
 
-        if (station.Bumpers?.Enabled == true && station.Bumpers.Sources.Count > 0)
-        {
-            var maxTicks = TimeSpan.FromMinutes(Math.Max(1, station.Bumpers.MaxClipMinutes)).Ticks;
-            compiled.Bumpers = ApplyExclusions(Expand(station.Bumpers.Sources, "Bumpers"), excludedIds, compiled)
-                .Where(i => i.RuntimeTicks > 0 && i.RuntimeTicks <= maxTicks)
-                .ToList();
-        }
-
         if (station.Bumpers?.Enabled == true)
         {
+            // Clips: expanded, minus the station's excluded items, kept only when they have a runtime within the clip cap.
             var maxTicks = TimeSpan.FromMinutes(Math.Max(1, station.Bumpers.MaxClipMinutes)).Ticks;
-            compiled.PreRoll = CompileRoll(station.Bumpers.PreRoll, compiled.Bumpers, maxTicks, s => Expand(s, "Pre-roll"), excludedIds, compiled);
-            compiled.PostRoll = CompileRoll(station.Bumpers.PostRoll, compiled.Bumpers, maxTicks, s => Expand(s, "Post-roll"), excludedIds, compiled);
+            List<PlayableItem> Clips(List<ContentSource> sources, string section)
+                => ApplyExclusions(Expand(sources, section), excludedIds, compiled)
+                    .Where(i => i.RuntimeTicks > 0 && i.RuntimeTicks <= maxTicks)
+                    .ToList();
+
+            // Bumpers first: a roll without sources of its own copies them.
+            if (station.Bumpers.Sources.Count > 0)
+            {
+                compiled.Bumpers = Clips(station.Bumpers.Sources, "Bumpers");
+            }
+
+            compiled.PreRoll = CompileRoll(station.Bumpers.PreRoll, compiled.Bumpers, s => Clips(s, "Pre-roll"));
+            compiled.PostRoll = CompileRoll(station.Bumpers.PostRoll, compiled.Bumpers, s => Clips(s, "Post-roll"));
         }
 
         // Same item may be excluded via several sources; report once.
@@ -120,21 +121,14 @@ public sealed class StationCompiler
     }
 
     /// <summary>The clips for a pre/post-roll position: its own sources when it has any, otherwise the main bumper list.</summary>
-    private static List<PlayableItem> CompileRoll(BumperRollConfig? roll, List<PlayableItem> bumpers, long maxTicks, Func<List<ContentSource>, List<PlayableItem>> expand, HashSet<Guid> excludedIds, CompiledStation compiled)
+    private static List<PlayableItem> CompileRoll(BumperRollConfig? roll, List<PlayableItem> bumpers, Func<List<ContentSource>, List<PlayableItem>> clips)
     {
         if (roll?.Enabled != true)
         {
             return new List<PlayableItem>();
         }
 
-        if (roll.Sources.Count == 0)
-        {
-            return bumpers.ToList();
-        }
-
-        return ApplyExclusions(expand(roll.Sources), excludedIds, compiled)
-            .Where(i => i.RuntimeTicks > 0 && i.RuntimeTicks <= maxTicks)
-            .ToList();
+        return roll.Sources.Count == 0 ? bumpers.ToList() : clips(roll.Sources);
     }
 
     /// <summary>The station's own excluded tags plus the global list when the station has not opted out.</summary>
@@ -232,7 +226,7 @@ public sealed class StationCompiler
             }
         }
 
-        return a.Pool.Concat(a.Lineup).Concat(a.Filler).Concat(a.Blocks.Values.SelectMany(x => x)).Select(i => i.RuntimeTicks)
-            .SequenceEqual(b.Pool.Concat(b.Lineup).Concat(b.Filler).Concat(b.Blocks.Values.SelectMany(x => x)).Select(i => i.RuntimeTicks));
+        // Every section's ids already match, so comparing the runtimes in one sequence is aligned item by item.
+        return a.ProgramItems.Select(i => i.RuntimeTicks).SequenceEqual(b.ProgramItems.Select(i => i.RuntimeTicks));
     }
 }

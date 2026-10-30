@@ -14,10 +14,13 @@ public class BumperFillTests
         return new List<PlayableItem> { ident, Items.Movie("Trailer 2m", 2), Items.Movie("Promo 1m", 1), Items.Movie("Long 4m", 4) };
     }
 
+    /// <summary>Fill clips only: no pre- or post-roll, no weather.</summary>
+    private static BumperFill.Clips FillOnly(IReadOnlyList<PlayableItem> fill) => new(fill, Array.Empty<PlayableItem>(), Array.Empty<PlayableItem>());
+
     [Fact]
     public void Plan_PlacesOnlyClipsThatFit_EachAtMostOnce_ThenCardRemainder()
     {
-        var clips = Clips();
+        var clips = FillOnly(Clips());
         var gap = TimeSpan.FromMinutes(3).Ticks;
         var pieces = BumperFill.Plan(gap, clips, 42UL);
 
@@ -37,12 +40,12 @@ public class BumperFillTests
     [Fact]
     public void Plan_IsDeterministic_AndEmptyClipsGiveOneCard()
     {
-        var clips = Clips();
+        var clips = FillOnly(Clips());
         var a = BumperFill.Plan(TimeSpan.FromMinutes(5).Ticks, clips, 7UL);
         var b = BumperFill.Plan(TimeSpan.FromMinutes(5).Ticks, clips, 7UL);
         Assert.Equal(a.Select(p => p.Clip?.ItemId), b.Select(p => p.Clip?.ItemId));
 
-        var none = BumperFill.Plan(TimeSpan.FromMinutes(5).Ticks, Array.Empty<PlayableItem>(), 7UL);
+        var none = BumperFill.Plan(TimeSpan.FromMinutes(5).Ticks, FillOnly(Array.Empty<PlayableItem>()), 7UL);
         Assert.Single(none);
         Assert.Null(none[0].Clip);
     }

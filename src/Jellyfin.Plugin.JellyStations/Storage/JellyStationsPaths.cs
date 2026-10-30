@@ -94,7 +94,30 @@ public sealed class JellyStationsPaths
 
     public string CompiledFile(Guid id) => Path.Combine(CompiledDir, id.ToString("N") + ".json");
 
-    public string LogoFile(string fileName) => Path.Combine(LogosDir, fileName);
+    /// <summary>
+    /// The on-disk path of a logo, or null when <paramref name="fileName"/> is not a bare file name inside the
+    /// logos folder. The name is stored on the station, so a crafted import must not be able to point it elsewhere.
+    /// </summary>
+    public string? LogoFile(string fileName) => ChildFile(LogosDir, fileName);
+
+    /// <summary>Joins a bare file name onto a directory, or returns null when the name would escape it.</summary>
+    internal static string? ChildFile(string dir, string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName) || fileName is "." or "..")
+        {
+            return null;
+        }
+
+        if (Path.GetFileName(fileName) != fileName || fileName.IndexOfAny(new[] { '/', '\\' }) >= 0 || Path.IsPathRooted(fileName))
+        {
+            return null;
+        }
+
+        var root = Path.GetFullPath(dir);
+        var full = Path.GetFullPath(Path.Combine(root, fileName));
+        var prefix = root.EndsWith(Path.DirectorySeparatorChar) ? root : root + Path.DirectorySeparatorChar;
+        return full.StartsWith(prefix, StringComparison.Ordinal) && full.Length > prefix.Length ? full : null;
+    }
 
     public void EnsureDirectories()
     {

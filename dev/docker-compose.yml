@@ -3,7 +3,9 @@ services:
     image: jellyfin/jellyfin:12.2
     container_name: jellystations-jf
     ports:
-      - "8096:8096"
+      # Loopback only: the dev server is set up by script with a generated admin password and must not be reachable
+      # from the rest of the network.
+      - "127.0.0.1:8096:8096"
     volumes:
       - ./config:/config
       - ./cache:/cache

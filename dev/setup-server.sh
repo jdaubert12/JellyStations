@@ -1,11 +1,25 @@
 #!/usr/bin/env bash
-# Completes the Jellyfin first-run wizard on the local test container, creates an admin user
-# (admin / admin), adds the Movies and Shows libraries pointing at /media, and waits for the scan.
-# Writes the admin API token to dev/.token for ad-hoc curl calls.
+# Completes the Jellyfin first-run wizard on the local test container, creates an admin user ("admin" with a
+# generated password kept in dev/.password), adds the Movies and Shows libraries pointing at /media, and waits
+# for the scan. Writes the admin API token to dev/.token for ad-hoc curl calls. Both files are git-ignored.
 set -euo pipefail
 BASE="${JF_URL:-http://localhost:8096}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 AUTH='Authorization: MediaBrowser Client="jellystations-dev", Device="dev", DeviceId="jellystations-dev-1", Version="1.0"'
+
+# One password per checkout: generated on the first run, reused afterwards so the token can be refreshed.
+PW_FILE="$HERE/.password"
+if [ ! -s "$PW_FILE" ]; then
+  umask 077
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 16 > "$PW_FILE"
+  else
+    head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$PW_FILE"
+  fi
+  echo "Generated admin password in dev/.password"
+fi
+chmod 600 "$PW_FILE" 2>/dev/null || true
+PASSWORD="$(tr -d '\r\n' < "$PW_FILE")"
 
 echo "Waiting for $BASE ..."
 for i in $(seq 1 90); do
@@ -20,16 +34,18 @@ if [ "$wizard" != "true" ]; then
   curl -sf -X POST "$BASE/Startup/Configuration" -H "$AUTH" -H 'Content-Type: application/json' \
     -d '{"UICulture":"en-US","MetadataCountryCode":"US","PreferredMetadataLanguage":"en"}'
   curl -sf "$BASE/Startup/User" -H "$AUTH" >/dev/null
-  curl -sf -X POST "$BASE/Startup/User" -H "$AUTH" -H 'Content-Type: application/json' -d '{"Name":"admin","Password":"admin"}'
-  curl -sf -X POST "$BASE/Startup/RemoteAccess" -H "$AUTH" -H 'Content-Type: application/json' -d '{"EnableRemoteAccess":true,"EnableAutomaticPortMapping":false}'
+  curl -sf -X POST "$BASE/Startup/User" -H "$AUTH" -H 'Content-Type: application/json' -d "{\"Name\":\"admin\",\"Password\":\"$PASSWORD\"}"
+  curl -sf -X POST "$BASE/Startup/RemoteAccess" -H "$AUTH" -H 'Content-Type: application/json' -d '{"EnableRemoteAccess":false,"EnableAutomaticPortMapping":false}'
   curl -sf -X POST "$BASE/Startup/Complete" -H "$AUTH"
   echo "Wizard complete"
 fi
 
 TOKEN=$(curl -sf -X POST "$BASE/Users/AuthenticateByName" -H "$AUTH" -H 'Content-Type: application/json' \
-  -d '{"Username":"admin","Pw":"admin"}' | grep -o '"AccessToken":"[^"]*"' | cut -d'"' -f4)
-[ -n "$TOKEN" ] || { echo "login failed"; exit 1; }
+  -d "{\"Username\":\"admin\",\"Pw\":\"$PASSWORD\"}" | grep -o '"AccessToken":"[^"]*"' | cut -d'"' -f4)
+[ -n "$TOKEN" ] || { echo "login failed (an existing server set up before dev/.password existed keeps its old password; reset dev/config to start over)"; exit 1; }
+umask 077
 echo "$TOKEN" > "$HERE/.token"
+chmod 600 "$HERE/.token" 2>/dev/null || true
 H="Authorization: MediaBrowser Client=\"jellystations-dev\", Device=\"dev\", DeviceId=\"jellystations-dev-1\", Version=\"1.0\", Token=\"$TOKEN\""
 
 have=$(curl -sf "$BASE/Library/VirtualFolders" -H "$H")
@@ -50,4 +66,4 @@ for i in $(seq 1 60); do
   if [ "${count:-0}" -ge 8 ]; then echo "Library has $count videos"; break; fi
   sleep 3
 done
-echo "Token saved to dev/.token"
+echo "Token saved to dev/.token; sign in to http://localhost:8096 as admin with the password in dev/.password"

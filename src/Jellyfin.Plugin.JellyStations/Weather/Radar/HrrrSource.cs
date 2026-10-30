@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Net;
 using Microsoft.Extensions.Logging;
-using SkiaSharp;
 
 namespace Jellyfin.Plugin.JellyStations.Weather.Radar;
 
@@ -115,45 +114,12 @@ public sealed class HrrrSource : IForecastRadarSource
 
     public async Task<byte[]> FetchOverlayAsync(RadarViewport viewport, DateTime runUtc, int forecastMinute, CancellationToken ct)
     {
-        using var bitmap = new SKBitmap(viewport.DataWidth, viewport.DataHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bitmap);
-        canvas.Clear(SKColors.Transparent);
-        var failed = 0;
-        var total = 0;
-        Exception? lastError = null;
-        foreach (var (x, y, ox, oy) in viewport.Tiles())
-        {
-            total++;
-            try
-            {
-                var png = await _http.GetPngAsync(TileUrl(runUtc, forecastMinute, viewport.DataZoom, x, y), ct).ConfigureAwait(false);
-                using var tile = SKBitmap.Decode(png);
-                if (tile is not null)
-                {
-                    canvas.DrawBitmap(tile, ox, oy);
-                }
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                failed++;
-                lastError = ex;
-                _logger.LogDebug(ex, "JellyStations radar: HRRR tile {Layer} {Z}/{X}/{Y} failed", LayerName(runUtc, forecastMinute), viewport.DataZoom, x, y);
-            }
-        }
-
-        if (total > 0 && failed == total)
-        {
-            throw new InvalidOperationException("No HRRR tile could be fetched for forecast minute " + forecastMinute + (lastError is null ? string.Empty : ": " + lastError.Message));
-        }
-
-        canvas.Flush();
-        using var image = SKImage.FromBitmap(bitmap);
-        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-        return data.ToArray();
+        var (png, lastError) = await _http.StitchTilesAsync(
+            viewport,
+            (x, y) => TileUrl(runUtc, forecastMinute, viewport.DataZoom, x, y),
+            (ex, x, y) => _logger.LogDebug(ex, "JellyStations radar: HRRR tile {Layer} {Z}/{X}/{Y} failed", LayerName(runUtc, forecastMinute), viewport.DataZoom, x, y),
+            ct).ConfigureAwait(false);
+        return png ?? throw new InvalidOperationException("No HRRR tile could be fetched for forecast minute " + forecastMinute + (lastError is null ? string.Empty : ": " + lastError.Message));
     }
 
     private async Task<bool> ExistsAsync(string url, CancellationToken ct)

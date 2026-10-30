@@ -80,6 +80,9 @@ public class WeatherArgsTests
         var args = FfmpegArgsBuilder.ForWeather(Segment(music: false), TimeSpan.Zero, Profile());
 
         Assert.Contains("anullsrc=r=48000:cl=stereo", args);
+        // The silence is cut to the segment at its input: -t sits between -f lavfi and -i.
+        var silence = args.IndexOf("anullsrc=r=48000:cl=stereo");
+        Assert.Equal(new[] { "-f", "lavfi", "-t", "30.000", "-i" }, args.Skip(silence - 5).Take(5));
         Assert.Equal("3:a", args[args.IndexOf("-map", args.IndexOf("[v]")) + 1]);
         Assert.Contains("-af", args);
         Assert.DoesNotContain("concat=", Filter(args));

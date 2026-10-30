@@ -1,7 +1,5 @@
 using System.Globalization;
 using System.Net;
-using System.Net.Http.Headers;
-using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -74,43 +72,21 @@ public sealed partial class NwsAlertSource : IAlertSource
     public async Task<IReadOnlyList<WeatherAlert>> FetchAsync(WeatherLocation location, CancellationToken ct)
     {
         var url = BuildUrl(location.Latitude, location.Longitude);
-        using var client = _http.CreateClient("JellyStations.Weather");
-        client.Timeout = TimeSpan.FromSeconds(20);
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.UserAgent.Clear();
-        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Jellyfin-JellyStations", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0"));
-        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("(+https://github.com/jdaubert12/JellyStations)"));
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/geo+json"));
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
+        var reply = await WeatherHttp.GetStringAsync(_http, "JellyStations.Weather", TimeSpan.FromSeconds(20), url, ct, "application/geo+json", "application/json").ConfigureAwait(false);
+        if (!reply.IsSuccessStatusCode)
         {
-            var detail = TryReadDetail(body) ?? response.ReasonPhrase ?? string.Empty;
-            if (response.StatusCode == HttpStatusCode.BadRequest && detail.Contains("out of bounds", StringComparison.OrdinalIgnoreCase))
+            var detail = WeatherHttp.TryReadJsonString(reply.Body, "detail") ?? reply.ReasonPhrase ?? string.Empty;
+            if (reply.StatusCode == HttpStatusCode.BadRequest && detail.Contains("out of bounds", StringComparison.OrdinalIgnoreCase))
             {
                 throw new NotCoveredException("The National Weather Service does not cover this place");
             }
 
-            throw new HttpRequestException($"The National Weather Service answered {(int)response.StatusCode} {detail}".Trim(), null, response.StatusCode);
+            throw new HttpRequestException($"The National Weather Service answered {(int)reply.StatusCode} {detail}".Trim(), null, reply.StatusCode);
         }
 
-        var alerts = Parse(body);
+        var alerts = Parse(reply.Body);
         _logger.LogDebug("JellyStations alerts: {Place} has {Count} alert(s) from the NWS", location.Name, alerts.Count);
         return alerts;
-    }
-
-    private static string? TryReadDetail(string body)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(body);
-            return doc.RootElement.TryGetProperty("detail", out var d) ? d.GetString() : null;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
     }
 
     /// <summary>
@@ -134,25 +110,25 @@ public sealed partial class NwsAlertSource : IAlertSource
                 continue;
             }
 
-            var status = Str(p, "status");
+            var status = p.StringOrNull("status");
             if (!string.Equals(status, "Actual", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            var messageType = Str(p, "messageType");
+            var messageType = p.StringOrNull("messageType");
             if (string.Equals(messageType, "Cancel", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            var id = Str(p, "id") ?? string.Empty;
+            var id = p.StringOrNull("id") ?? string.Empty;
             if (id.Length > 0 && !seen.Add(id))
             {
                 continue;
             }
 
-            var ev = Str(p, "event") ?? string.Empty;
+            var ev = p.StringOrNull("event") ?? string.Empty;
             if (ev.Length == 0)
             {
                 continue;
@@ -162,14 +138,14 @@ public sealed partial class NwsAlertSource : IAlertSource
             {
                 Id = id,
                 Event = ev,
-                Headline = Str(p, "headline") ?? ev,
-                Description = Tidy(Str(p, "description")),
-                Instruction = Tidy(Str(p, "instruction")),
-                Severity = Str(p, "severity"),
-                Urgency = Str(p, "urgency"),
-                Certainty = Str(p, "certainty"),
-                Sender = Str(p, "senderName"),
-                Area = Str(p, "areaDesc"),
+                Headline = p.StringOrNull("headline") ?? ev,
+                Description = Tidy(p.StringOrNull("description")),
+                Instruction = Tidy(p.StringOrNull("instruction")),
+                Severity = p.StringOrNull("severity"),
+                Urgency = p.StringOrNull("urgency"),
+                Certainty = p.StringOrNull("certainty"),
+                Sender = p.StringOrNull("senderName"),
+                Area = p.StringOrNull("areaDesc"),
                 SentUtc = Time(p, "sent"),
                 StartUtc = Time(p, "onset") ?? Time(p, "effective"),
                 EndUtc = Time(p, "ends"),
@@ -241,13 +217,10 @@ public sealed partial class NwsAlertSource : IAlertSource
     [GeneratedRegex(@"^\*\s*([A-Za-z][A-Za-z ]{1,30}?)\.\.\.\s*")]
     private static partial Regex BulletHeading();
 
-    private static string? Str(JsonElement e, string name)
-        => e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
-
     /// <summary>NWS times carry an offset ("2026-10-27T16:00:00-08:00"); stored as UTC.</summary>
     private static DateTime? Time(JsonElement e, string name)
     {
-        var s = Str(e, name);
+        var s = e.StringOrNull(name);
         if (string.IsNullOrEmpty(s))
         {
             return null;

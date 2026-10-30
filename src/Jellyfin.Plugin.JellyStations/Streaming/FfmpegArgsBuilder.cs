@@ -55,14 +55,14 @@ public static partial class FfmpegArgsBuilder
         public string CardStreamEnd => N(Windows.Max(w => w.To));
 
         /// <summary>The overlay filter's enable expression: on while t is inside any window.</summary>
-        public string EnableExpression => string.Join("+", Windows.Select(w => "between(t," + N(w.From) + "," + N(w.To) + ")"));
+        public string EnableExpression => string.Join("+", Windows.Select(w => Between(w.From, w.To)));
 
         /// <summary>
         /// 0 while the card is fully in place, rising to 1 at the very start and end of each window: the fraction of
         /// the card still off screen. Evaluated per frame by the overlay filter (its x expression).
         /// </summary>
         public string SlideExpression => string.Join("+", Windows.Select(w =>
-            "between(t," + N(w.From) + "," + N(w.To) + ")*max(max(0,1-(t-" + N(w.From) + ")/" + N(AnimationSeconds) + "),max(0,1-(" + N(w.To) + "-t)/" + N(AnimationSeconds) + "))"));
+            Between(w.From, w.To) + "*max(max(0,1-(t-" + N(w.From) + ")/" + N(AnimationSeconds) + "),max(0,1-(" + N(w.To) + "-t)/" + N(AnimationSeconds) + "))"));
 
         /// <summary>
         /// sendcmd commands that drive the card's alpha (a colorchannelmixer instance named "fade"): up over the first
@@ -71,8 +71,6 @@ public static partial class FfmpegArgsBuilder
         public string FadeCommands => string.Join(";", Windows.Select(w =>
             N(w.From) + "-" + N(w.From + AnimationSeconds) + " [expr] colorchannelmixer@fade aa TI, [leave] colorchannelmixer@fade aa 1;"
             + N(w.To - AnimationSeconds) + "-" + N(w.To) + " [expr] colorchannelmixer@fade aa 1-TI, [leave] colorchannelmixer@fade aa 0"));
-
-        private static string N(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
     }
 
     /// <summary>Arguments to play an item's (first) file from an offset, normalized to the profile, as real-time MPEG-TS on stdout.</summary>
@@ -88,25 +86,12 @@ public static partial class FfmpegArgsBuilder
     {
         var args = new List<string>();
         Common(args);
-        HardwareInputArgs(args, p, decode: true, videoCodec);
-        AddSplit(args, p.ExtraInputArgs);
-
-        if (seek > TimeSpan.FromMilliseconds(500))
-        {
-            args.Add("-ss");
-            args.Add(Sec(seek));
-        }
-
-        args.Add("-i");
-        args.Add(path);
+        AddSourceInput(args, p, path, seek, videoCodec);
 
         var needSilence = !hasAudio;
         if (needSilence)
         {
-            args.Add("-f");
-            args.Add("lavfi");
-            args.Add("-i");
-            args.Add("anullsrc=r=48000:cl=stereo");
+            AddSilenceInput(args);
         }
 
         var nextIndex = needSilence ? 2 : 1;
@@ -140,38 +125,19 @@ public static partial class FfmpegArgsBuilder
 
         var audioMap = needSilence ? "1:a:0" : "0:a:" + (audioStreamIndex ?? 0).ToString(CultureInfo.InvariantCulture) + "?";
         // Input seeking (-ss before -i) is only applied past half a second; the subtitle file keeps the file's own clock.
-        var subtitleSeek = seek > TimeSpan.FromMilliseconds(500) ? seek : TimeSpan.Zero;
+        var subtitleSeek = seek > InputSeekThreshold ? seek : TimeSpan.Zero;
         if (overlay is null && upNext is null && subtitles?.IsBitmap != true)
         {
-            args.Add("-map");
-            args.Add("0:v:0");
-            args.Add("-map");
-            args.Add(audioMap);
-            args.Add("-vf");
-            args.Add(VideoFilter(p, hdrTransfer, subtitles, subtitleSeek) + EncoderUploadSuffix(p));
+            AddFilteredStreams(args, "0:v:0", audioMap, VideoFilter(p, hdrTransfer, subtitles, subtitleSeek) + EncoderUploadSuffix(p));
         }
         else
         {
-            args.Add("-filter_complex");
-            args.Add(ComposeFilter(p, hdrTransfer, overlay, logoIndex, upNext, cardIndex, subtitles, subtitleSeek));
-            args.Add("-map");
-            args.Add("[v]");
-            args.Add("-map");
-            args.Add(audioMap);
-            if (!p.IsVaapiEncoder)
-            {
-                args.Add("-pix_fmt");
-                args.Add(OutputPixelFormat(p));
-            }
+            AddGraphStreams(args, p, ComposeFilter(p, hdrTransfer, overlay, logoIndex, upNext, cardIndex, subtitles, subtitleSeek), "v", audioMap);
         }
 
         Output(args, p, tsOffset);
         return args;
     }
-
-    /// <summary>Normalized video with the logo scaled, faded and pinned to a corner with a small margin.</summary>
-    public static string OverlayFilter(EncodingProfile p, LogoOverlayInput overlay, int logoIndex, string? hdrTransfer = null)
-        => ComposeFilter(p, hdrTransfer, overlay, logoIndex, null, -1);
 
     /// <summary>
     /// Normalized video with, in order, the logo bug and the "Up next" card drawn over it. The card is a finished
@@ -336,10 +302,7 @@ public static partial class FfmpegArgsBuilder
         args.Add("lavfi");
         args.Add("-i");
         args.Add($"color=c={NormalizeColor(background)}:s={p.Width}x{p.Height}:r={p.Fps}");
-        args.Add("-f");
-        args.Add("lavfi");
-        args.Add("-i");
-        args.Add("anullsrc=r=48000:cl=stereo");
+        AddSilenceInput(args);
 
         var hasLogo = !string.IsNullOrEmpty(logoPath) && File.Exists(logoPath);
         if (hasLogo)
@@ -376,34 +339,11 @@ public static partial class FfmpegArgsBuilder
         if (filter.Length > 0)
         {
             filter.Append(CultureInfo.InvariantCulture, $";[{videoLabel}]{SdrGraphToOutput(p)}{EncoderUploadSuffix(p)}[v2]");
-            videoLabel = "v2";
-        }
-
-        if (filter.Length > 0)
-        {
-            args.Add("-filter_complex");
-            args.Add(filter.ToString());
-            args.Add("-map");
-            args.Add("[" + videoLabel + "]");
+            AddGraphStreams(args, p, filter.ToString(), "v2", "1:a");
         }
         else
         {
-            args.Add("-map");
-            args.Add("0:v");
-        }
-
-        args.Add("-map");
-        args.Add("1:a");
-
-        if (filter.Length == 0)
-        {
-            args.Add("-vf");
-            args.Add(SdrGraphToOutput(p) + EncoderUploadSuffix(p));
-        }
-        else if (!p.IsVaapiEncoder)
-        {
-            args.Add("-pix_fmt");
-            args.Add(OutputPixelFormat(p));
+            AddFilteredStreams(args, "0:v", "1:a", SdrGraphToOutput(p) + EncoderUploadSuffix(p));
         }
 
         Output(args, p, tsOffset);
@@ -444,7 +384,7 @@ public static partial class FfmpegArgsBuilder
                 }
 
                 // The decoder finds the one QSV device by type; the h264_qsv encoder shares it.
-                var decoder = QsvDecoder(videoCodec);
+                var decoder = HardwareDecodePolicy.QsvDecoder(videoCodec);
                 if (decoder is not null)
                 {
                     args.Add("-c:v");
@@ -484,22 +424,75 @@ public static partial class FfmpegArgsBuilder
         }
     }
 
-    /// <summary>The Intel Quick Sync decoder for a codec as Jellyfin names it, or null when there is none (or the codec is unknown).</summary>
-    public static string? QsvDecoder(string? videoCodec) => HardwareDecodePolicy.NormalizeCodec(videoCodec) switch
-    {
-        "h264" => "h264_qsv",
-        "hevc" => "hevc_qsv",
-        "mpeg2video" => "mpeg2_qsv",
-        "vc1" => "vc1_qsv",
-        "vp8" => "vp8_qsv",
-        "vp9" => "vp9_qsv",
-        "av1" => "av1_qsv",
-        _ => null
-    };
-
     private static void Common(List<string> args, string loglevel = "warning")
     {
         args.AddRange(new[] { "-hide_banner", "-loglevel", loglevel, "-nostdin", "-nostats" });
+    }
+
+    /// <summary>Input seeking (-ss before -i) is only applied past this; nearer the start the file plays from its beginning.</summary>
+    private static readonly TimeSpan InputSeekThreshold = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
+    /// A media file as input 0: the hardware decoder setup, the profile's extra input options and the input seek.
+    /// Shared by program segments and the hardware check so the check decodes exactly as a segment would.
+    /// </summary>
+    private static void AddSourceInput(List<string> args, EncodingProfile p, string path, TimeSpan seek, string? videoCodec)
+    {
+        HardwareInputArgs(args, p, decode: true, videoCodec);
+        AddSplit(args, p.ExtraInputArgs);
+        if (seek > InputSeekThreshold)
+        {
+            args.Add("-ss");
+            args.Add(Sec(seek));
+        }
+
+        args.Add("-i");
+        args.Add(path);
+    }
+
+    /// <summary>A silent 48 kHz stereo input, for a segment with no sound of its own; <paramref name="duration"/> limits it at the input.</summary>
+    private static void AddSilenceInput(List<string> args, TimeSpan? duration = null)
+    {
+        args.Add("-f");
+        args.Add("lavfi");
+        if (duration.HasValue)
+        {
+            args.Add("-t");
+            args.Add(Sec(duration.Value));
+        }
+
+        args.Add("-i");
+        args.Add("anullsrc=r=48000:cl=stereo");
+    }
+
+    /// <summary>The video and audio streams mapped straight from the inputs, the video through a simple filter chain.</summary>
+    private static void AddFilteredStreams(List<string> args, string videoMap, string audioMap, string videoFilter)
+    {
+        args.Add("-map");
+        args.Add(videoMap);
+        args.Add("-map");
+        args.Add(audioMap);
+        args.Add("-vf");
+        args.Add(videoFilter);
+    }
+
+    /// <summary>
+    /// The video taken from a filter graph's <paramref name="videoLabel"/> output and the audio mapped, then the
+    /// encoder's pixel format (a VA-API encoder gets its frames already uploaded by the graph).
+    /// </summary>
+    private static void AddGraphStreams(List<string> args, EncodingProfile p, string graph, string videoLabel, string audioMap)
+    {
+        args.Add("-filter_complex");
+        args.Add(graph);
+        args.Add("-map");
+        args.Add("[" + videoLabel + "]");
+        args.Add("-map");
+        args.Add(audioMap);
+        if (!p.IsVaapiEncoder)
+        {
+            args.Add("-pix_fmt");
+            args.Add(OutputPixelFormat(p));
+        }
     }
 
     /// <summary>
@@ -511,16 +504,7 @@ public static partial class FfmpegArgsBuilder
     {
         var args = new List<string>();
         Common(args, "verbose");
-        HardwareInputArgs(args, p, decode: true, videoCodec);
-        AddSplit(args, p.ExtraInputArgs);
-        if (seek > TimeSpan.FromMilliseconds(500))
-        {
-            args.Add("-ss");
-            args.Add(Sec(seek));
-        }
-
-        args.Add("-i");
-        args.Add(path);
+        AddSourceInput(args, p, path, seek, videoCodec);
         args.Add("-t");
         args.Add(Math.Max(1, seconds).ToString(CultureInfo.InvariantCulture));
         args.Add("-an");
@@ -537,11 +521,14 @@ public static partial class FfmpegArgsBuilder
         return args;
     }
 
+    /// <summary>The colour description every segment leaves with: BT.709 on an SDR profile, BT.2020 PQ on an HDR10 one.</summary>
+    public static OutputColorSpace OutputColor(bool hdr) => hdr ? OutputColorSpace.Hdr10 : OutputColorSpace.Sdr;
+
     /// <summary>Frame tags an SDR segment leaves the graph with. ffmpeg 7+ encoders take color metadata from the frames, not from -color_* options.</summary>
-    public const string SdrTags = "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709:range=tv";
+    public static readonly string SdrTags = OutputColorSpace.Sdr.FrameTags;
 
     /// <summary>Frame tags an HDR10 segment leaves the graph with: BT.2020 primaries, the PQ transfer, the non-constant-luminance matrix.</summary>
-    public const string HdrTags = "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc:range=tv";
+    public static readonly string HdrTags = OutputColorSpace.Hdr10.FrameTags;
 
     /// <summary>
     /// SDR video into the PQ container: stamped BT.709 first (zscale refuses untagged frames), widened to 10 bits so
@@ -667,7 +654,8 @@ public static partial class FfmpegArgsBuilder
             args.Add(preset);
         }
 
-        if (string.Equals(p.VideoEncoder, "libx264", StringComparison.OrdinalIgnoreCase))
+        var x264 = string.Equals(p.VideoEncoder, "libx264", StringComparison.OrdinalIgnoreCase);
+        if (x264)
         {
             args.Add("-profile:v");
             args.Add(p.H264Profile);
@@ -693,13 +681,13 @@ public static partial class FfmpegArgsBuilder
 
         // Declare the range the filter chain delivers (older builds read these options; newer ones take the frame
         // tags). A leaked BT.2020/PQ tag on an SDR channel is what makes clients transcode it.
-        var hdr = p.IsHdrOutput;
+        var color = OutputColor(p.IsHdrOutput);
         args.Add("-color_primaries");
-        args.Add(hdr ? "bt2020" : "bt709");
+        args.Add(color.Primaries);
         args.Add("-color_trc");
-        args.Add(hdr ? "smpte2084" : "bt709");
+        args.Add(color.Transfer);
         args.Add("-colorspace");
-        args.Add(hdr ? "bt2020nc" : "bt709");
+        args.Add(color.Matrix);
         args.Add("-color_range");
         args.Add("tv");
 
@@ -724,7 +712,7 @@ public static partial class FfmpegArgsBuilder
             args.Add("expr:gte(t,n_forced*" + Math.Max(1, p.GopSeconds).ToString(CultureInfo.InvariantCulture) + ")");
         }
 
-        if (string.Equals(p.VideoEncoder, "libx264", StringComparison.OrdinalIgnoreCase))
+        if (x264)
         {
             args.Add("-sc_threshold");
             args.Add("0");
@@ -897,6 +885,11 @@ public static partial class FfmpegArgsBuilder
 
     private static string Sec(TimeSpan t) => t.TotalSeconds.ToString("0.000", CultureInfo.InvariantCulture);
 
+    private static string N(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
+
+    /// <summary>A filter expression that is 1 while t is inside [from, to].</summary>
+    private static string Between(double from, double to) => "between(t," + N(from) + "," + N(to) + ")";
+
     private static string NormalizeColor(string c)
     {
         if (string.IsNullOrWhiteSpace(c))
@@ -925,4 +918,15 @@ public static partial class FfmpegArgsBuilder
     {
         return string.Join(' ', args.Select(a => a.Any(char.IsWhiteSpace) || a.Contains('\'') ? "\"" + a.Replace("\"", "\\\"", StringComparison.Ordinal) + "\"" : a));
     }
+}
+
+/// <summary>A colour description as ffmpeg names it: primaries, transfer and matrix, always limited (tv) range.</summary>
+public sealed record OutputColorSpace(string Primaries, string Transfer, string Matrix)
+{
+    public static readonly OutputColorSpace Sdr = new("bt709", "bt709", "bt709");
+
+    public static readonly OutputColorSpace Hdr10 = new("bt2020", "smpte2084", "bt2020nc");
+
+    /// <summary>The setparams filter that stamps frames with this description.</summary>
+    public string FrameTags => "setparams=color_primaries=" + Primaries + ":color_trc=" + Transfer + ":colorspace=" + Matrix + ":range=tv";
 }

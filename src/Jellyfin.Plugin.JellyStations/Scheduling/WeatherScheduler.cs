@@ -20,7 +20,7 @@ internal sealed class WeatherScheduler : IStationScheduler
         _input = input;
         _config = input.Weather ?? new WeatherConfig();
         _gridTicks = TimeSpan.FromMinutes(Math.Clamp(_config.GuideEntryMinutes, 15, 240)).Ticks;
-        _tz = WeeklySlotScheduler.ResolveTimeZone(input.TimeZoneId);
+        _tz = TimeZones.Resolve(input.TimeZoneId);
         _title = Title(_config);
     }
 
@@ -72,6 +72,6 @@ internal sealed class WeatherScheduler : IStationScheduler
             }
         }
 
-        return new ScheduleEntry(_input.StationId, _input.Revision, EntryKind.Weather, null, start, end, false, _title);
+        return ScheduleEntry.Weather(_input, start, end, _title);
     }
 }

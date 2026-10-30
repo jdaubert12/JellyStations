@@ -136,14 +136,14 @@ public class FfmpegArgsBuilderTests
     [InlineData(LogoCorner.BottomRight, "overlay=W-w-20:H-h-20:")]
     public void Corners_MapToPositions(LogoCorner corner, string expected)
     {
-        var graph = FfmpegArgsBuilder.OverlayFilter(Profile, new FfmpegArgsBuilder.LogoOverlayInput("x.png", corner, 50, 8), 1);
+        var graph = FfmpegArgsBuilder.ComposeFilter(Profile, null, new FfmpegArgsBuilder.LogoOverlayInput("x.png", corner, 50, 8), 1, null, -1);
         Assert.Contains(expected, graph, StringComparison.Ordinal);
     }
 
     [Fact]
     public void OverlayValues_AreClamped()
     {
-        var graph = FfmpegArgsBuilder.OverlayFilter(Profile, new FfmpegArgsBuilder.LogoOverlayInput("x.png", LogoCorner.TopRight, 500, 90), 1);
+        var graph = FfmpegArgsBuilder.ComposeFilter(Profile, null, new FfmpegArgsBuilder.LogoOverlayInput("x.png", LogoCorner.TopRight, 500, 90), 1, null, -1);
         Assert.Contains("scale=-1:180,", graph, StringComparison.Ordinal);
         Assert.Contains("aa=1.00", graph, StringComparison.Ordinal);
     }
@@ -303,7 +303,7 @@ public class FfmpegArgsBuilderTests
         Assert.DoesNotContain("-hwaccel", args);
         Assert.DoesNotContain("-hwaccel_output_format", args);
         Assert.Equal("libx264", ValueAfter(args.Skip(InputIndex(args)).ToList(), "-c:v"));
-        Assert.Equal(FfmpegArgsBuilder.QsvDecoder(codec), decoder);
+        Assert.Equal(HardwareDecodePolicy.QsvDecoder(codec), decoder);
     }
 
     [Theory]
@@ -333,8 +333,8 @@ public class FfmpegArgsBuilderTests
         var input = args.Take(InputIndex(args)).ToList();
         Assert.Equal("qsv=qs", ValueAfter(input, "-init_hw_device"));
         Assert.DoesNotContain("-c:v", input);
-        Assert.Null(FfmpegArgsBuilder.QsvDecoder("mpeg4"));
-        Assert.Null(FfmpegArgsBuilder.QsvDecoder(null));
+        Assert.Null(HardwareDecodePolicy.QsvDecoder("mpeg4"));
+        Assert.Null(HardwareDecodePolicy.QsvDecoder(null));
     }
 
     [Fact]

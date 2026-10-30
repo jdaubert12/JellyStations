@@ -9,17 +9,22 @@ docker compose -f dev/docker-compose.yml up -d
 # 2. Build and install the plugin, restart the container, tail the log
 .\scripts\deploy-local.ps1
 
-# 3. Open http://localhost:8096, finish the setup wizard, add libraries:
-#    Movies  -> /media/movies
-#    Shows   -> /media/tv
+# 3. Finish the setup wizard and add the libraries by script (Git Bash), or by hand at
+#    http://localhost:8096 with Movies -> /media/movies and Shows -> /media/tv
+bash dev/setup-server.sh
 ```
+
+The server listens on loopback only (`127.0.0.1:8096` in `dev/docker-compose.yml`) and remote access is
+off. `setup-server.sh` creates the `admin` user with a generated password kept in `dev/.password` and
+writes an API token to `dev/.token`; both are git-ignored. A server set up before the password file
+existed keeps whatever password it was given; delete `dev/config` to start over.
 
 `dev/media` holds synthetic clips (ffmpeg `testsrc`, which renders a running timecode so
 join-in-progress offsets can be checked by eye). Regenerate them with the commands in
 `dev/make-media.sh` if the folder is empty. `dev/config` and `dev/cache` are the container's
 state and are git-ignored.
 
-Plugin data on the test server: `dev/config/data/JellyStations/`. Plugin DLL: `dev/config/plugins/JellyStations_1.21.0.0/`.
+Plugin data on the test server: `dev/config/data/JellyStations/`. Plugin DLL: `dev/config/plugins/JellyStations_1.22.0.0/`.
 
 ## Stream test
 

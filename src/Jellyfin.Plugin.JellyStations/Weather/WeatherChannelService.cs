@@ -47,7 +47,10 @@ public sealed class WeatherChannelService
         _logger = logger;
     }
 
-    /// <summary>The segment starting at <paramref name="nowUtc"/> inside <paramref name="entry"/>, or null when the station has no usable place.</summary>
+    /// <summary>
+    /// The segment starting at <paramref name="nowUtc"/> inside <paramref name="entry"/>, or null when the station
+    /// has no usable place. An ordinary station shows its weather channel's places, look and music (its own logo).
+    /// </summary>
     public WeatherSegment? BuildSegment(Guid stationId, DateTime nowUtc, ScheduleEntry entry, EncodingProfile profile)
     {
         var station = _stations.Get(stationId);
@@ -56,14 +59,20 @@ public sealed class WeatherChannelService
             return null;
         }
 
-        var config = station.Weather;
+        var channel = WeatherSources.ChannelFor(station, _stations.GetAll());
+        if (channel is null)
+        {
+            return null;
+        }
+
+        var config = channel.Weather;
         var locations = config.Locations.Where(l => l.IsValid).ToList();
         if (locations.Count == 0)
         {
             return null;
         }
 
-        var zone = WeeklySlotScheduler.ResolveTimeZone(station.TimeZoneId);
+        var zone = TimeZones.Resolve(station.TimeZoneId);
         var loops = locations.Select(l => config.ShowRadar ? _radar.Get(l.Id) : null).ToList();
         var forecasts = locations.Select(l => config.ShowForecastRadar ? _radar.GetForecast(l.Id) : null).ToList();
         var forecastFrames = forecasts.Select(f => f?.ForecastFrames(nowUtc, config.ForecastRadarHours, config.ForecastRadarStepMinutes) ?? Array.Empty<RadarFrame>()).ToList();
@@ -104,18 +113,10 @@ public sealed class WeatherChannelService
         {
             var place = s.Screen.LocationIndex >= 0 && s.Screen.LocationIndex < places.Count ? places[s.Screen.LocationIndex] : null;
             var offset = place is null ? (long)zone.GetUtcOffset(nowUtc).TotalSeconds : PlaceOffsetSeconds(place, zone, nowUtc);
-            var loop = s.Screen.Kind == WeatherScreenKind.Radar && place is not null ? loops[s.Screen.LocationIndex] : null;
-            if (loop is { IsPlayable: true })
+            var sequence = place is null ? null : SequenceFrames(s.Screen.Kind, loops[s.Screen.LocationIndex], forecasts[s.Screen.LocationIndex], forecastFrames[s.Screen.LocationIndex]);
+            if (sequence is { } seq)
             {
-                var listPath = RadarSequence(station.Id, loop, loop.Frames, s, place!, places, config, nowUtc, zone, logoPath, profile, attribution);
-                slides.Add(new WeatherSlide(listPath, s.Duration.TotalSeconds, unixStart + offset, IsSequence: true));
-                continue;
-            }
-
-            var forecast = s.Screen.Kind == WeatherScreenKind.ForecastRadar && place is not null ? forecasts[s.Screen.LocationIndex] : null;
-            if (forecast is not null && forecastFrames[s.Screen.LocationIndex].Count >= 2)
-            {
-                var listPath = RadarSequence(station.Id, forecast, forecastFrames[s.Screen.LocationIndex], s, place!, places, config, nowUtc, zone, logoPath, profile, attribution);
+                var listPath = RadarSequence(station.Id, seq.Loop, seq.Frames, s, place!, places, config, nowUtc, zone, logoPath, profile, attribution);
                 slides.Add(new WeatherSlide(listPath, s.Duration.TotalSeconds, unixStart + offset, IsSequence: true));
                 continue;
             }
@@ -129,10 +130,11 @@ public sealed class WeatherChannelService
         var credits = new List<WeatherCredit>();
         if (config.MusicEnabled)
         {
-            var compiled = _compiled.Get(station.Id);
+            // The channel's music on the channel's clock, so a station borrowing the weather plays what the channel plays.
+            var compiled = _compiled.Get(channel.Id);
             if (compiled is { Music.Count: > 0 })
             {
-                var timeline = new MusicTimeline(compiled.Music, station.AnchorUtc == default ? DateTime.UnixEpoch : station.AnchorUtc, station.Id, station.Revision);
+                var timeline = new MusicTimeline(compiled.Music, channel.AnchorUtc == default ? DateTime.UnixEpoch : channel.AnchorUtc, channel.Id, channel.Revision);
                 foreach (var piece in timeline.Between(segStart, segEnd))
                 {
                     if (!File.Exists(piece.Track.Path))
@@ -181,6 +183,17 @@ public sealed class WeatherChannelService
     /// that plays them on <see cref="RadarTiming"/>'s clock; the list is named by its content, so a repeat of the
     /// same screen with the same frames reuses it.
     /// </summary>
+    /// <summary>
+    /// The frames a radar screen plays as a sequence: the radar loop when it is playable, the forecast window when it
+    /// has two frames or more. Null for any other screen, which is drawn as one still.
+    /// </summary>
+    private static (RadarLoop Loop, IReadOnlyList<RadarFrame> Frames)? SequenceFrames(WeatherScreenKind kind, RadarLoop? radar, RadarLoop? forecast, IReadOnlyList<RadarFrame> forecastFrames) => kind switch
+    {
+        WeatherScreenKind.Radar when radar is { IsPlayable: true } => (radar, radar.Frames),
+        WeatherScreenKind.ForecastRadar when forecast is not null && forecastFrames.Count >= 2 => (forecast, forecastFrames),
+        _ => null
+    };
+
     private string RadarSequence(Guid stationId, RadarLoop loop, IReadOnlyList<RadarFrame> frames, TimedScreen s, PlaceWeather place, IReadOnlyList<PlaceWeather> places, WeatherConfig config, DateTime nowUtc, TimeZoneInfo zone, string? logoPath, EncodingProfile profile, string attribution)
     {
         var plan = RadarTiming.Plan(s.Duration.TotalSeconds + WeatherSegment.FadeSeconds + 1.0, frames.Count);
@@ -220,21 +233,10 @@ public sealed class WeatherChannelService
     /// <summary>The place's UTC offset now: its configured zone, else the provider's, else the station's.</summary>
     public static long PlaceOffsetSeconds(PlaceWeather place, TimeZoneInfo stationZone, DateTime nowUtc)
     {
-        foreach (var id in new[] { place.Location.TimeZoneId, place.Report?.TimeZoneId })
+        // An id unknown on this host falls through to the next source.
+        if ((TimeZones.TryFind(place.Location.TimeZoneId) ?? TimeZones.TryFind(place.Report?.TimeZoneId)) is { } zone)
         {
-            if (string.IsNullOrWhiteSpace(id))
-            {
-                continue;
-            }
-
-            try
-            {
-                return (long)TimeZoneInfo.FindSystemTimeZoneById(id).GetUtcOffset(nowUtc).TotalSeconds;
-            }
-            catch (Exception)
-            {
-                // Unknown id on this host; try the next source.
-            }
+            return (long)zone.GetUtcOffset(nowUtc).TotalSeconds;
         }
 
         if (place.Report is not null)

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Scheduling;
 using Microsoft.Extensions.Logging;
@@ -270,8 +271,7 @@ public sealed class FfmpegRestreamer : IDisposable
 
                     if (softwareReason is not null)
                     {
-                        profile = profile.Clone();
-                        profile.HardwareDecode = string.Empty;
+                        profile = WithoutHardwareDecode(profile);
                     }
                 }
 
@@ -293,7 +293,7 @@ public sealed class FfmpegRestreamer : IDisposable
                     remaining.ToString(@"hh\:mm\:ss"),
                     hdrOutput ? (part.Part.IsHdr ? ", HDR10 out" : ", SDR source into HDR10") : tonemap ? ", tone mapping HDR to SDR" : string.Empty,
                     hardwareDecode ? ", " + profile.HardwareDecode + " decoding" : softwareReason is null ? string.Empty : ", software decoding (" + softwareReason + ")",
-                    upNext is null ? string.Empty : ", up next card at " + string.Join(", ", upNext.Windows.Select(w => w.From.ToString("0", System.Globalization.CultureInfo.InvariantCulture) + "s")),
+                    upNext is null ? string.Empty : ", up next card at " + string.Join(", ", upNext.Windows.Select(w => w.From.ToString("0", CultureInfo.InvariantCulture) + "s")),
                     subtitles is null ? (part.Part.HasSubtitles ? ", subtitles unavailable" : string.Empty) : subtitles.IsBitmap ? ", bitmap subtitles" : ", subtitles burned in");
                 _logger.LogDebug("JellyStations ffmpeg {Args}", FfmpegArgsBuilder.ToLogString(args));
                 _telemetry = new SegmentTelemetry(item.DisplayTitle, isSlate: false, profile.HardwareDecode, profile.VideoEncoder, tonemap, part.Part.IsHdr, overlay is not null)
@@ -313,7 +313,8 @@ public sealed class FfmpegRestreamer : IDisposable
 
                 // Early means before this segment's planned end: a part finishing on time is not a failure.
                 var endedEarly = DateTime.UtcNow < segmentEnd - MinSegment;
-                if (exitCode != 0 && ran < TimeSpan.FromSeconds(5) && hardwareDecode)
+                var quickFailure = IsQuickFailure(exitCode, ran);
+                if (quickFailure && hardwareDecode)
                 {
                     // The GPU decoders do not fall back to software by themselves. A device that cannot be opened
                     // (missing driver, wrong node) fails every file, so that disables hardware decoding for the
@@ -325,37 +326,37 @@ public sealed class FfmpegRestreamer : IDisposable
                     {
                         _hardwareDecodeSupported = false;
                         _logger.LogWarning("JellyStations [{Station}]: ffmpeg exited with {Code} with {Kind} decoding; continuing with software decoding", _stationName, exitCode, profile.HardwareDecode);
-                        Fault(profile.HardwareDecode + " hardware decoding failed on " + item.DisplayTitle + " (ffmpeg exit " + exitCode + "); software decoding until the stream restarts" + (detail is null ? string.Empty : ": " + detail));
+                        Fault(profile.HardwareDecode + " hardware decoding failed on " + item.DisplayTitle + " (ffmpeg exit " + exitCode + "); software decoding until the stream restarts" + Detail(detail));
                     }
                     else
                     {
                         _softwarePrograms.Add(entry.ProgramId);
                         _logger.LogWarning("JellyStations [{Station}]: ffmpeg exited with {Code} with {Kind} decoding on {Title}; replaying it with software decoding", _stationName, exitCode, profile.HardwareDecode, item.DisplayTitle);
-                        Fault(profile.HardwareDecode + " could not decode " + item.DisplayTitle + " (ffmpeg exit " + exitCode + "); this program plays with software decoding" + (detail is null ? string.Empty : ": " + detail));
+                        Fault(profile.HardwareDecode + " could not decode " + item.DisplayTitle + " (ffmpeg exit " + exitCode + "); this program plays with software decoding" + Detail(detail));
                     }
 
                     continue;
                 }
 
-                if (exitCode != 0 && ran < TimeSpan.FromSeconds(5) && tonemap)
+                if (quickFailure && tonemap)
                 {
                     // zscale/tonemap missing from this ffmpeg build: play the HDR file untouched (tagged SDR) rather than show a card.
                     _tonemapSupported = false;
                     _logger.LogWarning("JellyStations [{Station}]: ffmpeg exited with {Code} while tone mapping; continuing without tone mapping", _stationName, exitCode);
-                    Fault("HDR tone mapping failed (ffmpeg exit " + exitCode + "); HDR programs play without it until the stream restarts" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
+                    Fault("HDR tone mapping failed (ffmpeg exit " + exitCode + "); HDR programs play without it until the stream restarts" + Detail(_lastStderr));
                     continue;
                 }
 
-                if (exitCode != 0 && ran < TimeSpan.FromSeconds(5) && upNext is not null)
+                if (quickFailure && upNext is not null)
                 {
                     // The card overlay is the newest thing in the graph: drop it for this session and replay.
                     _upNextSupported = false;
                     _logger.LogWarning("JellyStations [{Station}]: ffmpeg exited with {Code} with the up next card; continuing without it", _stationName, exitCode);
-                    Fault("Up next card failed (ffmpeg exit " + exitCode + "); disabled until the stream restarts" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
+                    Fault("Up next card failed (ffmpeg exit " + exitCode + "); disabled until the stream restarts" + Detail(_lastStderr));
                     continue;
                 }
 
-                if (exitCode != 0 && ran < TimeSpan.FromSeconds(5) && overlay is not null)
+                if (quickFailure && overlay is not null)
                 {
                     // The overlay filter (or the logo file) is the likely culprit: drop the overlay for this session and replay.
                     _overlaySupported = false;
@@ -364,13 +365,13 @@ public sealed class FfmpegRestreamer : IDisposable
                     continue;
                 }
 
-                if (exitCode != 0 && ran < TimeSpan.FromSeconds(5))
+                if (quickFailure)
                 {
                     consecutiveFailures++;
                     lastFailedProgramId = entry.ProgramId;
                     _logger.LogWarning("JellyStations [{Station}]: ffmpeg exited with {Code} after {Seconds:0.0}s for {Path}", _stationName, exitCode, ran.TotalSeconds, item.Path);
-                    Fault(item.DisplayTitle + ": ffmpeg exited with code " + exitCode + " after " + ran.TotalSeconds.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
-                        + "s (" + part.Part.Path + ")" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
+                    Fault(item.DisplayTitle + ": ffmpeg exited with code " + exitCode + " after " + ran.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture)
+                        + "s (" + part.Part.Path + ")" + Detail(_lastStderr));
                     if (consecutiveFailures >= 5)
                     {
                         _logger.LogError("JellyStations [{Station}]: 5 consecutive encoder failures; showing a slate for 60s", _stationName);
@@ -430,10 +431,25 @@ public sealed class FfmpegRestreamer : IDisposable
             return _profile;
         }
 
-        var software = _profile.Clone();
+        return WithoutHardwareDecode(_profile);
+    }
+
+    private static EncodingProfile WithoutHardwareDecode(EncodingProfile profile)
+    {
+        var software = profile.Clone();
         software.HardwareDecode = string.Empty;
         return software;
     }
+
+    /// <summary>": detail" for a fault message, or nothing when there is no detail.</summary>
+    private static string Detail(string? detail) => detail is null ? string.Empty : ": " + detail;
+
+    /// <summary>An ffmpeg run that failed straight away: a broken graph or input rather than a problem mid-program.</summary>
+    private static bool IsQuickFailure(int exitCode, TimeSpan ran) => exitCode != 0 && ran < TimeSpan.FromSeconds(5);
+
+    /// <summary>The next program after an entry, within the up next look-ahead; null when nothing playable follows.</summary>
+    private ScheduleEntry? NextProgramAfter(ScheduleEntry entry)
+        => UpNextCard.NextProgram(_resolver.Enumerate(_stationId, entry.EndUtc, entry.EndUtc + UpNextCard.Lookahead), entry.EndUtc);
 
     /// <summary>The logo bug to draw over programs, or null when off, unsupported, or the logo file is missing.</summary>
     private FfmpegArgsBuilder.LogoOverlayInput? OverlayInput()
@@ -469,7 +485,7 @@ public sealed class FfmpegRestreamer : IDisposable
             return null;
         }
 
-        var next = UpNextCard.NextProgram(_resolver.Enumerate(_stationId, entry.EndUtc, entry.EndUtc + UpNextCard.Lookahead), entry.EndUtc);
+        var next = NextProgramAfter(entry);
         if (next is null)
         {
             return null;
@@ -477,7 +493,7 @@ public sealed class FfmpegRestreamer : IDisposable
 
         var spec = UpNextCard.Spec(next, _upNext, _zone, profile);
         var prefix = _stationId.ToString("N") + "-";
-        var path = Path.Combine(_cardsDir, prefix + new DateTimeOffset(entry.StartUtc, TimeSpan.Zero).ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture) + ".png");
+        var path = Path.Combine(_cardsDir, prefix + new DateTimeOffset(entry.StartUtc, TimeSpan.Zero).ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture) + ".png");
         try
         {
             Directory.CreateDirectory(_cardsDir);
@@ -495,20 +511,21 @@ public sealed class FfmpegRestreamer : IDisposable
             _logger.LogDebug(ex, "JellyStations [{Station}]: could not tidy the cards folder", _stationName);
         }
 
-        if (await RenderCardAsync(spec, path, ct).ConfigureAwait(false))
-        {
-            return new FfmpegArgsBuilder.UpNextCardInput(path, _upNext.Corner, windows) { Animation = _upNext.Animation };
-        }
-
-        if (spec.ThumbnailPath is not null && await RenderCardAsync(spec with { ThumbnailPath = null }, path, ct).ConfigureAwait(false))
+        var rendered = await RenderCardAsync(spec, path, ct).ConfigureAwait(false);
+        if (!rendered && spec.ThumbnailPath is not null && await RenderCardAsync(spec with { ThumbnailPath = null }, path, ct).ConfigureAwait(false))
         {
             _logger.LogWarning("JellyStations [{Station}]: the artwork for {Title} could not be drawn on the up next card; card drawn without it", _stationName, next.Item!.DisplayTitle);
+            rendered = true;
+        }
+
+        if (rendered)
+        {
             return new FfmpegArgsBuilder.UpNextCardInput(path, _upNext.Corner, windows) { Animation = _upNext.Animation };
         }
 
         _upNextSupported = false;
         _logger.LogWarning("JellyStations [{Station}]: ffmpeg could not render the up next card; disabled until the stream restarts: {Error}", _stationName, _lastCardError);
-        Fault("Up next card could not be rendered; disabled until the stream restarts" + (_lastCardError is null ? string.Empty : ": " + _lastCardError));
+        Fault("Up next card could not be rendered; disabled until the stream restarts" + Detail(_lastCardError));
         return null;
     }
 
@@ -546,8 +563,7 @@ public sealed class FfmpegRestreamer : IDisposable
             return;
         }
 
-        var next = UpNextCard.NextProgram(_resolver.Enumerate(_stationId, entry.EndUtc, entry.EndUtc + UpNextCard.Lookahead), entry.EndUtc);
-        var item = next?.Item;
+        var item = NextProgramAfter(entry)?.Item;
         if (item is null)
         {
             return;
@@ -591,20 +607,8 @@ public sealed class FfmpegRestreamer : IDisposable
         {
             File.Delete(path);
             using var proc = ProcessRunner.Start(_ffmpegPath, args, line => _lastCardError = line.Trim());
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeout.CancelAfter(TimeSpan.FromSeconds(20));
-            try
+            if (!await proc.WaitForExitAsync(TimeSpan.FromSeconds(20), ct).ConfigureAwait(false))
             {
-                await proc.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                proc.Kill();
-                if (ct.IsCancellationRequested)
-                {
-                    throw;
-                }
-
                 _lastCardError = "ffmpeg did not finish within 20 s";
                 return false;
             }
@@ -653,7 +657,7 @@ public sealed class FfmpegRestreamer : IDisposable
             if (code != 0 && !ct.IsCancellationRequested)
             {
                 _logger.LogError("JellyStations [{Station}]: slate encoder failed (exit {Code}); pausing 5s", _stationName, code);
-                Fault("Slate encoder failed (ffmpeg exit " + code + ")" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
+                Fault("Slate encoder failed (ffmpeg exit " + code + ")" + Detail(_lastStderr));
                 await Task.Delay(TimeSpan.FromSeconds(5), ct).ConfigureAwait(false);
             }
         }
@@ -702,11 +706,11 @@ public sealed class FfmpegRestreamer : IDisposable
         }
 
         var ran = DateTime.UtcNow - started;
-        if (exitCode != 0 && ran < TimeSpan.FromSeconds(5))
+        if (IsQuickFailure(exitCode, ran))
         {
             _weatherFailures++;
             _logger.LogError("JellyStations [{Station}]: weather encoder failed (exit {Code}): {Error}", _stationName, exitCode, _lastStderr);
-            Fault("Weather encoder failed (ffmpeg exit " + exitCode + ")" + (_lastStderr is null ? string.Empty : ": " + _lastStderr));
+            Fault("Weather encoder failed (ffmpeg exit " + exitCode + ")" + Detail(_lastStderr));
             if (_weatherFailures >= 3)
             {
                 await RunSlateAsync(TimeSpan.FromSeconds(60), "Technical difficulties", ct, entry.EndUtc).ConfigureAwait(false);
@@ -866,7 +870,7 @@ public sealed class FfmpegRestreamer : IDisposable
 
     private void Note(string line)
     {
-        _recentErrors.Enqueue(DateTime.UtcNow.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) + " " + line);
+        _recentErrors.Enqueue(DateTime.UtcNow.ToString("HH:mm:ss", CultureInfo.InvariantCulture) + " " + line);
         while (_recentErrors.Count > MaxLogLines && _recentErrors.TryDequeue(out _))
         {
         }

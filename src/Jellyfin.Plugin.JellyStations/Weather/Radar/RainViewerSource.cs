@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using SkiaSharp;
 
 namespace Jellyfin.Plugin.JellyStations.Weather.Radar;
 
@@ -48,19 +47,31 @@ public sealed class RainViewerSource : IRadarSource
 
     public bool Covers(double latitude, double longitude) => true;
 
+    public const string DefaultHost = "https://tilecache.rainviewer.com";
+
+    /// <summary>
+    /// The index names the tile host. Only an https rainviewer.com address is followed: the index is fetched from a
+    /// third party, and must not be able to point this server at an internal address.
+    /// </summary>
+    public static bool IsRainViewerHost(string? host) =>
+        Uri.TryCreate(host, UriKind.Absolute, out var uri)
+        && uri.Scheme == Uri.UriSchemeHttps
+        && (uri.Host.Equals("rainviewer.com", StringComparison.OrdinalIgnoreCase) || uri.Host.EndsWith(".rainviewer.com", StringComparison.OrdinalIgnoreCase))
+        && string.IsNullOrEmpty(uri.UserInfo);
+
     public static RainViewerIndex ParseIndex(string json)
     {
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
-        var host = root.TryGetProperty("host", out var h) && h.ValueKind == JsonValueKind.String ? h.GetString()! : "https://tilecache.rainviewer.com";
+        var host = root.StringOrNull("host") is { } h && IsRainViewerHost(h) ? h : DefaultHost;
         var frames = new List<RainViewerFrame>();
         if (root.TryGetProperty("radar", out var radar) && radar.TryGetProperty("past", out var past) && past.ValueKind == JsonValueKind.Array)
         {
             foreach (var item in past.EnumerateArray())
             {
-                if (item.TryGetProperty("time", out var t) && item.TryGetProperty("path", out var p) && p.ValueKind == JsonValueKind.String)
+                if (item.TryGetProperty("time", out var t) && item.StringOrNull("path") is { } path)
                 {
-                    frames.Add(new RainViewerFrame(DateTime.UnixEpoch.AddSeconds(t.GetInt64()), p.GetString()!));
+                    frames.Add(new RainViewerFrame(DateTime.UnixEpoch.AddSeconds(t.GetInt64()), path));
                 }
             }
         }
@@ -87,43 +98,12 @@ public sealed class RainViewerSource : IRadarSource
         var frame = index.Past.FirstOrDefault(f => f.TimeUtc == timeUtc)
             ?? throw new InvalidOperationException("RainViewer no longer lists the frame for " + timeUtc.ToString("HH:mm", CultureInfo.InvariantCulture) + " UTC");
 
-        using var bitmap = new SKBitmap(viewport.DataWidth, viewport.DataHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
-        using var canvas = new SKCanvas(bitmap);
-        canvas.Clear(SKColors.Transparent);
-        var failed = 0;
-        var total = 0;
-        foreach (var (x, y, ox, oy) in viewport.Tiles())
-        {
-            total++;
-            try
-            {
-                var png = await _http.GetPngAsync(TileUrl(index.Host, frame.Path, viewport.DataZoom, x, y), ct).ConfigureAwait(false);
-                using var tile = SKBitmap.Decode(png);
-                if (tile is not null)
-                {
-                    canvas.DrawBitmap(tile, ox, oy);
-                }
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                failed++;
-                _logger.LogDebug(ex, "JellyStations radar: RainViewer tile {Z}/{X}/{Y} failed", viewport.DataZoom, x, y);
-            }
-        }
-
-        if (total > 0 && failed == total)
-        {
-            throw new InvalidOperationException("No RainViewer tile could be fetched");
-        }
-
-        canvas.Flush();
-        using var image = SKImage.FromBitmap(bitmap);
-        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
-        return data.ToArray();
+        var (png, _) = await _http.StitchTilesAsync(
+            viewport,
+            (x, y) => TileUrl(index.Host, frame.Path, viewport.DataZoom, x, y),
+            (ex, x, y) => _logger.LogDebug(ex, "JellyStations radar: RainViewer tile {Z}/{X}/{Y} failed", viewport.DataZoom, x, y),
+            ct).ConfigureAwait(false);
+        return png ?? throw new InvalidOperationException("No RainViewer tile could be fetched");
     }
 
     private async Task<RainViewerIndex> IndexAsync(CancellationToken ct)

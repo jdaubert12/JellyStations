@@ -74,6 +74,13 @@ public static class Units
     public static string ShortDayName(DateTime date, DateTime today)
         => date.Date == today.Date ? "Today" : date.ToString("ddd", CultureInfo.InvariantCulture);
 
+    /// <summary>"4:00 PM" when <paramref name="local"/> falls on <paramref name="today"/>, else "Thu 4:00 PM".</summary>
+    public static string DayClock(DateTime local, DateTime today, bool twentyFourHour)
+    {
+        var clock = Clock(local, twentyFourHour);
+        return local.Date == today.Date ? clock : ShortDayName(local, today) + " " + clock;
+    }
+
     /// <summary>The strftime format drawtext uses for the live clock.</summary>
     public static string DrawtextClockFormat(bool twentyFourHour) => twentyFourHour ? "%H\\\\\\:%M" : "%-I\\\\\\:%M %p";
 }

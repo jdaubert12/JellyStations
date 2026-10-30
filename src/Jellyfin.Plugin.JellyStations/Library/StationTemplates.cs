@@ -12,7 +12,7 @@ public static class StationTemplates
     /// <summary>A template from a station: a deep copy with every id, source, item, place and music track removed.</summary>
     public static StationTemplate FromStation(Station station, string name)
     {
-        var settings = Clone(station);
+        var settings = JsonFileStore.Clone(station);
         StripContent(settings);
         return new StationTemplate
         {
@@ -59,6 +59,7 @@ public static class StationTemplates
         s.Weather.Locations = new List<WeatherLocation>();
         s.Weather.MusicSources = new List<ContentSource>();
         s.Weather.MusicFolder = null;
+        s.WeatherSourceStationId = null;
     }
 
     /// <summary>
@@ -67,7 +68,7 @@ public static class StationTemplates
     /// </summary>
     public static Station ApplyTo(StationTemplate template, Station draft)
     {
-        var station = Clone(template.Settings ?? new Station());
+        var station = JsonFileStore.Clone(template.Settings ?? new Station());
         StripContent(station);
         station.Id = draft.Id;
         station.Name = string.IsNullOrWhiteSpace(draft.Name) ? (template.DefaultName ?? string.Empty) : draft.Name;
@@ -103,10 +104,6 @@ public static class StationTemplates
 
     /// <summary>The template with this id among the saved and built-in ones, or null.</summary>
     public static StationTemplate? Find(IEnumerable<StationTemplate>? saved, Guid id) => Merge(saved).FirstOrDefault(t => t.Id == id);
-
-    public static Station Clone(Station station) => JsonFileStore.Clone(station);
-
-    public static StationTemplate Clone(StationTemplate template) => JsonFileStore.Clone(template);
 
     /// <summary>The nine presets the New station page started with, now data. Ids are fixed so links and exports hold.</summary>
     public static IReadOnlyList<StationTemplate> BuiltIn { get; } = BuildPresets();

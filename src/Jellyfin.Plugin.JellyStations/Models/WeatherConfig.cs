@@ -168,14 +168,14 @@ public sealed class WeatherConfig
             ForecastRadarStepMinutes *= 2;
         }
         Provider = string.IsNullOrWhiteSpace(Provider) ? DefaultProvider : Provider.Trim().ToLowerInvariant();
-        GuideTitle = string.IsNullOrWhiteSpace(GuideTitle) ? null : GuideTitle.Trim();
+        GuideTitle = Text.TrimOrNull(GuideTitle);
         if (GuideTitle is { Length: > 120 })
         {
             GuideTitle = GuideTitle[..120];
         }
 
         MusicSources ??= new List<ContentSource>();
-        MusicFolder = string.IsNullOrWhiteSpace(MusicFolder) ? null : MusicFolder.Trim();
+        MusicFolder = Text.TrimOrNull(MusicFolder);
         MusicVolumePercent = Math.Clamp(MusicVolumePercent, 20, 150);
     }
 }
@@ -211,13 +211,13 @@ public sealed class WeatherLocation
             Name = Name[..40];
         }
 
-        Region = string.IsNullOrWhiteSpace(Region) ? null : Region.Trim();
+        Region = Text.TrimOrNull(Region);
         if (Region is { Length: > 60 })
         {
             Region = Region[..60];
         }
 
-        TimeZoneId = string.IsNullOrWhiteSpace(TimeZoneId) ? null : TimeZoneId.Trim();
+        TimeZoneId = Text.TrimOrNull(TimeZoneId);
         Latitude = Math.Round(Latitude, 4);
         Longitude = Math.Round(Longitude, 4);
     }

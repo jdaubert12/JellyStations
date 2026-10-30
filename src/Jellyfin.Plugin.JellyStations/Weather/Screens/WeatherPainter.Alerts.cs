@@ -55,7 +55,7 @@ public sealed partial class WeatherPainter
             Text(x, now, x.W / 2, centre + 200, 38, FontWeight.SemiBold, x.T.Accent, SKTextAlign.Center, maxWidth: x.W - 160);
         }
 
-        Text(x, x.NowLocal.ToString("dddd, MMMM d", CultureInfo.InvariantCulture), x.W / 2, centre + 256, 30, FontWeight.Regular, x.T.Secondary, SKTextAlign.Center);
+        Text(x, x.LongDate, x.W / 2, centre + 256, 30, FontWeight.Regular, x.T.Secondary, SKTextAlign.Center);
     }
 
     /// <summary>A canvas layer at an opacity, restored on dispose.</summary>
@@ -152,30 +152,29 @@ public sealed partial class WeatherPainter
             return;
         }
 
+        // The description keeps a blank line between its paragraphs; the instruction follows one blank line, its paragraphs run on.
         var lines = new List<(string Text, bool Instruction)>();
-        foreach (var paragraph in (a.Description ?? a.Headline).Split('\n'))
+        void AddParagraphs(string text, bool instruction, bool blankBetween)
         {
-            if (lines.Count > 0)
+            foreach (var paragraph in text.Split('\n'))
             {
-                lines.Add((string.Empty, false));
-            }
+                if (blankBetween && lines.Count > 0)
+                {
+                    lines.Add((string.Empty, false));
+                }
 
-            foreach (var line in Wrap(paragraph, bodySize, FontWeight.Regular, right - left))
-            {
-                lines.Add((line, false));
+                foreach (var line in Wrap(paragraph, bodySize, instruction ? FontWeight.SemiBold : FontWeight.Regular, right - left))
+                {
+                    lines.Add((line, instruction));
+                }
             }
         }
 
+        AddParagraphs(a.Description ?? a.Headline, instruction: false, blankBetween: true);
         if (!string.IsNullOrEmpty(a.Instruction))
         {
             lines.Add((string.Empty, false));
-            foreach (var paragraph in a.Instruction.Split('\n'))
-            {
-                foreach (var line in Wrap(paragraph, bodySize, FontWeight.SemiBold, right - left))
-                {
-                    lines.Add((line, true));
-                }
-            }
+            AddParagraphs(a.Instruction, instruction: true, blankBetween: false);
         }
 
         var cut = lines.Count > maxLines;
@@ -205,13 +204,7 @@ public sealed partial class WeatherPainter
     /// <summary>"Until Thu 4:00 PM", "From 7:00 AM until Fri 1:00 AM" or "In effect", in the place's zone.</summary>
     private static string When(Ctx x, WeatherAlert a)
     {
-        var offset = x.NowLocal - x.R.NowUtc;
-        string Stamp(DateTime utc)
-        {
-            var local = utc + offset;
-            var clock = Units.Clock(local, x.C.TwentyFourHourClock);
-            return local.Date == x.NowLocal.Date ? clock : Units.ShortDayName(local, x.NowLocal) + " " + clock;
-        }
+        string Stamp(DateTime utc) => Units.DayClock(utc + x.Offset, x.NowLocal, x.C.TwentyFourHourClock);
 
         var start = a.StartUtc is { } s && s > x.R.NowUtc ? "From " + Stamp(s) : null;
         var end = a.EndUtc ?? a.ExpiresUtc;
@@ -241,10 +234,7 @@ public sealed partial class WeatherPainter
         var end = a.EndUtc ?? a.ExpiresUtc;
         if (end is { } e)
         {
-            var local = e.AddSeconds(offsetSeconds);
-            var today = nowUtc.AddSeconds(offsetSeconds);
-            var clock = Units.Clock(local, twentyFourHour);
-            text += " until " + (local.Date == today.Date ? clock : Units.ShortDayName(local, today) + " " + clock);
+            text += " until " + Units.DayClock(e.AddSeconds(offsetSeconds), nowUtc.AddSeconds(offsetSeconds), twentyFourHour);
         }
 
         if (alerts.Count > 1)
@@ -266,11 +256,8 @@ public sealed partial class WeatherPainter
 
         var a = place.ActiveAlerts[0];
         var color = AlertColor(a.Severity);
-        var text = Summary(place.ActiveAlerts, x.R.NowUtc, (long)(x.NowLocal - x.R.NowUtc).TotalSeconds, x.C.TwentyFourHourClock);
-        using (var paint = new SKPaint { IsAntialias = true, Color = color.WithAlpha(0x55) })
-        {
-            x.Canvas.DrawRoundRect(new SKRect(80, 153, x.W - 80, 193), 10, 10, paint);
-        }
+        var text = Summary(place.ActiveAlerts, x.R.NowUtc, (long)x.Offset.TotalSeconds, x.C.TwentyFourHourClock);
+        FillRoundRect(x, new SKRect(80, 153, x.W - 80, 193), 10, color.WithAlpha(0x55));
 
         WarningGlyph(x, 112, 173, 20, color);
         Text(x, text, 142, 182, 25, FontWeight.SemiBold, x.T.Text, maxWidth: x.W - 240);

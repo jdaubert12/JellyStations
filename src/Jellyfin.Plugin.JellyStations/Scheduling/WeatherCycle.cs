@@ -120,10 +120,6 @@ public static class WeatherCycle
         return list;
     }
 
-    /// <summary>Compatibility overload: the radar availability as two functions.</summary>
-    public static IReadOnlyList<CycleScreen> Pass(WeatherConfig c, int locationCount, Func<int, bool>? hasRadar, Func<int, bool>? hasForecastRadar = null, Func<int, bool>? hasAlerts = null)
-        => Pass(c, locationCount, new CycleAvailability(hasRadar, hasForecastRadar, hasAlerts));
-
     /// <summary>The short pass that fills the rest of an "on the 8s" window: each place's alerts (when it has any) and current conditions, then the travel screen.</summary>
     public static IReadOnlyList<CycleScreen> ShortPass(WeatherConfig c, int locationCount, CycleAvailability? available = null)
     {
@@ -160,9 +156,6 @@ public static class WeatherCycle
     }
 
     public static TimeSpan PassLength(WeatherConfig c, int locationCount, CycleAvailability? available = null) => Length(c, Pass(c, locationCount, available));
-
-    public static TimeSpan PassLength(WeatherConfig c, int locationCount, Func<int, bool>? hasRadar, Func<int, bool>? hasForecastRadar = null, Func<int, bool>? hasAlerts = null)
-        => PassLength(c, locationCount, new CycleAvailability(hasRadar, hasForecastRadar, hasAlerts));
 
     /// <summary>
     /// The screens on air from <paramref name="fromUtc"/> until <paramref name="toUtc"/>, in order, the first and
@@ -224,10 +217,6 @@ public static class WeatherCycle
 
         return result;
     }
-
-    /// <summary>Compatibility overload: the availability as functions.</summary>
-    public static IReadOnlyList<TimedScreen> Timeline(WeatherConfig c, int locationCount, DateTime fromUtc, DateTime toUtc, DateTime cycleStartUtc, TimeZoneInfo zone, Func<int, bool>? hasRadar, Func<int, bool>? hasForecastRadar = null, Func<int, bool>? hasAlerts = null)
-        => Timeline(c, locationCount, fromUtc, toUtc, cycleStartUtc, zone, new CycleAvailability(hasRadar, hasForecastRadar, hasAlerts));
 
     /// <summary>Without "on the 8s": the pass containing <paramref name="utc"/>, counted from the cycle start.</summary>
     private static (DateTime Start, DateTime End, IReadOnlyList<CycleScreen> Screens) PassFrame(WeatherConfig c, int locationCount, DateTime utc, DateTime cycleStartUtc, CycleAvailability a)

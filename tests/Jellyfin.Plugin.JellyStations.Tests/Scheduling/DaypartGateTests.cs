@@ -7,7 +7,7 @@ namespace Jellyfin.Plugin.JellyStations.Tests.Scheduling;
 
 public class DaypartGateTests
 {
-    private static readonly TimeZoneInfo NewYork = WeeklySlotScheduler.ResolveTimeZone("America/New_York");
+    private static readonly TimeZoneInfo NewYork = TimeZones.Resolve("America/New_York");
 
     private static DaypartRule Rule(string start, string end, string max, bool unrated = false)
         => new() { StartLocal = start, EndLocal = end, MaxRating = max, AllowUnrated = unrated };

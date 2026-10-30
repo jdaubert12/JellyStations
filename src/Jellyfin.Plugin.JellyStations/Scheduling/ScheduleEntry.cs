@@ -28,6 +28,18 @@ public sealed record ScheduleEntry(
         EntryKind.Weather => SourceLabel ?? "Local weather",
         _ => Item?.Title ?? string.Empty
     };
+
+    /// <summary>A program airing <paramref name="item"/> on the input's station.</summary>
+    public static ScheduleEntry Program(ScheduleInput input, PlayableItem item, DateTime startUtc, DateTime endUtc, bool truncated = false, string? label = null)
+        => new(input.StationId, input.Revision, EntryKind.Program, item, startUtc, endUtc, truncated, label);
+
+    /// <summary>Dead air with the station card.</summary>
+    public static ScheduleEntry Slate(ScheduleInput input, DateTime startUtc, DateTime endUtc, string? label = null)
+        => new(input.StationId, input.Revision, EntryKind.Slate, null, startUtc, endUtc, false, label);
+
+    /// <summary>A run of weather screens, titled <paramref name="label"/>.</summary>
+    public static ScheduleEntry Weather(ScheduleInput input, DateTime startUtc, DateTime endUtc, string? label)
+        => new(input.StationId, input.Revision, EntryKind.Weather, null, startUtc, endUtc, false, label);
 }
 
 /// <summary>The entry airing at a given instant and how far into it we are.</summary>

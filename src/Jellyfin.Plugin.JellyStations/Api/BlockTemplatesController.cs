@@ -31,21 +31,12 @@ public sealed class BlockTemplatesController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(template.Name))
         {
-            return BadRequest(new ValidationErrorDto { Errors = { "Give the template a name." } });
-        }
-
-        template.Name = template.Name.Trim();
-        template.Days ??= new List<DayOfWeek>();
-        template.Sources ??= new List<ContentSource>();
-        if (template.Id == Guid.Empty)
-        {
-            template.Id = Guid.NewGuid();
+            return BadRequest(ValidationErrorDto.Of("Give the template a name."));
         }
 
         var settings = _settings.Get();
         var list = Templates(settings);
-        list.RemoveAll(t => string.Equals(t.Name, template.Name, StringComparison.OrdinalIgnoreCase) || t.Id == template.Id);
-        list.Add(template);
+        Upsert(list, template);
         settings.BlockTemplates = list.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
         _settings.Save(settings);
         return Ok(settings.BlockTemplates);
@@ -60,6 +51,24 @@ public sealed class BlockTemplatesController : ControllerBase
         settings.BlockTemplates = list;
         _settings.Save(settings);
         return Ok(list);
+    }
+
+    /// <summary>
+    /// Cleans a named template (trimmed name, empty lists for missing ones, an id when it has none) and puts it in the
+    /// list in place of one with the same name (case-insensitive) or id.
+    /// </summary>
+    internal static void Upsert(List<SlotBlock> list, SlotBlock template)
+    {
+        template.Name = template.Name.Trim();
+        template.Days ??= new List<DayOfWeek>();
+        template.Sources ??= new List<ContentSource>();
+        if (template.Id == Guid.Empty)
+        {
+            template.Id = Guid.NewGuid();
+        }
+
+        list.RemoveAll(t => string.Equals(t.Name, template.Name, StringComparison.OrdinalIgnoreCase) || t.Id == template.Id);
+        list.Add(template);
     }
 
     private static List<SlotBlock> Templates(GlobalSettings settings) => settings.BlockTemplates ??= new List<SlotBlock>();

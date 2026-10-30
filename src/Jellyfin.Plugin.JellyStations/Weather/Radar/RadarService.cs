@@ -15,59 +15,32 @@ namespace Jellyfin.Plugin.JellyStations.Weather.Radar;
 /// the ones that fell out of the loop. A restart picks the cached frames back up. Nothing is fetched for a station
 /// nobody enabled.
 /// </summary>
-public sealed partial class RadarService : IDisposable
+public sealed partial class RadarService : LocationPoller
 {
     /// <summary>Frames per loop: 45 minutes of NEXRAD at five-minute steps, 90 minutes of RainViewer at ten.</summary>
     public const int FrameCount = 10;
 
     public static readonly TimeSpan Interval = TimeSpan.FromMinutes(5);
 
-    private static readonly TimeSpan Tick = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan KeepFrames = TimeSpan.FromHours(3);
 
-    private readonly StationRepository _stations;
     private readonly JellyStationsPaths _paths;
     private readonly IReadOnlyList<IRadarSource> _sources;
     private readonly IReadOnlyList<IForecastRadarSource> _forecastSources;
     private readonly ILogger<RadarService> _logger;
     private readonly ConcurrentDictionary<Guid, RadarLoop> _loops = new();
     private readonly ConcurrentDictionary<Guid, RadarFetchStatus> _status = new();
-    private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly CancellationTokenSource _cts = new();
-    private Timer? _timer;
-    private int _disposed;
-    private int _ticking;
 
     public RadarService(StationRepository stations, JellyStationsPaths paths, IEnumerable<IRadarSource> sources, IEnumerable<IForecastRadarSource> forecastSources, ILogger<RadarService> logger)
+        : base(stations, logger, "radar", startDelay: TimeSpan.FromSeconds(5), nudgeDelay: TimeSpan.FromSeconds(2))
     {
-        _stations = stations;
         _paths = paths;
         _sources = sources.ToList();
         _forecastSources = forecastSources.ToList();
         _logger = logger;
-        _stations.Changed += (_, _) => Nudge();
     }
 
     public IReadOnlyList<IRadarSource> Sources => _sources;
-
-    /// <summary>Starts polling. Called once by the hosted service.</summary>
-    public void Start()
-    {
-        _timer ??= new Timer(_ => _ = TickAsync(), null, TimeSpan.FromSeconds(5), Tick);
-    }
-
-    /// <summary>Polls soon (after a station was saved) rather than at the next regular tick.</summary>
-    public void Nudge()
-    {
-        try
-        {
-            _timer?.Change(TimeSpan.FromSeconds(2), Tick);
-        }
-        catch (ObjectDisposedException)
-        {
-            // Shutting down.
-        }
-    }
 
     /// <summary>The first source that covers the place, or null when none does.</summary>
     public IRadarSource? SourceFor(WeatherLocation location) => _sources.FirstOrDefault(s => s.Covers(location.Latitude, location.Longitude));
@@ -123,71 +96,30 @@ public sealed partial class RadarService : IDisposable
             return true;
         }
 
-        if (status.LastAttemptUtc is null)
-        {
-            return loop is null || nowUtc - loop.FetchedUtc >= Interval;
-        }
-
-        if (status.Failures > 0)
-        {
-            var backoff = TimeSpan.FromMinutes(Math.Min(15, Math.Pow(2, Math.Min(10, status.Failures - 1))));
-            return nowUtc - status.LastAttemptUtc.Value >= backoff;
-        }
-
-        return nowUtc - status.LastAttemptUtc.Value >= Interval;
+        return FetchBackoff.IsDue(status, () => loop?.FetchedUtc, Interval, nowUtc);
     }
 
     public static string FrameFileName(string sourceId, RadarZoom zoom, DateTime timeUtc)
         => sourceId + "-" + zoom.ToString().ToLowerInvariant() + "-" + ((long)(timeUtc - DateTime.UnixEpoch).TotalSeconds).ToString(CultureInfo.InvariantCulture) + ".png";
 
-    private async Task TickAsync()
+    protected override bool Polls(Station station) => station.Weather.ShowRadar || station.Weather.ShowForecastRadar;
+
+    protected override async Task PollAsync(Station station, WeatherLocation location, DateTime nowUtc, CancellationToken ct)
     {
-        if (Volatile.Read(ref _disposed) == 1 || Interlocked.Exchange(ref _ticking, 1) == 1)
+        if (station.Weather.ShowRadar && IsDue(location.Id, station.Weather.RadarZoom, nowUtc))
         {
-            return;
+            await FetchAsync(station, location, ct).ConfigureAwait(false);
         }
 
-        try
+        if (station.Weather.ShowForecastRadar && IsForecastDue(location.Id, station.Weather, nowUtc))
         {
-            var now = DateTime.UtcNow;
-            foreach (var station in _stations.GetAll().Where(s => s.UsesWeather && s.Enabled && (s.Weather.ShowRadar || s.Weather.ShowForecastRadar) && SeasonWindows.IsActive(s, now)))
-            {
-                foreach (var location in station.Weather.Locations.Where(l => l.IsValid))
-                {
-                    if (_cts.IsCancellationRequested)
-                    {
-                        return;
-                    }
-
-                    if (station.Weather.ShowRadar && IsDue(location.Id, station.Weather.RadarZoom, now))
-                    {
-                        await FetchAsync(station, location, _cts.Token).ConfigureAwait(false);
-                    }
-
-                    if (station.Weather.ShowForecastRadar && IsForecastDue(location.Id, station.Weather, now))
-                    {
-                        await FetchForecastAsync(station, location, _cts.Token).ConfigureAwait(false);
-                    }
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Shutting down.
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "JellyStations radar: poll failed");
-        }
-        finally
-        {
-            Volatile.Write(ref _ticking, 0);
+            await FetchForecastAsync(station, location, ct).ConfigureAwait(false);
         }
     }
 
     private async Task FetchAsync(Station station, WeatherLocation location, CancellationToken ct)
     {
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        await Gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var status = Status(location.Id);
@@ -216,26 +148,22 @@ public sealed partial class RadarService : IDisposable
                 foreach (var time in times)
                 {
                     var path = Path.Combine(dir, FrameFileName(source.Id, zoom, time));
-                    if (!File.Exists(path))
+                    try
                     {
-                        try
+                        if (await EnsureFrameFileAsync(path, () => source.FetchOverlayAsync(viewport, time, ct), ct).ConfigureAwait(false))
                         {
-                            var png = await source.FetchOverlayAsync(viewport, time, ct).ConfigureAwait(false);
-                            var tmp = path + ".tmp";
-                            await File.WriteAllBytesAsync(tmp, png, ct).ConfigureAwait(false);
-                            File.Move(tmp, path, overwrite: true);
                             fetched++;
                         }
-                        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                        {
-                            throw;
-                        }
-                        catch (Exception ex)
-                        {
-                            lastFrameError = ex;
-                            _logger.LogDebug(ex, "JellyStations radar [{Station}]: frame {Time} for {Place} failed", station.Name, time, location.Name);
-                            continue;
-                        }
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastFrameError = ex;
+                        _logger.LogDebug(ex, "JellyStations radar [{Station}]: frame {Time} for {Place} failed", station.Name, time, location.Name);
+                        continue;
                     }
 
                     frames.Add(new RadarFrame(time, path));
@@ -248,9 +176,7 @@ public sealed partial class RadarService : IDisposable
 
                 var loop = new RadarLoop(source.Id, source.Name, source.Attribution, zoom, frames, now);
                 _loops[location.Id] = loop;
-                status.LastSuccessUtc = now;
-                status.LastError = null;
-                status.Failures = 0;
+                status.MarkSuccess(now);
                 Sweep(dir, frames);
                 _logger.LogDebug("JellyStations radar [{Station}]: {Place} has {Count} frame(s) from {Source}, {New} new, newest {Time:HH:mm} UTC", station.Name, location.Name, frames.Count, source.Id, fetched, loop.Latest.TimeUtc);
             }
@@ -260,15 +186,29 @@ public sealed partial class RadarService : IDisposable
             }
             catch (Exception ex)
             {
-                status.Failures++;
-                status.LastError = ex.Message;
+                status.MarkFailure(ex.Message);
                 _logger.LogWarning("JellyStations radar [{Station}]: fetch for {Place} from {Source} failed ({Count} in a row): {Error}", station.Name, location.Name, source.Id, status.Failures, ex.Message);
             }
         }
         finally
         {
-            _gate.Release();
+            Gate.Release();
         }
+    }
+
+    /// <summary>Fetches one frame into <paramref name="path"/> (through a temp file) unless it is cached already; true when it was fetched now. A failed fetch throws.</summary>
+    private static async Task<bool> EnsureFrameFileAsync(string path, Func<Task<byte[]>> fetch, CancellationToken ct)
+    {
+        if (File.Exists(path))
+        {
+            return false;
+        }
+
+        var png = await fetch().ConfigureAwait(false);
+        var tmp = path + ".tmp";
+        await File.WriteAllBytesAsync(tmp, png, ct).ConfigureAwait(false);
+        File.Move(tmp, path, overwrite: true);
+        return true;
     }
 
     /// <summary>Removes frame files that are no longer part of the loop (older frames, another zoom, another source).</summary>
@@ -346,18 +286,4 @@ public sealed partial class RadarService : IDisposable
 
     [GeneratedRegex(@"^([a-z0-9]+)-([a-z]+)-(\d+)\.png$", RegexOptions.IgnoreCase)]
     private static partial Regex FrameName();
-
-    /// <summary>Safe to call twice: the hosted service disposes on stop and the container disposes again on shutdown.</summary>
-    public void Dispose()
-    {
-        if (Interlocked.Exchange(ref _disposed, 1) == 1)
-        {
-            return;
-        }
-
-        _cts.Cancel();
-        _timer?.Dispose();
-        _cts.Dispose();
-        _gate.Dispose();
-    }
 }

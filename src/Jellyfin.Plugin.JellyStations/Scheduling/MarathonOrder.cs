@@ -61,24 +61,7 @@ internal static class MarathonOrder
         var shuffled = SplitMix64.Permutation(runs.Count, seed ^ 0x5A5A5A5A5A5A5A5AUL).Select(r => runs[r]).ToList();
         if (avoidRepeats && shuffled.Count > 2)
         {
-            for (var i = 1; i < shuffled.Count; i++)
-            {
-                if (!Violation(shuffled, items, i, null))
-                {
-                    continue;
-                }
-
-                var done = false;
-                for (var j = i + 1; j < shuffled.Count && !done; j++)
-                {
-                    done = TrySwap(shuffled, items, i, j, null);
-                }
-
-                for (var j = 0; j < i - 1 && !done; j++)
-                {
-                    done = TrySwap(shuffled, items, i, j, null);
-                }
-            }
+            Adjacency.Spread(shuffled, run => KeyOfRun(run, items));
         }
 
         if (order == PlayOrder.ShuffleEpisodesInOrder)
@@ -101,63 +84,12 @@ internal static class MarathonOrder
     /// </summary>
     public static void KeepRunOrder(List<int[]> runs, IReadOnlyList<PlayableItem> items)
     {
-        var positions = new Dictionary<Guid, List<int>>();
-        for (var p = 0; p < runs.Count; p++)
-        {
-            var series = SeriesOf(runs[p], items);
-            if (series is null)
-            {
-                continue;
-            }
-
-            if (!positions.TryGetValue(series.Value, out var list))
-            {
-                list = new List<int>();
-                positions[series.Value] = list;
-            }
-
-            list.Add(p);
-        }
-
-        foreach (var slots in positions.Values)
-        {
-            if (slots.Count < 2)
-            {
-                continue;
-            }
-
-            // Runs were cut from an episode-sorted list, so ranking their first elements with the same sort
-            // puts the runs back into episode order.
-            var firsts = slots.Select(p => runs[p][0]).ToList();
-            var rank = EpisodeOrder.Sorted(firsts, items).Select((idx, r) => (idx, r)).ToDictionary(t => t.idx, t => t.r);
-            var ordered = slots.Select(p => runs[p]).OrderBy(run => rank[run[0]]).ToList();
-            for (var j = 0; j < slots.Count; j++)
-            {
-                runs[slots[j]] = ordered[j];
-            }
-        }
+        // Runs were cut from an episode-sorted list, so ranking their first elements with the same sort
+        // puts the runs back into episode order.
+        EpisodeOrder.Reorder(runs, items, run => run[0]);
     }
 
-    /// <summary>True if the run at idx is the same series or movie as the run before it (or as beforeStart for idx 0).</summary>
-    public static bool Violation(List<int[]> runs, IReadOnlyList<PlayableItem> items, int idx, string? beforeStart)
-    {
-        var key = KeyOfRun(runs[idx], items);
-        var prev = idx == 0 ? beforeStart : KeyOfRun(runs[idx - 1], items);
-        return prev == key;
-    }
-
+    /// <summary>Swaps runs a and b unless that puts the same series or movie back to back (see <see cref="Adjacency.TrySwap{T}"/>).</summary>
     public static bool TrySwap(List<int[]> runs, IReadOnlyList<PlayableItem> items, int a, int b, string? beforeStart)
-    {
-        (runs[a], runs[b]) = (runs[b], runs[a]);
-        foreach (var idx in new[] { a, a + 1, b, b + 1 })
-        {
-            if (idx >= 0 && idx < runs.Count && Violation(runs, items, idx, beforeStart))
-            {
-                (runs[a], runs[b]) = (runs[b], runs[a]);
-                return false;
-            }
-        }
-
-        return true;
-    }
+        => Adjacency.TrySwap(runs, run => KeyOfRun(run, items), a, b, beforeStart);
 }

@@ -9,7 +9,7 @@ namespace Jellyfin.Plugin.JellyStations.Tests.Scheduling;
 public class PoolWithBlocksTests
 {
     private static readonly Guid MovieBlockId = Guid.Parse("33333333-3333-3333-3333-333333333333");
-    private static readonly TimeZoneInfo NewYork = WeeklySlotScheduler.ResolveTimeZone("America/New_York");
+    private static readonly TimeZoneInfo NewYork = TimeZones.Resolve("America/New_York");
     private static readonly List<DayOfWeek> EveryDay = Enum.GetValues<DayOfWeek>().ToList();
 
     private static SlotBlock MovieNight(string start = "18:00", int minutes = 180, SlotOverflow overflow = SlotOverflow.FillerRemainder)

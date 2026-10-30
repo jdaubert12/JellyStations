@@ -48,7 +48,7 @@ public sealed class MusicPacksController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
-            return StatusCode(StatusCodes.Status409Conflict, new ValidationErrorDto { Errors = new List<string> { ex.Message } });
+            return StatusCode(StatusCodes.Status409Conflict, ValidationErrorDto.Of(ex.Message));
         }
     }
 

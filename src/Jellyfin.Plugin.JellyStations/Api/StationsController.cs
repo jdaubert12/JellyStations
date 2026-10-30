@@ -63,10 +63,11 @@ public sealed class StationsController : ControllerBase
                 Seasonal = SeasonWindows.IsSeasonal(s),
                 InSeason = SeasonWindows.IsActive(s, now),
                 NextSeasonChange = SeasonWindows.NextChange(s, now)?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                WeatherChannelId = s.Mode == ScheduleMode.Weather ? null : _stations.WeatherChannelFor(s)?.Id,
                 Next = resolved is null ? new List<ScheduleEntryDto>() : NextPrograms(s.Id, now),
                 LastError = fault?.Message,
                 LastErrorUtc = fault?.Utc,
-                Health = StationHealth.Build(s, compiled)
+                Health = StationHealth.Build(s, compiled, _stations.WeatherChannelFor(s))
             };
         });
         return Ok(result.ToList());
@@ -97,8 +98,8 @@ public sealed class StationsController : ControllerBase
         var settings = _settings.Get();
         return Ok(new StationExportDocument
         {
-            Stations = _stations.GetAll().OrderBy(s => s.ChannelNumber, StringComparer.OrdinalIgnoreCase).ToList(),
-            StationTemplates = (settings.StationTemplates ?? new List<StationTemplate>()).Select(StationTemplates.Clone).ToList(),
+            Stations = _stations.GetAll().ToList(),
+            StationTemplates = (settings.StationTemplates ?? new List<StationTemplate>()).Select(t => JsonFileStore.Clone(t)).ToList(),
             BlockTemplates = settings.BlockTemplates ?? new List<SlotBlock>()
         });
     }
@@ -108,7 +109,7 @@ public sealed class StationsController : ControllerBase
     /// station is matched to an existing one by id, then by name, and updated; unmatched stations are created. Item
     /// references whose ids are unknown on this server are matched by the display name stored beside them; what
     /// cannot be matched is dropped and reported. Templates replace the saved ones with the same name or id. Logos
-    /// are not part of the import.
+    /// are not part of the import, and extra ffmpeg arguments in an encoding profile are cleared and reported.
     /// </summary>
     [HttpPost("Import")]
     public ActionResult<ImportResultDto> Import([FromBody] JsonElement body)
@@ -117,7 +118,7 @@ public sealed class StationsController : ControllerBase
         var document = StationExportDocument.Parse(body, JsonDefaults.Options);
         if (document is null)
         {
-            return BadRequest(new ValidationErrorDto { Errors = { "The file is not a station export: expected a JSON array of stations or an export document." } });
+            return BadRequest(ValidationErrorDto.Of("The file is not a station export: expected a JSON array of stations or an export document."));
         }
 
         var result = new ImportResultDto();
@@ -128,9 +129,8 @@ public sealed class StationsController : ControllerBase
             var name = draft.Name ?? "(unnamed)";
             try
             {
-                var resolution = _importResolver.Resolve(draft);
-                result.Resolved.AddRange(resolution.Resolved.Select(r => name + ": " + r));
-                result.Unmatched.AddRange(resolution.Unmatched.Select(r => name + ": " + r));
+                result.Stripped.AddRange(StationExportDocument.StripEncoderArguments(draft).Select(s => name + ": " + s));
+                AddResolution(result, _importResolver.Resolve(draft), name);
 
                 var match = existing.FirstOrDefault(s => draft.Id != Guid.Empty && s.Id == draft.Id)
                     ?? existing.FirstOrDefault(s => string.Equals(s.Name?.Trim(), draft.Name?.Trim(), StringComparison.OrdinalIgnoreCase));
@@ -183,9 +183,9 @@ public sealed class StationsController : ControllerBase
 
             try
             {
-                var resolution = _importResolver.Resolve(template.Settings ??= new Station());
-                result.Resolved.AddRange(resolution.Resolved.Select(r => "template " + name + ": " + r));
-                result.Unmatched.AddRange(resolution.Unmatched.Select(r => "template " + name + ": " + r));
+                template.Settings ??= new Station();
+                result.Stripped.AddRange(StationExportDocument.StripEncoderArguments(template.Settings).Select(s => "template " + name + ": " + s));
+                AddResolution(result, _importResolver.Resolve(template.Settings), "template " + name);
                 StationTemplatesController.Upsert(stationTemplates, template);
                 result.StationTemplates.Add(name);
             }
@@ -206,24 +206,20 @@ public sealed class StationsController : ControllerBase
                 continue;
             }
 
-            block.Name = block.Name.Trim();
-            block.Days ??= new List<DayOfWeek>();
-            block.Sources ??= new List<ContentSource>();
-            if (block.Id == Guid.Empty)
-            {
-                block.Id = Guid.NewGuid();
-            }
-
-            var resolution = _importResolver.Resolve(new Station { Slots = new SlotsConfig { Blocks = new List<SlotBlock> { block } } });
-            result.Resolved.AddRange(resolution.Resolved.Select(r => "block template " + block.Name + ": " + r));
-            result.Unmatched.AddRange(resolution.Unmatched.Select(r => "block template " + block.Name + ": " + r));
-            blockTemplates.RemoveAll(t => string.Equals(t.Name, block.Name, StringComparison.OrdinalIgnoreCase) || t.Id == block.Id);
-            blockTemplates.Add(block);
+            BlockTemplatesController.Upsert(blockTemplates, block);
+            AddResolution(result, _importResolver.Resolve(new Station { Slots = new SlotsConfig { Blocks = new List<SlotBlock> { block } } }), "block template " + block.Name);
             result.BlockTemplates.Add(block.Name);
         }
 
         settings.BlockTemplates = blockTemplates.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
         _settings.Save(settings);
+    }
+
+    /// <summary>Reports an import's by-name matches and dropped references, each prefixed with what they belong to.</summary>
+    private static void AddResolution(ImportResultDto result, ImportResolution resolution, string prefix)
+    {
+        result.Resolved.AddRange(resolution.Resolved.Select(r => prefix + ": " + r));
+        result.Unmatched.AddRange(resolution.Unmatched.Select(r => prefix + ": " + r));
     }
 
     [HttpGet("{id}")]
@@ -307,8 +303,16 @@ public sealed class StationsController : ControllerBase
             return NotFound();
         }
 
+        // The span is capped whichever way it is asked for: an explicit `to` far in the future would otherwise
+        // materialise years of entries in memory.
+        var maxSpan = TimeSpan.FromDays(21);
         var start = (from ?? DateTime.UtcNow).ToUniversalTime();
         var end = (to ?? start.AddHours(Math.Clamp(hours, 1, 24 * 21))).ToUniversalTime();
+        if (end > start + maxSpan)
+        {
+            end = start + maxSpan;
+        }
+
         return Ok(_resolver.Enumerate(id, start, end).Select(e => Map.Entry(e, null)).ToList());
     }
 
@@ -347,20 +351,36 @@ public sealed class StationsController : ControllerBase
             return NotFound();
         }
 
-        var ext = (Request.ContentType ?? string.Empty).ToLowerInvariant() switch
+        const long maxBytes = 5 * 1024 * 1024;
+        if (Request.ContentLength > maxBytes)
         {
-            "image/png" => ".png",
-            "image/jpeg" => ".jpg",
-            "image/webp" => ".webp",
-            "image/gif" => ".gif",
-            _ => ".png"
-        };
+            return BadRequest(ValidationErrorDto.Of("Logo must be between 1 byte and 5 MB."));
+        }
 
+        // Read at most the limit plus one byte, so an oversized or unterminated body is never buffered whole.
         using var ms = new MemoryStream();
-        await Request.Body.CopyToAsync(ms).ConfigureAwait(false);
-        if (ms.Length == 0 || ms.Length > 5 * 1024 * 1024)
+        var buffer = new byte[64 * 1024];
+        int read;
+        while ((read = await Request.Body.ReadAsync(buffer, HttpContext.RequestAborted).ConfigureAwait(false)) > 0)
         {
-            return BadRequest(new ValidationErrorDto { Errors = { "Logo must be between 1 byte and 5 MB." } });
+            ms.Write(buffer, 0, read);
+            if (ms.Length > maxBytes)
+            {
+                return BadRequest(ValidationErrorDto.Of("Logo must be between 1 byte and 5 MB."));
+            }
+        }
+
+        if (ms.Length == 0)
+        {
+            return BadRequest(ValidationErrorDto.Of("Logo must be between 1 byte and 5 MB."));
+        }
+
+        // The extension follows what the bytes are, not what the request claimed: the anonymous logo endpoint serves
+        // this file back as an image, so only real images are kept.
+        var ext = ImageSniff.Extension(ms.GetBuffer().AsSpan(0, (int)ms.Length));
+        if (ext is null)
+        {
+            return BadRequest(ValidationErrorDto.Of("Logo must be a PNG, JPEG, WebP or GIF image."));
         }
 
         ms.Position = 0;
@@ -418,18 +438,14 @@ public sealed class StationsController : ControllerBase
             return null;
         }
 
+        // Mirrors CyclicScheduler: every program is padded together with the bumper break that follows it.
         var items = station.Mode == ScheduleMode.Lineup ? compiled.Lineup : compiled.Pool;
-        var grid = TimeSpan.FromMinutes(station.PaddingGridMinutes);
+        var grid = TimeSpan.FromMinutes(Math.Max(0, station.PaddingGridMinutes));
+        var brk = ScheduleInput.BreakFor(station);
         long ticks = 0;
         foreach (var i in items)
         {
-            var d = i.Runtime;
-            if (grid > TimeSpan.Zero || station.PaddingByLength)
-            {
-                d = Scheduling.Padding.Pad(d, grid, station.PaddingByLength);
-            }
-
-            ticks += d.Ticks;
+            ticks += Scheduling.Padding.Pad(i.Runtime + brk, grid, station.PaddingByLength).Ticks;
         }
 
         return TimeSpan.FromTicks(ticks);

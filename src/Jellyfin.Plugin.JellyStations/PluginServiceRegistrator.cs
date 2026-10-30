@@ -30,6 +30,15 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<StationCompiler>();
 
         serviceCollection.AddHttpClient();
+
+        // Weather and radar talk to fixed https hosts that answer directly. A redirect would be a hijack and an
+        // oversized body a fault, so neither is followed into memory; the callers report the 3xx as a failed fetch.
+        // The music pack client keeps redirects: its hosts bounce to their file servers, and every download is
+        // checked against the catalogue's length and SHA-256 anyway.
+        serviceCollection.AddHttpClient("JellyStations.Weather", c => c.MaxResponseContentBufferSize = 4 * 1024 * 1024)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
+        serviceCollection.AddHttpClient("JellyStations.Radar", c => c.MaxResponseContentBufferSize = 16 * 1024 * 1024)
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler { AllowAutoRedirect = false });
         serviceCollection.AddSingleton<IWeatherProvider, OpenMeteoProvider>();
         serviceCollection.AddSingleton<WeatherService>();
         serviceCollection.AddSingleton<Weather.Radar.RadarHttp>();
@@ -52,17 +61,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         {
             var stations = sp.GetRequiredService<StationRepository>();
             var compiled = sp.GetRequiredService<CompiledStationRepository>();
-            return new ScheduleResolver(id =>
-            {
-                var station = stations.Get(id);
-                if (station is null)
-                {
-                    return null;
-                }
-
-                var snapshot = compiled.Get(id) ?? new Models.CompiledStation { StationId = id, Revision = station.Revision };
-                return ScheduleInput.From(station, snapshot);
-            });
+            return new ScheduleResolver(id => ScheduleInput.ForStation(id, stations, compiled));
         });
 
         serviceCollection.AddSingleton<GuideRefreshService>();

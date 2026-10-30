@@ -75,7 +75,7 @@ public sealed class SettingsController : ControllerBase
         settings.BlockTemplates = previous.BlockTemplates ?? new List<SlotBlock>();
         settings.StationTemplates = previous.StationTemplates ?? new List<StationTemplate>();
         _settings.Save(settings);
-        if (JsonFileStore.Serialize(previous.DefaultEncoding) != JsonFileStore.Serialize(settings.DefaultEncoding))
+        if (!JsonFileStore.SameJson(previous.DefaultEncoding, settings.DefaultEncoding))
         {
             _sessions.StopAll();
         }
@@ -102,7 +102,7 @@ public sealed class GuideController : ControllerBase
     }
 
     [HttpPost("Refresh")]
-    public IActionResult Refresh() => _guide.TriggerNow() ? Accepted() : StatusCode(503, new ValidationErrorDto { Errors = { "The Live TV guide refresh task is not available." } });
+    public IActionResult Refresh() => _guide.TriggerNow() ? Accepted() : StatusCode(503, ValidationErrorDto.Of("The Live TV guide refresh task is not available."));
 }
 
 [ApiController]
@@ -127,8 +127,7 @@ public sealed class StatusController : ControllerBase
     public ActionResult<HealthReportDto> Health()
     {
         var stations = _stations.GetAll()
-            .OrderBy(s => s.ChannelNumber, StringComparer.OrdinalIgnoreCase)
-            .Select(s => StationHealth.Build(s, _stations.GetCompiled(s.Id)))
+            .Select(s => StationHealth.Build(s, _stations.GetCompiled(s.Id), _stations.WeatherChannelFor(s)))
             .ToList();
         return Ok(new HealthReportDto
         {
@@ -312,13 +311,13 @@ public sealed class HardwareController : ControllerBase
         var ffmpegPath = _sessions.FfmpegPath;
         if (!System.IO.File.Exists(ffmpegPath))
         {
-            return BadRequest(new ValidationErrorDto { Errors = { "ffmpeg not found at " + ffmpegPath } });
+            return BadRequest(ValidationErrorDto.Of("ffmpeg not found at " + ffmpegPath));
         }
 
         var pick = PickFile(request.StationId);
         if (pick is null)
         {
-            return BadRequest(new ValidationErrorDto { Errors = { request.StationId.HasValue ? "That station has no playable file to test with; refresh its content first." : "No station has a playable file to test with yet." } });
+            return BadRequest(ValidationErrorDto.Of(request.StationId.HasValue ? "That station has no playable file to test with; refresh its content first." : "No station has a playable file to test with yet."));
         }
 
         var (station, part, seek) = pick.Value;
@@ -377,7 +376,7 @@ public sealed class HardwareController : ControllerBase
         var now = DateTime.UtcNow;
         IEnumerable<Station> candidates = stationId.HasValue
             ? (_stations.Get(stationId.Value) is { } one ? new[] { one } : Array.Empty<Station>())
-            : _stations.GetAll().Where(s => s.Enabled).OrderBy(s => s.ChannelNumber, StringComparer.OrdinalIgnoreCase);
+            : _stations.GetAll().Where(s => s.Enabled);
 
         foreach (var station in candidates)
         {
@@ -397,7 +396,7 @@ public sealed class HardwareController : ControllerBase
                 continue;
             }
 
-            var first = compiled.Pool.Concat(compiled.Lineup).Concat(compiled.Blocks.Values.SelectMany(b => b)).Concat(compiled.Filler)
+            var first = compiled.ProgramItems
                 .Select(i => i.SegmentAt(TimeSpan.Zero).Part)
                 .FirstOrDefault(p => System.IO.File.Exists(p.Path));
             if (first is not null)

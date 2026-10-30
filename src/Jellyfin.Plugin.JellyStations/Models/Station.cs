@@ -51,6 +51,12 @@ public sealed class Station
     /// <summary>Weather channel settings (Weather mode): places, units, screens and music.</summary>
     public WeatherConfig Weather { get; set; } = new();
 
+    /// <summary>
+    /// For an ordinary station with a weather time block or weather in the breaks: the weather channel whose
+    /// places, look and music they show. Null = the first weather channel. Always null on a weather channel.
+    /// </summary>
+    public Guid? WeatherSourceStationId { get; set; }
+
     /// <summary>Per-station encoding override; null uses the global default.</summary>
     public EncodingProfile? Encoding { get; set; }
 

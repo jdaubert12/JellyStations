@@ -84,4 +84,7 @@ public static class JsonFileStore
     }
 
     public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, Options);
+
+    /// <summary>True when both values serialize to the same JSON: a deep equality for settings objects.</summary>
+    public static bool SameJson<T>(T a, T b) => Serialize(a) == Serialize(b);
 }

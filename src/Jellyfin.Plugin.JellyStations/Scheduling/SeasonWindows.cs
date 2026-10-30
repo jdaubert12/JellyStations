@@ -56,7 +56,7 @@ public static class SeasonWindows
 
     private static DateOnly ToLocalDate(Station station, DateTime utcNow)
     {
-        var tz = WeeklySlotScheduler.ResolveTimeZone(station.TimeZoneId);
+        var tz = TimeZones.Resolve(station.TimeZoneId);
         var local = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc), tz);
         return DateOnly.FromDateTime(local);
     }

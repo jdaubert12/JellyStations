@@ -18,7 +18,11 @@ public static class StationHealth
         ExclusionReason.NoRuntime, ExclusionReason.NoPath, ExclusionReason.NotFound, ExclusionReason.NotVideo
     };
 
-    public static StationHealthDto Build(Station station, CompiledStation? compiled, double minUniqueHours = MinUniqueHours)
+    /// <summary>
+    /// Judges a station from its last compile. <paramref name="weatherChannel"/> is the weather channel an ordinary
+    /// station with a weather block or weather in the breaks shows (null = none exists); ignored for other stations.
+    /// </summary>
+    public static StationHealthDto Build(Station station, CompiledStation? compiled, Station? weatherChannel = null, double minUniqueHours = MinUniqueHours)
     {
         var dto = new StationHealthDto
         {
@@ -57,7 +61,15 @@ public static class StationHealth
 
         if (station.UsesWeather)
         {
-            WeatherWarnings(station, compiled, dto);
+            // An ordinary station shows a weather channel's places; it has none of its own to judge.
+            if (weatherChannel is null)
+            {
+                dto.Warnings.Add("No weather channel: the weather block and breaks show a card until a weather channel exists and is picked in the Weather section.");
+            }
+            else if (!weatherChannel.Weather.Locations.Any(l => l.IsValid))
+            {
+                dto.Warnings.Add("The weather channel \"" + weatherChannel.Name + "\" has no places: the weather block and breaks show a card until one is added there.");
+            }
         }
 
         if (compiled.TotalItemCount == 0)
@@ -88,9 +100,7 @@ public static class StationHealth
         var places = w.Locations.Count(l => l.IsValid);
         if (places == 0)
         {
-            dto.Warnings.Add(station.Mode == ScheduleMode.Weather
-                ? "No places: the channel shows a card until a place is added."
-                : "No places: the weather block and breaks show a card until a place is added in the Weather section.");
+            dto.Warnings.Add("No places: the channel shows a card until a place is added.");
         }
 
         dto.MusicHours = Math.Round(compiled.Music.Sum(t => (double)t.RuntimeTicks) / TimeSpan.TicksPerHour, 1);
@@ -119,7 +129,7 @@ public static class StationHealth
     {
         var seen = new HashSet<Guid>();
         long ticks = 0;
-        foreach (var item in compiled.Pool.Concat(compiled.Lineup).Concat(compiled.Blocks.Values.SelectMany(b => b)).Concat(compiled.Filler))
+        foreach (var item in compiled.ProgramItems)
         {
             if (seen.Add(item.ItemId))
             {

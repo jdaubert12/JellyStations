@@ -10,8 +10,20 @@ namespace Jellyfin.Plugin.JellyStations.Streaming;
 /// </summary>
 public sealed class HardwareDecodePolicy
 {
+    /// <summary>The codecs GPU decoders take, as Jellyfin names them, with the name a person reads and the Intel Quick Sync decoder.</summary>
+    private static readonly GpuCodec[] GpuCodecs =
+    {
+        new("h264", "H.264", "h264_qsv"),
+        new("hevc", "HEVC", "hevc_qsv"),
+        new("mpeg2video", "MPEG-2", "mpeg2_qsv"),
+        new("vc1", "VC-1", "vc1_qsv"),
+        new("vp8", "VP8", "vp8_qsv"),
+        new("vp9", "VP9", "vp9_qsv"),
+        new("av1", "AV1", "av1_qsv")
+    };
+
     /// <summary>The codec names Jellyfin lists under "Enable hardware decoding for".</summary>
-    public static readonly string[] AllCodecs = { "h264", "hevc", "mpeg2video", "vc1", "vp8", "vp9", "av1" };
+    public static readonly string[] AllCodecs = GpuCodecs.Select(c => c.Codec).ToArray();
 
     public HardwareDecodePolicy(string kind, IEnumerable<string> codecs, bool hevc10 = true, bool vp9Ten = true, bool hevcRext10 = false, bool hevcRext12 = false, bool fromJellyfin = false)
     {
@@ -157,17 +169,17 @@ public sealed class HardwareDecodePolicy
         return null;
     }
 
+    /// <summary>The Intel Quick Sync decoder for a codec as Jellyfin names it, or null when there is none (or the codec is unknown).</summary>
+    public static string? QsvDecoder(string? videoCodec)
+    {
+        var codec = NormalizeCodec(videoCodec);
+        return GpuCodecs.FirstOrDefault(c => c.Codec == codec)?.QsvDecoder;
+    }
+
     public static string Describe(string codec, string? profile, int depth, string? chroma)
     {
-        var name = codec switch
+        var name = GpuCodecs.FirstOrDefault(c => c.Codec == codec)?.Name ?? codec switch
         {
-            "h264" => "H.264",
-            "hevc" => "HEVC",
-            "mpeg2video" => "MPEG-2",
-            "vc1" => "VC-1",
-            "vp8" => "VP8",
-            "vp9" => "VP9",
-            "av1" => "AV1",
             "mpeg4" => "MPEG-4 ASP (DivX/Xvid)",
             "msmpeg4v3" => "MS-MPEG-4 v3 (DivX 3)",
             "wmv1" or "wmv2" => "WMV",
@@ -237,3 +249,6 @@ public sealed class HardwareDecodePolicy
         return f.StartsWith("nv12", StringComparison.Ordinal) || f.StartsWith("p010", StringComparison.Ordinal) ? "420" : null;
     }
 }
+
+/// <summary>One codec a GPU decoder takes: Jellyfin's name for it, the name a person reads, its Quick Sync decoder.</summary>
+internal sealed record GpuCodec(string Codec, string Name, string QsvDecoder);

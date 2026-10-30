@@ -19,6 +19,42 @@ public sealed class StationExportDocument
 
     public List<SlotBlock> BlockTemplates { get; set; } = new();
 
+    /// <summary>
+    /// Clears the parts of an imported station's encoding profile that reach ffmpeg's command line verbatim: the extra
+    /// input and output arguments and the hardware device. An admin can type these in the editor, but a file from
+    /// elsewhere must not be able to add, say, a second output that writes into the plugins folder. Returns a short
+    /// description of each field that was cleared, empty when there was nothing to clear.
+    /// </summary>
+    public static IReadOnlyList<string> StripEncoderArguments(Station station)
+    {
+        var encoding = station.Encoding;
+        if (encoding is null)
+        {
+            return Array.Empty<string>();
+        }
+
+        var stripped = new List<string>();
+        if (!string.IsNullOrWhiteSpace(encoding.ExtraInputArgs))
+        {
+            stripped.Add("extra input arguments (" + encoding.ExtraInputArgs.Trim() + ")");
+            encoding.ExtraInputArgs = string.Empty;
+        }
+
+        if (!string.IsNullOrWhiteSpace(encoding.ExtraOutputArgs))
+        {
+            stripped.Add("extra output arguments (" + encoding.ExtraOutputArgs.Trim() + ")");
+            encoding.ExtraOutputArgs = string.Empty;
+        }
+
+        if (!string.IsNullOrWhiteSpace(encoding.HardwareDevice))
+        {
+            stripped.Add("hardware device (" + encoding.HardwareDevice.Trim() + ")");
+            encoding.HardwareDevice = string.Empty;
+        }
+
+        return stripped;
+    }
+
     /// <summary>Parses either shape; null when the JSON is neither an array nor an object.</summary>
     public static StationExportDocument? Parse(JsonElement json, JsonSerializerOptions options)
     {

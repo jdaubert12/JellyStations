@@ -25,7 +25,7 @@ public sealed class StationRepository
     public IReadOnlyList<Station> GetAll()
     {
         EnsureLoaded();
-        return _cache.Values.OrderBy(s => SortKey(s.ChannelNumber)).ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        return _cache.Values.OrderBy(s => s, StationOrder.ByChannel).ToList();
     }
 
     public Station? Get(Guid id)
@@ -91,10 +91,5 @@ public sealed class StationRepository
             _loaded = true;
             _logger.LogInformation("JellyStations: loaded {Count} station(s)", _cache.Count);
         }
-    }
-
-    private static (int, string) SortKey(string number)
-    {
-        return int.TryParse(number, out var n) ? (n, string.Empty) : (int.MaxValue, number ?? string.Empty);
     }
 }

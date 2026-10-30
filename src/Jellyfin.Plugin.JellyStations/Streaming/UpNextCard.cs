@@ -113,17 +113,7 @@ public static class UpNextCard
     }
 
     /// <summary>The station's time zone, or UTC when the id is unknown on this host.</summary>
-    public static TimeZoneInfo Zone(string? timeZoneId)
-    {
-        try
-        {
-            return string.IsNullOrWhiteSpace(timeZoneId) ? TimeZoneInfo.Utc : TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
-        }
-        catch (Exception)
-        {
-            return TimeZoneInfo.Utc;
-        }
-    }
+    public static TimeZoneInfo Zone(string? timeZoneId) => TimeZones.Resolve(timeZoneId);
 
     /// <summary>Cuts a line that would run past the card, with an ellipsis. drawtext does not wrap.</summary>
     public static string Fit(string text, int widthPx, int fontSize)

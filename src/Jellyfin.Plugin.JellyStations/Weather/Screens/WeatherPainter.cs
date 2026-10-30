@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Scheduling;
@@ -142,6 +143,7 @@ public sealed partial class WeatherPainter
             T = theme;
             W = width;
             R = request;
+            Offset = request.Place?.Report is { } rep ? TimeSpan.FromSeconds(rep.UtcOffsetSeconds) : request.StationZone.GetUtcOffset(request.NowUtc);
         }
 
         public SKCanvas Canvas { get; }
@@ -156,19 +158,17 @@ public sealed partial class WeatherPainter
 
         public WeatherReport? Report => R.Place?.Report;
 
-        /// <summary>Wall-clock "now" at the screen's place (or the station when there is no place).</summary>
-        public DateTime NowLocal
-        {
-            get
-            {
-                if (R.Place?.Report is { } rep)
-                {
-                    return R.NowUtc.AddSeconds(rep.UtcOffsetSeconds);
-                }
+        /// <summary>The screen's place's offset from UTC (the report's, or the station's zone when there is no report).</summary>
+        public TimeSpan Offset { get; }
 
-                return R.NowUtc + R.StationZone.GetUtcOffset(R.NowUtc);
-            }
-        }
+        /// <summary>Wall-clock "now" at the screen's place (or the station when there is no place).</summary>
+        public DateTime NowLocal => R.NowUtc + Offset;
+
+        /// <summary>Today as the header writes it: "Thursday, October 29".</summary>
+        public string LongDate => NowLocal.ToString("dddd, MMMM d", CultureInfo.InvariantCulture);
+
+        /// <summary>A UTC time as the place's wall clock, in the station's clock style.</summary>
+        public string Clock(DateTime utc) => Units.Clock(utc + Offset, C.TwentyFourHourClock);
     }
 
     // ---- Chrome -----------------------------------------------------------------------------
@@ -185,7 +185,7 @@ public sealed partial class WeatherPainter
         var place = x.R.Place;
         var title = x.R.Kind == WeatherScreenKind.Travel ? "Travel cities" : place?.Location.Name ?? "Weather";
         var subtitle = x.R.Kind == WeatherScreenKind.Travel
-            ? x.NowLocal.ToString("dddd, MMMM d", CultureInfo.InvariantCulture)
+            ? x.LongDate
             : place?.Location.Region ?? string.Empty;
         Text(x, title, 80, 86, 62, FontWeight.SemiBold, x.T.Text, maxWidth: x.W * 0.55f);
         if (subtitle.Length > 0)
@@ -210,13 +210,9 @@ public sealed partial class WeatherPainter
         {
             under = "Updated " + Units.Clock(rep.ObservedUtc.AddSeconds(rep.UtcOffsetSeconds), x.C.TwentyFourHourClock);
         }
-        else if (x.R.Kind == WeatherScreenKind.Radar && x.R.Radar is { } frame)
+        else if (x.R.Kind is WeatherScreenKind.Radar or WeatherScreenKind.ForecastRadar && x.R.Radar is { } frame)
         {
-            under = "As of " + Units.Clock(frame.TimeUtc + (x.NowLocal - x.R.NowUtc), x.C.TwentyFourHourClock);
-        }
-        else if (x.R.Kind == WeatherScreenKind.ForecastRadar && x.R.Radar is { } forecast)
-        {
-            under = "Forecast for " + Units.Clock(forecast.TimeUtc + (x.NowLocal - x.R.NowUtc), x.C.TwentyFourHourClock);
+            under = (x.R.Kind == WeatherScreenKind.Radar ? "As of " : "Forecast for ") + x.Clock(frame.TimeUtc);
         }
         else if (x.R.Kind == WeatherScreenKind.Alerts && place?.ActiveAlerts.FirstOrDefault()?.Sender is { Length: > 0 } sender)
         {
@@ -224,7 +220,7 @@ public sealed partial class WeatherPainter
         }
         else if (x.R.Kind != WeatherScreenKind.Travel)
         {
-            under = x.NowLocal.ToString("dddd, MMMM d", CultureInfo.InvariantCulture);
+            under = x.LongDate;
         }
         else
         {
@@ -280,11 +276,8 @@ public sealed partial class WeatherPainter
 
     private void Current(Ctx x)
     {
-        var place = x.R.Place;
-        var rep = x.Report;
-        if (place is null || rep is null)
+        if (!TryReport(x, out var place, out var rep))
         {
-            Unavailable(x, "Waiting for the first forecast", place?.Location.Name);
             return;
         }
 
@@ -342,22 +335,13 @@ public sealed partial class WeatherPainter
             }
         }
 
-        if (place.Stale)
-        {
-            StaleBanner(x, rep);
-        }
-        else
-        {
-            AlertStrip(x);
-        }
+        StaleBannerOrAlertStrip(x, place, rep);
     }
 
     private void Hourly(Ctx x)
     {
-        var rep = x.Report;
-        if (x.R.Place is null || rep is null)
+        if (!TryReport(x, out var place, out var rep))
         {
-            Unavailable(x, "Waiting for the first forecast", x.R.Place?.Location.Name);
             return;
         }
 
@@ -370,7 +354,7 @@ public sealed partial class WeatherPainter
 
         if (hours.Count == 0)
         {
-            Unavailable(x, "No hourly forecast", x.R.Place.Location.Name);
+            Unavailable(x, "No hourly forecast", place.Location.Name);
             return;
         }
 
@@ -451,22 +435,13 @@ public sealed partial class WeatherPainter
             }
         }
 
-        if (x.R.Place.Stale)
-        {
-            StaleBanner(x, rep);
-        }
-        else
-        {
-            AlertStrip(x);
-        }
+        StaleBannerOrAlertStrip(x, place, rep);
     }
 
     private void Daily(Ctx x)
     {
-        var rep = x.Report;
-        if (x.R.Place is null || rep is null)
+        if (!TryReport(x, out var place, out var rep))
         {
-            Unavailable(x, "Waiting for the first forecast", x.R.Place?.Location.Name);
             return;
         }
 
@@ -478,7 +453,7 @@ public sealed partial class WeatherPainter
 
         if (days.Count == 0)
         {
-            Unavailable(x, "No daily forecast", x.R.Place.Location.Name);
+            Unavailable(x, "No daily forecast", place.Location.Name);
             return;
         }
 
@@ -517,14 +492,7 @@ public sealed partial class WeatherPainter
             }
         }
 
-        if (x.R.Place.Stale)
-        {
-            StaleBanner(x, rep);
-        }
-        else
-        {
-            AlertStrip(x);
-        }
+        StaleBannerOrAlertStrip(x, place, rep);
     }
 
     private void Travel(Ctx x)
@@ -589,6 +557,33 @@ public sealed partial class WeatherPainter
         }
     }
 
+    /// <summary>The screen's place and its report; false, with the waiting notice drawn, when either is missing.</summary>
+    private bool TryReport(Ctx x, [NotNullWhen(true)] out PlaceWeather? place, [NotNullWhen(true)] out WeatherReport? rep)
+    {
+        place = x.R.Place;
+        rep = x.Report;
+        if (place is null || rep is null)
+        {
+            Unavailable(x, "Waiting for the first forecast", place?.Location.Name);
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>Under the header of a forecast screen: the stale banner when the report is old, else the alert strip.</summary>
+    private void StaleBannerOrAlertStrip(Ctx x, PlaceWeather place, WeatherReport rep)
+    {
+        if (place.Stale)
+        {
+            StaleBanner(x, rep);
+        }
+        else
+        {
+            AlertStrip(x);
+        }
+    }
+
     private void Unavailable(Ctx x, string message, string? place)
     {
         WeatherIcons.Draw(x.Canvas, WeatherIcon.Unknown, true, x.W / 2, 440, 260, x.T.Icons);
@@ -602,17 +597,18 @@ public sealed partial class WeatherPainter
     private void StaleBanner(Ctx x, WeatherReport rep)
     {
         var text = "Forecast not updated since " + Units.Clock(rep.FetchedUtc.AddSeconds(rep.UtcOffsetSeconds), x.C.TwentyFourHourClock) + " · showing the last report";
-        using var paint = new SKPaint { IsAntialias = true, Color = x.T.Accent.WithAlpha(0x33) };
-        x.Canvas.DrawRoundRect(new SKRect(80, 160, x.W - 80, 206), 10, 10, paint);
+        FillRoundRect(x, new SKRect(80, 160, x.W - 80, 206), 10, x.T.Accent.WithAlpha(0x33));
         Text(x, text, x.W / 2, 192, 26, FontWeight.SemiBold, x.T.Text, SKTextAlign.Center);
     }
 
     // ---- Primitives -------------------------------------------------------------------------
 
-    private void Panel(Ctx x, SKRect rect)
+    private static void Panel(Ctx x, SKRect rect) => FillRoundRect(x, rect, 24, x.T.Panel);
+
+    private static void FillRoundRect(Ctx x, SKRect rect, float radius, SKColor color)
     {
-        using var paint = new SKPaint { IsAntialias = true, Color = x.T.Panel };
-        x.Canvas.DrawRoundRect(rect, 24, 24, paint);
+        using var paint = new SKPaint { IsAntialias = true, Color = color };
+        x.Canvas.DrawRoundRect(rect, radius, radius, paint);
     }
 
     private static void Line(Ctx x, float x1, float y1, float x2, float y2, byte alpha = 0)

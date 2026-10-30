@@ -28,7 +28,7 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
     public WeeklySlotScheduler(ScheduleInput input)
     {
         _input = input;
-        _tz = ResolveTimeZone(input.TimeZoneId);
+        _tz = TimeZones.Resolve(input.TimeZoneId);
         var anchorLocal = TimeZoneInfo.ConvertTimeFromUtc(input.AnchorUtc, _tz).Date;
         var daysSinceMonday = ((int)anchorLocal.DayOfWeek + 6) % 7;
         _anchorMondayLocal = anchorLocal.AddDays(-daysSinceMonday);
@@ -36,18 +36,6 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         _filler = input.Mode == ScheduleMode.Pool
             ? new FillerStream(input.Pool, input.PoolOrder, input.AvoidSameSeriesBackToBack, input.MarathonMin, input.MarathonMax, input.DaypartRules, input.PoolOrder != PlayOrder.Sequential, "Pool")
             : new FillerStream(input.Filler, input.FillerOrder, false, 1, 1, Array.Empty<DaypartRuleInput>(), false, "Filler");
-    }
-
-    public static TimeZoneInfo ResolveTimeZone(string id)
-    {
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById(id);
-        }
-        catch (Exception)
-        {
-            return TimeZoneInfo.Utc;
-        }
     }
 
     public ResolvedProgram? Resolve(DateTime utc)
@@ -335,7 +323,7 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         if (block.IsWeather)
         {
             // The weather screens run for the whole occurrence; the cycle starts at its start.
-            entries.Add(new ScheduleEntry(_input.StationId, _input.Revision, EntryKind.Weather, null, start, end, false, block.Name));
+            entries.Add(ScheduleEntry.Weather(_input, start, end, block.Name));
             return end;
         }
 
@@ -639,10 +627,10 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
     }
 
     private ScheduleEntry Program(PlayableItem item, DateTime start, DateTime end, bool truncated, string label)
-        => new(_input.StationId, _input.Revision, EntryKind.Program, item, start, end, truncated, label);
+        => ScheduleEntry.Program(_input, item, start, end, truncated, label);
 
     private ScheduleEntry Slate(DateTime start, DateTime end, string label)
-        => new(_input.StationId, _input.Revision, EntryKind.Slate, null, start, end, false, label);
+        => ScheduleEntry.Slate(_input, start, end, label);
 
     /// <summary>The stream that plays whenever no block is on. PreferFit: before cutting an item at a gap end, look for an unplayed one that fits.</summary>
     private sealed record FillerStream(IReadOnlyList<PlayableItem> Items, PlayOrder Order, bool AvoidRepeats, int MarathonMin, int MarathonMax, IReadOnlyList<DaypartRuleInput> Rules, bool PreferFit, string Label);

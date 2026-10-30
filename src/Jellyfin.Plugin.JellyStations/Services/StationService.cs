@@ -5,6 +5,7 @@ using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Scheduling;
 using Jellyfin.Plugin.JellyStations.Storage;
 using Jellyfin.Plugin.JellyStations.Streaming;
+using Jellyfin.Plugin.JellyStations.Weather;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.JellyStations.Services;
@@ -63,6 +64,9 @@ public sealed class StationService
                 throw new ValidationException(new[] { "A station with this id already exists." });
             }
 
+            // A logo only arrives through SaveLogo, which names the file itself. Never trust a name from the body
+            // or an import: the anonymous logo endpoint serves whatever file this points at.
+            draft.LogoFileName = null;
             Normalize(draft);
             var errors = Validate(draft, null);
             if (errors.Count > 0)
@@ -77,7 +81,7 @@ public sealed class StationService
                 draft.AnchorUtc = DefaultAnchor(draft);
             }
 
-            var compiled = _compiler.Compile(draft, EffectiveProfile(draft), _settings.Get().ExcludedTags);
+            var compiled = Compile(draft);
             _compiled.Save(compiled);
             _stations.Save(draft);
             _resolver.Invalidate(draft.Id);
@@ -109,7 +113,7 @@ public sealed class StationService
             var scheduleChanged = ScheduleFingerprint(existing) != ScheduleFingerprint(draft);
             draft.Revision = scheduleChanged ? existing.Revision + 1 : existing.Revision;
 
-            var compiled = _compiler.Compile(draft, EffectiveProfile(draft), _settings.Get().ExcludedTags);
+            var compiled = Compile(draft);
             var previous = _compiled.Get(id);
             if (!scheduleChanged && previous is not null && !StationCompiler.SameContent(previous, compiled))
             {
@@ -123,10 +127,10 @@ public sealed class StationService
             _stations.Save(draft);
             _resolver.Invalidate(id);
 
-            var encodingChanged = JsonFileStore.Serialize(existing.Encoding) != JsonFileStore.Serialize(draft.Encoding)
-                || JsonFileStore.Serialize(existing.LogoOverlay) != JsonFileStore.Serialize(draft.LogoOverlay)
-                || JsonFileStore.Serialize(existing.UpNextCard) != JsonFileStore.Serialize(draft.UpNextCard);
-            var windowsChanged = JsonFileStore.Serialize(existing.ActiveWindows) != JsonFileStore.Serialize(draft.ActiveWindows);
+            var encodingChanged = !JsonFileStore.SameJson(existing.Encoding, draft.Encoding)
+                || !JsonFileStore.SameJson(existing.LogoOverlay, draft.LogoOverlay)
+                || !JsonFileStore.SameJson(existing.UpNextCard, draft.UpNextCard);
+            var windowsChanged = !JsonFileStore.SameJson(existing.ActiveWindows, draft.ActiveWindows);
             if (encodingChanged || !draft.Enabled || (windowsChanged && !Scheduling.SeasonWindows.IsActive(draft, DateTime.UtcNow)))
             {
                 _sessions.StopStation(id);
@@ -150,11 +154,11 @@ public sealed class StationService
             var removed = _stations.Delete(id);
             _compiled.Delete(id);
             _resolver.Invalidate(id);
-            if (station?.LogoFileName is { Length: > 0 } logo)
+            if (station?.LogoFileName is { Length: > 0 } logo && _paths.LogoFile(logo) is { } logoPath)
             {
                 try
                 {
-                    File.Delete(_paths.LogoFile(logo));
+                    File.Delete(logoPath);
                 }
                 catch (Exception)
                 {
@@ -178,7 +182,7 @@ public sealed class StationService
         {
             var station = _stations.Get(id) ?? throw new KeyNotFoundException("Station not found.");
             var previous = _compiled.Get(id);
-            var compiled = _compiler.Compile(station, EffectiveProfile(station), _settings.Get().ExcludedTags);
+            var compiled = Compile(station);
             var changed = previous is null || !StationCompiler.SameContent(previous, compiled);
             if (changed && previous is not null)
             {
@@ -206,11 +210,7 @@ public sealed class StationService
     public RecompileAllResultDto RecompileAll()
     {
         var result = new RecompileAllResultDto();
-        var all = _stations.GetAll()
-            .OrderBy(s => double.TryParse(s.ChannelNumber, NumberStyles.Float, CultureInfo.InvariantCulture, out var n) ? n : double.MaxValue)
-            .ThenBy(s => s.ChannelNumber, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        foreach (var station in all)
+        foreach (var station in _stations.GetAll())
         {
             var row = new StationCompileResultDto { Id = station.Id, Name = station.Name, ChannelNumber = station.ChannelNumber };
             try
@@ -270,23 +270,16 @@ public sealed class StationService
         }
     }
 
-    public ScheduleInput? GetScheduleInput(Guid id)
-    {
-        var station = _stations.Get(id);
-        if (station is null)
-        {
-            return null;
-        }
-
-        var compiled = _compiled.Get(id) ?? new CompiledStation { StationId = id, Revision = station.Revision };
-        return ScheduleInput.From(station, compiled);
-    }
+    public ScheduleInput? GetScheduleInput(Guid id) => ScheduleInput.ForStation(id, _stations, _compiled);
 
     public IReadOnlyList<ScheduleEntry> Preview(Station draft, DateTime fromUtc, DateTime toUtc)
     {
         var compiled = CompileDraft(draft);
-        return ScheduleResolver.EnumerateInput(ScheduleInput.From(draft, compiled), fromUtc, toUtc);
+        return ScheduleResolver.EnumerateInput(ScheduleInput.From(draft, compiled, WeatherSources.ConfigFor(draft, _stations.GetAll())), fromUtc, toUtc);
     }
+
+    /// <summary>The weather channel whose places <paramref name="station"/> shows, if any (see <see cref="WeatherSources.ChannelFor"/>).</summary>
+    public Station? WeatherChannelFor(Station station) => WeatherSources.ChannelFor(station, _stations.GetAll());
 
     /// <summary>Normalizes an unsaved draft and expands its content in memory without persisting anything.</summary>
     public CompiledStation CompileDraft(Station draft)
@@ -307,7 +300,7 @@ public sealed class StationService
             draft.Revision = 1;
         }
 
-        return _compiler.Compile(draft, EffectiveProfile(draft), _settings.Get().ExcludedTags);
+        return Compile(draft);
     }
 
     /// <summary>Flattens a compiled snapshot into the content listing, excluded items last.</summary>
@@ -414,17 +407,17 @@ public sealed class StationService
             var station = _stations.Get(id) ?? throw new KeyNotFoundException("Station not found.");
             _paths.EnsureDirectories();
             var fileName = id.ToString("N") + extension;
-            var path = _paths.LogoFile(fileName);
+            var path = _paths.LogoFile(fileName) ?? throw new InvalidOperationException("Logo file name was rejected: " + fileName);
             using (var fs = File.Create(path))
             {
                 content.CopyTo(fs);
             }
 
-            if (!string.IsNullOrEmpty(station.LogoFileName) && station.LogoFileName != fileName)
+            if (!string.IsNullOrEmpty(station.LogoFileName) && station.LogoFileName != fileName && _paths.LogoFile(station.LogoFileName) is { } previous)
             {
                 try
                 {
-                    File.Delete(_paths.LogoFile(station.LogoFileName));
+                    File.Delete(previous);
                 }
                 catch (Exception)
                 {
@@ -446,7 +439,7 @@ public sealed class StationService
         }
 
         var path = _paths.LogoFile(station.LogoFileName);
-        return File.Exists(path) ? path : null;
+        return path is not null && File.Exists(path) ? path : null;
     }
 
     public static CompileResultDto ToCompileResult(CompiledStation compiled, bool changed)
@@ -461,6 +454,9 @@ public sealed class StationService
         };
     }
 
+    /// <summary>Expands a station's content with its effective encoding profile and the server-wide excluded tags.</summary>
+    private CompiledStation Compile(Station station) => _compiler.Compile(station, EffectiveProfile(station), _settings.Get().ExcludedTags);
+
     private DateTime DefaultAnchor(Station station)
     {
         var grid = TimeSpan.FromMinutes(Math.Max(station.PaddingGridMinutes, 1));
@@ -471,7 +467,7 @@ public sealed class StationService
     {
         s.Name = (s.Name ?? string.Empty).Trim();
         s.ChannelNumber = (s.ChannelNumber ?? string.Empty).Trim();
-        s.CallSign = string.IsNullOrWhiteSpace(s.CallSign) ? null : s.CallSign.Trim();
+        s.CallSign = Text.TrimOrNull(s.CallSign);
         s.TimeZoneId = string.IsNullOrWhiteSpace(s.TimeZoneId) ? "UTC" : s.TimeZoneId.Trim();
         s.PaddingGridMinutes = Math.Max(0, s.PaddingGridMinutes);
         if (s.PaddingByLength && s.PaddingGridMinutes == 0)
@@ -486,17 +482,14 @@ public sealed class StationService
         s.Lineup.Items ??= new List<LineupItem>();
         s.AnchorUtc = s.AnchorUtc == default ? default : DateTime.SpecifyKind(s.AnchorUtc.ToUniversalTime(), DateTimeKind.Utc);
         s.Bumpers ??= new BumperConfig();
-        s.Bumpers.Sources ??= new List<ContentSource>();
-        NormalizeSources(s.Bumpers.Sources);
+        s.Bumpers.Sources = NormalizeSources(s.Bumpers.Sources);
         s.Bumpers.BreakMinutes = Math.Clamp(s.Bumpers.BreakMinutes, 0, 30);
         s.Bumpers.MaxClipMinutes = Math.Clamp(s.Bumpers.MaxClipMinutes, 1, 60);
         s.Bumpers.PreRoll ??= new BumperRollConfig();
-        s.Bumpers.PreRoll.Sources ??= new List<ContentSource>();
-        NormalizeSources(s.Bumpers.PreRoll.Sources);
+        s.Bumpers.PreRoll.Sources = NormalizeSources(s.Bumpers.PreRoll.Sources);
         s.Bumpers.PostRoll ??= new BumperRollConfig();
-        s.Bumpers.PostRoll.Sources ??= new List<ContentSource>();
-        NormalizeSources(s.Bumpers.PostRoll.Sources);
-        s.CardText = string.IsNullOrWhiteSpace(s.CardText) ? null : s.CardText.Trim();
+        s.Bumpers.PostRoll.Sources = NormalizeSources(s.Bumpers.PostRoll.Sources);
+        s.CardText = Text.TrimOrNull(s.CardText);
         if (s.CardText is { Length: > 80 })
         {
             s.CardText = s.CardText[..80];
@@ -504,7 +497,11 @@ public sealed class StationService
 
         s.Weather ??= new WeatherConfig();
         s.Weather.Normalize();
-        NormalizeSources(s.Weather.MusicSources);
+        s.Weather.MusicSources = NormalizeSources(s.Weather.MusicSources);
+        if (s.Mode == ScheduleMode.Weather || s.WeatherSourceStationId == Guid.Empty || s.WeatherSourceStationId == s.Id)
+        {
+            s.WeatherSourceStationId = null;
+        }
         s.LogoOverlay ??= new LogoOverlayConfig();
         s.LogoOverlay.Normalize();
         s.UpNextCard ??= new UpNextCardConfig();
@@ -515,10 +512,9 @@ public sealed class StationService
         s.ExcludedTags = NormalizeTags(s.ExcludedTags);
         foreach (var w in s.ActiveWindows)
         {
-            w.Label = string.IsNullOrWhiteSpace(w.Label) ? null : w.Label.Trim();
+            w.Label = Text.TrimOrNull(w.Label);
         }
 
-        s.Pool.Sources ??= new List<ContentSource>();
         s.Pool.DaypartRules ??= new List<DaypartRule>();
         foreach (var r in s.Pool.DaypartRules)
         {
@@ -530,9 +526,8 @@ public sealed class StationService
         s.Pool.CooldownHours = Math.Clamp(s.Pool.CooldownHours, 0, 168);
         s.Pool.MarathonMin = Math.Clamp(s.Pool.MarathonMin, 1, 50);
         s.Pool.MarathonMax = Math.Clamp(s.Pool.MarathonMax, s.Pool.MarathonMin, 50);
-        s.Slots.Filler.Sources ??= new List<ContentSource>();
-        NormalizeSources(s.Pool.Sources);
-        NormalizeSources(s.Slots.Filler.Sources);
+        s.Pool.Sources = NormalizeSources(s.Pool.Sources);
+        s.Slots.Filler.Sources = NormalizeSources(s.Slots.Filler.Sources);
         foreach (var b in s.Slots.Blocks)
         {
             if (b.Id == Guid.Empty)
@@ -541,9 +536,8 @@ public sealed class StationService
             }
 
             b.Days ??= new List<DayOfWeek>();
-            b.Sources ??= new List<ContentSource>();
             b.MaxStartDelayMinutes = Math.Clamp(b.MaxStartDelayMinutes, 0, 240);
-            NormalizeSources(b.Sources);
+            b.Sources = NormalizeSources(b.Sources);
             NormalizeRecurrence(b, s);
         }
     }
@@ -557,8 +551,7 @@ public sealed class StationService
         var start = RecurrenceRule.ParseDate(b.RecurrenceStart);
         if (start is null && b.Recurrence == BlockRecurrence.EveryNWeeks)
         {
-            var tz = WeeklySlotScheduler.ResolveTimeZone(s.TimeZoneId ?? "UTC");
-            start = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz).Date;
+            start = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZones.Resolve(s.TimeZoneId)).Date;
         }
 
         b.RecurrenceStart = start is null ? null : RecurrenceRule.Format(start.Value);
@@ -568,45 +561,38 @@ public sealed class StationService
     public static List<string> NormalizeTags(IEnumerable<string>? tags)
         => (tags ?? Array.Empty<string>()).Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
-    private static void NormalizeSources(List<ContentSource> sources)
+    /// <summary>Cleans each source in place (an absent list becomes an empty one) and returns the list.</summary>
+    private static List<ContentSource> NormalizeSources(List<ContentSource>? sources)
     {
+        sources ??= new List<ContentSource>();
         foreach (var src in sources)
         {
             src.ItemKinds ??= new List<SourceKind>();
-            src.Tag = string.IsNullOrWhiteSpace(src.Tag) ? null : src.Tag.Trim();
+            src.Tag = Text.TrimOrNull(src.Tag);
             src.Weight = Math.Clamp(src.Weight, 1, 10);
-            if (src.SeasonFrom is < 1)
-            {
-                src.SeasonFrom = null;
-            }
-
-            if (src.SeasonTo is < 1)
-            {
-                src.SeasonTo = null;
-            }
-
-            if (src.SeasonFrom.HasValue && src.SeasonTo.HasValue && src.SeasonFrom > src.SeasonTo)
-            {
-                (src.SeasonFrom, src.SeasonTo) = (src.SeasonTo, src.SeasonFrom);
-            }
-
+            (src.SeasonFrom, src.SeasonTo) = CleanRange(src.SeasonFrom, src.SeasonTo, 1);
             src.MaxRating = Library.RatingLadder.Rank(src.MaxRating) is null ? null : Library.RatingLadder.Normalize(src.MaxRating);
             src.Ratings = (src.Ratings ?? new List<string>()).Select(Library.RatingLadder.Normalize).Where(r => r is not null).Select(r => r!).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            if (src.YearFrom is < 1800)
-            {
-                src.YearFrom = null;
-            }
-
-            if (src.YearTo is < 1800)
-            {
-                src.YearTo = null;
-            }
-
-            if (src.YearFrom.HasValue && src.YearTo.HasValue && src.YearFrom > src.YearTo)
-            {
-                (src.YearFrom, src.YearTo) = (src.YearTo, src.YearFrom);
-            }
+            (src.YearFrom, src.YearTo) = CleanRange(src.YearFrom, src.YearTo, 1800);
         }
+
+        return sources;
+    }
+
+    /// <summary>An optional from/to range with ends below <paramref name="min"/> dropped and a reversed range swapped.</summary>
+    private static (int? From, int? To) CleanRange(int? from, int? to, int min)
+    {
+        if (from < min)
+        {
+            from = null;
+        }
+
+        if (to < min)
+        {
+            to = null;
+        }
+
+        return from.HasValue && to.HasValue && from > to ? (to, from) : (from, to);
     }
 
     private List<string> Validate(Station s, Station? existing)
@@ -648,11 +634,7 @@ public sealed class StationService
             errors.Add($"Channel number {s.ChannelNumber} is already used by another station.");
         }
 
-        try
-        {
-            TimeZoneInfo.FindSystemTimeZoneById(s.TimeZoneId);
-        }
-        catch (Exception)
+        if (TimeZones.TryFind(s.TimeZoneId) is null)
         {
             errors.Add($"Unknown time zone '{s.TimeZoneId}'.");
         }
@@ -672,11 +654,11 @@ public sealed class StationService
             errors.Add("Add at least one time slot block or filler source.");
         }
 
-        if (s.UsesWeather)
+        if (s.Mode == ScheduleMode.Weather)
         {
             if (!s.Weather.Locations.Any(l => l.IsValid))
             {
-                errors.Add(s.Mode == ScheduleMode.Weather ? "Add at least one place to the weather channel." : "Add at least one place in the Weather section for the weather block or breaks.");
+                errors.Add("Add at least one place to the weather channel.");
             }
 
             foreach (var l in s.Weather.Locations.Where(l => !l.IsValid))
@@ -687,6 +669,18 @@ public sealed class StationService
             if (!string.Equals(s.Weather.Provider, WeatherConfig.DefaultProvider, StringComparison.OrdinalIgnoreCase))
             {
                 errors.Add("Unknown weather provider '" + s.Weather.Provider + "'.");
+            }
+        }
+        else if (s.UsesWeather)
+        {
+            // The weather block and the weather in the breaks show a weather channel's places; the station has none of its own.
+            if (s.WeatherSourceStationId is { } wanted && _stations.Get(wanted) is not { Mode: ScheduleMode.Weather })
+            {
+                errors.Add("The weather on this station comes from a weather channel that no longer exists; pick another in the Weather section.");
+            }
+            else if (WeatherSources.ChannelFor(s, _stations.GetAll()) is null)
+            {
+                errors.Add("The weather block or the weather in the breaks needs a weather channel: create one first (New station, Weather channel), then pick it in the Weather section.");
             }
         }
 
@@ -812,7 +806,8 @@ public sealed class StationService
             s.TimeZoneId,
             s.Bumpers,
             s.MinRuntimeMinutes,
-            s.Weather
+            s.Weather,
+            s.WeatherSourceStationId
         });
     }
 }

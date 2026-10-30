@@ -53,6 +53,14 @@ public sealed class CompiledStation
     public List<MusicTrack> Music { get; set; } = new();
 
     public int TotalItemCount => Pool.Count + Lineup.Count + Filler.Count + Blocks.Values.Sum(b => b.Count);
+
+    /// <summary>Every program item, in the order pool, lineup, blocks, filler (bumper clips not included; repeats kept).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IEnumerable<PlayableItem> ProgramItems => Pool.Concat(Lineup).Concat(Blocks.Values.SelectMany(b => b)).Concat(Filler);
+
+    /// <summary>Everything the station plays: <see cref="ProgramItems"/> plus its bumper, pre-roll and post-roll clips.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IEnumerable<PlayableItem> PlayedItems => ProgramItems.Concat(Bumpers).Concat(PreRoll).Concat(PostRoll);
 }
 
 /// <summary>What one content source contributed when the station was compiled.</summary>
@@ -79,6 +87,17 @@ public sealed class SourceExpansion
     /// A source whose items are all already on the station through an earlier source is not empty; its content plays.
     /// </summary>
     public bool IsEmpty => Kept == 0 && (Found == 0 || AlreadyListed < Found);
+
+    /// <summary>The expansion record for a library source, labelled with <see cref="Describe"/>.</summary>
+    public static SourceExpansion For(string section, ContentSource source, int found, int kept, int alreadyListed) => new()
+    {
+        Section = section,
+        Label = Describe(source),
+        Kind = source.Kind,
+        Found = found,
+        Kept = kept,
+        AlreadyListed = alreadyListed
+    };
 
     /// <summary>'Series "Bluey"', plus the rating or year filter in brackets when the source has one, so an empty result explains itself.</summary>
     public static string Describe(ContentSource source)

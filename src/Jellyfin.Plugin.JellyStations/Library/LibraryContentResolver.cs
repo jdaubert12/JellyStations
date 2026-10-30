@@ -350,8 +350,8 @@ public sealed class LibraryContentResolver
     /// <summary>Applies a container source's movie/episode filter. Empty or both kinds = everything.</summary>
     public static IEnumerable<BaseItem> FilterKinds(IEnumerable<BaseItem> items, ContentSource source)
     {
-        var movies = source.ItemKinds.Count == 0 || source.ItemKinds.Contains(SourceKind.Movie);
-        var episodes = source.ItemKinds.Count == 0 || source.ItemKinds.Contains(SourceKind.Episode);
+        var movies = source.IncludesMovies;
+        var episodes = source.IncludesEpisodes;
         if (movies && episodes)
         {
             return items;
@@ -439,12 +439,12 @@ public sealed class LibraryContentResolver
         }
 
         var kinds = new List<BaseItemKind>();
-        if (source.ItemKinds.Count == 0 || source.ItemKinds.Contains(SourceKind.Movie))
+        if (source.IncludesMovies)
         {
             kinds.Add(BaseItemKind.Movie);
         }
 
-        if (source.ItemKinds.Count == 0 || source.ItemKinds.Contains(SourceKind.Episode))
+        if (source.IncludesEpisodes)
         {
             kinds.Add(BaseItemKind.Episode);
         }
@@ -457,12 +457,16 @@ public sealed class LibraryContentResolver
             OrderBy = new[] { (ItemSortBy.SortName, SortOrder.Ascending), (ItemSortBy.ParentIndexNumber, SortOrder.Ascending), (ItemSortBy.IndexNumber, SortOrder.Ascending) },
             DtoOptions = new DtoOptions(true)
         };
-        apply(query);
-        if (source.LibraryId.HasValue && source.LibraryId.Value != Guid.Empty)
+        void Restrict(InternalItemsQuery q)
         {
-            query.ParentId = source.LibraryId.Value;
+            apply(q);
+            if (source.LibraryId.HasValue && source.LibraryId.Value != Guid.Empty)
+            {
+                q.ParentId = source.LibraryId.Value;
+            }
         }
 
+        Restrict(query);
         var items = _libraryManager.GetItemList(query);
 
         // Episodes whose own genre/tag list is empty inherit from the series; include those too.
@@ -474,11 +478,7 @@ public sealed class LibraryContentResolver
                 Recursive = true,
                 DtoOptions = new DtoOptions(true)
             };
-            apply(seriesQuery);
-            if (source.LibraryId.HasValue && source.LibraryId.Value != Guid.Empty)
-            {
-                seriesQuery.ParentId = source.LibraryId.Value;
-            }
+            Restrict(seriesQuery);
 
             var list = items.ToList();
             var seen = new HashSet<Guid>(list.Select(i => i.Id));
@@ -565,9 +565,12 @@ public sealed class LibraryContentResolver
             }
         }
 
-        result.Audio = audio.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => new TrackLanguageDto { Code = kv.Key, Name = LanguageNames.Describe(kv.Key), Files = kv.Value }).ToList();
-        result.Subtitles = subtitles.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => new TrackLanguageDto { Code = kv.Key, Name = LanguageNames.Describe(kv.Key), Files = kv.Value }).ToList();
+        result.Audio = ToDtos(audio);
+        result.Subtitles = ToDtos(subtitles);
         return result;
+
+        static List<TrackLanguageDto> ToDtos(Dictionary<string, int> counts)
+            => counts.OrderByDescending(kv => kv.Value).ThenBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => new TrackLanguageDto { Code = kv.Key, Name = LanguageNames.Describe(kv.Key), Files = kv.Value }).ToList();
     }
 
     public PlayableItem? ToPlayable(BaseItem item, TrackPreferences tracks, List<ExcludedItem> excluded)
@@ -608,45 +611,17 @@ public sealed class LibraryContentResolver
             ProductionYear = video.ProductionYear,
             OfficialRating = video.OfficialRating,
             CommunityRating = video.CommunityRating,
-            PrimaryImagePath = video.PrimaryImagePath,
-            HasAudio = HasAudioTrack(video),
-            HdrTransfer = HdrTransferOf(video)
+            PrimaryImagePath = video.PrimaryImagePath
         };
-        ApplyTracks(video, tracks, (a, s) =>
-        {
-            playable.AudioStreamIndex = a;
-            playable.SubtitleStreamIndex = s?.StreamIndex;
-            playable.SubtitlePath = s?.ExternalPath;
-            playable.SubtitleIsBitmap = s?.IsBitmap ?? false;
-        });
-        ApplyVideoFacts(VideoStreamOf(video), (c, p, d, f) =>
-        {
-            playable.VideoCodec = c;
-            playable.VideoProfile = p;
-            playable.VideoBitDepth = d;
-            playable.PixelFormat = f;
-        });
+        FillFileFacts(playable, video, tracks);
 
         if (parts.Count > 1)
         {
             playable.Parts = parts
                 .Select(v =>
                 {
-                    var part = new PlayablePart { Path = v.Path, RuntimeTicks = v.RunTimeTicks!.Value, HasAudio = HasAudioTrack(v), HdrTransfer = HdrTransferOf(v) };
-                    ApplyTracks(v, tracks, (a, s) =>
-                    {
-                        part.AudioStreamIndex = a;
-                        part.SubtitleStreamIndex = s?.StreamIndex;
-                        part.SubtitlePath = s?.ExternalPath;
-                        part.SubtitleIsBitmap = s?.IsBitmap ?? false;
-                    });
-                    ApplyVideoFacts(VideoStreamOf(v), (c, p, d, f) =>
-                    {
-                        part.VideoCodec = c;
-                        part.VideoProfile = p;
-                        part.VideoBitDepth = d;
-                        part.PixelFormat = f;
-                    });
+                    var part = new PlayablePart { Path = v.Path, RuntimeTicks = v.RunTimeTicks!.Value };
+                    FillFileFacts(part, v, tracks);
                     return part;
                 })
                 .ToList();
@@ -724,36 +699,43 @@ public sealed class LibraryContentResolver
 
     private static string DisplayName(Video v) => v is Episode e ? $"{e.SeriesName} - {e.Name}" : v.Name ?? v.Id.ToString();
 
-    private static string? HdrTransferOf(Video video)
+    /// <summary>
+    /// Fills a file's audio presence, HDR transfer, video facts (codec, profile, bit depth and pixel format: what
+    /// decides whether a GPU can decode it) and the audio and subtitle tracks to play, from one read of Jellyfin's
+    /// probe of the file. A file whose streams cannot be read keeps the defaults: audio assumed, SDR, first audio track.
+    /// </summary>
+    private static void FillFileFacts(IPlayableFile file, Video video, TrackPreferences tracks)
     {
-        var stream = VideoStreamOf(video);
-        return stream is null ? null : HdrTransferOf(stream);
-    }
-
-    private static MediaStream? VideoStreamOf(Video video)
-    {
+        IReadOnlyList<MediaStream> streams;
         try
         {
-            return video.GetMediaStreams().FirstOrDefault(s => s.Type == MediaStreamType.Video);
+            streams = video.GetMediaStreams();
         }
         catch (Exception)
         {
-            return null;
-        }
-    }
-
-    /// <summary>Codec, profile, bit depth and pixel format of the probed video stream: what decides whether a GPU can decode it.</summary>
-    private static void ApplyVideoFacts(MediaStream? stream, Action<string?, string?, int?, string?> apply)
-    {
-        if (stream is null)
-        {
+            file.HasAudio = true;
             return;
         }
 
-        var codec = string.IsNullOrWhiteSpace(stream.Codec) ? null : stream.Codec.Trim().ToLowerInvariant();
-        var profile = string.IsNullOrWhiteSpace(stream.Profile) ? null : stream.Profile.Trim();
-        var format = string.IsNullOrWhiteSpace(stream.PixelFormat) ? null : stream.PixelFormat.Trim().ToLowerInvariant();
-        apply(codec, profile, stream.BitDepth > 0 ? stream.BitDepth : null, format);
+        file.HasAudio = streams.Count == 0 || streams.Any(s => s.Type == MediaStreamType.Audio);
+
+        var videoStream = streams.FirstOrDefault(s => s.Type == MediaStreamType.Video);
+        if (videoStream is not null)
+        {
+            file.HdrTransfer = HdrTransferOf(videoStream);
+            file.VideoCodec = Text.TrimOrNull(videoStream.Codec)?.ToLowerInvariant();
+            file.VideoProfile = Text.TrimOrNull(videoStream.Profile);
+            file.VideoBitDepth = videoStream.BitDepth > 0 ? videoStream.BitDepth : null;
+            file.PixelFormat = Text.TrimOrNull(videoStream.PixelFormat)?.ToLowerInvariant();
+        }
+
+        file.AudioStreamIndex = TrackPicker.PickAudio(streams, tracks.AudioLanguage, out var matched);
+        var subtitle = tracks.SubtitleLanguage is null || (tracks.SubtitlesOnlyIfAudioMissing && matched)
+            ? null
+            : TrackPicker.PickSubtitle(streams, tracks.SubtitleLanguage);
+        file.SubtitleStreamIndex = subtitle?.StreamIndex;
+        file.SubtitlePath = subtitle?.ExternalPath;
+        file.SubtitleIsBitmap = subtitle?.IsBitmap ?? false;
     }
 
     /// <summary>
@@ -776,39 +758,5 @@ public sealed class LibraryContentResolver
         }
 
         return stream.VideoRange == VideoRange.HDR ? "smpte2084" : null;
-    }
-
-    private static bool HasAudioTrack(Video video)
-    {
-        try
-        {
-            var streams = video.GetMediaStreams();
-            return streams.Count == 0 || streams.Any(s => s.Type == MediaStreamType.Audio);
-        }
-        catch (Exception)
-        {
-            return true;
-        }
-    }
-
-    /// <summary>The audio track and, when the source asks for them, the subtitle track of a file, from Jellyfin's probe of it.</summary>
-    private static void ApplyTracks(Video video, TrackPreferences tracks, Action<int?, SubtitlePick?> apply)
-    {
-        IReadOnlyList<MediaStream> streams;
-        try
-        {
-            streams = video.GetMediaStreams();
-        }
-        catch (Exception)
-        {
-            apply(null, null);
-            return;
-        }
-
-        var audio = TrackPicker.PickAudio(streams, tracks.AudioLanguage, out var matched);
-        var subtitle = tracks.SubtitleLanguage is null || (tracks.SubtitlesOnlyIfAudioMissing && matched)
-            ? null
-            : TrackPicker.PickSubtitle(streams, tracks.SubtitleLanguage);
-        apply(audio, subtitle);
     }
 }

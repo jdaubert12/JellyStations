@@ -6,6 +6,7 @@ using Jellyfin.Plugin.JellyStations.Library;
 using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Services;
 using Jellyfin.Plugin.JellyStations.Storage;
+using Jellyfin.Plugin.JellyStations.Weather;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -172,7 +173,7 @@ public sealed class MusicPackService : IDisposable
             Directory.CreateDirectory(folder);
             var client = _http.CreateClient("JellyStations.Packs");
             client.Timeout = TimeSpan.FromMinutes(10);
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-JellyStations/" + (Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0"));
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-JellyStations/" + WeatherHttp.Version);
 
             foreach (var track in pack.Tracks)
             {
@@ -255,9 +256,17 @@ public sealed class MusicPackService : IDisposable
             {
                 using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
                 var buffer = new byte[1 << 16];
+                long written = 0;
                 int read;
                 while ((read = await source.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
                 {
+                    written += read;
+                    if (written > track.Bytes)
+                    {
+                        // The catalogue says how long the file is; stop as soon as the server sends more rather than filling the disk.
+                        throw new InvalidDataException($"\"{track.Title}\" is longer than the published file ({track.Bytes} bytes); the source may have changed.");
+                    }
+
                     sha.AppendData(buffer, 0, read);
                     await file.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
                 }
@@ -318,7 +327,7 @@ public sealed class MusicPackService : IDisposable
         {
             var repo = _services.GetRequiredService<StationRepository>();
             var stations = _services.GetRequiredService<StationService>();
-            foreach (var station in repo.GetAll().Where(s => s.Mode == ScheduleMode.Weather && s.Weather.MusicEnabled))
+            foreach (var station in repo.GetAll().Where(s => WeatherSources.IsChannel(s) && s.Weather.MusicEnabled))
             {
                 if (MusicResolver.Folders(station.Weather.MusicFolder).Any(f => PathsEqual(_paths.ResolveMusicFolder(f), folder)))
                 {

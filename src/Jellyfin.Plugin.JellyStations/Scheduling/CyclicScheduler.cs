@@ -47,7 +47,7 @@ internal sealed class CyclicScheduler : IStationScheduler
         _padded = _items.Select(i => Padding.Pad(i.Runtime + input.Break, input.PaddingGrid, input.PaddingByLength).Ticks).ToArray();
         _clips = BumperFill.Clips.From(input);
         _cycleTicks = _padded.Sum();
-        _tz = WeeklySlotScheduler.ResolveTimeZone(input.TimeZoneId);
+        _tz = TimeZones.Resolve(input.TimeZoneId);
         _rules = input.DaypartRules;
     }
 
@@ -115,19 +115,19 @@ internal sealed class CyclicScheduler : IStationScheduler
         if (cycle.Gated is not null && cycle.Gated[i])
         {
             // The item is not allowed at this time of day and nothing else fit here: dead air for the whole slot.
-            return new ScheduleEntry(_input.StationId, _input.Revision, EntryKind.Slate, null, Utc(itemStart), Utc(slotEnd), false, "Not allowed at this time");
+            return ScheduleEntry.Slate(_input, Utc(itemStart), Utc(slotEnd), "Not allowed at this time");
         }
 
         if (inCycle < cycle.Starts[i] + item.RuntimeTicks)
         {
-            return new ScheduleEntry(_input.StationId, _input.Revision, EntryKind.Program, item, Utc(itemStart), Utc(itemEnd), false, null);
+            return ScheduleEntry.Program(_input, item, Utc(itemStart), Utc(itemEnd));
         }
 
+        var gap = ScheduleEntry.Slate(_input, Utc(itemEnd), Utc(slotEnd));
         if (_input.HasBumpers && slotEnd > itemEnd)
         {
             // The gap after the program: post-roll, fill clips, card for whatever is left, pre-roll for what follows.
             var offset = inCycle - (cycle.Starts[i] + item.RuntimeTicks);
-            var gap = new ScheduleEntry(_input.StationId, _input.Revision, EntryKind.Slate, null, Utc(itemEnd), Utc(slotEnd), false, null);
             var pieces = BumperFill.Plan(slotEnd - itemEnd, _clips, StableHash.Seed(_input.StationId, _input.Revision, "bumper:" + i, k), programBefore: true, programAfter: !NextIsGated(cycle, k, i));
             foreach (var p in pieces)
             {
@@ -138,7 +138,7 @@ internal sealed class CyclicScheduler : IStationScheduler
             }
         }
 
-        return new ScheduleEntry(_input.StationId, _input.Revision, EntryKind.Slate, null, Utc(itemEnd), Utc(slotEnd), false, null);
+        return gap;
     }
 
     /// <summary>True when the slot after position i (wrapping into the next cycle) is dead air, so no pre-roll should lead into it.</summary>
@@ -157,8 +157,8 @@ internal sealed class CyclicScheduler : IStationScheduler
 
     private ScheduleEntry SlateHour(DateTime utc)
     {
-        var start = new DateTime(utc.Ticks / TimeSpan.TicksPerHour * TimeSpan.TicksPerHour, DateTimeKind.Utc);
-        return new ScheduleEntry(_input.StationId, _input.Revision, EntryKind.Slate, null, start, start.AddHours(1), false, null);
+        var start = Padding.FloorToGrid(utc, TimeSpan.FromHours(1));
+        return ScheduleEntry.Slate(_input, start, start.AddHours(1));
     }
 
     private static DateTime Utc(long ticks) => new(ticks, DateTimeKind.Utc);
@@ -220,7 +220,7 @@ internal sealed class CyclicScheduler : IStationScheduler
             // The daypart gate can undo the seam check PoolOrdering made: the previous cycle may now end with the
             // same series or movie this one starts with, possibly with gated dead air in between. Re-check
             // against what the previous cycle actually airs last.
-            var prevKey = previous is not null ? LastAiredKey(previous) : LastAiredKeyAsGated(k - 1, cycleStart - _cycleTicks);
+            var prevKey = PreviousLastKey(k, cycleStart, previous);
             if (prevKey is not null && FixSeamAfterGate(runs, cycleStart, prevKey))
             {
                 runs = RestoreEpisodeOrder(runs);
@@ -318,6 +318,13 @@ internal sealed class CyclicScheduler : IStationScheduler
         return false;
     }
 
+    /// <summary>
+    /// Key of the last series or movie the cycle before k airs: from <paramref name="previous"/> as it finally aired
+    /// when given (chain mode), else from that cycle's runs as the gate left them.
+    /// </summary>
+    private string? PreviousLastKey(long k, long cycleStart, Cycle? previous)
+        => previous is not null ? LastAiredKey(previous) : LastAiredKeyAsGated(k - 1, cycleStart - _cycleTicks);
+
     /// <summary>Key of the last series or movie cycle k airs, judged from the runs as the gate left them (null when it airs nothing).</summary>
     private string? LastAiredKeyAsGated(long k, long cycleStart)
     {
@@ -412,7 +419,7 @@ internal sealed class CyclicScheduler : IStationScheduler
     private bool ApplyCooldown(List<int[]> runs, long k, long cycleStart, Cycle? previous)
     {
         var tail = TailEnds(k, cycleStart, previous);
-        var seamKey = previous is not null ? LastAiredKey(previous) : LastAiredKeyAsGated(k - 1, cycleStart - _cycleTicks);
+        var seamKey = PreviousLastKey(k, cycleStart, previous);
         var flags = RunFlags(runs, cycleStart);
         var gated = flags.Count(f => f);
 

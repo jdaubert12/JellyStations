@@ -100,6 +100,12 @@ public sealed class ImportResultDto
     /// <summary>Item references that could not be matched and were dropped from the imported station.</summary>
     public List<string> Unmatched { get; set; } = new();
 
+    /// <summary>
+    /// Encoder settings cleared from imported stations and templates because they reach ffmpeg's command line verbatim
+    /// (extra arguments, hardware device). The admin re-enters them in the editor if they were wanted.
+    /// </summary>
+    public List<string> Stripped { get; set; } = new();
+
     /// <summary>Station templates created or replaced, by name.</summary>
     public List<string> StationTemplates { get; set; } = new();
 
@@ -132,6 +138,9 @@ public sealed class StationSummaryDto
     public int Revision { get; set; }
 
     public bool HasLogo { get; set; }
+
+    /// <summary>Ordinary station with a weather block or weather in the breaks: the weather channel whose places it shows; null when none exists or the station shows no weather.</summary>
+    public Guid? WeatherChannelId { get; set; }
 
     public ScheduleEntryDto? NowPlaying { get; set; }
 
@@ -431,4 +440,7 @@ public sealed class HardwareTestRequestDto
 public sealed class ValidationErrorDto
 {
     public List<string> Errors { get; set; } = new();
+
+    /// <summary>An error body carrying the given messages.</summary>
+    public static ValidationErrorDto Of(params string[] errors) => new() { Errors = errors.ToList() };
 }

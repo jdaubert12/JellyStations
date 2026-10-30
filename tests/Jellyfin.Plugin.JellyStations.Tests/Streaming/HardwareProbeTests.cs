@@ -85,6 +85,28 @@ public class HardwareProbeTests
     }
 
     [Fact]
+    public void WithDecoderSkipped_KeepsTheRun_DropsTheDecoderReport()
+    {
+        var log = new[]
+        {
+            "[hevc @ 0x55] Using auto hwaccel type qsv with new default device.",
+            "[hevc @ 0x55] Failed setup for format qsv: hwaccel initialisation returned error.",
+            "frame=  120 fps= 12 q=-0.0 Lsize=N/A time=00:00:05.00 bitrate=N/A speed=0.48x"
+        };
+        var r = HardwareProbe.Interpret("qsv", Qsv, "/media/film.mkv", Args, log, 0, 10.0);
+        var skipped = r.WithDecoderSkipped("qsv", "10-bit H.264 is beyond what GPU decoders handle");
+
+        Assert.Equal("skipped", skipped.Decoder);
+        Assert.Equal("10-bit H.264 is beyond what GPU decoders handle", skipped.DecoderSkipReason);
+        Assert.Null(skipped.DecoderInUse);
+        Assert.Null(skipped.DecoderFallback);
+        Assert.Equal(r.Speed, skipped.Speed);
+        Assert.Equal(r.Command, skipped.Command);
+        Assert.Same(r.Problems, skipped.Problems);
+        Assert.Same(r.Log, skipped.Log);
+    }
+
+    [Fact]
     public void Interpret_QsvDecoderInTheStreamMapping_IsHardware()
     {
         // The explicit *_qsv decoder never says "hwaccel"; the stream mapping names it.

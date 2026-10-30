@@ -65,8 +65,10 @@ programs still start on the grid, and a position is skipped quietly when no clip
 room, up to a length you set (1 to 10 minutes), either at the end of the break right before the next
 program (or its pre-roll ident) or at the start right after the program (or its post-roll clip). It
 stretches into whatever time the clips leave, so a break shorter than the length still gets weather,
-and clips and the card take the rest. The places, look and music come from the station's **Weather**
-section, which the editor shows while this is on; like a clip, weather in a break is not a guide entry.
+and clips and the card take the rest. The places, look and music are those of a **weather channel**
+station, picked in the Weather section the editor shows while this is on (the first weather channel
+when none is picked), so the forecasts, alerts and radar are fetched once however many stations air
+them; only the logo is this station's own. Like a clip, weather in a break is not a guide entry.
 
 ### Logo
 
@@ -173,9 +175,9 @@ lands on another block.
 
 A block's **What plays** can be **Local weather** instead of programs: the occurrence is one run of the
 [weather channel](#weather-channel)'s screens, a real guide entry titled from the block name (or the
-Weather section's guide title), with the places, look and music from the station's **Weather**
-section, which the editor shows while such a block exists. "The weather at the top of every hour" is a
-5-minute weather block at 06:00 repeating every 60 minutes until 23:00.
+weather channel's guide title), with the places, look and music of the weather channel picked in the
+station's **Weather** section, which the editor shows while such a block exists. "The weather at the
+top of every hour" is a 5-minute weather block at 06:00 repeating every 60 minutes until 23:00.
 
 A time block can be saved as a **template** (bookmark button on the block) and added to any station
 from the dropdown next to "Add block". Templates are managed in Settings.
@@ -201,14 +203,19 @@ templates with the same name, which makes station sets easy to back up, share, o
 JSON array of stations, the pre-1.21 export format, still imports. Hand-picked items (movies, series,
 seasons, episodes, collections, playlists, libraries) are matched by title when their ids are unknown
 on the importing server, so a station file from another server, or one of the examples under
-`examples/stations/`, imports cleanly; anything that cannot be matched is dropped and listed.
+`examples/stations/`, imports cleanly; anything that cannot be matched is dropped and listed. Logos
+are not part of the file, and an imported encoding profile's extra ffmpeg arguments and hardware device
+are cleared and listed in the result (they reach ffmpeg's command line verbatim, so a file from elsewhere
+must not be able to set them; re-enter them in the editor if they were wanted).
 
 ## Weather channel
 
 A **Weather channel** station is in the spirit of the cable weather channel's "Local on the 8s": no
 voice, no library items, just forecasts drawn as full-screen graphics over music. Pick up to eight
 places (a search box finds towns and cities and fills in the coordinates and time zone) and the
-channel cycles through them.
+channel cycles through them. Other stations can air the same places in a weather time block or in
+their breaks (see above); they point at the weather channel rather than keeping places of their own,
+so every forecast, alert and radar frame is fetched once, and the channel's editor lists them.
 
 ### Screens and cycle
 

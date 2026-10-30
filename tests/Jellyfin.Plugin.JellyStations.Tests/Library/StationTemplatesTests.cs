@@ -54,6 +54,7 @@ public class StationTemplatesTests
             MusicSources = { new ContentSource { Kind = SourceKind.Album, ItemId = Show } },
             MusicFolder = "/music"
         },
+        WeatherSourceStationId = Guid.NewGuid(),
         Encoding = new EncodingProfile { Width = 1920, Height = 1080, VideoEncoder = "hevc_qsv" },
         ActiveWindows = { new SeasonWindow { Label = "Summer", StartMonth = 6, StartDay = 1, EndMonth = 8, EndDay = 31 } },
         ExcludedItemIds = { Show },
@@ -102,6 +103,7 @@ public class StationTemplatesTests
         Assert.Empty(s.Weather.Locations);
         Assert.Empty(s.Weather.MusicSources);
         Assert.Null(s.Weather.MusicFolder);
+        Assert.Null(s.WeatherSourceStationId); // a template belongs to no particular weather channel
     }
 
     [Fact]

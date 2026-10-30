@@ -1,7 +1,7 @@
 namespace Jellyfin.Plugin.JellyStations.Models;
 
 /// <summary>One file of a multi-part (stacked) video, e.g. a Blu-ray split into part1 and part2.</summary>
-public sealed class PlayablePart
+public sealed class PlayablePart : IPlayableFile
 {
     public string Path { get; set; } = string.Empty;
 
@@ -50,7 +50,7 @@ public sealed record PlayableSegment(PlayablePart Part, int Index, TimeSpan Seek
 }
 
 /// <summary>A Jellyfin-free snapshot of a library item, frozen at compile time.</summary>
-public sealed class PlayableItem
+public sealed class PlayableItem : IPlayableFile
 {
     public Guid ItemId { get; set; }
 
@@ -146,7 +146,8 @@ public sealed class PlayableItem
 
         if (Parts.Count == 0)
         {
-            var single = new PlayablePart { Path = Path, RuntimeTicks = RuntimeTicks, AudioStreamIndex = AudioStreamIndex, HasAudio = HasAudio, HdrTransfer = HdrTransfer, VideoCodec = VideoCodec, VideoProfile = VideoProfile, VideoBitDepth = VideoBitDepth, PixelFormat = PixelFormat, SubtitleStreamIndex = SubtitleStreamIndex, SubtitlePath = SubtitlePath, SubtitleIsBitmap = SubtitleIsBitmap };
+            var single = new PlayablePart { Path = Path, RuntimeTicks = RuntimeTicks };
+            PlayableFiles.CopyFacts(this, single);
             var seek = offset < single.Runtime ? offset : single.Runtime;
             return new PlayableSegment(single, 0, seek, single.Runtime - seek) { IsLast = true };
         }

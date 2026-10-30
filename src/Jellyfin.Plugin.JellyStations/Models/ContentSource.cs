@@ -17,6 +17,14 @@ public sealed class ContentSource
     /// <summary>For Genre, Playlist, BoxSet and Library kinds: which item kinds to include (Movie, Episode). Empty = both.</summary>
     public List<SourceKind> ItemKinds { get; set; } = new();
 
+    /// <summary>Whether ItemKinds admits movies (empty = both kinds).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IncludesMovies => ItemKinds.Count == 0 || ItemKinds.Contains(SourceKind.Movie);
+
+    /// <summary>Whether ItemKinds admits episodes (empty = both kinds).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IncludesEpisodes => ItemKinds.Count == 0 || ItemKinds.Contains(SourceKind.Episode);
+
     /// <summary>For Series kind: first season to include (null = from the start).</summary>
     public int? SeasonFrom { get; set; }
 

@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Storage;
+using Jellyfin.Plugin.JellyStations.Streaming;
 using MediaBrowser.Controller.MediaEncoding;
 using Microsoft.Extensions.Logging;
 
@@ -188,11 +189,7 @@ public sealed class MusicFolderScanner
     }
 
     /// <summary>The ffmpeg in use: the settings override, else Jellyfin's.</summary>
-    public string FfmpegPath()
-    {
-        var o = _settings.Get().FfmpegPathOverride;
-        return string.IsNullOrWhiteSpace(o) ? _mediaEncoder.EncoderPath : o;
-    }
+    public string FfmpegPath() => StreamSessionManager.ResolveFfmpegPath(_settings.Get().FfmpegPathOverride, _mediaEncoder.EncoderPath);
 
     /// <summary>Length and tags of one file; a zero runtime means it could not be read and the file is skipped.</summary>
     public IndexEntry Probe(string file)

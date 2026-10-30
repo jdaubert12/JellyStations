@@ -1,6 +1,5 @@
-using System.Net.Http.Headers;
-using System.Reflection;
 using Microsoft.Extensions.Logging;
+using SkiaSharp;
 
 namespace Jellyfin.Plugin.JellyStations.Weather.Radar;
 
@@ -54,6 +53,53 @@ public sealed class RadarHttp
         return bytes;
     }
 
+    /// <summary>
+    /// Fetches the window's slippy-map tiles and draws them onto one transparent PNG of the window. A tile that fails
+    /// is reported to <paramref name="onTileFailed"/> and left blank; the PNG is null only when every tile failed.
+    /// </summary>
+    public async Task<(byte[]? Png, Exception? LastError)> StitchTilesAsync(RadarViewport viewport, Func<int, int, string> tileUrl, Action<Exception, int, int> onTileFailed, CancellationToken ct)
+    {
+        using var bitmap = new SKBitmap(viewport.DataWidth, viewport.DataHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
+        using var canvas = new SKCanvas(bitmap);
+        canvas.Clear(SKColors.Transparent);
+        var failed = 0;
+        var total = 0;
+        Exception? lastError = null;
+        foreach (var (x, y, ox, oy) in viewport.Tiles())
+        {
+            total++;
+            try
+            {
+                var png = await GetPngAsync(tileUrl(x, y), ct).ConfigureAwait(false);
+                using var tile = SKBitmap.Decode(png);
+                if (tile is not null)
+                {
+                    canvas.DrawBitmap(tile, ox, oy);
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                lastError = ex;
+                onTileFailed(ex, x, y);
+            }
+        }
+
+        if (total > 0 && failed == total)
+        {
+            return (null, lastError);
+        }
+
+        canvas.Flush();
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+        return (data.ToArray(), lastError);
+    }
+
     public async Task<string> GetStringAsync(string url, CancellationToken ct)
     {
         var bytes = await GetBytesAsync(url, "application/json", ct).ConfigureAwait(false);
@@ -64,11 +110,7 @@ public sealed class RadarHttp
     {
         using var client = _http.CreateClient("JellyStations.Radar");
         client.Timeout = TimeSpan.FromSeconds(40);
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.UserAgent.Clear();
-        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Jellyfin-JellyStations", Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0"));
-        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("(+https://github.com/jdaubert12/JellyStations)"));
-        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue(accept));
+        using var request = WeatherHttp.CreateGet(url, accept);
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         if (!response.IsSuccessStatusCode)
         {

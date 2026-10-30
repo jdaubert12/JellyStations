@@ -100,23 +100,12 @@ public sealed partial class RadarService
             }
         }
 
-        if (status.LastAttemptUtc is null)
-        {
-            return loop is null || nowUtc - loop.FetchedUtc >= ForecastInterval;
-        }
-
-        if (status.Failures > 0)
-        {
-            var backoff = TimeSpan.FromMinutes(Math.Min(15, Math.Pow(2, Math.Min(10, status.Failures - 1))));
-            return nowUtc - status.LastAttemptUtc.Value >= backoff;
-        }
-
-        return nowUtc - status.LastAttemptUtc.Value >= ForecastInterval;
+        return FetchBackoff.IsDue(status, () => loop?.FetchedUtc, ForecastInterval, nowUtc);
     }
 
     private async Task FetchForecastAsync(Station station, WeatherLocation location, CancellationToken ct)
     {
-        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        await Gate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             var status = ForecastStatus(location.Id);
@@ -148,26 +137,22 @@ public sealed partial class RadarService
                 foreach (var minute in minutes)
                 {
                     var path = Path.Combine(dir, ForecastFrameFileName(source.Id, zoom, run, minute));
-                    if (!File.Exists(path))
+                    try
                     {
-                        try
+                        if (await EnsureFrameFileAsync(path, () => source.FetchOverlayAsync(viewport, run, minute, ct), ct).ConfigureAwait(false))
                         {
-                            var png = await source.FetchOverlayAsync(viewport, run, minute, ct).ConfigureAwait(false);
-                            var tmp = path + ".tmp";
-                            await File.WriteAllBytesAsync(tmp, png, ct).ConfigureAwait(false);
-                            File.Move(tmp, path, overwrite: true);
                             fetched++;
                         }
-                        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                        {
-                            throw;
-                        }
-                        catch (Exception ex)
-                        {
-                            lastFrameError = ex;
-                            _logger.LogDebug(ex, "JellyStations forecast radar [{Station}]: minute {Minute} of the {Run:HH:mm} run for {Place} failed", station.Name, minute, run, location.Name);
-                            continue;
-                        }
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        lastFrameError = ex;
+                        _logger.LogDebug(ex, "JellyStations forecast radar [{Station}]: minute {Minute} of the {Run:HH:mm} run for {Place} failed", station.Name, minute, run, location.Name);
+                        continue;
                     }
 
                     frames.Add(new RadarFrame(run.AddMinutes(minute), path));
@@ -183,9 +168,7 @@ public sealed partial class RadarService
                 var merged = frames.Concat(previous.Where(p => File.Exists(p.Path))).GroupBy(f => f.TimeUtc).Select(g => g.First()).OrderBy(f => f.TimeUtc).ToList();
                 var loop = new RadarLoop(source.Id, source.Name, source.Attribution, zoom, merged, now, run);
                 _forecastLoops[location.Id] = loop;
-                status.LastSuccessUtc = now;
-                status.LastError = null;
-                status.Failures = 0;
+                status.MarkSuccess(now);
                 status.RunUtc = run;
                 Sweep(dir, merged);
                 _logger.LogDebug("JellyStations forecast radar [{Station}]: {Place} has {Count} frame(s) from the {Run:HH:mm} UTC {Source} run, {New} new, out to {Time:HH:mm} UTC", station.Name, location.Name, merged.Count, run, source.Id, fetched, loop.Latest.TimeUtc);
@@ -196,14 +179,13 @@ public sealed partial class RadarService
             }
             catch (Exception ex)
             {
-                status.Failures++;
-                status.LastError = ex.Message;
+                status.MarkFailure(ex.Message);
                 _logger.LogWarning("JellyStations forecast radar [{Station}]: fetch for {Place} from {Source} failed ({Count} in a row): {Error}", station.Name, location.Name, source.Id, status.Failures, ex.Message);
             }
         }
         finally
         {
-            _gate.Release();
+            Gate.Release();
         }
     }
 

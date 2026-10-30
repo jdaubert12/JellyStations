@@ -195,7 +195,6 @@
       #JellyStationsPage .tvs-index { flex: none; width: 2.2em; opacity: .6; text-align: right; margin-right: .8em; }
       #JellyStationsPage input[type="color"].tvs-color { width: 4em; height: 2.2em; padding: 0; border: 1px solid rgba(255,255,255,.2); background: transparent; vertical-align: middle; }
       #JellyStationsPage .tvs-logo-preview { height: 4em; max-width: 12em; object-fit: contain; border-radius: 4px; background: rgba(255,255,255,.06); }
-      #JellyStationsPage .material-icons.tvs-icon-inline { font-size: 1.2em; vertical-align: middle; margin-right: .2em; }
     </style>
 
     <div data-role="content">
@@ -550,7 +549,17 @@
             <!-- Weather channel -->
             <div id="tvsPanelWeather" class="tvs-panel tvs-hidden" data-steps="2">
               <h3 class="sectionTitle" data-weather-aux>Weather</h3>
-              <div class="fieldDescription" data-weather-aux style="margin-bottom:.6em">This station is not a weather channel, but it puts the weather on the air in a weather time block or in its breaks. The places and the look below are what those show; the guide-entry settings of a weather channel do not apply.</div>
+              <div data-weather-aux>
+                <div class="fieldDescription" style="margin-bottom:.6em">This station is not a weather channel, but it puts the weather on the air in a weather time block or in its breaks. Those show a weather channel's places, look and music, so the forecasts, alerts and radar are fetched once for every station that airs them.</div>
+                <div class="selectContainer" id="tvsWeatherSourceBox">
+                  <label class="selectLabel" for="tvsWeatherSource">Weather channel</label>
+                  <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsWeatherSource"></select>
+                  <div class="fieldDescription">Change the places or the look on that channel; this station's own logo is drawn on the screens.</div>
+                </div>
+                <div id="tvsWeatherSourceNone" class="tvs-info tvs-hidden">No weather channel yet. Create one first (New station, then Weather channel) and come back; the weather block and breaks show a card until then.</div>
+              </div>
+              <div data-weather-only>
+              <div id="tvsWeatherBorrowers" class="tvs-info tvs-hidden"></div>
               <h4 class="tvs-subtitle">Places</h4>
               <div class="fieldDescription">The channel cycles through these in order: current conditions, the next twelve hours and the week ahead for each, then every place on one screen. Up to eight. Only each place's latitude and longitude is ever sent to the forecast provider.</div>
               <div id="tvsWeatherPlaces" class="paperList tvs-lineup"></div>
@@ -709,7 +718,7 @@
                 <div id="tvsMusicPicker"></div>
                 <div class="inputContainer">
                   <input is="emby-input" id="tvsWeatherMusicFolder" label="Also play every audio file in this folder on the server" type="text" autocomplete="off" placeholder="e.g. lounge; weather (folders under the plugin's music folder) or /media/music/ambient">
-                  <div class="fieldDescription" id="tvsWeatherMusicFolderHint">A name here means a folder under <code>data/JellyStations/music/</code> in the Jellyfin data folder; an absolute path works too; several folders separated by <code>;</code>. mp3, flac, ogg, opus, m4a, wav and more. New files are picked up when the station is recompiled (nightly, or Refresh content).</div>
+                  <div class="fieldDescription">A name here means a folder under <code>data/JellyStations/music/</code> in the Jellyfin data folder; an absolute path works too; several folders separated by <code>;</code>. mp3, flac, ogg, opus, m4a, wav and more. New files are picked up when the station is recompiled (nightly, or Refresh content).</div>
                 </div>
                 <div class="fieldDescription" style="margin-top:.8em"><strong>Music packs.</strong> Curated instrumental sets you may play and pass on: the plugin fetches each track from the artist's own site into the music folder, checks it against its published checksum and writes a CREDITS.txt beside the files. Nothing is bundled with the plugin.</div>
                 <div id="tvsMusicPacks" class="paperList"></div>
@@ -732,6 +741,7 @@
                   </label>
                   <div class="fieldDescription checkboxFieldDescription">Each file is measured once in the background (ffmpeg, a few seconds per track) and brought to −18 LUFS with peaks kept under −1 dB; until it has been measured a track plays as recorded. The music level above applies on top. Tracks also fade out and in over half a second where one ends and the next begins.</div>
                 </div>
+              </div>
               </div>
 
               <h4 class="tvs-subtitle">Forecast status</h4>
@@ -802,7 +812,7 @@
             </div>
           </div>
 
-          <div class="verticalSection" id="tvsExcludedSection" data-steps="2" data-not-weather>
+          <div class="verticalSection" data-steps="2" data-not-weather>
             <h3 class="sectionTitle">Excluded items</h3>
             <div id="tvsExcludedInfo" class="fieldDescription"></div>
             <div id="tvsExcludedList" class="paperList"></div>
@@ -849,7 +859,7 @@
                   <input is="emby-checkbox" type="checkbox" id="tvsBumperWeatherEnabled">
                   <span>Local weather in the breaks</span>
                 </label>
-                <div class="fieldDescription checkboxFieldDescription">A short run of the weather screens (title card, current conditions, radar, forecasts…) in every break with at least 45 seconds of room, up to the length below; clips and the card take whatever is left around it. The places and the look come from the Weather section, which appears below while this is on. Weather in a break is not a guide entry, like a clip.</div>
+                <div class="fieldDescription checkboxFieldDescription">A short run of the weather screens (title card, current conditions, radar, forecasts…) in every break with at least 45 seconds of room, up to the length below; clips and the card take whatever is left around it. The places, look and music are a weather channel's, picked in the Weather section, which appears below while this is on. Weather in a break is not a guide entry, like a clip.</div>
               </div>
               <div id="tvsBumperWeatherOptions" class="tvs-grid2">
                 <div class="inputContainer">
@@ -889,7 +899,7 @@
             <div id="tvsPreview" class="tvs-tablewrap"></div>
           </div>
 
-          <details class="tvs-advanced" id="tvsAdvanced" data-steps="1 2 3 all">
+          <details class="tvs-advanced" data-steps="1 2 3 all">
             <summary><span class="material-icons expand_more" aria-hidden="true"></span>Advanced <span class="tvs-secondary">call sign, padding grid, schedule anchor, station card text, encoding</span></summary>
             <div class="tvs-advanced-body">
               <div class="tvs-grid2">

@@ -93,6 +93,31 @@ public sealed class ProcessRunner : IDisposable
 
     public Task WaitForExitAsync(CancellationToken ct) => _process.WaitForExitAsync(ct);
 
+    /// <summary>
+    /// Waits up to <paramref name="timeout"/> for the process to exit: true when it did, false when it ran over and
+    /// was killed. When <paramref name="ct"/> is cancelled the process is killed and the cancellation thrown.
+    /// </summary>
+    public async Task<bool> WaitForExitAsync(TimeSpan timeout, CancellationToken ct)
+    {
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(timeout);
+        try
+        {
+            await _process.WaitForExitAsync(timeoutCts.Token).ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            Kill();
+            if (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+
+            return false;
+        }
+    }
+
     public void Kill()
     {
         try

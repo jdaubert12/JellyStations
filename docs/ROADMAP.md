@@ -435,6 +435,17 @@ time block becomes one `EntryKind.Weather` entry per occurrence (blocks also gai
 `ToEntry` turns into a Weather entry flagged `InBreak`, which the guide and "next" lists skip like a clip.
 Still open: almanac (needs a normals source; Open-Meteo has none).
 
+**2026-10-30 (1.22.0.0):** weather on ordinary stations no longer carries its own places. The user found
+that each station with weather in the breaks kept (and fetched for) its own copy of the places; now an
+ordinary station names a weather channel (`Station.WeatherSourceStationId`, null = the first weather
+channel) and `WeatherSources.ChannelFor` resolves it everywhere: the schedule input, `BuildSegment`
+(the channel's config, compiled music and anchor; the station's own logo), health, validation and the
+Weather API. The three pollers and the loudness service iterate `WeatherSources.InUse` (weather
+channels on the air, plus any a station on the air borrows from, even when the channel is disabled),
+so a place is fetched once however many stations show it. The editor's Weather section on an ordinary
+station is a weather-channel dropdown with that channel's forecast status; a weather channel's section
+lists the stations that air its places.
+
 Shipped as planned below with these differences. The **starter pack** is not a zip on the plugin's
 release but a manifest (`Assets/music-packs.json`) of thirty Kevin MacLeod pieces (CC BY 4.0) with
 URLs on incompetech.com and SHA-256 checksums; `MusicPackService` fetches them into
