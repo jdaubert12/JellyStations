@@ -3,20 +3,25 @@ using System.Text.RegularExpressions;
 
 namespace Jellyfin.Plugin.JellyStations.Library;
 
-/// <summary>A movie title offered to the detector.</summary>
-public sealed record FranchiseCandidate(Guid Id, string Title, int? Year, long RuntimeTicks);
+/// <summary>A movie offered to the detector: its title and, when the metadata provider knows one, the collection it belongs to.</summary>
+public sealed record FranchiseCandidate(Guid Id, string Title, int? Year, long RuntimeTicks, string? Collection = null);
 
-/// <summary>A detected group of movies sharing a title prefix.</summary>
+/// <summary>A detected group of movies sharing a collection or a title prefix.</summary>
 public sealed record Franchise(string Name, IReadOnlyList<FranchiseCandidate> Members);
 
 /// <summary>
-/// Finds franchises from title prefixes alone, for libraries without collections: "Harry Potter and the …" ×8,
+/// Finds franchises. Movies that name the same collection (TMDB's "James Bond Collection", stamped on every member
+/// whether or not a box set exists) group first, two titles being enough, so series whose titles share nothing
+/// ("Dr. No", "Goldfinger", "Skyfall") are found. The rest group by title prefix: "Harry Potter and the …" ×8,
 /// "The Lord of the Rings: …" ×3, "The Bourne …" ×5, "Iron Man" / "Iron Man 2". A prefix before a colon or dash, or
 /// of two leading words, needs two titles; a single leading word needs three so "Black Swan" and "Black Panther"
 /// stay apart. Each title joins its most specific qualifying group only.
 /// </summary>
 public static partial class FranchiseDetector
 {
+    /// <summary>Collections this small are not worth a marathon.</summary>
+    public const int CollectionMinMembers = 2;
+
     private static readonly HashSet<string> StopWords = new(StringComparer.Ordinal)
     {
         "a", "an", "the", "of", "in", "on", "at", "to", "and", "or", "for", "from", "with", "my", "our", "your", "his", "her", "its", "no", "not"
@@ -30,7 +35,17 @@ public static partial class FranchiseDetector
 
     public static IReadOnlyList<Franchise> Detect(IEnumerable<FranchiseCandidate> candidates)
     {
-        var items = candidates.Where(c => !string.IsNullOrWhiteSpace(c.Title)).ToList();
+        var all = candidates.Where(c => !string.IsNullOrWhiteSpace(c.Title)).ToList();
+
+        // Collections first: exact membership from the metadata provider beats any guess from the titles.
+        var byCollection = all
+            .Where(c => CollectionKey(c.Collection).Length > 0)
+            .GroupBy(c => CollectionKey(c.Collection), StringComparer.Ordinal)
+            .Where(g => g.Count() >= CollectionMinMembers)
+            .Select(g => new Franchise(CollectionDisplayName(g.First().Collection!), Ordered(g)))
+            .ToList();
+        var inCollection = new HashSet<Guid>(byCollection.SelectMany(f => f.Members.Select(m => m.Id)));
+        var items = all.Where(c => !inCollection.Contains(c.Id)).ToList();
 
         // Every key a title offers, strongest first; strong keys need two members, a single word needs three.
         var keysOf = new Dictionary<Guid, List<(string Key, bool Strong)>>();
@@ -81,12 +96,39 @@ public static partial class FranchiseDetector
             list.Add(item);
         }
 
-        return assigned
-            .Where(kv => kv.Value.Count >= (strongKeys.Contains(kv.Key) || kv.Key.Contains(' ') ? 2 : 3))
-            .Select(kv => new Franchise(DisplayName(kv.Key), kv.Value.OrderBy(m => m.Year ?? int.MaxValue).ThenBy(m => m.Title, StringComparer.OrdinalIgnoreCase).ToList()))
+        return byCollection
+            .Concat(assigned
+                .Where(kv => kv.Value.Count >= (strongKeys.Contains(kv.Key) || kv.Key.Contains(' ') ? 2 : 3))
+                .Select(kv => new Franchise(DisplayName(kv.Key), Ordered(kv.Value))))
             .OrderByDescending(f => f.Members.Sum(m => m.RuntimeTicks))
             .ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    /// <summary>Release order: by year, then title.</summary>
+    private static List<FranchiseCandidate> Ordered(IEnumerable<FranchiseCandidate> members)
+        => members.OrderBy(m => m.Year ?? int.MaxValue).ThenBy(m => m.Title, StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>A collection name as a grouping key: normalized like a title, with the provider's "Collection" suffix dropped.</summary>
+    public static string CollectionKey(string? collection) => Normalize(StripCollectionSuffix(collection));
+
+    /// <summary>"James Bond Collection" -> "James Bond"; the name keeps its own spelling otherwise.</summary>
+    public static string CollectionDisplayName(string collection)
+    {
+        var name = StripCollectionSuffix(collection);
+        return string.IsNullOrWhiteSpace(name) ? collection.Trim() : name;
+    }
+
+    private static string StripCollectionSuffix(string? collection)
+    {
+        var s = (collection ?? string.Empty).Trim();
+        const string suffix = "collection";
+        if (s.Length > suffix.Length && s.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
+        {
+            s = s[..^suffix.Length].TrimEnd(' ', ':', '-', '–', '—');
+        }
+
+        return s;
     }
 
     /// <summary>Candidate prefixes of a title, as normalized key strings.</summary>

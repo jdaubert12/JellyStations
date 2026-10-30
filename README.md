@@ -511,9 +511,11 @@ try a decoder before putting it on a profile.
 
 **Suggest stations** on the dashboard turns the library analysis into ready-made channels: genres and
 series with enough hours, a kids channel and family movies by rating, franchise marathons and a
-"Franchise Nights" slots station from titles that share a prefix, collections, decades, and seasonal
-channels from holiday tags. Tick the ones you want and they are created with the next free channel
-numbers, editable like any other station.
+"Franchise Nights" slots station, collections, decades, a "Classic Movies" channel for everything made
+before 1970, and seasonal channels from holiday tags. A franchise is any group of movies the metadata
+provider puts in one collection (TMDB's "James Bond Collection", whether or not you let Jellyfin build
+the box set), or failing that any set of titles that share a prefix. Tick the ones you want and they
+are created with the next free channel numbers, editable like any other station.
 
 **Not on a channel** on the dashboard lists the movies and shows no channel plays, from the compiled
 content of every enabled station (clips used as bumpers or idents count as on it). Tick titles and
@@ -631,7 +633,7 @@ usual Jellyfin API key or session token. The ones worth calling by hand:
 
 | Endpoint | What it returns or does |
 |---|---|
-| `GET /JellyStations/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises detected from shared title prefixes, decades, ratings, tags and libraries. The basis for station suggestions and the health report. |
+| `GET /JellyStations/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises (the provider's collection name, or shared title prefixes), decades, ratings, tags and libraries. The basis for station suggestions and the health report. |
 | `GET /JellyStations/Health` | Every station that needs attention, as the Status page lists them. |
 | `GET /JellyStations/Stations/Export`, `POST /JellyStations/Stations/Import` | The stations plus the saved station and block templates as one document; import takes that document or a bare array of stations. |
 | `GET /JellyStations/StationTemplates`, `GET .../{id}/Draft`, `POST`, `DELETE .../{id}` | Saved station templates first, then the built-in presets; a fresh station draft from one; save (replaces by name or id); delete a saved one. |

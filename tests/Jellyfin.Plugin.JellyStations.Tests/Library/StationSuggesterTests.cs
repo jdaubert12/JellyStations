@@ -35,6 +35,8 @@ public class StationSuggesterTests
             },
             Decades =
             {
+                new DecadeStatDto { Decade = 1940, Movies = 2, Hours = 3 },
+                new DecadeStatDto { Decade = 1960, Movies = 4, Hours = 6 },
                 new DecadeStatDto { Decade = 1980, Movies = 6, Hours = 9 },
                 new DecadeStatDto { Decade = 1990, Movies = 1, Hours = 2 }
             },
@@ -69,7 +71,7 @@ public class StationSuggesterTests
         var keys = list.Select(s => s.Key).ToList();
 
         Assert.Equal(
-            new[] { "kids", "family-movies", "genre:Comedy", "series:" + Bluey.ToString("N"), "franchise:Harry Potter", "franchise:Rocky", "franchise-nights", "collection:" + Bond.ToString("N"), "decade:1980", "seasonal:Holiday" },
+            new[] { "kids", "family-movies", "genre:Comedy", "series:" + Bluey.ToString("N"), "franchise:Harry Potter", "franchise:Rocky", "franchise-nights", "collection:" + Bond.ToString("N"), "decade:1980", "era:classics", "seasonal:Holiday" },
             keys);
 
         Assert.True(One(list, "genre:Comedy").Exists); // matched case-insensitively
@@ -133,6 +135,28 @@ public class StationSuggesterTests
         Assert.Equal(1980, decadeSource.YearFrom);
         Assert.Equal(1989, decadeSource.YearTo);
         Assert.Equal(new[] { SourceKind.Movie }, decadeSource.ItemKinds);
+
+        // Neither early decade reaches 8 h alone, but together they make a classics channel.
+        Assert.DoesNotContain(list, s => s.Key == "decade:1940" || s.Key == "decade:1960");
+        var classics = One(list, "era:classics");
+        Assert.Equal("Classic Movies", classics.Name);
+        Assert.Equal(9, classics.Hours);
+        Assert.Contains("6 movies from before 1970", classics.Description, StringComparison.Ordinal);
+        var classicSource = Assert.Single(classics.Station.Pool.Sources);
+        Assert.Equal(MoviesLib, classicSource.ItemId);
+        Assert.Null(classicSource.YearFrom);
+        Assert.Equal(1969, classicSource.YearTo);
+        Assert.Equal(new[] { SourceKind.Movie }, classicSource.ItemKinds);
+    }
+
+    [Fact]
+    public void Classics_HonourTheCutOffYear()
+    {
+        var list = StationSuggester.Suggest(Analysis(), Array.Empty<string>(), new SuggestionThresholds { ClassicsBeforeYear = 1990, ClassicsMinHours = 15 });
+        var classics = One(list, "era:classics");
+        Assert.Equal(18, classics.Hours); // 1940s + 1960s + 1980s
+        Assert.Equal(1989, Assert.Single(classics.Station.Pool.Sources).YearTo);
+        Assert.Contains("before 1990", classics.Description, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -178,7 +202,7 @@ public class StationSuggesterTests
     [Fact]
     public void Thresholds_AreHonoured_AndEmptyLibraryYieldsNothing()
     {
-        var strict = new SuggestionThresholds { GenreMinHours = 100, SeriesMinEpisodes = 100, KidsMinHours = 100, FamilyMoviesMinHours = 100, DecadeMinHours = 100, FranchiseMinTitles = 10, CollectionMinItems = 10, SeasonalMinHours = 100 };
+        var strict = new SuggestionThresholds { GenreMinHours = 100, SeriesMinEpisodes = 100, KidsMinHours = 100, FamilyMoviesMinHours = 100, DecadeMinHours = 100, ClassicsMinHours = 100, FranchiseMinTitles = 10, CollectionMinItems = 10, SeasonalMinHours = 100 };
         var list = StationSuggester.Suggest(Analysis(), Array.Empty<string>(), strict);
         Assert.Equal(new[] { "franchise-nights" }, list.Select(s => s.Key)); // nights need only two franchises
 

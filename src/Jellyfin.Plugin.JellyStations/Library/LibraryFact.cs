@@ -23,6 +23,9 @@ public sealed class LibraryFact
 
     public long RuntimeTicks { get; set; }
 
+    /// <summary>For a movie: the collection its metadata provider places it in ("James Bond Collection"), box set or not.</summary>
+    public string? CollectionName { get; set; }
+
     /// <summary>Own genres, or the series genres for an episode without any.</summary>
     public List<string> Genres { get; set; } = new();
 

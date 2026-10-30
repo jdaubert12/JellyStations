@@ -70,6 +70,45 @@ public class FranchiseDetectorTests
     }
 
     [Fact]
+    public void Detect_GroupsByCollectionName_BeforePrefixes()
+    {
+        var movies = new[]
+        {
+            M("Dr. No", 1962) with { Collection = "James Bond Collection" },
+            M("Goldfinger", 1964) with { Collection = "James Bond Collection" },
+            M("Skyfall", 2012) with { Collection = "james bond collection" },
+            M("Casino Royale", 2006) with { Collection = "James Bond Collection" },
+            M("Rocky", 1976) with { Collection = "Rocky Collection" }, M("Rocky II", 1979) with { Collection = "Rocky Collection" }, M("Rocky III", 1982),
+            M("The Bourne Identity", 2002), M("The Bourne Supremacy", 2004), M("The Bourne Ultimatum", 2007),
+            M("Coco", 2017) with { Collection = "Pixar Shorts" }
+        };
+
+        var franchises = FranchiseDetector.Detect(movies);
+
+        var bond = Assert.Single(franchises, f => f.Name == "James Bond");
+        Assert.Equal(new[] { "Dr. No", "Goldfinger", "Casino Royale", "Skyfall" }, bond.Members.Select(m => m.Title));
+
+        // A collection with two members groups; the third Rocky has no collection and so cannot join it, and "rocky"
+        // alone (single word, two titles) does not qualify as a prefix group.
+        var rocky = Assert.Single(franchises, f => f.Name == "Rocky");
+        Assert.Equal(2, rocky.Members.Count);
+
+        Assert.Contains("Bourne", franchises.Select(f => f.Name)); // prefix detection still runs for the rest
+        Assert.DoesNotContain("Pixar Shorts", franchises.Select(f => f.Name)); // one member
+        Assert.Equal(3, franchises.Count);
+    }
+
+    [Theory]
+    [InlineData("James Bond Collection", "James Bond")]
+    [InlineData("The Fast and the Furious Collection", "The Fast and the Furious")]
+    [InlineData("Collection", "Collection")]
+    [InlineData("Harry Potter", "Harry Potter")]
+    public void CollectionDisplayName_DropsTheSuffix(string collection, string expected)
+    {
+        Assert.Equal(expected, FranchiseDetector.CollectionDisplayName(collection));
+    }
+
+    [Fact]
     public void Detect_OrdersByHours()
     {
         var big = new[] { M("Alpha One"), M("Alpha Two"), M("Alpha Three") };

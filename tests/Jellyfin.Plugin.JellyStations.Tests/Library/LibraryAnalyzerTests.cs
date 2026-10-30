@@ -151,6 +151,23 @@ public class LibraryAnalyzerTests
     }
 
     [Fact]
+    public void Franchises_ComeFromCollectionNames()
+    {
+        var facts = Facts();
+        var drNo = Movie("Dr. No", 1962, "PG", 110, "Action");
+        drNo.CollectionName = "James Bond Collection";
+        var goldfinger = Movie("Goldfinger", 1964, "PG", 110, "Action");
+        goldfinger.CollectionName = "James Bond Collection";
+        facts.Add(drNo);
+        facts.Add(goldfinger);
+        var a = LibraryAnalyzer.Analyze(facts, new List<CollectionFact>(), DateTime.UtcNow);
+
+        var bond = Assert.Single(a.Franchises, f => f.Name == "James Bond");
+        Assert.Equal(new[] { drNo.Id, goldfinger.Id }, bond.ItemIds);
+        Assert.Equal(new[] { "Dr. No", "Goldfinger" }, bond.Titles);
+    }
+
+    [Fact]
     public void Franchises_ComeFromMovieTitles()
     {
         var facts = Facts();

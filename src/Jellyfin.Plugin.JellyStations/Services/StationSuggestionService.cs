@@ -35,6 +35,7 @@ public sealed class StationSuggestionService
             t.KidsMinHours = h;
             t.FamilyMoviesMinHours = h;
             t.DecadeMinHours = h;
+            t.ClassicsMinHours = h;
             t.SeasonalMinHours = Math.Min(t.SeasonalMinHours, h);
         }
 

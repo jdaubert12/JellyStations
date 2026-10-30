@@ -172,7 +172,7 @@ analyzer, then suggestion rules and the dashboard view on top of it.
 - **Library analysis — DONE 2026-10-15.** `LibraryAnalysisService` collects `LibraryFact`s per
   library (episode rating/genres/tags inherited from the series) and `LibraryAnalyzer` aggregates
   them: totals, kids/family/unrated hours, genres, series, collections, franchises
-  (`FranchiseDetector`, title prefixes), decades, ratings, tags, libraries. Cached 15 minutes,
+  (`FranchiseDetector`: collection names, then title prefixes), decades, ratings, tags, libraries. Cached 15 minutes,
   `GET /JellyStations/Library/Analysis?refresh=true` recomputes. The health report reads the same data.
 - **Suggest stations — DONE 2026-10-15.** `StationSuggester` (pure, tested) over the analysis:
   genres ≥ 8 h, series ≥ 20 episodes, Kids TV (libraries capped at G) and Family Movies (PG),
@@ -180,7 +180,10 @@ analyzer, then suggestion rules and the dashboard view on top of it.
   decades ≥ 8 h, seasonal channels from holiday tags with their guide window. "Suggest stations"
   view on the dashboard; `GET /JellyStations/Suggestions`, `POST /JellyStations/Suggestions/Create`.
 - **Franchise detection — DONE 2026-10-15** as part of the analyzer (`FranchiseDetector`). A
-  "pick a franchise" source type can build on it later.
+  "pick a franchise" source type can build on it later. **2026-10-30:** movies are grouped first by
+  the collection name the metadata provider stamps on them (`Movie.CollectionName`, TMDB's "James
+  Bond Collection", present even without a box set; two members suffice), then the rest by title
+  prefix as before. Found when a full Bond set produced no marathon: the titles share no prefix.
 - **Block recurrence — DONE 2026-10-16.** `SlotBlock.Recurrence`: weekly (default), every N
   weeks from a start date, chosen weeks of the month (Monday-based weeks, 5 = last), or listed
   dates. `RecurrenceRule` decides per local date; the weekly scheduler asks it when listing a
@@ -622,7 +625,11 @@ draft goes through `StationTemplates.ApplyTo` to pick up a look and its breaks.
    with the draft, the way "Not on a channel" already does. Small.
 2. **Preview a day.** `POST /JellyStations/Schedule/Preview` already takes a station body, so each
    suggestion row can expand to its next 24 hours before anyone commits. Small.
-3. **Smarter rules.** Split a genre into movies and TV when both clear the threshold; group several
+3. **Smarter rules.** Done so far (2026-10-30): franchises from the provider's collection name
+   (see Phase 3), and a "Classic Movies" station (`era:classics`) for every movie made before 1970
+   when they total 8 h, since the decade rule needs 8 h per decade and old films rarely manage it
+   one decade at a time (`SuggestionThresholds.ClassicsMinHours` / `ClassicsBeforeYear`). Still
+   open: split a genre into movies and TV when both clear the threshold; group several
    mid-size sitcoms into one "Comfort reruns" station instead of one channel per show or nothing;
    decade channels for TV; a documentary channel; an anime channel from the genre or tag; a studio
    or network channel once the analyzer collects studios (Phase 7 step 4 adds the source kind);

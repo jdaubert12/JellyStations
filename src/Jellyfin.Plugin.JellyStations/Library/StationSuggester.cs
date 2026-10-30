@@ -17,6 +17,12 @@ public sealed class SuggestionThresholds
 
     public double DecadeMinHours { get; set; } = 8;
 
+    /// <summary>Hours of movies made before <see cref="ClassicsBeforeYear"/> that earn a "Classic Movies" station.</summary>
+    public double ClassicsMinHours { get; set; } = 8;
+
+    /// <summary>First year that is no longer a classic.</summary>
+    public int ClassicsBeforeYear { get; set; } = 1970;
+
     /// <summary>Titles a franchise needs for its own marathon station.</summary>
     public int FranchiseMinTitles { get; set; } = 3;
 
@@ -27,8 +33,9 @@ public sealed class SuggestionThresholds
 
 /// <summary>
 /// Turns a <see cref="LibraryAnalysisDto"/> into ready-to-create stations: genre channels, series channels, a kids
-/// channel and family movies by rating, decade channels, franchise marathons and a "Franchise Nights" slots
-/// station, collection channels, and seasonal channels from holiday tags. Pure, so the rules are testable.
+/// channel and family movies by rating, decade channels and a classics channel, franchise marathons and a
+/// "Franchise Nights" slots station, collection channels, and seasonal channels from holiday tags. Pure, so the
+/// rules are testable.
 /// </summary>
 public static class StationSuggester
 {
@@ -182,6 +189,22 @@ public static class StationSuggester
             {
                 Add("decade:" + d.Decade.ToString(CultureInfo.InvariantCulture), "Decade", d.Decade.ToString(CultureInfo.InvariantCulture) + "s Movies", Count(d.Movies, "movie") + " from " + d.Decade.ToString(CultureInfo.InvariantCulture) + " to " + (d.Decade + 9).ToString(CultureInfo.InvariantCulture) + ", shuffled.", d.Hours, station);
             }
+        }
+
+        // Classics: every movie made before the cut-off year, which no single decade may reach on its own.
+        var classics = a.Decades.Where(d => d.Decade < t.ClassicsBeforeYear).ToList();
+        var classicHours = classics.Sum(d => d.Hours);
+        if (classics.Count > 0 && classicHours >= t.ClassicsMinHours && movieLibraries.Count > 0)
+        {
+            var lastYear = t.ClassicsBeforeYear - 1;
+            var station = Pool(PlayOrder.Shuffle, movieLibraries.Select(l =>
+            {
+                var s = LibrarySource(l, SourceKind.Movie, null);
+                s.YearTo = lastYear;
+                return s;
+            }));
+            station.PaddingByLength = true;
+            Add("era:classics", "Decade", "Classic Movies", Count(classics.Sum(d => d.Movies), "movie") + " from before " + t.ClassicsBeforeYear.ToString(CultureInfo.InvariantCulture) + ", shuffled.", classicHours, station);
         }
 
         // Seasonal channels from holiday tags, listed in the guide only during their window.

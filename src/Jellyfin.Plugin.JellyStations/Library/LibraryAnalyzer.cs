@@ -55,7 +55,7 @@ public static class LibraryAnalyzer
         result.Series = Series(episodes);
         result.Collections = Collections(facts, collections);
         result.Franchises = FranchiseDetector
-            .Detect(movies.Select(m => new FranchiseCandidate(m.Id, m.Title, m.Year, m.RuntimeTicks)))
+            .Detect(movies.Select(m => new FranchiseCandidate(m.Id, m.Title, m.Year, m.RuntimeTicks, m.CollectionName)))
             .Select(fr => new FranchiseStatDto
             {
                 Name = fr.Name,
