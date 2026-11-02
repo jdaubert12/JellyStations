@@ -54,6 +54,30 @@ public sealed class EncodingProfile
     /// </summary>
     public string OutputRange { get; set; } = OutputSdr;
 
+    /// <summary>
+    /// When a source is deinterlaced before scaling: <see cref="DeinterlaceAuto"/> (the files Jellyfin's probe reports
+    /// as interlaced), <see cref="DeinterlaceAlways"/> (every file, for libraries whose field-order flags are missing)
+    /// or <see cref="DeinterlaceOff"/>. Done in software by bwdif, one frame per field pair, or one frame per field on
+    /// a 50 or 60 fps profile.
+    /// </summary>
+    public string Deinterlace { get; set; } = DeinterlaceAuto;
+
+    public const string DeinterlaceAuto = "auto";
+
+    public const string DeinterlaceAlways = "always";
+
+    public const string DeinterlaceOff = "off";
+
+    public static readonly string[] DeinterlaceModes = { DeinterlaceAuto, DeinterlaceAlways, DeinterlaceOff };
+
+    /// <summary>True when a file is to be deinterlaced under this profile; blank or unknown modes count as auto.</summary>
+    public bool Deinterlaces(bool fileInterlaced) => (Deinterlace ?? string.Empty).Trim().ToLowerInvariant() switch
+    {
+        DeinterlaceAlways => true,
+        DeinterlaceOff => false,
+        _ => fileInterlaced
+    };
+
     public const string OutputSdr = "sdr";
 
     public const string OutputHdr10 = "hdr10";

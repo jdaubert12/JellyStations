@@ -192,6 +192,57 @@ public class StationTemplatesTests
     }
 
     [Fact]
+    public void ApplyLook_keeps_the_content_and_takes_the_look_and_breaks()
+    {
+        var t = StationTemplates.FromStation(FullStation(), "t");
+        var station = new Station { Name = "Harry Potter Marathon", ChannelNumber = "9", TimeZoneId = "Europe/London", Mode = ScheduleMode.Lineup };
+        station.Lineup.Items.Add(new LineupItem { ItemId = Show, DisplayName = "HP 1" });
+        station.Pool.Sources.Add(new ContentSource { Kind = SourceKind.Genre, Genre = "Fantasy" });
+
+        StationTemplates.ApplyLook(t, station);
+
+        // Identity and content untouched.
+        Assert.Equal("Harry Potter Marathon", station.Name);
+        Assert.Equal("9", station.ChannelNumber);
+        Assert.Equal("Europe/London", station.TimeZoneId);
+        Assert.Equal(ScheduleMode.Lineup, station.Mode);
+        Assert.Single(station.Lineup.Items);
+        Assert.Equal("Fantasy", Assert.Single(station.Pool.Sources).Genre);
+        Assert.Empty(station.Slots.Blocks);
+        Assert.Empty(station.ActiveWindows);
+
+        // The look and the breaks from the template, as copies.
+        Assert.True(station.Bumpers.Enabled);
+        Assert.Equal(Clip, Assert.Single(station.Bumpers.Sources).ItemId);
+        Assert.True(station.Bumpers.PreRoll.Enabled);
+        Assert.True(station.Bumpers.Weather.Enabled);
+        Assert.NotSame(t.Settings.Bumpers, station.Bumpers);
+        Assert.Equal(LogoCorner.BottomLeft, station.LogoOverlay.Corner);
+        Assert.Equal(new[] { 600, 60 }, station.UpNextCard.LeadTimesSeconds);
+        Assert.Equal("hevc_qsv", station.Encoding?.VideoEncoder);
+        Assert.True(station.PaddingByLength);
+        Assert.Equal(30, station.PaddingGridMinutes);
+        Assert.Equal("Back soon", station.CardText);
+        Assert.Equal(WeatherTheme.Classic, station.Weather.Theme);
+        Assert.Empty(station.Weather.Locations);
+        Assert.Null(station.WeatherSourceStationId);
+        Assert.False(station.AutoRecompileNightly);
+        Assert.Equal("PG", Assert.Single(station.Pool.DaypartRules).MaxRating);
+    }
+
+    [Fact]
+    public void ApplyLook_from_a_plain_template_leaves_family_hours_alone()
+    {
+        var station = new Station { Name = "Kids TV" };
+        station.Pool.DaypartRules.Add(new DaypartRule { StartLocal = "06:00", EndLocal = "20:00", MaxRating = "G" });
+
+        StationTemplates.ApplyLook(StationTemplates.BuiltIn[0], station);
+
+        Assert.Equal("G", Assert.Single(station.Pool.DaypartRules).MaxRating);
+        Assert.False(station.Bumpers.Enabled);
+    }
+
+    [Fact]
     public void ApplyTo_uses_the_default_name_and_the_template_time_zone_when_set()
     {
         var t = new StationTemplate { DefaultName = "Weather", Settings = new Station { Mode = ScheduleMode.Weather, TimeZoneId = "Asia/Tokyo" } };

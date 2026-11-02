@@ -59,6 +59,7 @@
   const ENCODERS = [['libx264', 'libx264 (software)'], ['h264_nvenc', 'h264_nvenc (NVIDIA)'], ['h264_qsv', 'h264_qsv (Intel Quick Sync)'], ['h264_vaapi', 'h264_vaapi (VA-API)'], ['libx265', 'libx265 (software, HEVC)'], ['hevc_nvenc', 'hevc_nvenc (NVIDIA, HEVC)'], ['hevc_qsv', 'hevc_qsv (Intel Quick Sync, HEVC)'], ['hevc_vaapi', 'hevc_vaapi (VA-API, HEVC)'], ['custom', 'Custom…']];
   const OUTPUT_RANGES = [['sdr', 'SDR (BT.709, 8-bit)'], ['hdr10', 'HDR10 (BT.2020 PQ, 10-bit HEVC)']];
   const HW_DECODERS = [['auto', 'Follow Jellyfin'], ['', 'None (software)'], ['qsv', 'Intel Quick Sync (qsv)'], ['vaapi', 'VA-API'], ['cuda', 'NVIDIA (cuda)'], ['videotoolbox', 'Apple VideoToolbox'], ['d3d11va', 'Windows (d3d11va)']];
+  const DEINTERLACE_MODES = [['auto', 'When the file is interlaced'], ['always', 'Always'], ['off', 'Off']];
   const STATUS_INTERVAL_MS = 5000;
   const LIST_INTERVAL_MS = 60000;
 
@@ -3404,11 +3405,51 @@
   // ------------------------------------------------------------------------------------------
 
   function openSuggestions(refresh) {
-    withBusy('Could not build suggestions', () => fetchSuggestions(refresh).then(() => {
+    withBusy('Could not build suggestions', () => Promise.all([fetchSuggestions(refresh), loadTimeZones(), loadStationTemplates()]).then(() => {
       show($('#tvsSuggestWelcome'), state.stations.length === 0);
+      renderSuggestOptions();
       renderSuggestions();
       showView('suggest');
     }));
+  }
+
+  /** The options every created station shares. The number and zone follow the list until the person changes them. */
+  function renderSuggestOptions() {
+    const first = $('#tvsSuggestFirst');
+    if (!first.dataset.touched) {
+      first.value = nextChannelNumber();
+    }
+    const tz = $('#tvsSuggestTimeZone');
+    const current = tz.value || guessTimeZone();
+    clear(tz);
+    const zones = state.timeZones.slice();
+    if (zones.indexOf(current) < 0) {
+      zones.unshift(current);
+    }
+    zones.forEach(z => tz.appendChild(el('option', { value: z, text: z })));
+    tz.value = current;
+    const look = $('#tvsSuggestTemplate');
+    const chosen = look.value || '';
+    clear(look);
+    look.appendChild(el('option', { value: '', text: 'Plain (no bumpers or overlays)' }));
+    state.stationTemplates.filter(t => !t.Settings || t.Settings.Mode !== 'Weather').forEach(t => {
+      look.appendChild(el('option', { value: t.Id, text: t.Name + (t.BuiltIn ? '' : ' (saved)') }));
+    });
+    look.value = state.stationTemplates.some(t => t.Id === chosen) ? chosen : '';
+  }
+
+  /** The shared options for Create and Draft: numbering, zone, template, logo and the thresholds the list used. */
+  function suggestOptions() {
+    const q = suggestQuery(false);
+    const first = parseInt(val('#tvsSuggestFirst'), 10);
+    return {
+      TimeZoneId: val('#tvsSuggestTimeZone') || guessTimeZone(),
+      FirstChannelNumber: !isNaN(first) && first > 0 ? first : null,
+      TemplateId: val('#tvsSuggestTemplate') || null,
+      Logo: checked('#tvsSuggestLogo'),
+      MinHours: q.minHours || null,
+      MinEpisodes: q.minEpisodes || null
+    };
   }
 
   function fetchSuggestions(refresh) {
@@ -3450,7 +3491,8 @@
               s.Exists ? badge('Already exists', 'off') : null
             ]),
             el('div', { className: 'listItemBodyText secondary', text: s.Hours + ' h · ' + s.Description })
-          ])
+          ]),
+          iconButton('edit', 'Change this station in the editor before creating it', () => editSuggestion(s))
         ]);
         box.appendChild(row);
       });
@@ -3473,17 +3515,39 @@
     if (!keys.length) {
       return;
     }
-    const q = suggestQuery(false);
-    const body = { Keys: keys, TimeZoneId: guessTimeZone(), MinHours: q.minHours || null, MinEpisodes: q.minEpisodes || null };
+    const body = suggestOptions();
+    body.Keys = keys;
     withBusy('Could not create stations', () => api('POST', 'Suggestions/Create', body).then(res => {
       const parts = [];
       if (res.Created.length) { parts.push('created ' + res.Created.length); }
       if (res.Errors.length) { parts.push(res.Errors.length + ' failed'); }
       toast('Suggestions: ' + (parts.join(', ') || 'nothing to do') + '.');
+      const notes = (res.Errors || []).concat(res.Warnings || []);
       return loadStations().then(() => fetchSuggestions(false)).then(() => {
+        delete $('#tvsSuggestFirst').dataset.touched;
+        renderSuggestOptions();
         renderSuggestions();
-        renderErrorBox($('#tvsSuggestError'), res.Errors.length ? res.Errors : null);
+        renderErrorBox($('#tvsSuggestError'), notes.length ? notes : null);
       });
+    }));
+  }
+
+  /** Opens a suggestion in the editor as a new, unsaved station with the options applied and a drawn logo ready to upload on save. */
+  function editSuggestion(s) {
+    const body = suggestOptions();
+    body.Key = s.Key;
+    state.detail = null;
+    withBusy('Could not open the suggestion', () => api('POST', 'Suggestions/Draft', body).then(station => {
+      const draft = resetIdentity(normalizeStation(station));
+      draft.ChannelNumber = station.ChannelNumber || draft.ChannelNumber;
+      draft.TimeZoneId = station.TimeZoneId || draft.TimeZoneId;
+      state.draft = draft; // logoSeedText reads the draft's sources
+      const template = state.stationTemplates.find(t => t.Id === body.TemplateId);
+      const color = template && template.LogoColor && /^#[0-9a-f]{6}$/i.test(template.LogoColor) ? template.LogoColor : colorForName(draft.Name || 'TV');
+      const canvas = body.Logo ? drawLogo(draft.Name, draft.ChannelNumber, color, logoSeedText(draft.Name, draft.ChannelNumber)) : null;
+      const blob = new Promise(resolve => (canvas ? canvas.toBlob(resolve, 'image/png') : resolve(null)));
+      return blob.then(logo => openEditorWith(draft, null, null, logo, template ? template.LogoColor : null))
+        .then(() => toast('Change what you like, then save to create \u201c' + draft.Name + '\u201d.'));
     }));
   }
 
@@ -4271,7 +4335,7 @@
     return {
       Width: 1280, Height: 720, Fps: 30, VideoBitrateKbps: 3500, AudioBitrateKbps: 160,
       VideoEncoder: 'libx264', OutputRange: 'sdr', Preset: 'veryfast', H264Profile: 'high', H264Level: '4.1', GopSeconds: 2,
-      HardwareDecode: 'auto', HardwareDevice: '',
+      HardwareDecode: 'auto', HardwareDevice: '', Deinterlace: 'auto',
       ExtraInputArgs: '', ExtraOutputArgs: '', AudioLanguagePreference: 'eng'
     };
   }
@@ -4286,6 +4350,7 @@
           inputHtml(p + 'height', 'Height', 'number', { min: 16, max: 4320, step: 2 }) +
         '</div>' +
         inputHtml(p + 'fps', 'Frame rate (fps)', 'number', { min: 1, max: 120, step: 1 }, 'Constant output frame rate. 24 suits a film station (most movies are 23.976 fps and judder when converted to 30); 30 suits series; 60 only for 60 fps sources.') +
+        selectHtml(p + 'deint', 'Deinterlacing', DEINTERLACE_MODES, 'Interlaced files (DVD rips, broadcast captures) are deinterlaced before scaling, so the combing never reaches the stream. "When the file is interlaced" follows the field order Jellyfin probed; "Always" is for files whose flags are missing; "Off" plays them as they are. Standard-definition files cost almost nothing; 1080i costs some CPU per station. On a 50 or 60 fps profile every field becomes a frame, so video-shot material keeps its motion.') +
         inputHtml(p + 'gop', 'Keyframe interval (seconds)', 'number', { min: 1, max: 30, step: 1 }, 'GOP length. Shorter makes channel changes faster at a small bitrate cost.') +
         inputHtml(p + 'vbr', 'Video bitrate (kbps)', 'number', { min: 100, max: 100000, step: 50 }, 'Target bitrate for the video stream. 3500 is plenty for 720p and 8000 for 1080p; more only inflates every client\'s download and Jellyfin\'s transcodes.') +
         inputHtml(p + 'abr', 'Audio bitrate (kbps)', 'number', { min: 32, max: 1024, step: 8 }, 'AAC audio bitrate.') +
@@ -4353,6 +4418,8 @@
         const hw = e.HardwareDecode == null ? 'auto' : String(e.HardwareDecode).trim().toLowerCase();
         q('hwdec').value = HW_DECODERS.some(o => o[0] === hw) ? hw : 'auto';
         q('hwdev').value = e.HardwareDevice || '';
+        const deint = e.Deinterlace == null ? 'auto' : String(e.Deinterlace).trim().toLowerCase();
+        q('deint').value = DEINTERLACE_MODES.some(o => o[0] === deint) ? deint : 'auto';
         q('inArgs').value = e.ExtraInputArgs || '';
         q('outArgs').value = e.ExtraOutputArgs || '';
       },
@@ -4372,6 +4439,7 @@
           GopSeconds: parseInt(q('gop').value, 10) || 0,
           HardwareDecode: q('hwdec').value,
           HardwareDevice: q('hwdev').value.trim(),
+          Deinterlace: q('deint').value,
           ExtraInputArgs: q('inArgs').value.trim(),
           ExtraOutputArgs: q('outArgs').value.trim(),
           AudioLanguagePreference: q('lang').value.trim()
@@ -5262,6 +5330,7 @@
     on('#tvsBtnSuggestBack', 'click', () => showView('list'));
     on('#tvsBtnSuggestCreate', 'click', createSelectedSuggestions);
     on('#tvsSuggestList', 'change', updateSuggestCount);
+    on('#tvsSuggestFirst', 'input', () => { $('#tvsSuggestFirst').dataset.touched = '1'; });
     on('#tvsBtnCoverageRefresh', 'click', () => openCoverage(true));
     on('#tvsCoverageDisabled', 'change', () => openCoverage(false));
     on('#tvsBtnCoverageBack', 'click', () => showView('list'));

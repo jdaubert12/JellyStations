@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.23.0.0"
+$version = "1.24.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Smarter franchise detection and a Classic Movies suggestion. Suggest stations now groups movies by the collection their metadata provider puts them in (TMDB's ""James Bond Collection"" and the like, stamped on every member whether or not Jellyfin builds the box set), so a series whose titles share nothing (Dr. No, Goldfinger, Skyfall) gets its marathon and its Franchise Nights slot; two members are enough, and the ""Collection"" suffix is dropped from the name. Titles without a collection are still grouped by shared prefix as before. A new ""Classic Movies"" suggestion offers every movie made before 1970 as one shuffled station once they total 8 hours, since old films rarely reach the decade rule's 8 hours one decade at a time; the cut-off year and the hours are thresholds, and the small-library toggle lowers the hours like the other rules. The station it creates is the same as setting a Movies library source to movies only with To year 1969, which any source could already do."
+    changelog = "Suggested stations arrive finished. Each station created from Suggest stations now gets a drawn logo (the editor's generated card, drawn on the server with the same seeded patterns and colors), the time zone and the first channel number chosen on the page (numbers already in use are skipped), and, with a station template picked under ""Look and breaks from"", that template's bumpers, pre-roll and post-roll, weather in the breaks, logo overlay, up next card, encoding, padding, card text and family hours, while the content stays the suggester's. A pencil on every suggestion opens it in the editor as an unsaved station with those options applied and the logo ready to upload on save, so it can be changed before it is created (POST /JellyStations/Suggestions/Draft). The Create result lists a warning for any station whose logo could not be drawn. Deinterlacing: interlaced files (DVD rips, broadcast captures) are now deinterlaced by the plugin before scaling, so the combing no longer ends up in the stream. The encoding profile gets a Deinterlacing setting: When the file is interlaced (the default, following the field order Jellyfin probed), Always (for files whose flags are missing) or Off; on a 50 or 60 fps profile every field becomes a frame so video-shot material keeps its motion. Stations are recompiled once at startup to record which files are interlaced, and the hardware test deinterlaces the same way."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

@@ -2,9 +2,10 @@
 
 Working plan for scheduling and curation features. Phase 1 is the agreed next three steps, in order.
 Later phases are candidates, roughly ordered by payoff per effort; reorder freely.
-Phase 7 (smarter stations: embeddings, watch history, optional local model) is the current plan.
+Phase 7 (smarter stations: embeddings, watch history, optional local model) is the current plan; an air log with history-weighted ordering is designed in `docs/HISTORY-SCHEDULING.md` (local note, not in the repo) (2026-11-01; cut down 2026-11-02 to an air log, series continuity and the seam, no weighting; ready to build).
 Phase 8 (weather channel) steps 1-6 shipped in 1.14.0.0 (2026-10-23); radar 1.18.0.0 and forecast radar 1.19.0.0 (2026-10-26); step 7: alerts screen (NWS), title cards, music levelling (loudnorm), weather time blocks (with block repeats) and weather in the breaks on ordinary stations built 2026-10-27 as 1.20.0.0; almanac still open.
-Phase 9 (better suggestions and channel templates, planned 2026-10-27) is in progress: B1 station templates built 2026-10-28 as 1.21.0.0; A1 (finish what gets created) is next.
+Phase 9 (better suggestions and channel templates, planned 2026-10-27) is in progress: B1 station templates built 2026-10-28 as 1.21.0.0; A1 (finish what gets created) built 2026-11-01 as 1.24.0.0; A2 (preview a day) is next.
+Feature survey of the other projects' trackers and communities, 2026-11-02, with a ranked list of candidates not yet planned: `docs/FEATURE-SURVEY-2026-11.md` (local note, not in the repo).
 
 Conventions for every step:
 
@@ -226,6 +227,11 @@ analyzer, then suggestion rules and the dashboard view on top of it.
   all served; channel logo too). Image paths are captured at compile time, so artwork added later
   shows after the nightly recompile. Still open: a "New" tag for recently added items. Small.
 - **Filler gate and block-level dayparting.** Extend Step 2 to slots mode if needed.
+- **Deinterlacing — DONE 2026-11-02.** The compiler records Jellyfin's interlaced flag per file
+  (compiled format 3), and `FfmpegArgsBuilder.VideoFilter` puts `bwdif` ahead of the scaler when
+  `EncodingProfile.Deinterlace` says so (`auto` follows the file, `always`, `off`); one frame per
+  field pair, or per field on a 50/60 fps profile. Bitmap subtitles are laid over the deinterlaced
+  picture. Settings and the station override get the select; the hardware test deinterlaces too.
 
 ---
 
@@ -367,7 +373,7 @@ In payoff order. Steps 1-3 need no language model at all.
    cosine search, clustering, naming) get xUnit tests with fixed vectors; the model call is behind
    an interface so tests never load a model. Index a 2,000-movie library inside a scheduled task,
    never in a web request. Medium-large.
-2. **Watch-history awareness.** Jellyfin's per-user played state and favorites, read through
+2. **Watch-history awareness.** (Design for the broadcast-side half, an air log of what each station aired plus recency-weighted shuffles in all three schedulers, is in `docs/HISTORY-SCHEDULING.md` (local note, not in the repo), written 2026-11-01 and cut down on 2026-11-02 after comparing ErsatzTV, Tunarr/dizqueTV, PseudoTV Live, Channels DVR and radio schedulers: an air log, series continuity and the seam at a revision bump, no recency weighting; the Jellyfin played-state items below stay as planned.) Jellyfin's per-user played state and favorites, read through
    `IUserDataManager` for the users the admin ticks in Settings ("Our household"). Per station, all
    off by default:
    - "Skip what we finished in the last N days" (cooldown keyed on real playback, not airing).
@@ -618,11 +624,18 @@ draft goes through `StationTemplates.ApplyTo` to pick up a look and its breaks.
 
 ### A. Suggestions, in payoff order
 
-1. **Finish what gets created.** Suggested stations arrive bare. Draw the logo server side with
-   SkiaSharp (already linked since the weather channel) using the same seeded patterns as the
-   editor's canvas, apply the global bumper sources when a clip library is configured, and let the
-   page choose the time zone and the first channel number. "Edit before creating" opens the editor
-   with the draft, the way "Not on a channel" already does. Small.
+1. **Finish what gets created — DONE 2026-11-01 (1.24.0.0).** `StationLogo` (Library) draws the
+   editor's card server side with SkiaSharp: the same FNV-1a seed, mulberry32 source, HSL colors and
+   six patterns as `drawLogo` in the page (tests pin the hash, random and color values against the
+   JavaScript), Inter Bold for the name. `StationSuggestionService.Create` takes
+   `FirstChannelNumber` (numbers in use are skipped), `TimeZoneId`, `TemplateId` and `Logo`; a
+   template is applied with `StationTemplates.ApplyLook`, which copies only the look and breaks
+   (bumpers, overlay, up next, encoding, padding, card text, weather look, family hours) over the
+   suggester's content, and the logo is drawn after `Create` and stored through `SaveLogo`
+   (failures become `Warnings`). `POST Suggestions/Draft` hands the page one suggestion as an
+   unsaved station with the options applied; the pencil on each row opens it in the editor with
+   the logo drawn in the browser as a pending upload. There is no global bumper-source setting, so
+   bumpers come from the template (its clips are part of the look) rather than from a clip library.
 2. **Preview a day.** `POST /JellyStations/Schedule/Preview` already takes a station body, so each
    suggestion row can expand to its next 24 hours before anyone commits. Small.
 3. **Smarter rules.** Done so far (2026-10-30): franchises from the provider's collection name

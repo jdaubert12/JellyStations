@@ -43,6 +43,10 @@
       #JellyStationsPage .tvs-season { margin: .8em 0 1.2em; }
       #JellyStationsPage .tvs-suggest-pick { display: flex; align-items: center; padding: 0 .6em 0 .2em; }
       #JellyStationsPage .tvs-suggest-pick input { width: 1.2em; height: 1.2em; }
+      #JellyStationsPage .tvs-suggest-options { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .4em 1.2em; margin: .6em 0 1em; }
+      #JellyStationsPage .tvs-suggest-option { margin: 0; min-width: 11em; }
+      #JellyStationsPage .tvs-suggest-option input[type=number] { width: 9em; }
+      #JellyStationsPage .tvs-suggest-check { width: auto; padding-bottom: .6em; }
       #JellyStationsPage .tvs-inline-btn { margin-left: .8em; padding: .3em .9em; font-size: .85em; }
       #JellyStationsPage .tvs-season-row { display: flex; flex-wrap: wrap; align-items: center; gap: .4em .6em; margin: .4em 0; }
       #JellyStationsPage .tvs-season-row select { width: auto; min-width: 6.5em; }
@@ -240,7 +244,22 @@
             <div class="tvs-welcome-title">Welcome to JellyStations</div>
             <div>Here is what your library could support, ready to go. Tick the channels you like and press <strong>Create selected</strong>; each one can be changed later. Prefer to build your own? <button type="button" id="tvsBtnSuggestPreset" class="tvs-linkbtn">Start from a preset</button>.</div>
           </div>
-          <div class="fieldDescription">Built from what is in the library: genres and series with enough hours, kids and family content by rating, franchises found from titles, collections, decades and holiday tags. Tick the ones you want; they are created with the next free channel numbers and can be edited afterwards like any station.</div>
+          <div class="fieldDescription">Built from what is in the library: genres and series with enough hours, kids and family content by rating, franchises found from titles, collections, decades and holiday tags. Tick the ones you want and press <strong>Create selected</strong>, or press the pencil on one to change it in the editor first. Each new station gets a drawn logo, and a template gives them all the same breaks and look.</div>
+          <div class="tvs-suggest-options">
+            <div class="inputContainer tvs-suggest-option">
+              <label class="inputLabel inputLabelUnfocused" for="tvsSuggestFirst">First channel number</label>
+              <input is="emby-input" type="number" id="tvsSuggestFirst" min="1" step="1" autocomplete="off">
+            </div>
+            <div class="selectContainer tvs-suggest-option">
+              <label class="selectLabel" for="tvsSuggestTimeZone">Time zone</label>
+              <select is="emby-select" id="tvsSuggestTimeZone" class="emby-select"></select>
+            </div>
+            <div class="selectContainer tvs-suggest-option">
+              <label class="selectLabel" for="tvsSuggestTemplate">Look and breaks from</label>
+              <select is="emby-select" id="tvsSuggestTemplate" class="emby-select"></select>
+            </div>
+            <label class="emby-checkbox-label tvs-suggest-option tvs-suggest-check"><input is="emby-checkbox" type="checkbox" id="tvsSuggestLogo" checked><span>Draw a logo for each</span></label>
+          </div>
           <div id="tvsSuggestError" class="tvs-error tvs-hidden"></div>
           <div id="tvsSuggestEmpty" class="tvs-empty tvs-hidden">Nothing to suggest yet. Add more movies or shows, or lower your expectations.</div>
           <div id="tvsSuggestList" class="paperList"></div>

@@ -7,9 +7,10 @@ public sealed class CompiledStation
 {
     /// <summary>
     /// Bump when a compile starts recording something the restreamer depends on (snapshots saved by an older
-    /// plugin are recompiled at startup). 1: items carry <see cref="PlayableItem.IsHdr"/>.
+    /// plugin are recompiled at startup). 1: items carry <see cref="PlayableItem.IsHdr"/>. 2: codec, profile, bit
+    /// depth and pixel format. 3: <see cref="PlayableItem.IsInterlaced"/>.
     /// </summary>
-    public const int CurrentFormat = 2;
+    public const int CurrentFormat = 3;
 
     public Guid StationId { get; set; }
 

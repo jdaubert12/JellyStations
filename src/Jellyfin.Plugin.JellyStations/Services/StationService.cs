@@ -789,6 +789,12 @@ public sealed class StationService
             errors.Add("hardware decoding must be auto, none, " + string.Join(", ", EncodingProfile.HardwareDecodeKinds) + ".");
         }
 
+        var deinterlace = (p.Deinterlace ?? string.Empty).Trim().ToLowerInvariant();
+        if (deinterlace.Length > 0 && !EncodingProfile.DeinterlaceModes.Contains(deinterlace, StringComparer.Ordinal))
+        {
+            errors.Add("deinterlacing must be " + string.Join(", ", EncodingProfile.DeinterlaceModes) + ".");
+        }
+
         return errors;
     }
 

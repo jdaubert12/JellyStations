@@ -80,4 +80,33 @@ public class HdrDetectionTests
         Assert.Single(errors);
         Assert.Contains("hardware decoding", errors[0], StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData("auto")]
+    [InlineData("")]
+    [InlineData("Always")]
+    [InlineData("off")]
+    public void ValidateEncoding_AcceptsDeinterlaceModes(string mode)
+    {
+        Assert.Empty(StationService.ValidateEncoding(new EncodingProfile { Deinterlace = mode }));
+    }
+
+    [Fact]
+    public void ValidateEncoding_RejectsUnknownDeinterlaceMode()
+    {
+        var errors = StationService.ValidateEncoding(new EncodingProfile { Deinterlace = "bob" });
+        Assert.Single(errors);
+        Assert.Contains("deinterlacing", errors[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Deinterlaces_FollowsTheFileUnderAuto_AndTheModeOtherwise()
+    {
+        var auto = new EncodingProfile();
+        Assert.True(auto.Deinterlaces(true));
+        Assert.False(auto.Deinterlaces(false));
+        Assert.True(new EncodingProfile { Deinterlace = "always" }.Deinterlaces(false));
+        Assert.False(new EncodingProfile { Deinterlace = "off" }.Deinterlaces(true));
+        Assert.True(new EncodingProfile { Deinterlace = null! }.Deinterlaces(true));
+    }
 }

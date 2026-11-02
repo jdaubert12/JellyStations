@@ -14,6 +14,17 @@ public class FfmpegProbeArgsTests
     }
 
     [Fact]
+    public void Probe_DeinterlacesAnInterlacedFileLikeAProgram()
+    {
+        var p = new EncodingProfile { HardwareDecode = string.Empty };
+        var interlaced = FfmpegArgsBuilder.ForProbe("/media/show.mkv", null, p, 5, TimeSpan.Zero, "mpeg2video", interlaced: true);
+        var progressive = FfmpegArgsBuilder.ForProbe("/media/show.mkv", null, p, 5, TimeSpan.Zero, "mpeg2video");
+
+        Assert.StartsWith("bwdif=mode=send_frame:parity=auto:deint=all,scale=", ValueAfter(interlaced, "-vf"), StringComparison.Ordinal);
+        Assert.StartsWith("scale=", ValueAfter(progressive, "-vf"), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Probe_IsVerboseFastAndSilent()
     {
         var p = new EncodingProfile { HardwareDecode = "qsv", HardwareDevice = "/dev/dri/renderD128" };

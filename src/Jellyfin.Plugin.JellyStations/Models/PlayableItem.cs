@@ -18,6 +18,9 @@ public sealed class PlayablePart : IPlayableFile
     /// <summary>True when the video is HDR and must be tone mapped to SDR for the stream.</summary>
     public bool IsHdr => !string.IsNullOrEmpty(HdrTransfer);
 
+    /// <summary>True when the video is interlaced (field coded) according to Jellyfin's probe; the profile decides whether it is deinterlaced.</summary>
+    public bool IsInterlaced { get; set; }
+
     /// <summary>Source video codec as ffmpeg names it (h264, hevc, mpeg2video, vc1, vp9, av1, mpeg4...), from the library probe.</summary>
     public string? VideoCodec { get; set; }
 
@@ -101,6 +104,9 @@ public sealed class PlayableItem : IPlayableFile
 
     /// <summary>True when the video is HDR and must be tone mapped to SDR for the stream.</summary>
     public bool IsHdr => !string.IsNullOrEmpty(HdrTransfer);
+
+    /// <summary>True when the video is interlaced (field coded) according to Jellyfin's probe; the profile decides whether it is deinterlaced.</summary>
+    public bool IsInterlaced { get; set; }
 
     /// <summary>Source video codec as ffmpeg names it (h264, hevc, mpeg2video, vc1, vp9, av1, mpeg4...), from the library probe.</summary>
     public string? VideoCodec { get; set; }

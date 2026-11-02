@@ -85,6 +85,33 @@ public static class StationTemplates
         return station;
     }
 
+    /// <summary>
+    /// Gives a station that already has its content a template's look and breaks, leaving its mode, sources, time
+    /// blocks and lineup alone: bumpers (clips, pre-roll, post-roll, weather in the breaks), logo overlay, up next
+    /// card, encoding, padding, card text, the weather look and the family hours when the template sets any. Used
+    /// for suggested stations, whose content the suggester wrote.
+    /// </summary>
+    public static void ApplyLook(StationTemplate template, Station station)
+    {
+        var look = JsonFileStore.Clone(template.Settings ?? new Station());
+        StripContent(look);
+        station.Bumpers = look.Bumpers ?? new BumperConfig();
+        station.LogoOverlay = look.LogoOverlay ?? new LogoOverlayConfig();
+        station.UpNextCard = look.UpNextCard ?? new UpNextCardConfig();
+        station.Encoding = look.Encoding;
+        station.PaddingByLength = look.PaddingByLength;
+        station.PaddingGridMinutes = look.PaddingGridMinutes;
+        station.CardText = look.CardText;
+        station.Weather = look.Weather ?? new WeatherConfig();
+        station.WeatherSourceStationId = null;
+        station.AutoRecompileNightly = look.AutoRecompileNightly;
+        if (look.Pool?.DaypartRules is { Count: > 0 } rules)
+        {
+            station.Pool ??= new PoolConfig();
+            station.Pool.DaypartRules = rules;
+        }
+    }
+
     /// <summary>Saved templates first (by name), then the built-in ones whose names no saved template has taken.</summary>
     public static List<StationTemplate> Merge(IEnumerable<StationTemplate>? saved)
     {

@@ -208,4 +208,17 @@ public class StationSuggesterTests
 
         Assert.Empty(StationSuggester.Suggest(new LibraryAnalysisDto(), Array.Empty<string>()));
     }
+
+    [Fact]
+    public void Channel_numbers_start_where_asked_and_skip_the_ones_in_use()
+    {
+        var stations = new[] { new Station { ChannelNumber = "3" }, new Station { ChannelNumber = "5" }, new Station { ChannelNumber = "x" } };
+        var used = Services.StationSuggestionService.UsedNumbers(stations);
+
+        Assert.Equal(6, Services.StationSuggestionService.NextChannelNumber(stations));
+        Assert.Equal(1, Services.StationSuggestionService.NextFree(0, used));
+        Assert.Equal(4, Services.StationSuggestionService.NextFree(3, used));
+        Assert.Equal(6, Services.StationSuggestionService.NextFree(5, used));
+        Assert.Equal(100, Services.StationSuggestionService.NextFree(100, used));
+    }
 }

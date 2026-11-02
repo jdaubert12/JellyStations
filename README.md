@@ -514,8 +514,14 @@ series with enough hours, a kids channel and family movies by rating, franchise 
 "Franchise Nights" slots station, collections, decades, a "Classic Movies" channel for everything made
 before 1970, and seasonal channels from holiday tags. A franchise is any group of movies the metadata
 provider puts in one collection (TMDB's "James Bond Collection", whether or not you let Jellyfin build
-the box set), or failing that any set of titles that share a prefix. Tick the ones you want and they
-are created with the next free channel numbers, editable like any other station.
+the box set), or failing that any set of titles that share a prefix. Tick the ones you want and press
+**Create selected**: each arrives with a drawn logo (the same generated card the editor makes), in the
+time zone and from the first channel number set above the list (numbers already in use are skipped),
+and with the breaks and look of the station template picked under **Look and breaks from**, if any:
+its bumpers, pre-roll and post-roll, weather in the breaks, logo overlay, up next card, encoding,
+padding, card text and family hours, over the suggestion's own content. The pencil on a suggestion
+opens it in the editor as an unsaved station with those options applied, to change before it is
+created. Everything is editable afterwards like any other station.
 
 **Not on a channel** on the dashboard lists the movies and shows no channel plays, from the compiled
 content of every enabled station (clips used as bumpers or idents count as on it). Tick titles and
@@ -541,6 +547,13 @@ by title, genre, rating or library.
   - *Frame rate*: 24 for a film station (most movies are 23.976 fps and judder when converted
     to 30), 30 for series, 60 only for 60 fps sources. Keep one rate per station; the profile
     must not change between programs.
+  - *Deinterlacing*: interlaced files (DVD rips, broadcast captures) are deinterlaced before
+    scaling, so the combing never reaches the stream. "When the file is interlaced" (default)
+    follows the field order Jellyfin probed and recorded at compile time; "Always" is for files
+    whose flags are missing; "Off" plays them as they are. It runs in software (`bwdif`) on every
+    decode path; standard definition costs almost nothing, 1080i some CPU per station. On a 50 or
+    60 fps profile every field becomes a frame, so video-shot material keeps its motion. Film on
+    NTSC DVD (telecined) plays fine but a one-time re-encode with inverse telecine looks better.
   - *Bitrate*: 3500 kbps is plenty for 720p and 8000 for 1080p. Higher only inflates every
     client's download and any transcode Jellyfin still has to do.
   - *Hardware decoding*: "Follow Jellyfin" (default) mirrors Dashboard > Playback > Transcoding
@@ -636,6 +649,7 @@ usual Jellyfin API key or session token. The ones worth calling by hand:
 | `GET /JellyStations/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises (the provider's collection name, or shared title prefixes), decades, ratings, tags and libraries. The basis for station suggestions and the health report. |
 | `GET /JellyStations/Health` | Every station that needs attention, as the Status page lists them. |
 | `GET /JellyStations/Stations/Export`, `POST /JellyStations/Stations/Import` | The stations plus the saved station and block templates as one document; import takes that document or a bare array of stations. |
+| `GET /JellyStations/Suggestions`, `POST .../Create`, `POST .../Draft` | Stations the library could support (`refresh`, `minHours`, `minEpisodes`); create the ones with the given `Keys` (`FirstChannelNumber`, `TimeZoneId`, `TemplateId` for the look and breaks, `Logo`), returning `Created`, `Errors` and `Warnings`; one suggestion (`Key`) as an unsaved station with the same options applied. |
 | `GET /JellyStations/StationTemplates`, `GET .../{id}/Draft`, `POST`, `DELETE .../{id}` | Saved station templates first, then the built-in presets; a fresh station draft from one; save (replaces by name or id); delete a saved one. |
 | `GET /JellyStations/Hardware` | Jellyfin's transcoding setting, what the default profile resolves to, the `/dev/dri` nodes and this ffmpeg build's hwaccels, encoders and filters. |
 | `POST /JellyStations/Hardware/Test` | Runs a station's current program through the real chain at full speed and reports the decoder and the speed relative to real time. |

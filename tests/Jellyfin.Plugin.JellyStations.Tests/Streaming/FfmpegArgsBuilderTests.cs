@@ -13,15 +13,83 @@ public class FfmpegArgsBuilderTests
     private const string PlainChain = "scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p," + SdrTags;
     private const string TonemapChain = "format=yuv420p10le,zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0:peak=100,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,sidedata=mode=delete";
 
-    private static PlayableItem Item(bool hasAudio = true, bool hdr = false, string transfer = "smpte2084") => new()
+    private static PlayableItem Item(bool hasAudio = true, bool hdr = false, string transfer = "smpte2084", bool interlaced = false) => new()
     {
         ItemId = Guid.NewGuid(),
         Path = "/media/show.mkv",
         RuntimeTicks = TimeSpan.FromMinutes(22).Ticks,
         Title = "Show",
         HasAudio = hasAudio,
-        HdrTransfer = hdr ? transfer : null
+        HdrTransfer = hdr ? transfer : null,
+        IsInterlaced = interlaced
     };
+
+    private const string Bwdif = "bwdif=mode=send_frame:parity=auto:deint=all";
+
+    [Fact]
+    public void InterlacedSource_IsDeinterlacedBeforeScaling_ByDefault()
+    {
+        var args = FfmpegArgsBuilder.ForFile(Item(interlaced: true), TimeSpan.Zero, null, TimeSpan.Zero, Profile);
+
+        Assert.Equal(Bwdif + "," + PlainChain, ValueAfter(args, "-vf"));
+    }
+
+    [Fact]
+    public void ProgressiveSource_IsNotDeinterlaced_ByDefault()
+    {
+        var args = FfmpegArgsBuilder.ForFile(Item(), TimeSpan.Zero, null, TimeSpan.Zero, Profile);
+
+        Assert.DoesNotContain("bwdif", ValueAfter(args, "-vf"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DeinterlaceOff_PlaysAnInterlacedSourceAsIs()
+    {
+        var p = new EncodingProfile { HardwareDecode = string.Empty, Deinterlace = EncodingProfile.DeinterlaceOff };
+        var args = FfmpegArgsBuilder.ForFile(Item(interlaced: true), TimeSpan.Zero, null, TimeSpan.Zero, p);
+
+        Assert.Equal(PlainChain, ValueAfter(args, "-vf"));
+    }
+
+    [Fact]
+    public void DeinterlaceAlways_DeinterlacesAProgressiveSource()
+    {
+        var p = new EncodingProfile { HardwareDecode = string.Empty, Deinterlace = " Always " };
+        var args = FfmpegArgsBuilder.ForFile(Item(), TimeSpan.Zero, null, TimeSpan.Zero, p);
+
+        Assert.StartsWith(Bwdif + ",scale=", ValueAfter(args, "-vf"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HighFrameRateProfile_KeepsEveryField()
+    {
+        var p = new EncodingProfile { HardwareDecode = string.Empty, Fps = 60 };
+        var args = FfmpegArgsBuilder.ForFile(Item(interlaced: true), TimeSpan.Zero, null, TimeSpan.Zero, p);
+
+        Assert.StartsWith("bwdif=mode=send_field:parity=auto:deint=all,scale=", ValueAfter(args, "-vf"), StringComparison.Ordinal);
+        Assert.EndsWith(",fps=60,format=yuv420p," + SdrTags, ValueAfter(args, "-vf"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Deinterlacing_RunsAheadOfToneMappingAndOverlays()
+    {
+        var hdr = FfmpegArgsBuilder.ForFile(Item(hdr: true, interlaced: true), TimeSpan.Zero, null, TimeSpan.Zero, Profile);
+        var overlay = FfmpegArgsBuilder.ForFile(Item(interlaced: true), TimeSpan.Zero, null, TimeSpan.Zero, Profile, new FfmpegArgsBuilder.LogoOverlayInput("/l.png", LogoCorner.TopRight, 70, 8));
+
+        Assert.StartsWith(Bwdif + ",scale=", ValueAfter(hdr, "-vf"), StringComparison.Ordinal);
+        Assert.Contains(TonemapChain, ValueAfter(hdr, "-vf"), StringComparison.Ordinal);
+        Assert.StartsWith("[0:v]" + Bwdif + ",scale=", ValueAfter(overlay, "-filter_complex"), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BitmapSubtitles_AreLaidOverTheDeinterlacedPicture()
+    {
+        var args = FfmpegArgsBuilder.ForFile(Item(interlaced: true), TimeSpan.Zero, null, TimeSpan.Zero, Profile, subtitles: FfmpegArgsBuilder.SubtitleInput.Bitmap(0));
+
+        var graph = ValueAfter(args, "-filter_complex");
+        Assert.StartsWith("[0:v]" + Bwdif + "[deint];[deint][0:s:0]overlay=eof_action=pass:repeatlast=0[subbed];[subbed]scale=", graph, StringComparison.Ordinal);
+        Assert.Equal(1, graph.Split("bwdif").Length - 1);
+    }
 
     private static string ValueAfter(List<string> args, string flag)
     {

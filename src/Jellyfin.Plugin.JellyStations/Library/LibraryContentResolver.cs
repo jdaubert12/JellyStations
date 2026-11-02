@@ -723,6 +723,7 @@ public sealed class LibraryContentResolver
         if (videoStream is not null)
         {
             file.HdrTransfer = HdrTransferOf(videoStream);
+            file.IsInterlaced = videoStream.IsInterlaced;
             file.VideoCodec = Text.TrimOrNull(videoStream.Codec)?.ToLowerInvariant();
             file.VideoProfile = Text.TrimOrNull(videoStream.Profile);
             file.VideoBitDepth = videoStream.BitDepth > 0 ? videoStream.BitDepth : null;

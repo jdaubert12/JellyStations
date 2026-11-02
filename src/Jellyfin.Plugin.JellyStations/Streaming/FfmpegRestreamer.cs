@@ -281,7 +281,7 @@ public sealed class FfmpegRestreamer : IDisposable
                 // An HDR10 channel needs the source's transfer to keep or convert it; an SDR channel only to tone map it.
                 var transfer = hdrOutput || tonemap ? part.Part.HdrTransfer : null;
                 var subtitles = await SubtitleInputAsync(part.Part, ct).ConfigureAwait(false);
-                var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, transfer, seek, duration, NextTsOffset(), profile, overlay, part.Part.VideoCodec, upNext, subtitles);
+                var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, transfer, seek, duration, NextTsOffset(), profile, overlay, part.Part.VideoCodec, upNext, subtitles, part.Part.IsInterlaced);
                 PrepareNextSubtitles(entry, ct);
 
                 _logger.LogInformation(

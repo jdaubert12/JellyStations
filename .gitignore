@@ -14,3 +14,7 @@ dev/.password
 dev/media/**/*.png
 prototypes/
 *.state
+
+# Design notes and surveys stay local; only the roadmap is published.
+docs/*
+!docs/ROADMAP.md

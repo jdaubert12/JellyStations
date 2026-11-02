@@ -21,6 +21,9 @@ public interface IPlayableFile
     /// <summary>Gets or sets the HDR transfer characteristic, or null for SDR video.</summary>
     string? HdrTransfer { get; set; }
 
+    /// <summary>Gets or sets a value indicating whether the video is interlaced (field coded), as Jellyfin's probe of the file reports it.</summary>
+    bool IsInterlaced { get; set; }
+
     /// <summary>Gets or sets the source video codec as ffmpeg names it.</summary>
     string? VideoCodec { get; set; }
 
@@ -52,6 +55,7 @@ public static class PlayableFiles
         to.AudioStreamIndex = from.AudioStreamIndex;
         to.HasAudio = from.HasAudio;
         to.HdrTransfer = from.HdrTransfer;
+        to.IsInterlaced = from.IsInterlaced;
         to.VideoCodec = from.VideoCodec;
         to.VideoProfile = from.VideoProfile;
         to.VideoBitDepth = from.VideoBitDepth;
