@@ -162,7 +162,7 @@ public sealed partial class RadarService : LocationPoller
                     catch (Exception ex)
                     {
                         lastFrameError = ex;
-                        _logger.LogDebug(ex, "JellyStations radar [{Station}]: frame {Time} for {Place} failed", station.Name, time, location.Name);
+                        _logger.LogDebug(ex, "JellyStations radar [{Station}]: frame {Time} for {Place} failed", Text.ForLog(station.Name), time, Text.ForLog(location.Name));
                         continue;
                     }
 
@@ -178,7 +178,7 @@ public sealed partial class RadarService : LocationPoller
                 _loops[location.Id] = loop;
                 status.MarkSuccess(now);
                 Sweep(dir, frames);
-                _logger.LogDebug("JellyStations radar [{Station}]: {Place} has {Count} frame(s) from {Source}, {New} new, newest {Time:HH:mm} UTC", station.Name, location.Name, frames.Count, source.Id, fetched, loop.Latest.TimeUtc);
+                _logger.LogDebug("JellyStations radar [{Station}]: {Place} has {Count} frame(s) from {Source}, {New} new, newest {Time:HH:mm} UTC", Text.ForLog(station.Name), Text.ForLog(location.Name), frames.Count, source.Id, fetched, loop.Latest.TimeUtc);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -187,7 +187,7 @@ public sealed partial class RadarService : LocationPoller
             catch (Exception ex)
             {
                 status.MarkFailure(ex.Message);
-                _logger.LogWarning("JellyStations radar [{Station}]: fetch for {Place} from {Source} failed ({Count} in a row): {Error}", station.Name, location.Name, source.Id, status.Failures, ex.Message);
+                _logger.LogWarning("JellyStations radar [{Station}]: fetch for {Place} from {Source} failed ({Count} in a row): {Error}", Text.ForLog(station.Name), Text.ForLog(location.Name), source.Id, status.Failures, ex.Message);
             }
         }
         finally

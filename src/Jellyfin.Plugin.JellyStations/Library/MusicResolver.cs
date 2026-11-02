@@ -152,7 +152,7 @@ public sealed class MusicResolver
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "JellyStations: failed to expand music source {Kind} {Id}", source.Kind, source.ItemId);
+            _logger.LogWarning(ex, "JellyStations: failed to expand music source {Source}", Text.ForLog(source.Kind + " " + source.ItemId));
             return Array.Empty<Audio>();
         }
     }

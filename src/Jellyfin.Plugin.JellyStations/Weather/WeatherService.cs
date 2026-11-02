@@ -108,10 +108,10 @@ public sealed class WeatherService : LocationPoller
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogDebug(ex, "JellyStations weather: could not cache the report for {Place}", location.Name);
+                    _logger.LogDebug(ex, "JellyStations weather: could not cache the report for {Place}", Text.ForLog(location.Name));
                 }
 
-                _logger.LogDebug("JellyStations weather [{Station}]: {Place} {Temp:0.0}°C, code {Code}", station.Name, location.Name, report.Current.TemperatureC, report.Current.WeatherCode);
+                _logger.LogDebug("JellyStations weather [{Station}]: {Place} {Temp:0.0}°C, code {Code}", Text.ForLog(station.Name), Text.ForLog(location.Name), report.Current.TemperatureC, report.Current.WeatherCode);
                 Changed?.Invoke(station.Id);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -121,7 +121,7 @@ public sealed class WeatherService : LocationPoller
             catch (Exception ex)
             {
                 status.MarkFailure(ex.Message);
-                _logger.LogWarning("JellyStations weather [{Station}]: fetch for {Place} failed ({Count} in a row): {Error}", station.Name, location.Name, status.Failures, ex.Message);
+                _logger.LogWarning("JellyStations weather [{Station}]: fetch for {Place} failed ({Count} in a row): {Error}", Text.ForLog(station.Name), Text.ForLog(location.Name), status.Failures, ex.Message);
             }
         }
         finally

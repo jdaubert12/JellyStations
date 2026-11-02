@@ -80,7 +80,7 @@ public sealed class MusicFolderScanner
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "JellyStations: cannot list music folder {Folder}", folder);
+                _logger.LogWarning(ex, "JellyStations: cannot list music folder {Folder}", Text.ForLog(folder));
                 return tracks;
             }
 

@@ -167,13 +167,13 @@ public sealed class AlertService : LocationPoller
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogDebug(ex, "JellyStations alerts: could not cache the alerts for {Place}", location.Name);
+                    _logger.LogDebug(ex, "JellyStations alerts: could not cache the alerts for {Place}", Text.ForLog(location.Name));
                 }
 
                 var changed = before is null || !before.Alerts.Select(a => a.Id).SequenceEqual(set.Alerts.Select(a => a.Id));
                 if (changed && (alerts.Count > 0 || before is { Alerts.Count: > 0 }))
                 {
-                    _logger.LogInformation("JellyStations alerts [{Station}]: {Place} now has {Count} alert(s){Which}", station.Name, location.Name, alerts.Count, alerts.Count == 0 ? string.Empty : ": " + string.Join("; ", alerts.Select(a => a.Event)));
+                    _logger.LogInformation("JellyStations alerts [{Station}]: {Place} now has {Count} alert(s){Which}", Text.ForLog(station.Name), Text.ForLog(location.Name), alerts.Count, alerts.Count == 0 ? string.Empty : ": " + string.Join("; ", alerts.Select(a => a.Event)));
                 }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -186,12 +186,12 @@ public sealed class AlertService : LocationPoller
                 status.LastError = ex.Message;
                 status.Failures = 0;
                 _sets.TryRemove(location.Id, out _);
-                _logger.LogInformation("JellyStations alerts [{Station}]: {Place}: {Error}; the alerts screen is skipped for it", station.Name, location.Name, ex.Message);
+                _logger.LogInformation("JellyStations alerts [{Station}]: {Place}: {Error}; the alerts screen is skipped for it", Text.ForLog(station.Name), Text.ForLog(location.Name), ex.Message);
             }
             catch (Exception ex)
             {
                 status.MarkFailure(ex.Message);
-                _logger.LogWarning("JellyStations alerts [{Station}]: fetch for {Place} from {Source} failed ({Count} in a row): {Error}", station.Name, location.Name, source.Id, status.Failures, ex.Message);
+                _logger.LogWarning("JellyStations alerts [{Station}]: fetch for {Place} from {Source} failed ({Count} in a row): {Error}", Text.ForLog(station.Name), Text.ForLog(location.Name), source.Id, status.Failures, ex.Message);
             }
         }
         finally

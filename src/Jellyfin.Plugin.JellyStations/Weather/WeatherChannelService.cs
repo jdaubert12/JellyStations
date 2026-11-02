@@ -139,7 +139,7 @@ public sealed class WeatherChannelService
                 {
                     if (!File.Exists(piece.Track.Path))
                     {
-                        _logger.LogWarning("JellyStations weather [{Station}]: music file missing, skipping: {Path}", station.Name, piece.Track.Path);
+                        _logger.LogWarning("JellyStations weather [{Station}]: music file missing, skipping: {Path}", Text.ForLog(station.Name), piece.Track.Path);
                         continue;
                     }
 

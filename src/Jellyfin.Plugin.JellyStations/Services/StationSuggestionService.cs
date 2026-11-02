@@ -160,7 +160,7 @@ public sealed class StationSuggestionService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Could not draw a logo for suggested station {Name}", station.Name);
+            _logger.LogWarning(ex, "Could not draw a logo for suggested station {Name}", Text.ForLog(station.Name));
             return false;
         }
     }

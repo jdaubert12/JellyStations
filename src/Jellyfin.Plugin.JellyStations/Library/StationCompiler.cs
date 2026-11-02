@@ -111,7 +111,7 @@ public sealed class StationCompiler
 
         _logger.LogInformation(
             "JellyStations: compiled station {Name} rev {Revision}: {Items} item(s), {Tracks} music track(s), {Excluded} excluded",
-            station.Name,
+            Text.ForLog(station.Name),
             station.Revision,
             compiled.TotalItemCount,
             compiled.Music.Count,

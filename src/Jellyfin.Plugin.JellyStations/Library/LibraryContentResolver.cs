@@ -241,7 +241,7 @@ public sealed class LibraryContentResolver
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "JellyStations: failed to expand source {Kind} {Id}", source.Kind, source.ItemId);
+            _logger.LogWarning(ex, "JellyStations: failed to expand source {Source}", Text.ForLog(source.Kind + " " + source.ItemId));
             return Array.Empty<BaseItem>();
         }
     }

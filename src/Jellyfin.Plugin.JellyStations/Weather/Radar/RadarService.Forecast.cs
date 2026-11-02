@@ -151,7 +151,7 @@ public sealed partial class RadarService
                     catch (Exception ex)
                     {
                         lastFrameError = ex;
-                        _logger.LogDebug(ex, "JellyStations forecast radar [{Station}]: minute {Minute} of the {Run:HH:mm} run for {Place} failed", station.Name, minute, run, location.Name);
+                        _logger.LogDebug(ex, "JellyStations forecast radar [{Station}]: minute {Minute} of the {Run:HH:mm} run for {Place} failed", Text.ForLog(station.Name), minute, run, Text.ForLog(location.Name));
                         continue;
                     }
 
@@ -171,7 +171,7 @@ public sealed partial class RadarService
                 status.MarkSuccess(now);
                 status.RunUtc = run;
                 Sweep(dir, merged);
-                _logger.LogDebug("JellyStations forecast radar [{Station}]: {Place} has {Count} frame(s) from the {Run:HH:mm} UTC {Source} run, {New} new, out to {Time:HH:mm} UTC", station.Name, location.Name, merged.Count, run, source.Id, fetched, loop.Latest.TimeUtc);
+                _logger.LogDebug("JellyStations forecast radar [{Station}]: {Place} has {Count} frame(s) from the {Run:HH:mm} UTC {Source} run, {New} new, out to {Time:HH:mm} UTC", Text.ForLog(station.Name), Text.ForLog(location.Name), merged.Count, run, source.Id, fetched, loop.Latest.TimeUtc);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -180,7 +180,7 @@ public sealed partial class RadarService
             catch (Exception ex)
             {
                 status.MarkFailure(ex.Message);
-                _logger.LogWarning("JellyStations forecast radar [{Station}]: fetch for {Place} from {Source} failed ({Count} in a row): {Error}", station.Name, location.Name, source.Id, status.Failures, ex.Message);
+                _logger.LogWarning("JellyStations forecast radar [{Station}]: fetch for {Place} from {Source} failed ({Count} in a row): {Error}", Text.ForLog(station.Name), Text.ForLog(location.Name), source.Id, status.Failures, ex.Message);
             }
         }
         finally

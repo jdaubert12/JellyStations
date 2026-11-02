@@ -85,7 +85,7 @@ public sealed partial class NwsAlertSource : IAlertSource
         }
 
         var alerts = Parse(reply.Body);
-        _logger.LogDebug("JellyStations alerts: {Place} has {Count} alert(s) from the NWS", location.Name, alerts.Count);
+        _logger.LogDebug("JellyStations alerts: {Place} has {Count} alert(s) from the NWS", Text.ForLog(location.Name), alerts.Count);
         return alerts;
     }
 

@@ -1,3 +1,4 @@
+using Jellyfin.Plugin.JellyStations.Models;
 using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.Logging;
 
@@ -42,7 +43,7 @@ public sealed class RecompileStationsTask : IScheduledTask
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "JellyStations: nightly recompile failed for {Name}", all[i].Name);
+                _logger.LogError(ex, "JellyStations: nightly recompile failed for {Name}", Text.ForLog(all[i].Name));
             }
 
             progress.Report(100.0 * (i + 1) / Math.Max(1, all.Count));

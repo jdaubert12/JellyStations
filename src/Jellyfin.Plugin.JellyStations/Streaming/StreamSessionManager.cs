@@ -112,7 +112,7 @@ public sealed class StreamSessionManager : IDisposable
         }
 
         session.ConsumerCount = Math.Max(0, session.ConsumerCount) + 1;
-        _logger.LogInformation("JellyStations [{Station}]: consumer attached (now {Count})", station.Name, session.ConsumerCount);
+        _logger.LogInformation("JellyStations [{Station}]: consumer attached (now {Count})", Text.ForLog(station.Name), session.ConsumerCount);
         return session;
     }
 
@@ -140,16 +140,18 @@ public sealed class StreamSessionManager : IDisposable
         var policy = DecodePolicy(profile);
         var ffmpeg = FfmpegPath;
         var mediaSource = BuildMediaSource(station, profile);
-        var logger = _loggerFactory.CreateLogger("Jellyfin.Plugin.JellyStations.Stream." + station.Name);
+        // The name goes into every log line of the session and the restreamer: cleaned of line breaks once, here.
+        var stationName = Text.ForLog(station.Name);
+        var logger = _loggerFactory.CreateLogger("Jellyfin.Plugin.JellyStations.Stream." + stationName);
 
         StationStreamSession? session = null;
         session = new StationStreamSession(
             station.Id,
-            station.Name,
+            stationName,
             mediaSource,
             buffer => new FfmpegRestreamer(
                 station.Id,
-                station.Name,
+                stationName,
                 ffmpeg,
                 profile,
                 settings,
@@ -170,7 +172,7 @@ public sealed class StreamSessionManager : IDisposable
 
         session.MediaSource.Path = _appHost.GetApiUrlForLocalAccess() + "/LiveTv/LiveStreamFiles/" + session.UniqueId + "/stream.ts";
         session.Released += (_, _) => OnReleased(session);
-        _logger.LogInformation("JellyStations [{Station}]: stream session {Id} created", station.Name, session.UniqueId);
+        _logger.LogInformation("JellyStations [{Station}]: stream session {Id} created", Text.ForLog(station.Name), session.UniqueId);
         return session;
     }
 

@@ -1,3 +1,4 @@
+using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.JellyStations.Api.Dto;
 using MediaBrowser.Controller.Dto;
@@ -116,7 +117,7 @@ public sealed class LibraryAnalysisService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "JellyStations: could not read library {Name} for analysis", folder.Name);
+                _logger.LogWarning(ex, "JellyStations: could not read library {Name} for analysis", Text.ForLog(folder.Name));
                 continue;
             }
 

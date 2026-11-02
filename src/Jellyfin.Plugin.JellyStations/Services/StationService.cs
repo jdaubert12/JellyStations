@@ -226,7 +226,7 @@ public sealed class StationService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "JellyStations: failed to recompile station {Name}", station.Name);
+                _logger.LogError(ex, "JellyStations: failed to recompile station {Name}", Text.ForLog(station.Name));
                 row.Error = ex.Message;
                 result.FailedCount++;
             }
@@ -255,7 +255,7 @@ public sealed class StationService
             {
                 if (compiled is not null)
                 {
-                    _logger.LogInformation("JellyStations: recompiling {Name} (snapshot format {Old} -> {New})", station.Name, compiled.Format, CompiledStation.CurrentFormat);
+                    _logger.LogInformation("JellyStations: recompiling {Name} (snapshot format {Old} -> {New})", Text.ForLog(station.Name), compiled.Format, CompiledStation.CurrentFormat);
                 }
 
                 try
@@ -264,7 +264,7 @@ public sealed class StationService
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "JellyStations: failed to compile station {Name}", station.Name);
+                    _logger.LogError(ex, "JellyStations: failed to compile station {Name}", Text.ForLog(station.Name));
                 }
             }
         }

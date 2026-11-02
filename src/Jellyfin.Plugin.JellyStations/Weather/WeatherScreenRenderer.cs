@@ -1,3 +1,4 @@
+using Jellyfin.Plugin.JellyStations.Models;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -42,7 +43,7 @@ public sealed class WeatherScreenRenderer
             {
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 _painter.Paint(request, path);
-                _logger.LogDebug("JellyStations weather: drew {Kind} screen for {Place} in {Ms} ms", request.Kind, request.Place?.Location.Name ?? "all", sw.ElapsedMilliseconds);
+                _logger.LogDebug("JellyStations weather: drew {Kind} screen for {Place} in {Ms} ms", request.Kind, Text.ForLog(request.Place?.Location.Name ?? "all"), sw.ElapsedMilliseconds);
             }
 
             Sweep(dir);
