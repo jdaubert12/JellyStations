@@ -23,6 +23,10 @@ internal sealed class CyclicScheduler : IStationScheduler
     private readonly TimeZoneInfo _tz;
     private readonly IReadOnlyList<DaypartRuleInput> _rules;
     private readonly long _cooldownTicks;
+    private readonly AirHistorySnapshot? _snapshot;
+    private readonly long _takenTicks;
+    private readonly long _chainStart;
+    private readonly bool _chains;
     private readonly ConcurrentDictionary<long, Cycle> _cycles = new();
 
     public CyclicScheduler(ScheduleInput input)
@@ -42,6 +46,7 @@ internal sealed class CyclicScheduler : IStationScheduler
             _marathonMin = input.MarathonMin;
             _marathonMax = input.MarathonMax;
             _cooldownTicks = TimeSpan.FromHours(Math.Max(0, input.CooldownHours)).Ticks;
+            _snapshot = input.History;
         }
 
         _padded = _items.Select(i => Padding.Pad(i.Runtime + input.Break, input.PaddingGrid, input.PaddingByLength).Ticks).ToArray();
@@ -49,6 +54,18 @@ internal sealed class CyclicScheduler : IStationScheduler
         _cycleTicks = _padded.Sum();
         _tz = TimeZones.Resolve(input.TimeZoneId);
         _rules = input.DaypartRules;
+
+        // With a snapshot the cycle containing the moment it was taken is the first that airs under this revision:
+        // it continues from the snapshot, and the cycles after it chain from it when they carry anything forward
+        // (a cooldown rests what aired; episodes in order carry each series' position). Cycles before it never air
+        // under this revision and are built standalone, exactly as without a snapshot.
+        if (_snapshot is not null && _cycleTicks > 0)
+        {
+            _takenTicks = DateTime.SpecifyKind(_snapshot.TakenUtc, DateTimeKind.Utc).Ticks;
+            _chainStart = Padding.FloorDiv(_takenTicks - _input.AnchorUtc.Ticks, _cycleTicks);
+        }
+
+        _chains = _input.Mode == ScheduleMode.Pool && (_cooldownTicks > 0 || (_snapshot is not null && _order == PlayOrder.ShuffleEpisodesInOrder));
     }
 
     public bool IsEmpty => _items.Count == 0 || _cycleTicks <= 0;
@@ -170,16 +187,16 @@ internal sealed class CyclicScheduler : IStationScheduler
             return c;
         }
 
-        if (_cooldownTicks > 0 && _input.Mode == ScheduleMode.Pool && k > 0)
+        if (_chains && k > _chainStart)
         {
-            // With a cooldown each cycle reads the previous one as it finally aired, so build the chain from the
-            // anchor (or the nearest cycle still cached) up to k. A cycle is a shuffle and a few passes, so even
-            // thousands of them cost milliseconds.
-            var from = _cycles.Keys.Where(x => x >= 0 && x < k).DefaultIfEmpty(-1).Max();
-            Cycle? prev = from >= 0 && _cycles.TryGetValue(from, out var cached) ? cached : null;
-            for (var i = prev is null ? 0 : from + 1; i <= k; i++)
+            // With a cooldown (or a series position to carry) each cycle reads the previous one as it finally aired,
+            // so build the chain from the chain start (the anchor, or the snapshot's cycle; or the nearest cycle
+            // still cached) up to k. A cycle is a shuffle and a few passes, so even thousands of them cost milliseconds.
+            var from = _cycles.Keys.Where(x => x >= _chainStart && x < k).DefaultIfEmpty(_chainStart - 1).Max();
+            Cycle? prev = from >= _chainStart && _cycles.TryGetValue(from, out var cached) ? cached : null;
+            for (var i = prev is null ? _chainStart : from + 1; i <= k; i++)
             {
-                prev = BuildCycle(i, i == 0 ? null : prev);
+                prev = BuildCycle(i, i == _chainStart ? null : prev);
                 Store(i, prev);
             }
 
@@ -214,14 +231,16 @@ internal sealed class CyclicScheduler : IStationScheduler
     {
         var cycleStart = _input.AnchorUtc.Ticks + (k * _cycleTicks);
         var runs = GatedRuns(k, cycleStart);
+        var fromSnapshot = UsesSnapshot(k, previous);
 
-        if (_rules.Count > 0 && _input.Mode == ScheduleMode.Pool && _avoidRepeats && runs.Count > 2)
+        if ((_rules.Count > 0 || fromSnapshot) && _input.Mode == ScheduleMode.Pool && _avoidRepeats && runs.Count > 2)
         {
             // The daypart gate can undo the seam check PoolOrdering made: the previous cycle may now end with the
             // same series or movie this one starts with, possibly with gated dead air in between. Re-check
-            // against what the previous cycle actually airs last.
+            // against what the previous cycle actually airs last (or, in the snapshot's cycle, what the previous
+            // revision aired last, at the first slot this revision really airs).
             var prevKey = PreviousLastKey(k, cycleStart, previous);
-            if (prevKey is not null && FixSeamAfterGate(runs, cycleStart, prevKey))
+            if (prevKey is not null && FixSeamAfterGate(runs, cycleStart, prevKey, fromSnapshot ? FirstRealRun(runs, cycleStart) : 0))
             {
                 runs = RestoreEpisodeOrder(runs);
             }
@@ -241,8 +260,36 @@ internal sealed class CyclicScheduler : IStationScheduler
             acc += _padded[order[i]];
         }
 
+        Dictionary<Guid, int>? offsets = null;
+        if (_snapshot is not null && _order == PlayOrder.ShuffleEpisodesInOrder && _input.Mode == ScheduleMode.Pool && (fromSnapshot || previous is not null))
+        {
+            // Continuity: each series keeps the positions the passes gave it, but plays on from where the previous
+            // revision (snapshot's cycle) or the previous cycle (chain) left it. Positions before the snapshot never
+            // air and take the episodes before that point.
+            var offsetsIn = previous?.EpisodeOffsets ?? EpisodeOrder.OffsetsFrom(_snapshot, _items);
+            offsets = EpisodeOrder.Resume(order, _items, starts, offsetsIn, fromSnapshot ? _takenTicks - cycleStart : long.MinValue);
+        }
+
         var gated = _rules.Count > 0 ? DaypartGate.Flags(order, _items, cycleStart, _padded, _tz, _rules) : null;
-        return new Cycle(order, starts, gated);
+        return new Cycle(order, starts, gated, offsets);
+    }
+
+    /// <summary>True when cycle k is the snapshot's cycle being built fresh: the seam and the cooldown read the snapshot.</summary>
+    private bool UsesSnapshot(long k, Cycle? previous) => _snapshot is not null && previous is null && k == _chainStart;
+
+    /// <summary>Index of the first run whose slot starts at or after the snapshot was taken (the first this revision really airs from its start).</summary>
+    private int FirstRealRun(List<int[]> runs, long cycleStart)
+    {
+        var starts = RunStarts(runs, cycleStart);
+        for (var r = 0; r < starts.Length; r++)
+        {
+            if (starts[r] >= _takenTicks)
+            {
+                return r;
+            }
+        }
+
+        return starts.Length;
     }
 
     /// <summary>Runs for cycle k after the pool ordering and, when there are daypart rules, the gate.</summary>
@@ -284,10 +331,10 @@ internal sealed class CyclicScheduler : IStationScheduler
     /// every neighbour distinct, airs the same last run, and leaves no more daypart violations than before.
     /// Gives up quietly otherwise.
     /// </summary>
-    private bool FixSeamAfterGate(List<int[]> runs, long cycleStart, string prevKey)
+    private bool FixSeamAfterGate(List<int[]> runs, long cycleStart, string prevKey, int fromRun = 0)
     {
         var flags = RunFlags(runs, cycleStart);
-        var first = Array.IndexOf(flags, false);
+        var first = fromRun < flags.Length ? Array.IndexOf(flags, false, fromRun) : -1;
         var last = Array.LastIndexOf(flags, false);
         if (first < 0 || MarathonOrder.KeyOfRun(runs[first], _items) != prevKey)
         {
@@ -323,7 +370,9 @@ internal sealed class CyclicScheduler : IStationScheduler
     /// when given (chain mode), else from that cycle's runs as the gate left them.
     /// </summary>
     private string? PreviousLastKey(long k, long cycleStart, Cycle? previous)
-        => previous is not null ? LastAiredKey(previous) : LastAiredKeyAsGated(k - 1, cycleStart - _cycleTicks);
+        => previous is not null ? LastAiredKey(previous)
+            : UsesSnapshot(k, previous) ? _snapshot!.LastKey
+            : LastAiredKeyAsGated(k - 1, cycleStart - _cycleTicks);
 
     /// <summary>Key of the last series or movie cycle k airs, judged from the runs as the gate left them (null when it airs nothing).</summary>
     private string? LastAiredKeyAsGated(long k, long cycleStart)
@@ -380,14 +429,45 @@ internal sealed class CyclicScheduler : IStationScheduler
     {
         var prevStart = cycleStart - _cycleTicks;
         var ends = new Dictionary<string, long>(StringComparer.Ordinal);
+        if (UsesSnapshot(k, previous))
+        {
+            // What the previous revision aired within the window rests the same way the previous cycle would.
+            foreach (var (key, entry) in _snapshot!.Keys)
+            {
+                var end = DateTime.SpecifyKind(entry.LastEndUtc, DateTimeKind.Utc).Ticks;
+                if (end > cycleStart - _cooldownTicks)
+                {
+                    ends[key] = end;
+                }
+            }
+
+            return ends;
+        }
+
         if (previous is not null)
         {
+            // When the previous cycle is the snapshot's, its slots before the snapshot never aired: what they hold
+            // rested according to the snapshot instead.
+            var afterSnapshot = _snapshot is not null && k - 1 == _chainStart;
             for (var i = 0; i < previous.Order.Length; i++)
             {
-                var end = prevStart + previous.Starts[i] + _padded[previous.Order[i]];
-                if ((previous.Gated is null || !previous.Gated[i]) && end > cycleStart - _cooldownTicks)
+                var start = prevStart + previous.Starts[i];
+                var end = start + _padded[previous.Order[i]];
+                if ((previous.Gated is null || !previous.Gated[i]) && end > cycleStart - _cooldownTicks && (!afterSnapshot || start >= _takenTicks))
                 {
                     ends[PoolOrdering.KeyOf(_items[previous.Order[i]])] = end;
+                }
+            }
+
+            if (afterSnapshot)
+            {
+                foreach (var (key, entry) in _snapshot!.Keys)
+                {
+                    var end = DateTime.SpecifyKind(entry.LastEndUtc, DateTimeKind.Utc).Ticks;
+                    if (end > cycleStart - _cooldownTicks && (!ends.TryGetValue(key, out var known) || end > known))
+                    {
+                        ends[key] = end;
+                    }
                 }
             }
 
@@ -422,6 +502,9 @@ internal sealed class CyclicScheduler : IStationScheduler
         var seamKey = PreviousLastKey(k, cycleStart, previous);
         var flags = RunFlags(runs, cycleStart);
         var gated = flags.Count(f => f);
+        // In the snapshot's cycle the slots before the snapshot never air under this revision: a rested film may
+        // sit there freely, and only the slots from the snapshot on count as violations.
+        var minStart = UsesSnapshot(k, previous) ? _takenTicks : long.MinValue;
 
         // A series or movie that airs c times a round needs c rests; when those cannot fit in the round the rule
         // is impossible for it, so it is left out rather than searched for in vain.
@@ -444,7 +527,7 @@ internal sealed class CyclicScheduler : IStationScheduler
             }
         }
 
-        var violations = CooldownViolations(runs, cycleStart, tail, flags, hopeless);
+        var violations = CooldownViolations(runs, cycleStart, tail, flags, hopeless, minStart);
         var stuck = new HashSet<int>();
         var budget = 4000;
         var changed = false;
@@ -470,7 +553,7 @@ internal sealed class CyclicScheduler : IStationScheduler
                 }
 
                 var newFlags = RunFlags(runs, cycleStart);
-                var after = newFlags.Count(f => f) <= gated ? CooldownViolations(runs, cycleStart, tail, newFlags, hopeless) : null;
+                var after = newFlags.Count(f => f) <= gated ? CooldownViolations(runs, cycleStart, tail, newFlags, hopeless, minStart) : null;
                 if (after is not null && after.Count < violations.Count)
                 {
                     flags = newFlags;
@@ -494,7 +577,7 @@ internal sealed class CyclicScheduler : IStationScheduler
     }
 
     /// <summary>Positions of aired runs that start less than the cooldown after the previous airing of the same series or movie.</summary>
-    private List<int> CooldownViolations(List<int[]> runs, long cycleStart, Dictionary<string, long> tailEnds, bool[] flags, HashSet<string> hopeless)
+    private List<int> CooldownViolations(List<int[]> runs, long cycleStart, Dictionary<string, long> tailEnds, bool[] flags, HashSet<string> hopeless, long minStart = long.MinValue)
     {
         var lastEnd = new Dictionary<string, long>(tailEnds, StringComparer.Ordinal);
         var starts = RunStarts(runs, cycleStart);
@@ -507,7 +590,7 @@ internal sealed class CyclicScheduler : IStationScheduler
             }
 
             var key = MarathonOrder.KeyOfRun(runs[i], _items);
-            if (!hopeless.Contains(key) && lastEnd.TryGetValue(key, out var end) && starts[i] - end < _cooldownTicks)
+            if (starts[i] >= minStart && !hopeless.Contains(key) && lastEnd.TryGetValue(key, out var end) && starts[i] - end < _cooldownTicks)
             {
                 result.Add(i);
             }
@@ -542,16 +625,20 @@ internal sealed class CyclicScheduler : IStationScheduler
 
     private sealed class Cycle
     {
-        public Cycle(int[] order, long[] starts, bool[]? gated)
+        public Cycle(int[] order, long[] starts, bool[]? gated, Dictionary<Guid, int>? episodeOffsets = null)
         {
             Order = order;
             Starts = starts;
             Gated = gated;
+            EpisodeOffsets = episodeOffsets;
         }
 
         public int[] Order { get; }
 
         public long[] Starts { get; }
+
+        /// <summary>Per series: the index in its sorted episodes the next cycle starts at (null outside a continuity chain).</summary>
+        public Dictionary<Guid, int>? EpisodeOffsets { get; }
 
         /// <summary>Per position: true when the item may not air here (daypart rule) and the slot is dead air.</summary>
         public bool[]? Gated { get; }

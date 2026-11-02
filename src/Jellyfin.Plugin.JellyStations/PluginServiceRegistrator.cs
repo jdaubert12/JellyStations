@@ -22,6 +22,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<StationRepository>();
         serviceCollection.AddSingleton<CompiledStationRepository>();
         serviceCollection.AddSingleton<SettingsRepository>();
+        serviceCollection.AddSingleton<AirLogRepository>();
 
         serviceCollection.AddSingleton<LibraryContentResolver>();
         serviceCollection.AddSingleton<MusicFolderScanner>();
@@ -64,6 +65,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
             return new ScheduleResolver(id => ScheduleInput.ForStation(id, stations, compiled));
         });
 
+        serviceCollection.AddSingleton<AirLogRecorder>();
         serviceCollection.AddSingleton<GuideRefreshService>();
         serviceCollection.AddSingleton<StreamSessionManager>();
         serviceCollection.AddSingleton<StationService>();

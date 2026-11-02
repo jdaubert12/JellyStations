@@ -58,7 +58,7 @@ public sealed class StationsController : ControllerBase
                 ExcludedCount = compiled?.Excluded.Count ?? 0,
                 Revision = s.Revision,
                 HasLogo = _stations.LogoPath(s) is not null,
-                NowPlaying = resolved is null ? null : Map.Entry(resolved.Entry, resolved.Offset),
+                NowPlaying = resolved is null ? null : Map.Entry(resolved.Entry, resolved.Offset, _stations.History(s.Id)),
                 Streaming = _sessions.Get(s.Id) is { IsDisposed: false },
                 Seasonal = SeasonWindows.IsSeasonal(s),
                 InSeason = SeasonWindows.IsActive(s, now),
@@ -85,7 +85,8 @@ public sealed class StationsController : ControllerBase
             programs.Add(upcoming[0]);
         }
 
-        return programs.Select(e => Map.Entry(e, null)).ToList();
+        var log = _stations.History(stationId);
+        return programs.Select(e => Map.Entry(e, null, log)).ToList();
     }
 
     /// <summary>
@@ -313,7 +314,67 @@ public sealed class StationsController : ControllerBase
             end = start + maxSpan;
         }
 
-        return Ok(_resolver.Enumerate(id, start, end).Select(e => Map.Entry(e, null)).ToList());
+        var log = _stations.History(id);
+        return Ok(_resolver.Enumerate(id, start, end).Select(e => Map.Entry(e, null, log)).ToList());
+    }
+
+    /// <summary>What the station has aired, latest first, and when the snapshot its current schedule continues from was taken.</summary>
+    [HttpGet("{id}/History")]
+    public ActionResult<AirHistoryDto> History([FromRoute] Guid id)
+    {
+        if (_stations.Get(id) is null)
+        {
+            return NotFound();
+        }
+
+        var log = _stations.History(id);
+        return Ok(new AirHistoryDto
+        {
+            SnapshotTakenUtc = _stations.GetCompiled(id)?.History?.TakenUtc,
+            Total = log.Total,
+            LastTickUtc = log.LastTickUtc,
+            Entries = log.Keys
+                .OrderByDescending(kv => kv.Value.LastStartUtc)
+                .Select(kv => new AirHistoryEntryDto
+                {
+                    Key = kv.Key,
+                    Title = kv.Value.Title,
+                    LastItemId = kv.Value.LastItemId,
+                    Season = kv.Value.Season,
+                    Episode = kv.Value.Episode,
+                    LastStartUtc = DateTime.SpecifyKind(kv.Value.LastStartUtc, DateTimeKind.Utc),
+                    LastEndUtc = DateTime.SpecifyKind(kv.Value.LastEndUtc, DateTimeKind.Utc),
+                    Count = kv.Value.Count
+                })
+                .ToList()
+        });
+    }
+
+    /// <summary>Forgets what the station aired. Its schedule holds until the next revision.</summary>
+    [HttpDelete("{id}/History")]
+    public IActionResult ClearHistory([FromRoute] Guid id)
+    {
+        if (_stations.Get(id) is null)
+        {
+            return NotFound();
+        }
+
+        _stations.ClearHistory(id);
+        return NoContent();
+    }
+
+    /// <summary>Deals the schedule afresh from now: a new revision that continues every series from its next episode and rests what just aired.</summary>
+    [HttpPost("{id}/Reshuffle")]
+    public ActionResult<Station> Reshuffle([FromRoute] Guid id)
+    {
+        try
+        {
+            return Ok(_stations.Reshuffle(id));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
     }
 
     /// <summary>Compiled content of a saved station, excluded items last.</summary>
@@ -327,7 +388,7 @@ public sealed class StationsController : ControllerBase
             return NotFound();
         }
 
-        return Ok(StationService.ToContentList(station, compiled, offset, limit));
+        return Ok(StationService.ToContentList(station, compiled, offset, limit, _stations.History(id)));
     }
 
     [HttpGet("{id}/NowPlaying")]
@@ -339,7 +400,7 @@ public sealed class StationsController : ControllerBase
         }
 
         var r = _resolver.Resolve(id, DateTime.UtcNow);
-        return r is null ? NotFound() : Ok(Map.Entry(r.Entry, r.Offset));
+        return r is null ? NotFound() : Ok(Map.Entry(r.Entry, r.Offset, _stations.History(id)));
     }
 
     [HttpPost("{id}/Logo")]
@@ -454,10 +515,21 @@ public sealed class StationsController : ControllerBase
 
 internal static class Map
 {
-    public static ScheduleEntryDto Entry(ScheduleEntry e, TimeSpan? offset)
+    public static ScheduleEntryDto Entry(ScheduleEntry e, TimeSpan? offset, AirLog? log = null)
     {
+        AirLogKey? key = null;
+        AirLogItem? item = null;
+        if (log is not null && e.Kind == EntryKind.Program && e.Item is not null)
+        {
+            log.Keys.TryGetValue(PoolOrdering.KeyOf(e.Item), out key);
+            log.Items.TryGetValue(e.Item.ItemId, out item);
+        }
+
         return new ScheduleEntryDto
         {
+            LastAiredUtc = key is not null && key.LastStartUtc < e.StartUtc ? DateTime.SpecifyKind(key.LastStartUtc, DateTimeKind.Utc) : null,
+            AirCount = key?.Count ?? 0,
+            ItemLastAiredUtc = item is not null && item.LastStartUtc < e.StartUtc ? DateTime.SpecifyKind(item.LastStartUtc, DateTimeKind.Utc) : null,
             ProgramId = e.ProgramId,
             StartUtc = DateTime.SpecifyKind(e.StartUtc, DateTimeKind.Utc),
             EndUtc = DateTime.SpecifyKind(e.EndUtc, DateTimeKind.Utc),

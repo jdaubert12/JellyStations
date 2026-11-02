@@ -59,7 +59,7 @@ public sealed class ScheduleController : ControllerBase
         try
         {
             var compiled = _stations.CompileDraft(draft);
-            return Ok(StationService.ToContentList(draft, compiled, offset, limit));
+            return Ok(StationService.ToContentList(draft, compiled, offset, limit, LogFor(draft)));
         }
         catch (Exception ex)
         {
@@ -76,11 +76,15 @@ public sealed class ScheduleController : ControllerBase
         try
         {
             var entries = _stations.Preview(draft, start, end);
-            return Ok(entries.Select(e => Map.Entry(e, null)).ToList());
+            var log = LogFor(draft);
+            return Ok(entries.Select(e => Map.Entry(e, null, log)).ToList());
         }
         catch (Exception ex)
         {
             return BadRequest(ValidationErrorDto.Of(ex.Message));
         }
     }
+
+    /// <summary>The air log behind a draft of a saved station (null for a station that does not exist yet).</summary>
+    private AirLog? LogFor(Station draft) => draft.Id != Guid.Empty && _stations.Get(draft.Id) is not null ? _stations.History(draft.Id) : null;
 }

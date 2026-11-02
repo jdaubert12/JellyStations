@@ -39,8 +39,8 @@ Every station has one mode, chosen when it is created and changeable later.
 
 | Mode | What it does |
 |---|---|
-| **Pool** ("Shuffle a collection" in the dashboard) | Pick shows, movies, genres, collections or playlists. The station plays through the pool in shuffled or sequential cycles, or shuffled with each series' episodes kept in order (a random show comes up, but it is always that show's next episode). Shuffle avoids the same series or the same movie back to back, also across the seam between two cycles. A pool can also **rest** a show or film for N hours before it plays again, which keeps a film from coming straight back when one round ends and the next begins (a gentle rule: when nothing rested is available the station plays on; stations with time blocks are not covered yet). Optional **time blocks** take over at fixed local times, say a movie every evening from 18:00 to 21:00 on a cartoon station, and the pool carries on where it left off afterwards. When the block's content ends early, the pool fills the rest and its last program may finish past the block end rather than being cut, and a block can start up to N minutes late so the program already playing finishes first, keeping its full duration (both per-block options, on for new blocks). |
-| **Slots** ("Weekly schedule" in the dashboard) | Recurring blocks in the station's time zone, e.g. weekdays 20:00-21:00 = Seinfeld, Saturday 08:00-12:00 = cartoons. A filler pool plays between blocks. Sequential blocks pick up where they left off each day. |
+| **Pool** ("Shuffle a collection" in the dashboard) | Pick shows, movies, genres, collections or playlists. The station plays through the pool in shuffled or sequential cycles, or shuffled with each series' episodes kept in order (a random show comes up, but it is always that show's next episode). Shuffle avoids the same series or the same movie back to back, also across the seam between two cycles. A pool can also **rest** a show or film for N hours before it plays again, which keeps a film from coming straight back when one round ends and the next begins (a gentle rule: when nothing rested is available the station plays on; stations with time blocks are not covered yet). When the schedule is dealt afresh (an edit, new content, or **Reshuffle now**), each series continues from its next episode and what just aired rests; see [Air history](#air-history). Optional **time blocks** take over at fixed local times, say a movie every evening from 18:00 to 21:00 on a cartoon station, and the pool carries on where it left off afterwards. When the block's content ends early, the pool fills the rest and its last program may finish past the block end rather than being cut, and a block can start up to N minutes late so the program already playing finishes first, keeping its full duration (both per-block options, on for new blocks). |
+| **Slots** ("Weekly schedule" in the dashboard) | Recurring blocks in the station's time zone, e.g. weekdays 20:00-21:00 = Seinfeld, Saturday 08:00-12:00 = cartoons. A filler pool plays between blocks. Sequential blocks pick up where they left off each day, and after an edit they resume after the item they aired last. |
 | **Lineup** ("Play a fixed list" in the dashboard) | A hand-ordered list that loops forever from the station's anchor time. |
 | **Weather** ("Weather channel" in the dashboard) | No library items: the plugin draws the screens itself. Current conditions, the next twelve hours and the week ahead for up to eight places, cycling over music, with a live clock. See [Weather channel](#weather-channel). |
 
@@ -123,6 +123,30 @@ Films split across files (Blu-ray `part1` / `part2`, which Jellyfin stacks into 
 scheduled at their full combined length and play straight through, one guide entry. Items without a
 known runtime are skipped and listed in the editor; refresh their metadata in Jellyfin and press
 **Refresh content**.
+
+### Air history
+
+Every station keeps a log of what it aired: once a minute the plugin notes the programs on each
+enabled station's timeline (a slot that aired counts, whether or not anyone watched; an hour or more
+with the server off is not back-filled). The log is never read while a schedule plays. It matters at
+the moment a station gets a new schedule, which happens when an edit changes the timeline, when a
+refresh finds new or removed content, or when you press **Reshuffle now** on the station row. The
+log is frozen into that new schedule, which then continues from it:
+
+- With *episodes in order*, every series carries on from the episode after the one that aired last,
+  in the pool and in time blocks, instead of going back to its first episode. If that episode has
+  since vanished from the library, the next one by number is used.
+- A Sequential or episodes-in-order block resumes after the item it aired last; the stream between
+  blocks skips what it had already played in the current pass (the next pass is full again).
+- The series or film that was airing when the schedule changed never leads the new one, and the
+  rest rule counts what the old schedule just aired.
+
+Shuffled blocks and plain shuffles are dealt afresh, as before. A refresh that finds the content
+unchanged keeps the timeline byte for byte, and a station with no log schedules exactly as it did in
+earlier versions. **History** on the station row lists what aired, when and how often, and how long
+ago the current schedule was dealt; **Clear** empties the log (the current schedule holds until the
+next one). Schedule rows, the content table and the Now line say when a title last aired and how
+often. The log is kept in the data folder under `history/` and is not part of an export.
 
 ### Tags
 
@@ -648,6 +672,8 @@ usual Jellyfin API key or session token. The ones worth calling by hand:
 |---|---|
 | `GET /JellyStations/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises (the provider's collection name, or shared title prefixes), decades, ratings, tags and libraries. The basis for station suggestions and the health report. |
 | `GET /JellyStations/Health` | Every station that needs attention, as the Status page lists them. |
+| `GET /JellyStations/Stations/{id}/History`, `DELETE .../History` | What the station has aired (per series or film: last start and end, the last episode, the count), latest first, and when the snapshot its current schedule continues from was taken; delete empties the log. |
+| `POST /JellyStations/Stations/{id}/Reshuffle` | Deals the schedule afresh from now as a new revision that continues every series from its next episode and rests what just aired. |
 | `GET /JellyStations/Stations/Export`, `POST /JellyStations/Stations/Import` | The stations plus the saved station and block templates as one document; import takes that document or a bare array of stations. |
 | `GET /JellyStations/Suggestions`, `POST .../Create`, `POST .../Draft` | Stations the library could support (`refresh`, `minHours`, `minEpisodes`); create the ones with the given `Keys` (`FirstChannelNumber`, `TimeZoneId`, `TemplateId` for the look and breaks, `Logo`), returning `Created`, `Errors` and `Warnings`; one suggestion (`Key`) as an unsaved station with the same options applied. |
 | `GET /JellyStations/StationTemplates`, `GET .../{id}/Draft`, `POST`, `DELETE .../{id}` | Saved station templates first, then the built-in presets; a fresh station draft from one; save (replaces by name or id); delete a saved one. |

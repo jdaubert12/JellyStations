@@ -37,6 +37,12 @@ public sealed class ContentItemDto
 
     /// <summary>True when the exclusion comes from a tag rule rather than the station's item list (not toggleable per item).</summary>
     public bool ExcludedByRule { get; set; }
+
+    /// <summary>When this item last aired on the station, from the air log; null when it has not.</summary>
+    public DateTime? LastAiredUtc { get; set; }
+
+    /// <summary>How often this item has aired on the station.</summary>
+    public int AirCount { get; set; }
 }
 
 /// <summary>Station content listing with totals.</summary>
@@ -235,6 +241,48 @@ public sealed class ScheduleEntryDto
     public bool IsMovie { get; set; }
 
     public bool IsSeries { get; set; }
+
+    /// <summary>When the series or film last aired on the station before this entry, from the air log; null when it has not.</summary>
+    public DateTime? LastAiredUtc { get; set; }
+
+    /// <summary>How often the series or film has aired on the station.</summary>
+    public int AirCount { get; set; }
+
+    /// <summary>When this very item (the episode) last aired before this entry; null when it has not.</summary>
+    public DateTime? ItemLastAiredUtc { get; set; }
+}
+
+/// <summary>A station's air log, latest first.</summary>
+public sealed class AirHistoryDto
+{
+    /// <summary>When the snapshot the current revision continues from was taken; null when it has none.</summary>
+    public DateTime? SnapshotTakenUtc { get; set; }
+
+    /// <summary>Program airings logged in all.</summary>
+    public long Total { get; set; }
+
+    public DateTime? LastTickUtc { get; set; }
+
+    public List<AirHistoryEntryDto> Entries { get; set; } = new();
+}
+
+public sealed class AirHistoryEntryDto
+{
+    public string Key { get; set; } = string.Empty;
+
+    public string Title { get; set; } = string.Empty;
+
+    public Guid LastItemId { get; set; }
+
+    public int? Season { get; set; }
+
+    public int? Episode { get; set; }
+
+    public DateTime LastStartUtc { get; set; }
+
+    public DateTime LastEndUtc { get; set; }
+
+    public int Count { get; set; }
 }
 
 public sealed class CompileResultDto

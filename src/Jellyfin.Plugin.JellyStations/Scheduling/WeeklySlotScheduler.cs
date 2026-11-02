@@ -24,6 +24,8 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
     private readonly Dictionary<long, List<ScheduleEntry>> _entries = new();
     private readonly Dictionary<(string Scope, long Round), int[]> _perms = new();
     private readonly Dictionary<long, int[]> _fillerOrders = new();
+    private readonly AirHistorySnapshot? _snapshot;
+    private readonly DateTime _takenUtc;
 
     public WeeklySlotScheduler(ScheduleInput input)
     {
@@ -36,6 +38,15 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         _filler = input.Mode == ScheduleMode.Pool
             ? new FillerStream(input.Pool, input.PoolOrder, input.AvoidSameSeriesBackToBack, input.MarathonMin, input.MarathonMax, input.DaypartRules, input.PoolOrder != PlayOrder.Sequential, "Pool")
             : new FillerStream(input.Filler, input.FillerOrder, false, 1, 1, Array.Empty<DaypartRuleInput>(), false, "Filler");
+
+        // With a snapshot, the first pick of every block cursor and of the stream at or after the moment it was
+        // taken continues from what the previous revision aired (see SeedBlock and SeedFiller). The flags that say
+        // it happened live in the cursors, which the week state clones, so a replayed week decides the same way.
+        _snapshot = input.History;
+        if (_snapshot is not null)
+        {
+            _takenUtc = DateTime.SpecifyKind(_snapshot.TakenUtc, DateTimeKind.Utc);
+        }
     }
 
     public ResolvedProgram? Resolve(DateTime utc)
@@ -351,6 +362,11 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         var placedAny = false;
         while (t < end)
         {
+            if (_snapshot is not null && !cursor.Seeded && t >= _takenUtc)
+            {
+                SeedBlock(cursor, items, order, scope);
+            }
+
             var item = items[Perm(scope, order, items, cursor.Round)[cursor.Index]];
             if (item.RuntimeTicks <= 0)
             {
@@ -402,13 +418,22 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         {
             BeginPass(cursor);
             var remaining = end - t;
-            var p = PickFiller(cursor, t, remaining);
-            if (p < 0 && cursor.UsedCount > 0 && PickFiller(PeekNextPass(cursor), t, remaining) >= 0)
+            string? avoid = null;
+            if (_snapshot is not null && !cursor.Seeded && t >= _takenUtc)
+            {
+                // The first pick this revision really makes: skip what the stream had already played this pass, and
+                // do not lead with the series or film that was airing when the revision changed.
+                SeedFiller(cursor);
+                avoid = _filler.AvoidRepeats ? _snapshot.LastKey : null;
+            }
+
+            var p = PickFiller(cursor, t, remaining, avoid);
+            if (p < 0 && cursor.UsedCount > 0 && PickFiller(PeekNextPass(cursor), t, remaining, avoid) >= 0)
             {
                 // Whatever is left of this pass may not air now, but a fresh pass has something that may: start it.
                 cursor.NextPass();
                 BeginPass(cursor);
-                p = PickFiller(cursor, t, remaining);
+                p = PickFiller(cursor, t, remaining, avoid);
             }
 
             if (p < 0)
@@ -480,9 +505,16 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
 
     /// <summary>
     /// Position (in the pass order) of the item to play at <paramref name="t"/>, or -1 when no unplayed item may air
-    /// then. With episodes in order, a series' later episodes wait for its earlier ones.
+    /// then. With episodes in order, a series' later episodes wait for its earlier ones. A candidate whose series or
+    /// film is <paramref name="avoidKey"/> is passed over when any other fits.
     /// </summary>
-    private int PickFiller(FillerCursor cursor, DateTime t, TimeSpan remaining)
+    private int PickFiller(FillerCursor cursor, DateTime t, TimeSpan remaining, string? avoidKey = null)
+    {
+        var p = PickFillerCore(cursor, t, remaining, avoidKey);
+        return p < 0 && avoidKey is not null ? PickFillerCore(cursor, t, remaining, null) : p;
+    }
+
+    private int PickFillerCore(FillerCursor cursor, DateTime t, TimeSpan remaining, string? avoidKey)
     {
         var items = _filler.Items;
         var order = FillerOrder(cursor.Round);
@@ -508,6 +540,11 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
                 continue;
             }
 
+            if (avoidKey is not null && PoolOrdering.KeyOf(item) == avoidKey)
+            {
+                continue;
+            }
+
             if (item.Runtime <= remaining || !preferFit)
             {
                 return p;
@@ -520,6 +557,132 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         }
 
         return first;
+    }
+
+    /// <summary>
+    /// Continues a Sequential or episodes-in-order block after the item it aired last under the previous revision
+    /// (by id; for a series whose last episode is gone, by number). A Shuffle block is a deck and is left alone.
+    /// Runs once per block cursor, at its first pick at or after the snapshot, so an occurrence that straddles the
+    /// snapshot resumes at the right item.
+    /// </summary>
+    private void SeedBlock(Cursor cursor, IReadOnlyList<PlayableItem> items, PlayOrder order, string scope)
+    {
+        cursor.Seeded = true;
+        if (order == PlayOrder.Shuffle || items.Count == 0)
+        {
+            return;
+        }
+
+        var perm = Perm(scope, order, items, cursor.Round);
+        var last = LastAired(items);
+        if (last >= 0)
+        {
+            cursor.Index = Array.IndexOf(perm, last);
+            cursor.Advance(items.Count);
+            return;
+        }
+
+        // The episode that aired is gone: continue the series that aired last at its first episode numbered after it.
+        var (series, point) = LastAiredSeries(items);
+        if (series is null)
+        {
+            return;
+        }
+
+        var positions = Enumerable.Range(0, perm.Length).Where(p => items[perm[p]].SeriesId == series).ToList();
+        var at = EpisodeOrder.StartIndex(positions.Select(p => perm[p]).ToList(), items, point, out var found);
+        if (found && at < positions.Count)
+        {
+            cursor.Index = positions[at];
+        }
+    }
+
+    /// <summary>
+    /// Sets what the stream has played this pass to what the previous revision really aired: for Sequential,
+    /// everything up to the item that aired last; with episodes in order, each series' episodes up to the one that
+    /// aired last. Picks this revision made before the snapshot never aired and are forgotten for those items. A
+    /// Shuffle stream is a deck and is left alone. That one pass is shorter; the next is full.
+    /// </summary>
+    private void SeedFiller(FillerCursor cursor)
+    {
+        cursor.Seeded = true;
+        var items = _filler.Items;
+        var order = FillerOrder(cursor.Round);
+        if (_filler.Order == PlayOrder.Sequential)
+        {
+            var last = LastAired(items);
+            var at = last < 0 ? -1 : Array.IndexOf(order, last);
+            if (at < 0)
+            {
+                return;
+            }
+
+            for (var p = 0; p < order.Length; p++)
+            {
+                cursor.Set(p, p <= at || items[order[p]].RuntimeTicks <= 0);
+            }
+
+            return;
+        }
+
+        if (_filler.Order != PlayOrder.ShuffleEpisodesInOrder)
+        {
+            return;
+        }
+
+        foreach (var group in Enumerable.Range(0, order.Length).Where(p => items[order[p]].SeriesId.HasValue).GroupBy(p => items[order[p]].SeriesId!.Value))
+        {
+            var positions = group.ToList();
+            if (!_snapshot!.Keys.TryGetValue(PoolOrdering.KeyOf(items[order[positions[0]]]), out var key))
+            {
+                continue;
+            }
+
+            var at = EpisodeOrder.StartIndex(positions.Select(p => order[p]).ToList(), items, new ResumePoint(key.LastItemId, key.Season, key.Episode), out var found);
+            if (!found)
+            {
+                continue;
+            }
+
+            for (var j = 0; j < positions.Count; j++)
+            {
+                cursor.Set(positions[j], j < at || items[order[positions[j]]].RuntimeTicks <= 0);
+            }
+        }
+    }
+
+    /// <summary>Index into <paramref name="items"/> of the one the snapshot says aired last, or -1.</summary>
+    private int LastAired(IReadOnlyList<PlayableItem> items)
+    {
+        var best = -1;
+        var bestAt = DateTime.MinValue;
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (_snapshot!.Items.TryGetValue(items[i].ItemId, out var at) && at > bestAt)
+            {
+                best = i;
+                bestAt = at;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>The series among <paramref name="items"/> that aired last according to the snapshot, and where it stopped.</summary>
+    private (Guid? Series, ResumePoint Point) LastAiredSeries(IReadOnlyList<PlayableItem> items)
+    {
+        Guid? best = null;
+        SnapshotKey? bestKey = null;
+        foreach (var item in items)
+        {
+            if (item.SeriesId is { } series && _snapshot!.Keys.TryGetValue(PoolOrdering.KeyOf(item), out var key) && (bestKey is null || key.LastEndUtc > bestKey.LastEndUtc))
+            {
+                best = series;
+                bestKey = key;
+            }
+        }
+
+        return bestKey is null ? (null, default) : (best, new ResumePoint(bestKey.LastItemId, bestKey.Season, bestKey.Episode));
     }
 
     /// <summary>A fresh cursor for the pass after the given one, used to look ahead without moving the stream.</summary>
@@ -643,6 +806,9 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
 
         public int Index { get; set; }
 
+        /// <summary>True once the cursor has made its first pick at or after the snapshot (see SeedBlock).</summary>
+        public bool Seeded { get; set; }
+
         public void Advance(int n)
         {
             Index++;
@@ -653,7 +819,7 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
             }
         }
 
-        public Cursor Clone() => new() { Round = Round, Index = Index };
+        public Cursor Clone() => new() { Round = Round, Index = Index, Seeded = Seeded };
     }
 
     /// <summary>Where the between-block stream is: which pass, and which positions of it have played.</summary>
@@ -665,12 +831,24 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
 
         public int UsedCount { get; set; }
 
+        /// <summary>True once the stream has made its first pick at or after the snapshot (see SeedFiller).</summary>
+        public bool Seeded { get; set; }
+
         public void Mark(int p)
         {
             if (!Used[p])
             {
                 Used[p] = true;
                 UsedCount++;
+            }
+        }
+
+        public void Set(int p, bool used)
+        {
+            if (Used[p] != used)
+            {
+                Used[p] = used;
+                UsedCount += used ? 1 : -1;
             }
         }
 
@@ -681,7 +859,7 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
             UsedCount = 0;
         }
 
-        public FillerCursor Clone() => new() { Round = Round, Used = (bool[])Used.Clone(), UsedCount = UsedCount };
+        public FillerCursor Clone() => new() { Round = Round, Used = (bool[])Used.Clone(), UsedCount = UsedCount, Seeded = Seeded };
     }
 
     private sealed class WeekState

@@ -21,6 +21,7 @@ public sealed class StationService
     private readonly GuideRefreshService _guide;
     private readonly StreamSessionManager _sessions;
     private readonly JellyStationsPaths _paths;
+    private readonly AirLogRecorder _airLog;
     private readonly ILogger<StationService> _logger;
     private readonly object _writeLock = new();
 
@@ -33,8 +34,10 @@ public sealed class StationService
         GuideRefreshService guide,
         StreamSessionManager sessions,
         JellyStationsPaths paths,
+        AirLogRecorder airLog,
         ILogger<StationService> logger)
     {
+        _airLog = airLog;
         _stations = stations;
         _compiled = compiled;
         _settings = settings;
@@ -82,6 +85,7 @@ public sealed class StationService
             }
 
             var compiled = Compile(draft);
+            compiled.History = HistoryFor(true, null, () => _airLog.Snapshot(draft.Id, DateTime.UtcNow, compiled));
             _compiled.Save(compiled);
             _stations.Save(draft);
             _resolver.Invalidate(draft.Id);
@@ -123,6 +127,7 @@ public sealed class StationService
             }
 
             compiled.Revision = draft.Revision;
+            compiled.History = HistoryFor(scheduleChanged, previous, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled));
             _compiled.Save(compiled);
             _stations.Save(draft);
             _resolver.Invalidate(id);
@@ -153,6 +158,7 @@ public sealed class StationService
             _sessions.StopStation(id);
             var removed = _stations.Delete(id);
             _compiled.Delete(id);
+            _airLog.Clear(id);
             _resolver.Invalidate(id);
             if (station?.LogoFileName is { Length: > 0 } logo && _paths.LogoFile(logo) is { } logoPath)
             {
@@ -191,6 +197,7 @@ public sealed class StationService
                 _stations.Save(station);
             }
 
+            compiled.History = HistoryFor(changed && previous is not null, previous, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled));
             _compiled.Save(compiled);
             _resolver.Invalidate(id);
             if (changed && triggerGuide)
@@ -272,9 +279,49 @@ public sealed class StationService
 
     public ScheduleInput? GetScheduleInput(Guid id) => ScheduleInput.ForStation(id, _stations, _compiled);
 
+    /// <summary>
+    /// Deals the station's schedule afresh from now: a new revision with a fresh snapshot of the air log, so every
+    /// series continues from its next episode and what just aired rests, while the order is reshuffled.
+    /// </summary>
+    public Station Reshuffle(Guid id)
+    {
+        lock (_writeLock)
+        {
+            var station = _stations.Get(id) ?? throw new KeyNotFoundException("Station not found.");
+            station.Revision++;
+            var compiled = Compile(station);
+            compiled.Revision = station.Revision;
+            compiled.History = HistoryFor(true, null, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled));
+            _compiled.Save(compiled);
+            _stations.Save(station);
+            _resolver.Invalidate(id);
+            _guide.Trigger();
+            return station;
+        }
+    }
+
+    /// <summary>The station's air log as it stands.</summary>
+    public AirLog History(Guid id) => _airLog.Get(id);
+
+    /// <summary>Forgets what the station aired. The snapshot already in its compile holds until the next revision.</summary>
+    public void ClearHistory(Guid id) => _airLog.Clear(id);
+
+    /// <summary>
+    /// The snapshot a compile carries: a fresh one when the revision was bumped (the timeline changes anyway, so it
+    /// may as well continue from what aired), otherwise the previous compile's, so a recompile of unchanged content
+    /// keeps the timeline byte for byte.
+    /// </summary>
+    public static AirHistorySnapshot? HistoryFor(bool revisionBumped, CompiledStation? previous, Func<AirHistorySnapshot?> fresh)
+        => revisionBumped ? fresh() : previous?.History;
+
     public IReadOnlyList<ScheduleEntry> Preview(Station draft, DateTime fromUtc, DateTime toUtc)
     {
         var compiled = CompileDraft(draft);
+        var saved = _stations.Get(draft.Id);
+        var savedCompiled = saved is null ? null : _compiled.Get(draft.Id);
+        // A draft a save would not bump reuses the saved snapshot; otherwise it takes a fresh one, as the save would.
+        var bumped = saved is null || savedCompiled is null || ScheduleFingerprint(saved) != ScheduleFingerprint(draft) || !StationCompiler.SameContent(savedCompiled, compiled);
+        compiled.History = HistoryFor(bumped, savedCompiled, () => _airLog.Snapshot(draft.Id, DateTime.UtcNow, compiled));
         return ScheduleResolver.EnumerateInput(ScheduleInput.From(draft, compiled, WeatherSources.ConfigFor(draft, _stations.GetAll())), fromUtc, toUtc);
     }
 
@@ -304,7 +351,7 @@ public sealed class StationService
     }
 
     /// <summary>Flattens a compiled snapshot into the content listing, excluded items last.</summary>
-    public static ContentListDto ToContentList(Station station, CompiledStation compiled, int offset, int limit)
+    public static ContentListDto ToContentList(Station station, CompiledStation compiled, int offset, int limit, AirLog? log = null)
     {
         var blockNames = station.Slots.Blocks.ToDictionary(b => b.Id, b => string.IsNullOrWhiteSpace(b.Name) ? "Block" : b.Name);
         var rows = new List<ContentItemDto>();
@@ -340,7 +387,9 @@ public sealed class StationService
                     IsSeries = item.IsSeries,
                     IsMovie = item.IsMovie,
                     Excluded = excluded,
-                    ExcludedByRule = byRule
+                    ExcludedByRule = byRule,
+                    LastAiredUtc = log is not null && log.Items.TryGetValue(item.ItemId, out var aired) ? DateTime.SpecifyKind(aired.LastStartUtc, DateTimeKind.Utc) : null,
+                    AirCount = log is not null && log.Items.TryGetValue(item.ItemId, out var aired2) ? aired2.Count : 0
                 });
             }
         }

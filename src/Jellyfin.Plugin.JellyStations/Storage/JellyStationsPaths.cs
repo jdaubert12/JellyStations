@@ -35,6 +35,7 @@ public sealed class JellyStationsPaths
         WeatherDir = Path.Combine(Root, "weather");
         MusicDir = Path.Combine(Root, "music");
         AssetsDir = Path.Combine(Root, "assets");
+        HistoryDir = Path.Combine(Root, "history");
         SettingsFile = Path.Combine(Root, "settings.json");
         MusicIndexFile = Path.Combine(Root, "music-index.json");
         MusicLoudnessFile = Path.Combine(Root, "music-loudness.json");
@@ -48,6 +49,9 @@ public sealed class JellyStationsPaths
 
     /// <summary>Fonts and other files the plugin unpacks from its own assembly for ffmpeg to read.</summary>
     public string AssetsDir { get; }
+
+    /// <summary>One air log per station: what it aired, written by the recorder once a minute.</summary>
+    public string HistoryDir { get; }
 
     /// <summary>Probed durations and tags of music folder files, keyed by path.</summary>
     public string MusicIndexFile { get; }
@@ -130,5 +134,6 @@ public sealed class JellyStationsPaths
         Directory.CreateDirectory(WeatherDir);
         Directory.CreateDirectory(MusicDir);
         Directory.CreateDirectory(AssetsDir);
+        Directory.CreateDirectory(HistoryDir);
     }
 }

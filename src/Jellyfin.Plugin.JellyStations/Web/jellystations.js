@@ -454,6 +454,41 @@
     return isNaN(d.getTime()) ? '' : d.toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
   }
 
+  /** "3 d ago", "2 h ago", "just now"; '' for a missing or unreadable time. */
+  function fmtAgo(iso) {
+    if (!iso) {
+      return '';
+    }
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) {
+      return '';
+    }
+    const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
+    if (s < 90) {
+      return 'just now';
+    }
+    if (s < 3600) {
+      return Math.round(s / 60) + ' min ago';
+    }
+    if (s < 48 * 3600) {
+      return Math.round(s / 3600) + ' h ago';
+    }
+    return Math.round(s / 86400) + ' d ago';
+  }
+
+  /** "last aired 3 d ago · aired 12 times" from an entry or content row carrying the air log fields; '' when it never aired. */
+  function airedText(e) {
+    if (!e || !e.AirCount) {
+      return '';
+    }
+    const parts = [];
+    if (e.LastAiredUtc) {
+      parts.push('last aired ' + fmtAgo(e.LastAiredUtc));
+    }
+    parts.push(e.AirCount === 1 ? 'aired once' : 'aired ' + e.AirCount + ' times');
+    return parts.join(' · ');
+  }
+
   function fmtDayHeading(date) {
     return date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
   }
@@ -1018,6 +1053,10 @@
         const left = isFinite(total) ? fmtLeft(total - np.OffsetSeconds) : '';
         nowText += ' (' + fmtClock(np.OffsetSeconds) + ' in' + (left ? ', ' + left + ' left' : '') + ')';
       }
+      const aired = airedText(np);
+      if (aired) {
+        nowText += ' · ' + aired;
+      }
     } else {
       nowText = s.Enabled ? 'Now: nothing scheduled – add content or recompile' : 'Now: off air (disabled)';
     }
@@ -1041,32 +1080,98 @@
         }, 'tvs-fault-dismiss')
       ]));
     }
+    const history = el('div', { className: 'tvs-history', hidden: true });
+    body.appendChild(history);
     row.appendChild(body);
 
     const actions = el('div', { className: 'tvs-station-actions' });
-    renderStationActions(actions, s, false);
+    renderStationActions(actions, s, false, history);
     row.appendChild(actions);
     return row;
   }
 
-  function renderStationActions(container, s, armed) {
+  function renderStationActions(container, s, armed, history) {
     clear(container);
     if (armed) {
-      container.appendChild(textButton('Confirm delete?', () => deleteStation(s), 'button-cancel'));
-      container.appendChild(iconButton('close', 'Keep station', () => renderStationActions(container, s, false)));
+      const isDelete = armed === true || armed === 'delete';
+      container.appendChild(textButton(isDelete ? 'Confirm delete?' : 'Reshuffle now?', () => (isDelete ? deleteStation(s) : reshuffleStation(s)), 'button-cancel'));
+      container.appendChild(iconButton('close', isDelete ? 'Keep station' : 'Keep the schedule', () => renderStationActions(container, s, false, history)));
       clearTimeout(state.deleteTimer);
       state.deleteTimer = setTimeout(() => {
         if (container.isConnected) {
-          renderStationActions(container, s, false);
+          renderStationActions(container, s, false, history);
         }
       }, 6000);
       return;
     }
     container.appendChild(iconButton('refresh', 'Restart stream', () => restartStream(s)));
     container.appendChild(iconButton('restart_alt', 'Start schedule from now', () => reanchorStation(s)));
+    if (s.Mode !== 'Weather') {
+      container.appendChild(iconButton('shuffle', 'Reshuffle now (a new order from this moment; every series continues from its next episode and what just aired rests)', () => renderStationActions(container, s, 'reshuffle', history)));
+      container.appendChild(iconButton('history', 'History (what this station has aired)', () => toggleHistory(s, history)));
+    }
     container.appendChild(iconButton('edit', 'Edit', () => openEditor(s.Id)));
     container.appendChild(iconButton('content_copy', 'Duplicate (a new station with the same settings and content)', () => duplicateStation(s)));
-    container.appendChild(iconButton('delete', 'Delete', () => renderStationActions(container, s, true)));
+    container.appendChild(iconButton('delete', 'Delete', () => renderStationActions(container, s, 'delete', history)));
+  }
+
+  function reshuffleStation(s) {
+    withBusy('Could not reshuffle', () => api('POST', 'Stations/' + s.Id + '/Reshuffle').then(() => {
+      toast('“' + s.Name + '” has a fresh schedule from this moment.');
+      return loadStations();
+    }));
+  }
+
+  function toggleHistory(s, panel) {
+    if (!panel.hidden) {
+      panel.hidden = true;
+      return;
+    }
+    panel.hidden = false;
+    clear(panel).appendChild(el('div', { className: 'tvs-secondary', text: 'Loading history…' }));
+    api('GET', 'Stations/' + s.Id + '/History').then(h => renderHistory(s, panel, h)).catch(err => {
+      readErrors(err).then(messages => renderWarnList(clear(panel), 'Could not load the history: ', messages));
+    });
+  }
+
+  function renderHistory(s, panel, h) {
+    clear(panel);
+    const entries = Array.isArray(h.Entries) ? h.Entries : [];
+    const head = el('div', { className: 'tvs-history-head' });
+    const summaryText = entries.length
+      ? plural(h.Total, 'airing') + ' logged, ' + plural(entries.length, 'title')
+        + (h.SnapshotTakenUtc ? ' · schedule continues from ' + fmtAgo(h.SnapshotTakenUtc) : ' · schedule not yet continued from the log (it will be at the next edit or reshuffle)')
+      : 'Nothing logged yet. The log fills in as programs air (about once a minute).';
+    head.appendChild(el('span', { className: 'tvs-secondary', text: summaryText }));
+    if (entries.length) {
+      head.appendChild(textButton('Clear history', () => {
+        withBusy('Could not clear the history', () => apiNoBody('DELETE', 'Stations/' + s.Id + '/History').then(() => {
+          toast('History of “' + s.Name + '” cleared.');
+          return api('GET', 'Stations/' + s.Id + '/History').then(fresh => renderHistory(s, panel, fresh));
+        }));
+      }));
+    }
+    head.appendChild(iconButton('close', 'Hide history', () => { panel.hidden = true; }));
+    panel.appendChild(head);
+    if (!entries.length) {
+      return;
+    }
+    const table = el('table', { className: 'tvs-table' });
+    table.appendChild(tableHead(['Title', 'Last aired', 'Times']));
+    const tbody = el('tbody');
+    entries.slice(0, 100).forEach(e => {
+      const ep = e.Key && e.Key.indexOf('s:') === 0 && (e.Season || e.Episode) ? ' (last S' + (e.Season || 0) + 'E' + (e.Episode || 0) + ')' : '';
+      tbody.appendChild(el('tr', null, [
+        el('td', { text: (e.Title || '') + ep }),
+        el('td', { className: 'nowrap', text: fmtDateTime(e.LastStartUtc) + ' · ' + fmtAgo(e.LastStartUtc) }),
+        el('td', { className: 'nowrap', text: String(e.Count) })
+      ]));
+    });
+    table.appendChild(tbody);
+    panel.appendChild(table);
+    if (entries.length > 100) {
+      panel.appendChild(el('div', { className: 'tvs-secondary', text: 'Showing the 100 most recent of ' + entries.length + '.' }));
+    }
   }
 
   function deleteStation(s) {
@@ -2537,8 +2642,13 @@
           setExcluded(r.ItemId, !excluded);
           renderContent();
         } });
+      const titleCell = el('td', { text: title });
+      const aired = airedText(r);
+      if (aired) {
+        titleCell.appendChild(el('div', { className: 'tvs-secondary', text: aired }));
+      }
       tbody.appendChild(el('tr', { className: excluded ? 'excluded' : '' }, [
-        el('td', { text: title }),
+        titleCell,
         el('td', { className: 'nowrap', text: r.Year || '' }),
         el('td', { className: 'nowrap', text: r.Rating || '' }),
         el('td', { className: 'nowrap', text: r.Minutes + ' min' }),
@@ -2603,6 +2713,10 @@
       const programCell = el('td', null, el('span', { text: entryTitle(e) }));
       if (e.IsTruncated) {
         programCell.appendChild(badge('cut off', 'warn'));
+      }
+      const aired = airedText(e);
+      if (aired) {
+        programCell.appendChild(el('div', { className: 'tvs-secondary', text: aired + (e.ItemLastAiredUtc && e.IsSeries ? ' · this episode ' + fmtAgo(e.ItemLastAiredUtc) : '') }));
       }
       if (classes.indexOf('now') >= 0) {
         programCell.appendChild(badge('On air', 'live'));

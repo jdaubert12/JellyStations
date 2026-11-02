@@ -77,6 +77,13 @@ public sealed class ScheduleInput
     public IReadOnlyList<MusicTrack> Music { get; init; } = Array.Empty<MusicTrack>();
 
     /// <summary>
+    /// What the station had aired when this revision began (Pool and Slots modes; null when there is no history).
+    /// Only the cycle or week containing <see cref="AirHistorySnapshot.TakenUtc"/> reads it: for the seam with what
+    /// just aired and to continue each series from its next episode.
+    /// </summary>
+    public AirHistorySnapshot? History { get; init; }
+
+    /// <summary>
     /// Builds the scheduler's input. <paramref name="weather"/> is the weather the station airs (its own on a
     /// weather channel, the chosen weather channel's on an ordinary station, see <c>WeatherSources.ConfigFor</c>);
     /// null means a weather channel's own settings, or no weather at all on an ordinary station.
@@ -141,6 +148,7 @@ public sealed class ScheduleInput
             FillerOrder = station.Slots.Filler.Order,
             Weather = station.UsesWeather ? config : null,
             Music = station.Mode == ScheduleMode.Weather ? compiled.Music : Array.Empty<MusicTrack>(),
+            History = station.Mode is ScheduleMode.Pool or ScheduleMode.Slots ? compiled.History : null,
             WeatherBreak = usesWeather && station.HasWeatherBreaks ? TimeSpan.FromMinutes(Math.Clamp(station.Bumpers!.Weather.Minutes, 1, 10)) : TimeSpan.Zero,
             WeatherBreakFirst = station.Bumpers?.Weather?.Position == BreakPosition.AfterProgram,
             WeatherLabel = weatherTitle,

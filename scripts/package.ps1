@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.24.0.0"
+$version = "1.25.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Suggested stations arrive finished. Each station created from Suggest stations now gets a drawn logo (the editor's generated card, drawn on the server with the same seeded patterns and colors), the time zone and the first channel number chosen on the page (numbers already in use are skipped), and, with a station template picked under ""Look and breaks from"", that template's bumpers, pre-roll and post-roll, weather in the breaks, logo overlay, up next card, encoding, padding, card text and family hours, while the content stays the suggester's. A pencil on every suggestion opens it in the editor as an unsaved station with those options applied and the logo ready to upload on save, so it can be changed before it is created (POST /JellyStations/Suggestions/Draft). The Create result lists a warning for any station whose logo could not be drawn. Deinterlacing: interlaced files (DVD rips, broadcast captures) are now deinterlaced by the plugin before scaling, so the combing no longer ends up in the stream. The encoding profile gets a Deinterlacing setting: When the file is interlaced (the default, following the field order Jellyfin probed), Always (for files whose flags are missing) or Off; on a 50 or 60 fps profile every field becomes a frame so video-shot material keeps its motion. Stations are recompiled once at startup to record which files are interlaced, and the hardware test deinterlaces the same way."
+    changelog = "Air history. The plugin now keeps an air log per station: once a minute it notes which programs each enabled station aired (a slot that aired counts, viewer or not; a gap longer than an hour while the server was off is not back-filled). When an edit, a content change or the new Reshuffle action starts a new revision, the log is frozen into the compile and the new schedule continues from it: with episodes in order, every series carries on from the episode after the one that aired last (by number when that episode is gone) instead of going back to episode 1; a Sequential or episodes-in-order time block resumes after the item it aired last and the between-block stream skips what it had already played this pass; the series or film that was airing when the revision changed never leads the new schedule, and the cooldown rests what the previous revision just aired. A recompile of unchanged content keeps the timeline byte for byte, and a station with no history schedules exactly as before. The station row gains History (what aired, when and how often, with a Clear button) and Reshuffle now (a fresh order from this moment that still continues every series); schedule rows, the content table and the Now line say when a title last aired and how often. New endpoints: GET and DELETE /JellyStations/Stations/{id}/History, POST /JellyStations/Stations/{id}/Reshuffle; schedule and content entries carry LastAiredUtc and AirCount. The log lives in the data folder under history/ and is not part of an export."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true
