@@ -57,6 +57,45 @@ public sealed class StationService
 
     public EncodingProfile EffectiveProfile(Station station) => station.Encoding ?? _settings.Get().DefaultEncoding;
 
+    /// <summary>The logo bug the station draws: its own, or the plugin-wide default.</summary>
+    public LogoOverlayConfig EffectiveLogoOverlay(Station station) => station.LogoOverlay ?? _settings.Get().LogoOverlay ?? new LogoOverlayConfig();
+
+    /// <summary>The "Up next" card the station shows: its own, or the plugin-wide default.</summary>
+    public UpNextCardConfig EffectiveUpNextCard(Station station) => station.UpNextCard ?? _settings.Get().UpNextCard ?? new UpNextCardConfig();
+
+    /// <summary>
+    /// Drops every station's own logo bug or "Up next" card so all of them follow the plugin-wide default
+    /// again. A station that had its own is saved as it is otherwise (no recompile: the schedule does not
+    /// change) and its stream, if running, restarts with the default. Returns how many stations changed.
+    /// </summary>
+    public int ClearOverlayOverrides(OverlayKind kind)
+    {
+        var changed = 0;
+        foreach (var station in _stations.GetAll())
+        {
+            var had = kind == OverlayKind.LogoOverlay ? station.LogoOverlay is not null : station.UpNextCard is not null;
+            if (!had)
+            {
+                continue;
+            }
+
+            if (kind == OverlayKind.LogoOverlay)
+            {
+                station.LogoOverlay = null;
+            }
+            else
+            {
+                station.UpNextCard = null;
+            }
+
+            _stations.Save(station);
+            _sessions.StopStation(station.Id);
+            changed++;
+        }
+
+        return changed;
+    }
+
     public Station Create(Station draft)
     {
         lock (_writeLock)
@@ -551,10 +590,9 @@ public sealed class StationService
         {
             s.WeatherSourceStationId = null;
         }
-        s.LogoOverlay ??= new LogoOverlayConfig();
-        s.LogoOverlay.Normalize();
-        s.UpNextCard ??= new UpNextCardConfig();
-        s.UpNextCard.Normalize();
+        Storage.StationUpgrades.Apply(s);
+        s.LogoOverlay?.Normalize();
+        s.UpNextCard?.Normalize();
         s.MinRuntimeMinutes = Math.Clamp(s.MinRuntimeMinutes, 0, 600);
         s.ActiveWindows ??= new List<SeasonWindow>();
         s.ExcludedItemIds = (s.ExcludedItemIds ?? new List<Guid>()).Where(g => g != Guid.Empty).Distinct().ToList();

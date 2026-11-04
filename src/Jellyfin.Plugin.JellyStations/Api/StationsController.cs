@@ -52,6 +52,8 @@ public sealed class StationsController : ControllerBase
                 ChannelNumber = s.ChannelNumber,
                 Mode = s.Mode,
                 Enabled = s.Enabled,
+                OwnLogoOverlay = s.LogoOverlay is not null,
+                OwnUpNextCard = s.UpNextCard is not null,
                 ItemCount = compiled?.TotalItemCount ?? 0,
                 MusicCount = compiled?.Music.Count ?? 0,
                 LocationCount = s.Mode == ScheduleMode.Weather ? s.Weather.Locations.Count(l => l.IsValid) : 0,

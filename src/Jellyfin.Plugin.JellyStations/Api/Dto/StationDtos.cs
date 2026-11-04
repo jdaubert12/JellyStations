@@ -131,6 +131,12 @@ public sealed class StationSummaryDto
 
     public bool Enabled { get; set; }
 
+    /// <summary>The station sets its own logo bug rather than following the plugin-wide default.</summary>
+    public bool OwnLogoOverlay { get; set; }
+
+    /// <summary>The station sets its own "Up next" card rather than following the plugin-wide default.</summary>
+    public bool OwnUpNextCard { get; set; }
+
     public int ItemCount { get; set; }
 
     /// <summary>Weather channel: music tracks compiled.</summary>
@@ -296,6 +302,12 @@ public sealed class CompileResultDto
     public DateTime CompiledUtc { get; set; }
 
     public bool ContentChanged { get; set; }
+}
+
+/// <summary>How many stations dropped their own logo bug or "Up next" card for the plugin-wide default.</summary>
+public sealed class ClearOverridesResultDto
+{
+    public int Changed { get; set; }
 }
 
 /// <summary>Outcome of recompiling every station at once.</summary>

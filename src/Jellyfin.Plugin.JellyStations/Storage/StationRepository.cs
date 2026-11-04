@@ -79,6 +79,11 @@ public sealed class StationRepository
                     var station = JsonFileStore.Read<Station>(file);
                     if (station is not null && station.Id != Guid.Empty)
                     {
+                        if (StationUpgrades.Apply(station))
+                        {
+                            _logger.LogInformation("JellyStations: station file {File} brought up to format {Version}", file, Station.CurrentFormatVersion);
+                        }
+
                         _cache[station.Id] = station;
                     }
                 }

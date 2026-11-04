@@ -4,6 +4,12 @@ public sealed class GlobalSettings
 {
     public EncodingProfile DefaultEncoding { get; set; } = new();
 
+    /// <summary>The logo bug every station draws unless it sets its own (<see cref="Station.LogoOverlay"/>). Off by default.</summary>
+    public LogoOverlayConfig LogoOverlay { get; set; } = new();
+
+    /// <summary>The "Up next" card every station shows unless it sets its own (<see cref="Station.UpNextCard"/>). Off by default.</summary>
+    public UpNextCardConfig UpNextCard { get; set; } = new();
+
     /// <summary>Seconds a station stream keeps running after the last viewer leaves.</summary>
     public int LingerSeconds { get; set; } = 30;
 

@@ -336,6 +336,125 @@
       '</div>';
   }
 
+  function checkboxHtml(id, label, description) {
+    return '<div class="checkboxContainer' + (description ? ' checkboxContainer-withDescription' : '') + '">' +
+      '<label class="emby-checkbox-label"><input is="emby-checkbox" type="checkbox" id="' + id + '"><span>' + esc(label) + '</span></label>' +
+      (description ? '<div class="fieldDescription checkboxFieldDescription">' + esc(description) + '</div>' : '') +
+      '</div>';
+  }
+
+  const CORNERS = [['TopLeft', 'Top left'], ['TopRight', 'Top right'], ['BottomLeft', 'Bottom left'], ['BottomRight', 'Bottom right']];
+  const CORNER_LABEL = { TopLeft: 'top left', TopRight: 'top right', BottomLeft: 'bottom left', BottomRight: 'bottom right' };
+  const UP_NEXT_ANIMATIONS = [['None', 'None'], ['Fade', 'Fade'], ['Slide', 'Slide in from the side'], ['FadeAndSlide', 'Fade and slide']];
+
+  /**
+   * The logo bug controls (on/off, corner, opacity, height), rendered into a container under the given id
+   * prefix so the same form serves the plugin-wide default in Settings and a station's own in its editor.
+   */
+  function createLogoBugForm(container, prefix) {
+    const p = prefix + '_';
+    container.innerHTML =
+      checkboxHtml(p + 'on', 'Show the logo over the video', 'Draws the logo in a corner of every program, like a broadcast channel bug.') +
+      '<div id="' + p + 'opts" class="tvs-grid2 tvs-hidden">' +
+        selectHtml(p + 'corner', 'Corner', CORNERS) +
+        inputHtml(p + 'opacity', 'Opacity (%)', 'number', { min: LIMITS.logoOpacity.min, max: LIMITS.logoOpacity.max, step: 5 }) +
+        inputHtml(p + 'size', 'Logo height (% of picture)', 'number', { min: LIMITS.logoHeightPercent.min, max: LIMITS.logoHeightPercent.max, step: 1 }) +
+      '</div>';
+    const q = name => container.querySelector('#' + p + name);
+    const sync = () => show(q('opts'), q('on').checked);
+    q('on').addEventListener('change', sync);
+    return {
+      set(cfg) {
+        const o = normalizeLogoOverlay(Object.assign({}, cfg || {}));
+        q('on').checked = o.Enabled;
+        q('corner').value = o.Corner;
+        q('opacity').value = o.Opacity;
+        q('size').value = o.HeightPercent;
+        sync();
+      },
+      get() {
+        return normalizeLogoOverlay({
+          Enabled: q('on').checked,
+          Corner: q('corner').value,
+          Opacity: q('opacity').value,
+          HeightPercent: q('size').value
+        });
+      }
+    };
+  }
+
+  /** The "Up next" card controls, same idea as the logo bug form. */
+  function createUpNextForm(container, prefix) {
+    const p = prefix + '_';
+    container.innerHTML =
+      checkboxHtml(p + 'on', 'Show an "Up next" card before each program ends', 'A small panel in a corner of the picture with the next program\'s title, artwork and start and end time, drawn into the stream for every viewer.') +
+      '<div id="' + p + 'opts" class="tvs-hidden">' +
+        '<div class="tvs-grid2">' +
+          selectHtml(p + 'corner', 'Corner', CORNERS) +
+          selectHtml(p + 'anim', 'Animation', UP_NEXT_ANIMATIONS, 'How the card arrives and leaves, over about half a second.') +
+          inputHtml(p + 'before', 'Appears before the end at', 'text', { placeholder: '30s' }, 'One or more times, e.g. "1h, 30m, 5m, 30s". The card shows once at each, for the seconds below. Up to eight.') +
+          inputHtml(p + 'show', 'Stays for (seconds)', 'number', { min: LIMITS.upNextShowSeconds.min, max: LIMITS.upNextShowSeconds.max, step: 1 }) +
+          inputHtml(p + 'size', 'Card height (% of picture)', 'number', { min: LIMITS.upNextHeightPercent.min, max: LIMITS.upNextHeightPercent.max, step: 1 }) +
+          inputHtml(p + 'opacity', 'Background opacity (%)', 'number', { min: LIMITS.upNextOpacity.min, max: LIMITS.upNextOpacity.max, step: 5 }) +
+        '</div>' +
+        checkboxHtml(p + 'thumb', 'Show the poster or episode thumbnail') +
+        checkboxHtml(p + 'times', 'Show the start and end time') +
+        checkboxHtml(p + 'clock24', '24-hour clock (20:00 instead of 8:00 PM)') +
+      '</div>';
+    const q = name => container.querySelector('#' + p + name);
+    const sync = () => show(q('opts'), q('on').checked);
+    q('on').addEventListener('change', sync);
+    return {
+      set(cfg) {
+        const c = normalizeUpNextCard(Object.assign({}, cfg || {}));
+        q('on').checked = c.Enabled;
+        q('corner').value = c.Corner;
+        q('anim').value = c.Animation;
+        q('before').value = formatLeadTimes(c.LeadTimesSeconds);
+        q('show').value = c.ShowSeconds;
+        q('size').value = c.HeightPercent;
+        q('opacity').value = c.Opacity;
+        q('thumb').checked = c.ShowThumbnail;
+        q('times').checked = c.ShowTimes;
+        q('clock24').checked = c.TwentyFourHourClock;
+        sync();
+      },
+      get() {
+        return normalizeUpNextCard({
+          Enabled: q('on').checked,
+          Corner: q('corner').value,
+          Animation: q('anim').value,
+          LeadTimesSeconds: parseLeadTimes(q('before').value),
+          ShowSeconds: q('show').value,
+          HeightPercent: q('size').value,
+          Opacity: q('opacity').value,
+          ShowThumbnail: q('thumb').checked,
+          ShowTimes: q('times').checked,
+          TwentyFourHourClock: q('clock24').checked
+        });
+      }
+    };
+  }
+
+  /** The plugin-wide logo bug from Settings, as the editor shows it and the stream draws it for stations without their own. */
+  function pluginLogoOverlay() {
+    return normalizeLogoOverlay(Object.assign({}, (state.settings && state.settings.LogoOverlay) || {}));
+  }
+
+  function pluginUpNextCard() {
+    return normalizeUpNextCard(Object.assign({}, (state.settings && state.settings.UpNextCard) || {}));
+  }
+
+  /** "off" or "on, top right, 8% high at 70% opacity". */
+  function describeLogoBug(o) {
+    return o.Enabled ? 'on, ' + CORNER_LABEL[o.Corner] + ', ' + o.HeightPercent + '% high at ' + o.Opacity + '% opacity' : 'off';
+  }
+
+  /** "off" or "on, bottom right, 1h, 30m, 30s before the end for 10 s". */
+  function describeUpNext(c) {
+    return c.Enabled ? 'on, ' + CORNER_LABEL[c.Corner] + ', ' + formatLeadTimes(c.LeadTimesSeconds) + ' before the end for ' + c.ShowSeconds + ' s' : 'off';
+  }
+
   // ------------------------------------------------------------------------------------------
   // Formatting helpers
   // ------------------------------------------------------------------------------------------
@@ -369,6 +488,9 @@
    * Bounds and defaults of the station's numeric settings, shared by the normalizers (loaded stations) and readDraft
    * (the form).
    */
+  /** Station.FormatVersion the server expects from this page (see StationUpgrades on the server). */
+  const STATION_FORMAT = 2;
+
   const LIMITS = {
     cooldownHours: { min: 0, max: 168, def: 0 },
     marathon: { min: 1, max: Infinity, def: 1 },
@@ -1247,8 +1369,10 @@
       CallSign: null,
       Enabled: true,
       LogoFileName: null,
-      LogoOverlay: { Enabled: false, Corner: 'TopRight', Opacity: 70, HeightPercent: 8 },
-      UpNextCard: { Enabled: false, Corner: 'BottomRight', Animation: 'Fade', LeadTimesSeconds: [30], ShowSeconds: 10, HeightPercent: 14, Opacity: 85, ShowThumbnail: true, ShowTimes: true, TwentyFourHourClock: false },
+      // null = the plugin-wide default from Settings; an object is this station's own.
+      LogoOverlay: null,
+      UpNextCard: null,
+      FormatVersion: STATION_FORMAT,
       TimeZoneId: guessTimeZone(),
       AnchorUtc: null,
       Revision: 1,
@@ -1320,14 +1444,24 @@
     wb.Minutes = clampTo(wb.Minutes, LIMITS.weatherBreakMinutes);
     wb.Position = wb.Position === 'AfterProgram' ? 'AfterProgram' : 'BeforeProgram';
     s.CardText = s.CardText || null;
-    s.LogoOverlay = s.LogoOverlay || {};
-    s.LogoOverlay.Enabled = !!s.LogoOverlay.Enabled;
-    s.LogoOverlay.Corner = s.LogoOverlay.Corner || 'TopRight';
-    s.LogoOverlay.Opacity = clampTo(s.LogoOverlay.Opacity, LIMITS.logoOpacity);
-    s.LogoOverlay.HeightPercent = clampTo(s.LogoOverlay.HeightPercent, LIMITS.logoHeightPercent);
-    const card = s.UpNextCard = s.UpNextCard || {};
+    // The server has already brought the station up to the current format: null means "the plugin-wide default".
+    s.LogoOverlay = s.LogoOverlay ? normalizeLogoOverlay(s.LogoOverlay) : null;
+    s.UpNextCard = s.UpNextCard ? normalizeUpNextCard(s.UpNextCard) : null;
+    s.FormatVersion = STATION_FORMAT;
+    return s;
+  }
+
+  function normalizeLogoOverlay(o) {
+    o.Enabled = !!o.Enabled;
+    o.Corner = CORNER_LABEL[o.Corner] ? o.Corner : 'TopRight';
+    o.Opacity = clampTo(o.Opacity, LIMITS.logoOpacity);
+    o.HeightPercent = clampTo(o.HeightPercent, LIMITS.logoHeightPercent);
+    return o;
+  }
+
+  function normalizeUpNextCard(card) {
     card.Enabled = !!card.Enabled;
-    card.Corner = card.Corner || 'BottomRight';
+    card.Corner = CORNER_LABEL[card.Corner] ? card.Corner : 'BottomRight';
     card.Animation = ['None', 'Fade', 'Slide', 'FadeAndSlide'].indexOf(card.Animation) >= 0 ? card.Animation : 'Fade';
     card.LeadTimesSeconds = normalizeLeadTimes(card.LeadTimesSeconds);
     card.ShowSeconds = clampUpNextShowSeconds(card.ShowSeconds, card.LeadTimesSeconds);
@@ -1336,7 +1470,7 @@
     card.ShowThumbnail = card.ShowThumbnail !== false;
     card.ShowTimes = card.ShowTimes !== false;
     card.TwentyFourHourClock = !!card.TwentyFourHourClock;
-    return s;
+    return card;
   }
 
   /** How long the up next card shows: within its limits and never longer than the shortest lead time. */
@@ -1564,11 +1698,11 @@
     if (s.Encoding) {
       parts.push('own encoding');
     }
-    if (s.LogoOverlay && s.LogoOverlay.Enabled) {
-      parts.push('logo bug');
+    if (s.LogoOverlay) {
+      parts.push(s.LogoOverlay.Enabled ? 'logo bug' : 'no logo bug');
     }
-    if (s.UpNextCard && s.UpNextCard.Enabled) {
-      parts.push('up next card');
+    if (s.UpNextCard) {
+      parts.push(s.UpNextCard.Enabled ? 'up next card' : 'no up next card');
     }
     return parts.join(' · ');
   }
@@ -1584,8 +1718,6 @@
     d.CallSign = null;
     d.Enabled = true;
     d.TimeZoneId = d.TimeZoneId || base.TimeZoneId;
-    d.LogoOverlay = d.LogoOverlay || base.LogoOverlay;
-    d.UpNextCard = d.UpNextCard || base.UpNextCard;
     return d;
   }
 
@@ -1718,8 +1850,8 @@
     '#tvsBumperWeatherEnabled': '#tvsBumperWeatherOptions',
     '#tvsPreRollEnabled': '#tvsPreRollPicker',
     '#tvsPostRollEnabled': '#tvsPostRollPicker',
-    '#tvsOverlayEnabled': '#tvsOverlayOptions',
-    '#tvsUpNextEnabled': '#tvsUpNextOptions',
+    '#tvsOverlayCustom': '#tvsOverlayCustomBox',
+    '#tvsUpNextCustom': '#tvsUpNextCustomBox',
     '#tvsEncodingEnabled': '#tvsStationEncoding',
     '#tvsWeatherTitleCards': '#tvsWeatherTitleCardBox',
     '#tvsWeatherRadar': '#tvsWeatherRadarZoomBox',
@@ -1793,20 +1925,17 @@
     setChecked('#tvsLogoAutoColor', readPref('tvsLogoAutoColor') === '1');
     suggestLogoColor();
     renderLogo();
-    setChecked('#tvsOverlayEnabled', !!d.LogoOverlay.Enabled);
-    setVal('#tvsOverlayCorner', d.LogoOverlay.Corner);
-    setVal('#tvsOverlayOpacity', d.LogoOverlay.Opacity);
-    setVal('#tvsOverlaySize', d.LogoOverlay.HeightPercent);
-    setChecked('#tvsUpNextEnabled', !!d.UpNextCard.Enabled);
-    setVal('#tvsUpNextCorner', d.UpNextCard.Corner);
-    setVal('#tvsUpNextAnimation', d.UpNextCard.Animation || 'Fade');
-    setVal('#tvsUpNextBefore', formatLeadTimes(d.UpNextCard.LeadTimesSeconds));
-    setVal('#tvsUpNextShow', d.UpNextCard.ShowSeconds);
-    setVal('#tvsUpNextSize', d.UpNextCard.HeightPercent);
-    setVal('#tvsUpNextOpacity', d.UpNextCard.Opacity);
-    setChecked('#tvsUpNextThumb', d.UpNextCard.ShowThumbnail);
-    setChecked('#tvsUpNextTimes', d.UpNextCard.ShowTimes);
-    setChecked('#tvsUpNextClock24', d.UpNextCard.TwentyFourHourClock);
+    // Logo bug and up next card: the station's own, or the plugin-wide default (the form starts from it when customized).
+    if (!state.stationOverlay) {
+      state.stationOverlay = createLogoBugForm($('#tvsOverlayCustomBox'), 'tvsStOverlay');
+      state.stationUpNext = createUpNextForm($('#tvsUpNextCustomBox'), 'tvsStUpNext');
+    }
+    setChecked('#tvsOverlayCustom', !!d.LogoOverlay);
+    state.stationOverlay.set(d.LogoOverlay || pluginLogoOverlay());
+    $('#tvsOverlayDefaultHint').textContent = describeLogoBug(pluginLogoOverlay());
+    setChecked('#tvsUpNextCustom', !!d.UpNextCard);
+    state.stationUpNext.set(d.UpNextCard || pluginUpNextCard());
+    $('#tvsUpNextDefaultHint').textContent = describeUpNext(pluginUpNextCard());
 
     // Mode panels
     setVal('#tvsPoolOrder', d.Pool.Order);
@@ -2348,20 +2477,8 @@
     d.PaddingGridMinutes = paddingGridMinutes();
     d.AutoRecompileNightly = checked('#tvsNightly');
     d.CardText = val('#tvsCardText').trim() || null;
-    d.LogoOverlay.Enabled = checked('#tvsOverlayEnabled');
-    d.LogoOverlay.Corner = val('#tvsOverlayCorner') || 'TopRight';
-    d.LogoOverlay.Opacity = clampTo(val('#tvsOverlayOpacity'), LIMITS.logoOpacity);
-    d.LogoOverlay.HeightPercent = clampTo(val('#tvsOverlaySize'), LIMITS.logoHeightPercent);
-    d.UpNextCard.Enabled = checked('#tvsUpNextEnabled');
-    d.UpNextCard.Corner = val('#tvsUpNextCorner') || 'BottomRight';
-    d.UpNextCard.Animation = val('#tvsUpNextAnimation') || 'Fade';
-    d.UpNextCard.LeadTimesSeconds = parseLeadTimes(val('#tvsUpNextBefore'));
-    d.UpNextCard.ShowSeconds = clampUpNextShowSeconds(val('#tvsUpNextShow'), d.UpNextCard.LeadTimesSeconds);
-    d.UpNextCard.HeightPercent = clampTo(val('#tvsUpNextSize'), LIMITS.upNextHeightPercent);
-    d.UpNextCard.Opacity = clampTo(val('#tvsUpNextOpacity'), LIMITS.upNextOpacity);
-    d.UpNextCard.ShowThumbnail = checked('#tvsUpNextThumb');
-    d.UpNextCard.ShowTimes = checked('#tvsUpNextTimes');
-    d.UpNextCard.TwentyFourHourClock = checked('#tvsUpNextClock24');
+    d.LogoOverlay = checked('#tvsOverlayCustom') ? state.stationOverlay.get() : null;
+    d.UpNextCard = checked('#tvsUpNextCustom') ? state.stationUpNext.get() : null;
     d.ExcludedTags = parseTagList(val('#tvsExcludedTags'));
     d.UseGlobalExcludedTags = checked('#tvsUseGlobalTags');
     d.MinRuntimeMinutes = clampTo(val('#tvsMinRuntime'), LIMITS.minRuntimeMinutes);
@@ -4580,6 +4697,13 @@
       state.settingsEncoding = createEncodingForm($('#tvsSettingsEncoding'), 'tvsGlEnc');
     }
     state.settingsEncoding.set(s.DefaultEncoding || defaultEncoding());
+    if (!state.settingsOverlay) {
+      state.settingsOverlay = createLogoBugForm($('#tvsSettingsOverlay'), 'tvsGlOverlay');
+      state.settingsUpNext = createUpNextForm($('#tvsSettingsUpNext'), 'tvsGlUpNext');
+    }
+    state.settingsOverlay.set(s.LogoOverlay);
+    state.settingsUpNext.set(s.UpNextCard);
+    renderOverrideCounts();
     setVal('#tvsLinger', s.LingerSeconds !== undefined ? s.LingerSeconds : 30);
     setVal('#tvsIdleStop', s.IdleStopSeconds !== undefined ? s.IdleStopSeconds : 120);
     setVal('#tvsMaxSessions', s.MaxConcurrentSessions !== undefined ? s.MaxConcurrentSessions : 4);
@@ -4595,9 +4719,34 @@
     renderTemplateRows('StationTemplates', Array.isArray(s.StationTemplates) ? s.StationTemplates : []);
   }
 
+  /** How many stations set their own bug or card, next to the "Use on every station" buttons. */
+  function renderOverrideCounts() {
+    [['OwnLogoOverlay', '#tvsOverlayOwnCount', '#tvsBtnOverlayAll', 'logo bug'], ['OwnUpNextCard', '#tvsUpNextOwnCount', '#tvsBtnUpNextAll', 'card']].forEach(([key, countSel, buttonSel, what]) => {
+      const own = state.stations.filter(st => st[key]).length;
+      $(countSel).textContent = own === 0
+        ? 'Every station follows this default.'
+        : own + (own === 1 ? ' station sets its own ' : ' stations set their own ') + what + '.';
+      show($(buttonSel), own > 0);
+    });
+  }
+
+  /** Drops every station's own logo bug or card so all of them follow the default just saved or shown. */
+  function clearOverrides(kind) {
+    withBusy('Could not update the stations', () => api('POST', 'Settings/ClearOverrides/' + kind).then(result => {
+      const n = result && result.Changed ? result.Changed : 0;
+      toast(n === 0 ? 'Every station already follows the default.' : n + (n === 1 ? ' station now follows' : ' stations now follow') + ' the default.');
+      return api('GET', 'Stations').then(list => {
+        state.stations = Array.isArray(list) ? list : [];
+        renderOverrideCounts();
+      });
+    }));
+  }
+
   function saveSettings() {
     const payload = {
       DefaultEncoding: state.settingsEncoding.get(),
+      LogoOverlay: state.settingsOverlay.get(),
+      UpNextCard: state.settingsUpNext.get(),
       LingerSeconds: parseInt(val('#tvsLinger'), 10),
       IdleStopSeconds: parseInt(val('#tvsIdleStop'), 10),
       MaxGuideDays: parseInt(val('#tvsMaxGuideDays'), 10),
@@ -4629,7 +4778,8 @@
     }
     renderErrorBox(box, null);
     loading(true);
-    api('PUT', 'Settings', payload).then(() => {
+    api('PUT', 'Settings', payload).then(saved => {
+      state.settings = saved || Object.assign({}, state.settings, payload);
       toast('Settings saved.');
       showView('list');
       return loadStations();
@@ -5561,6 +5711,8 @@
     on('#tvsBtnSettingsBack', 'click', backToList);
     on('#tvsBtnSettingsCancel', 'click', backToList);
     on('#tvsBtnSettingsSave', 'click', saveSettings);
+    on('#tvsBtnOverlayAll', 'click', () => clearOverrides('LogoOverlay'));
+    on('#tvsBtnUpNextAll', 'click', () => clearOverrides('UpNextCard'));
     on('#tvsSlateColor', 'input', () => {
       $('#tvsSlateColorText').textContent = val('#tvsSlateColor');
     });
@@ -5581,6 +5733,8 @@
       // Always start on the list when the dashboard navigates here.
       showView('list');
       loadStations();
+      // The editor shows what the plugin-wide logo bug and card are; fetched once, kept current by the Settings page.
+      api('GET', 'Settings').then(settings => { state.settings = settings || state.settings || {}; }).catch(() => {});
     });
 
     const onHide = () => {

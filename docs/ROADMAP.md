@@ -280,6 +280,12 @@ order; together they turn a station into a broadcast.
    (`UpNextCard.Window`; multi-part items only on the last part or when cut). Falls back to a card
    without artwork, then disables the card for the session, each with a station fault. Unit tests
    cover the lookup, window, times, layout and both ffmpeg argument lists.
+   **Plugin-wide defaults — DONE 2026-11-04 (1.26.0.0).** `GlobalSettings.LogoOverlay` / `UpNextCard`
+   are what every station draws; `Station.LogoOverlay` / `UpNextCard` became nullable (null = the
+   default, like `Encoding`). `StationUpgrades` (format version 2, applied at load, import and to saved
+   templates) turns an old station's off bug/card into null and keeps one that was on. Settings saves
+   restart only the streams that follow a changed default; `POST Settings/ClearOverrides/{kind}` drops
+   every station's own. The editor's Logo step has "Set ... for this station" with the default described.
 
 Considered and parked: off-air hours (a daypart rule approximates it),
 custom guide titles per block, studio and people sources, smart (search) collections, multi-part

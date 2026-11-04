@@ -18,7 +18,12 @@ public sealed class SettingsRepository
     {
         lock (_lock)
         {
-            _cached ??= JsonFileStore.Read<GlobalSettings>(_paths.SettingsFile) ?? new GlobalSettings();
+            if (_cached is null)
+            {
+                _cached = JsonFileStore.Read<GlobalSettings>(_paths.SettingsFile) ?? new GlobalSettings();
+                StationUpgrades.Apply(_cached);
+            }
+
             return _cached;
         }
     }

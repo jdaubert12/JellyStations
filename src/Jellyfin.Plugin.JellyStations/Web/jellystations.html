@@ -48,6 +48,8 @@
       #JellyStationsPage .tvs-suggest-option input[type=number] { width: 9em; }
       #JellyStationsPage .tvs-suggest-check { width: auto; padding-bottom: .6em; }
       #JellyStationsPage .tvs-inline-btn { margin-left: .8em; padding: .3em .9em; font-size: .85em; }
+      #JellyStationsPage .tvs-override-box { margin: .4em 0 0 1.6em; padding-left: 1em; border-left: 2px solid rgba(255,255,255,.15); }
+      #JellyStationsPage .tvs-override-row { margin: .4em 0 .8em; }
       #JellyStationsPage .tvs-season-row { display: flex; flex-wrap: wrap; align-items: center; gap: .4em .6em; margin: .4em 0; }
       #JellyStationsPage .tvs-season-row select { width: auto; min-width: 6.5em; }
       #JellyStationsPage .tvs-season-row input[type=text] { width: 9em; }
@@ -380,89 +382,20 @@
             <div class="fieldDescription" id="tvsLogoHint">PNG, JPEG, WebP or GIF up to 5 MB. Shown in the guide and on station-break slates.</div>
             <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:1em">
               <label class="emby-checkbox-label">
-                <input is="emby-checkbox" type="checkbox" id="tvsOverlayEnabled">
-                <span>Show the logo over the video</span>
+                <input is="emby-checkbox" type="checkbox" id="tvsOverlayCustom">
+                <span>Set the logo bug for this station</span>
               </label>
-              <div class="fieldDescription checkboxFieldDescription">Draws the logo in a corner of every program, like a broadcast channel bug. Costs some encoder CPU; changing it restarts this station's stream.</div>
+              <div class="fieldDescription checkboxFieldDescription">The logo drawn in a corner of every program, like a broadcast channel bug. Off: this station follows the plugin-wide default from Settings, currently <strong id="tvsOverlayDefaultHint">off</strong>. Costs some encoder CPU; changing it restarts this station's stream.</div>
             </div>
-            <div id="tvsOverlayOptions" class="tvs-grid2 tvs-hidden">
-              <div class="selectContainer">
-                <label class="selectLabel" for="tvsOverlayCorner">Corner</label>
-                <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsOverlayCorner">
-                  <option value="TopLeft">Top left</option>
-                  <option value="TopRight">Top right</option>
-                  <option value="BottomLeft">Bottom left</option>
-                  <option value="BottomRight">Bottom right</option>
-                </select>
-              </div>
-              <div class="inputContainer">
-                <input is="emby-input" id="tvsOverlayOpacity" label="Opacity (%)" type="number" min="10" max="100" step="5">
-              </div>
-              <div class="inputContainer">
-                <input is="emby-input" id="tvsOverlaySize" label="Logo height (% of picture)" type="number" min="3" max="25" step="1">
-              </div>
-            </div>
+            <div id="tvsOverlayCustomBox" class="tvs-hidden tvs-override-box"></div>
             <div class="checkboxContainer checkboxContainer-withDescription" style="margin-top:1em">
               <label class="emby-checkbox-label">
-                <input is="emby-checkbox" type="checkbox" id="tvsUpNextEnabled">
-                <span>Show an "Up next" card before each program ends</span>
+                <input is="emby-checkbox" type="checkbox" id="tvsUpNextCustom">
+                <span>Set the "Up next" card for this station</span>
               </label>
-              <div class="fieldDescription checkboxFieldDescription">A small panel in a corner of the picture with the next program's title, artwork and start and end time, drawn into the stream for every viewer. Pick a different corner from the logo. Costs some encoder CPU for the whole program; changing it restarts this station's stream.</div>
+              <div class="fieldDescription checkboxFieldDescription">A small panel in a corner of the picture with the next program's title, artwork and start and end time, drawn into the stream for every viewer. Off: this station follows the plugin-wide default from Settings, currently <strong id="tvsUpNextDefaultHint">off</strong>. Pick a different corner from the logo. Costs some encoder CPU for the whole program; changing it restarts this station's stream.</div>
             </div>
-            <div id="tvsUpNextOptions" class="tvs-hidden">
-              <div class="tvs-grid2">
-                <div class="selectContainer">
-                  <label class="selectLabel" for="tvsUpNextCorner">Corner</label>
-                  <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsUpNextCorner">
-                    <option value="TopLeft">Top left</option>
-                    <option value="TopRight">Top right</option>
-                    <option value="BottomLeft">Bottom left</option>
-                    <option value="BottomRight">Bottom right</option>
-                  </select>
-                </div>
-                <div class="selectContainer">
-                  <label class="selectLabel" for="tvsUpNextAnimation">Animation</label>
-                  <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsUpNextAnimation">
-                    <option value="None">None</option>
-                    <option value="Fade">Fade</option>
-                    <option value="Slide">Slide in from the side</option>
-                    <option value="FadeAndSlide">Fade and slide</option>
-                  </select>
-                  <div class="fieldDescription">How the card arrives and leaves, over about half a second.</div>
-                </div>
-                <div class="inputContainer">
-                  <input is="emby-input" id="tvsUpNextBefore" label="Appears before the end at" type="text" placeholder="30s">
-                  <div class="fieldDescription">One or more times, e.g. "1h, 30m, 5m, 30s". The card shows once at each, for the seconds below. Up to eight.</div>
-                </div>
-                <div class="inputContainer">
-                  <input is="emby-input" id="tvsUpNextShow" label="Stays for (seconds)" type="number" min="3" max="60" step="1">
-                </div>
-                <div class="inputContainer">
-                  <input is="emby-input" id="tvsUpNextSize" label="Card height (% of picture)" type="number" min="8" max="30" step="1">
-                </div>
-                <div class="inputContainer">
-                  <input is="emby-input" id="tvsUpNextOpacity" label="Background opacity (%)" type="number" min="30" max="100" step="5">
-                </div>
-              </div>
-              <div class="checkboxContainer">
-                <label class="emby-checkbox-label">
-                  <input is="emby-checkbox" type="checkbox" id="tvsUpNextThumb">
-                  <span>Show the poster or episode thumbnail</span>
-                </label>
-              </div>
-              <div class="checkboxContainer">
-                <label class="emby-checkbox-label">
-                  <input is="emby-checkbox" type="checkbox" id="tvsUpNextTimes">
-                  <span>Show the start and end time</span>
-                </label>
-              </div>
-              <div class="checkboxContainer">
-                <label class="emby-checkbox-label">
-                  <input is="emby-checkbox" type="checkbox" id="tvsUpNextClock24">
-                  <span>24-hour clock (20:00 instead of 8:00 PM)</span>
-                </label>
-              </div>
-            </div>
+            <div id="tvsUpNextCustomBox" class="tvs-hidden tvs-override-box"></div>
           </div>
 
           <div class="verticalSection" data-steps="2 3">
@@ -982,7 +915,7 @@
           <div class="tvs-toolbar">
             <div class="tvs-page-head">
               <h2 class="sectionTitle">Settings</h2>
-              <span class="tvs-secondary">Plugin-wide defaults for every station. Encoding can be overridden per station; everything else applies everywhere.</span>
+              <span class="tvs-secondary">Plugin-wide defaults for every station. Encoding, the logo bug and the "Up next" card can be overridden per station; everything else applies everywhere.</span>
             </div>
             <button is="emby-button" type="button" id="tvsBtnSettingsBack" class="raised emby-button"><span>Back to list</span></button>
           </div>
@@ -992,6 +925,23 @@
             <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">tune</span>Default encoding</h3>
             <div class="fieldDescription">Every program on every station is normalized to this profile so the stream never changes format mid-air. Stations can override it individually.</div>
             <div id="tvsSettingsEncoding"></div>
+          </div>
+
+          <div class="verticalSection tvs-section">
+            <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">branding_watermark</span>Logo bug and "Up next" card</h3>
+            <div class="fieldDescription">What every station draws over its programs unless it sets its own on the Logo step of its editor. Both are burned into the stream by the plugin's ffmpeg and cost some encoder CPU for the whole program; give them different corners. Changing these restarts the streams of the stations that follow them.</div>
+            <h4 class="tvs-subtitle">Logo bug</h4>
+            <div id="tvsSettingsOverlay"></div>
+            <div class="tvs-inline tvs-override-row">
+              <span id="tvsOverlayOwnCount" class="tvs-secondary"></span>
+              <button is="emby-button" type="button" id="tvsBtnOverlayAll" class="raised emby-button tvs-inline-btn tvs-hidden" title="Drop every station's own logo bug so all of them follow this default"><span>Use on every station</span></button>
+            </div>
+            <h4 class="tvs-subtitle">"Up next" card</h4>
+            <div id="tvsSettingsUpNext"></div>
+            <div class="tvs-inline tvs-override-row">
+              <span id="tvsUpNextOwnCount" class="tvs-secondary"></span>
+              <button is="emby-button" type="button" id="tvsBtnUpNextAll" class="raised emby-button tvs-inline-btn tvs-hidden" title="Drop every station's own card so all of them follow this default"><span>Use on every station</span></button>
+            </div>
           </div>
 
           <div class="verticalSection tvs-section">

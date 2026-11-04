@@ -146,9 +146,9 @@ public class StationTemplatesTests
         Assert.True(s.Bumpers.PreRoll.Enabled);
         Assert.True(s.Bumpers.Weather.Enabled);
 
-        Assert.True(s.LogoOverlay.Enabled);
+        Assert.True(s.LogoOverlay!.Enabled);
         Assert.Equal(LogoCorner.BottomLeft, s.LogoOverlay.Corner);
-        Assert.True(s.UpNextCard.Enabled);
+        Assert.True(s.UpNextCard!.Enabled);
         Assert.Equal(new[] { 600, 60 }, s.UpNextCard.LeadTimesSeconds);
         Assert.Equal("Back soon", s.CardText);
         Assert.False(s.AutoRecompileNightly);
@@ -217,8 +217,8 @@ public class StationTemplatesTests
         Assert.True(station.Bumpers.PreRoll.Enabled);
         Assert.True(station.Bumpers.Weather.Enabled);
         Assert.NotSame(t.Settings.Bumpers, station.Bumpers);
-        Assert.Equal(LogoCorner.BottomLeft, station.LogoOverlay.Corner);
-        Assert.Equal(new[] { 600, 60 }, station.UpNextCard.LeadTimesSeconds);
+        Assert.Equal(LogoCorner.BottomLeft, station.LogoOverlay!.Corner);
+        Assert.Equal(new[] { 600, 60 }, station.UpNextCard!.LeadTimesSeconds);
         Assert.Equal("hevc_qsv", station.Encoding?.VideoEncoder);
         Assert.True(station.PaddingByLength);
         Assert.Equal(30, station.PaddingGridMinutes);
@@ -240,6 +240,9 @@ public class StationTemplatesTests
 
         Assert.Equal("G", Assert.Single(station.Pool.DaypartRules).MaxRating);
         Assert.False(station.Bumpers.Enabled);
+        // A template without its own bug or card leaves the station on the plugin-wide defaults.
+        Assert.Null(station.LogoOverlay);
+        Assert.Null(station.UpNextCard);
     }
 
     [Fact]

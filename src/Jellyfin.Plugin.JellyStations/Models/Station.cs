@@ -15,11 +15,23 @@ public sealed class Station
 
     public string? LogoFileName { get; set; }
 
-    /// <summary>Optional logo bug drawn over programs. Off by default.</summary>
-    public LogoOverlayConfig LogoOverlay { get; set; } = new();
+    /// <summary>
+    /// The station's own logo bug; null uses the plugin-wide default from Settings (<see cref="GlobalSettings.LogoOverlay"/>).
+    /// Files written before <see cref="FormatVersion"/> 2 always carried one, off unless the person turned it on;
+    /// <see cref="Storage.StationUpgrades"/> turns the ones that were off into "use the default".
+    /// </summary>
+    public LogoOverlayConfig? LogoOverlay { get; set; }
 
-    /// <summary>Optional "Up next" card drawn over the end of each program. Off by default.</summary>
-    public UpNextCardConfig UpNextCard { get; set; } = new();
+    /// <summary>The station's own "Up next" card; null uses the plugin-wide default from Settings (<see cref="GlobalSettings.UpNextCard"/>).</summary>
+    public UpNextCardConfig? UpNextCard { get; set; }
+
+    /// <summary>
+    /// Shape of this station's JSON, so a file written by an older version can be brought up to date once
+    /// (<see cref="Storage.StationUpgrades"/>). 0 (absent) is anything before 1.26.0.0.
+    /// </summary>
+    public int FormatVersion { get; set; }
+
+    public const int CurrentFormatVersion = 2;
 
     /// <summary>IANA or Windows time zone id used for slot times.</summary>
     public string TimeZoneId { get; set; } = "UTC";

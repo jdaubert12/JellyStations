@@ -96,8 +96,8 @@ public static class StationTemplates
         var look = JsonFileStore.Clone(template.Settings ?? new Station());
         StripContent(look);
         station.Bumpers = look.Bumpers ?? new BumperConfig();
-        station.LogoOverlay = look.LogoOverlay ?? new LogoOverlayConfig();
-        station.UpNextCard = look.UpNextCard ?? new UpNextCardConfig();
+        station.LogoOverlay = look.LogoOverlay;
+        station.UpNextCard = look.UpNextCard;
         station.Encoding = look.Encoding;
         station.PaddingByLength = look.PaddingByLength;
         station.PaddingGridMinutes = look.PaddingGridMinutes;

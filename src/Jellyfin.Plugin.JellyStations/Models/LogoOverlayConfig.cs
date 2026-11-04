@@ -1,5 +1,12 @@
 namespace Jellyfin.Plugin.JellyStations.Models;
 
+/// <summary>The two overlays a station can set for itself or take from the plugin-wide defaults.</summary>
+public enum OverlayKind
+{
+    LogoOverlay,
+    UpNextCard
+}
+
 /// <summary>Corner of the picture a logo overlay sits in.</summary>
 public enum LogoCorner
 {

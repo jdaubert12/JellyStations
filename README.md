@@ -74,7 +74,9 @@ them; only the logo is this station's own. Like a clip, weather in a break is no
 
 A station **logo** appears in the guide and on station cards. It can also be drawn over the video as a
 corner bug, with a choice of corner, size and opacity. That is off by default because the overlay
-filter costs encoder CPU.
+filter costs encoder CPU. The bug is set once for every station under Settings; a station that
+wants something else (or nothing) ticks **Set the logo bug for this station** on its Logo step, and
+the editor says what the plugin-wide default currently is.
 
 ### "Up next" card
 
@@ -89,7 +91,9 @@ the client's HLS delay, and no client support is needed; it cannot be dismissed.
 station breaks are skipped when choosing what to announce, programs too short to carry the card do
 without it, and a card that ffmpeg cannot draw is dropped for the session with a note on the station
 row. Off by default: like the logo it costs encoder CPU for the whole program, and the two should sit
-in different corners.
+in different corners. Like the logo bug, the card is set once for every station under Settings and a
+station overrides it with **Set the "Up next" card for this station**; **Use on every station** in
+Settings drops every station's own card (or bug) so all of them follow the default again.
 
 ### Content sources and filters
 
@@ -599,6 +603,13 @@ by title, genre, rating or library.
     where a client tuning in mid-program starts. libx264 and VA-API get forced key frames; QSV,
     NVENC and AMF set them by GOP alone, since their forced key frames are plain I frames that no
     demuxer treats as a key frame (a client would get audio and no video until the next program).
+- **Logo bug and "Up next" card**: what every station draws over its programs, with the same
+  controls as a station's editor (see [Logo](#logo) and ["Up next" card](#up-next-card)). A station
+  follows these unless it sets its own on its Logo step; the editor says what the default currently
+  is and starts its own from it. Saving a changed default restarts the streams of the stations that
+  follow it. **Use on every station** next to each default drops the stations' own settings so all of
+  them follow it again. Stations from before 1.26.0.0 that had the bug or card off now follow the
+  default (which starts off, so nothing changes on the air); those that had it on keep their own.
 - **Linger**: seconds the encoder keeps running after the last viewer leaves (quick re-tunes
   reuse it).
 - **Stop an unwatched stream after**: seconds a station may run with nobody reading it before

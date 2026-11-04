@@ -38,6 +38,10 @@ public sealed class SettingsController : ControllerBase
     public ActionResult<GlobalSettings> Put([FromBody] GlobalSettings settings)
     {
         settings.DefaultEncoding ??= new EncodingProfile();
+        settings.LogoOverlay ??= new LogoOverlayConfig();
+        settings.LogoOverlay.Normalize();
+        settings.UpNextCard ??= new UpNextCardConfig();
+        settings.UpNextCard.Normalize();
         var errors = StationService.ValidateEncoding(settings.DefaultEncoding);
         if (settings.LingerSeconds < 0 || settings.LingerSeconds > 600)
         {
@@ -79,6 +83,19 @@ public sealed class SettingsController : ControllerBase
         {
             _sessions.StopAll();
         }
+        else
+        {
+            // A changed default bug or card restarts only the streams that follow it; stations with their own keep going.
+            var logoChanged = !JsonFileStore.SameJson(previous.LogoOverlay, settings.LogoOverlay);
+            var cardChanged = !JsonFileStore.SameJson(previous.UpNextCard, settings.UpNextCard);
+            foreach (var station in _stations.GetAll())
+            {
+                if ((logoChanged && station.LogoOverlay is null) || (cardChanged && station.UpNextCard is null))
+                {
+                    _sessions.StopStation(station.Id);
+                }
+            }
+        }
 
         if (!previous.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).SequenceEqual(settings.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
         {
@@ -86,6 +103,21 @@ public sealed class SettingsController : ControllerBase
         }
 
         return Ok(settings);
+    }
+
+    /// <summary>
+    /// Drops every station's own logo bug (kind = LogoOverlay) or "Up next" card (kind = UpNextCard) so all
+    /// stations follow the plugin-wide default. Returns how many stations changed.
+    /// </summary>
+    [HttpPost("ClearOverrides/{kind}")]
+    public ActionResult<ClearOverridesResultDto> ClearOverrides(OverlayKind kind)
+    {
+        if (!Enum.IsDefined(kind))
+        {
+            return BadRequest(new ValidationErrorDto { Errors = new List<string> { "Unknown overlay kind." } });
+        }
+
+        return Ok(new ClearOverridesResultDto { Changed = _stations.ClearOverlayOverrides(kind) });
     }
 }
 

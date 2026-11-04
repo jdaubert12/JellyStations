@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Jellyfin.Plugin.JellyStations.Models;
+using Jellyfin.Plugin.JellyStations.Storage;
 
 namespace Jellyfin.Plugin.JellyStations.Library;
 
@@ -55,8 +56,30 @@ public sealed class StationExportDocument
         return stripped;
     }
 
-    /// <summary>Parses either shape; null when the JSON is neither an array nor an object.</summary>
+    /// <summary>
+    /// Parses either shape; null when the JSON is neither an array nor an object. Stations and templates written
+    /// by an older version are brought up to date (<see cref="StationUpgrades"/>).
+    /// </summary>
     public static StationExportDocument? Parse(JsonElement json, JsonSerializerOptions options)
+    {
+        var doc = ParseShape(json, options);
+        if (doc is not null)
+        {
+            foreach (var station in doc.Stations)
+            {
+                StationUpgrades.Apply(station);
+            }
+
+            foreach (var template in doc.StationTemplates)
+            {
+                StationUpgrades.Apply(template);
+            }
+        }
+
+        return doc;
+    }
+
+    private static StationExportDocument? ParseShape(JsonElement json, JsonSerializerOptions options)
     {
         if (json.ValueKind == JsonValueKind.Array)
         {
