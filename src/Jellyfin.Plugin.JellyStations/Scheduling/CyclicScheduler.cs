@@ -111,7 +111,15 @@ internal sealed class CyclicScheduler : IStationScheduler
         while (current.StartUtc < toUtc)
         {
             yield return current;
-            current = Next(current);
+            var next = Next(current);
+            if (next.EndUtc <= current.EndUtc)
+            {
+                // The timeline must move forward. A layout fault that does not would repeat one entry without end,
+                // and every caller keeps what it is given: stop short rather than take the server down.
+                yield break;
+            }
+
+            current = next;
         }
     }
 
@@ -252,13 +260,7 @@ internal sealed class CyclicScheduler : IStationScheduler
         }
 
         var order = runs.SelectMany(r => r).ToArray();
-        var starts = new long[order.Length];
-        long acc = 0;
-        for (var i = 0; i < order.Length; i++)
-        {
-            starts[i] = acc;
-            acc += _padded[order[i]];
-        }
+        var starts = StartsOf(order);
 
         Dictionary<Guid, int>? offsets = null;
         if (_snapshot is not null && _order == PlayOrder.ShuffleEpisodesInOrder && _input.Mode == ScheduleMode.Pool && (fromSnapshot || previous is not null))
@@ -268,10 +270,31 @@ internal sealed class CyclicScheduler : IStationScheduler
             // air and take the episodes before that point.
             var offsetsIn = previous?.EpisodeOffsets ?? EpisodeOrder.OffsetsFrom(_snapshot, _items);
             offsets = EpisodeOrder.Resume(order, _items, starts, offsetsIn, fromSnapshot ? _takenTicks - cycleStart : long.MinValue);
+
+            // Resume moved episodes between the positions their series holds, and episodes differ in length: the
+            // slot times have to be those of the order that airs. Left as laid out before the move, a shorter
+            // episode in a longer one's slot ended before the next slot began, and the instant in between resolved
+            // to an entry of no length that an enumeration never got past (it filled memory until the server was
+            // killed, 1.25.0.0 to 1.26.1.0). The cycle's length does not change: it holds the same items.
+            starts = StartsOf(order);
         }
 
         var gated = _rules.Count > 0 ? DaypartGate.Flags(order, _items, cycleStart, _padded, _tz, _rules) : null;
         return new Cycle(order, starts, gated, offsets);
+    }
+
+    /// <summary>Offset of each position's slot from the start of the cycle, for the items in the order given.</summary>
+    private long[] StartsOf(int[] order)
+    {
+        var starts = new long[order.Length];
+        long acc = 0;
+        for (var i = 0; i < order.Length; i++)
+        {
+            starts[i] = acc;
+            acc += _padded[order[i]];
+        }
+
+        return starts;
     }
 
     /// <summary>True when cycle k is the snapshot's cycle being built fresh: the seam and the cooldown read the snapshot.</summary>

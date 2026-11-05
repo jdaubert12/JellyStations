@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.26.1.0"
+$version = "1.26.2.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Square pixels on every program. A source with non-square pixels (DVD rips, 720x480 or 720x576 shown as 4:3 or 16:9) was fitted by its stored size and its pixel shape was passed into the channel's stream, so the picture came out the wrong width, the shape changed from program to program, and Jellyfin's cached probe could announce the whole channel as anamorphic; some players (seen with Moonfin on tvOS) then showed the picture squeezed. The picture is now fitted by its display aspect ratio and every program leaves as the same square-pixel frame. Each station gets a new stream id once, so Jellyfin probes it afresh instead of serving the old anamorphic description (the first tune-in after the update takes about 3 seconds longer). When the encoder produces no data within 20 seconds of a tune-in, the server log now carries a warning that names the file and ffmpeg's last lines."
+    changelog = "Fixes a server crash loop. On a pool station that plays episodes in order, anything that started a new revision (saving a changed station, a recompile that found new content, Reshuffle) continued each series from its next episode but kept the slot times of the order before that move. Episodes of different lengths then left an instant no program covered, the schedule repeated one empty entry without end, and reading it (the guide refresh, the air log's minute tick) used up the server's memory until Jellyfin was killed and restarted, over and over (1.25.0.0 to 1.26.1.0). The slot times now follow the order that airs, and a schedule that does not move forward stops instead of repeating. Affected stations get a correct timeline on the first start with this version; nothing needs to be edited."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

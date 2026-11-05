@@ -188,4 +188,49 @@ public class HistoryContinuityTests
 
         Assert.True(sw.Elapsed < TimeSpan.FromSeconds(8), "50 chained cycles of 2000 items took " + sw.Elapsed);
     }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(3, 5)]
+    public void EpisodesInOrder_OfDifferentLengths_LeaveNoHoleInTheTimeline(int marathonMin, int marathonMax)
+    {
+        // Continuing a series rotates its episodes within the positions it holds. With episodes of different
+        // lengths (any real library) the slot times have to follow the rotated order: laid out before it, a short
+        // episode in a long episode's slot left an instant no entry covered, which the walk below never got past
+        // (and a schedule enumeration filled memory on until the server died).
+        var pool = new List<PlayableItem>();
+        foreach (var name in new[] { "Bluey", "Frasier", "Seinfeld" })
+        {
+            var run = Items.SeriesRun(name, 10, 20);
+            for (var i = 0; i < run.Count; i++)
+            {
+                run[i].RuntimeTicks += TimeSpan.FromSeconds((i * 37) % 300).Ticks;
+            }
+
+            pool.AddRange(run);
+        }
+
+        ScheduleInput Station(int revision, AirHistorySnapshot? history)
+        {
+            var station = Items.PoolStation(pool, PlayOrder.ShuffleEpisodesInOrder, grid: 0, revision: revision, avoid: true);
+            station.Pool.MarathonMin = marathonMin;
+            station.Pool.MarathonMax = marathonMax;
+            return ScheduleInput.From(station, new CompiledStation { StationId = station.Id, Revision = revision, Pool = pool, History = history });
+        }
+
+        var taken = Items.Anchor.AddDays(2).AddHours(7).AddMinutes(10);
+        var (_, snapshot) = Aired(Station(1, null), pool, taken);
+        var rev2 = Station(2, snapshot);
+
+        var t = taken;
+        var end = taken.AddDays(3);
+        var steps = 0;
+        while (t < end)
+        {
+            var entry = ScheduleResolver.ResolveInput(rev2, t)!.Entry;
+            Assert.True(entry.StartUtc <= t && entry.EndUtc > t, $"no entry covers {t:o}: got {entry.Kind} {entry.StartUtc:o} to {entry.EndUtc:o}");
+            t = entry.EndUtc;
+            Assert.True(++steps < 5000, "the walk does not advance");
+        }
+    }
 }
