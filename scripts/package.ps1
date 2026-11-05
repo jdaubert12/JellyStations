@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.26.2.0"
+$version = "1.27.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Fixes a server crash loop. On a pool station that plays episodes in order, anything that started a new revision (saving a changed station, a recompile that found new content, Reshuffle) continued each series from its next episode but kept the slot times of the order before that move. Episodes of different lengths then left an instant no program covered, the schedule repeated one empty entry without end, and reading it (the guide refresh, the air log's minute tick) used up the server's memory until Jellyfin was killed and restarted, over and over (1.25.0.0 to 1.26.1.0). The slot times now follow the order that airs, and a schedule that does not move forward stops instead of repeating. Affected stations get a correct timeline on the first start with this version; nothing needs to be edited."
+    changelog = "Preview a day on the suggestions page. The clock button on a suggested station opens the next 24 hours it would play, with the time zone and the look and breaks chosen at the top of the page, before anything is created. Changing the time zone or the look rebuilds the open previews. A shuffled channel draws its order again when it is created, so the preview is a sample day and not the exact first one. More suggestion rules: a genre with enough hours in movies and again in episodes becomes two channels (""Comedy Movies"", ""Comedy TV""); Anime and Documentaries channels from every genre and tag that spell the same thing; ""Comfort Reruns"" of the half-hour comedies together; decade channels for shows (""1990s TV""). Suggestions know what is on the air: each shows the hours no enabled channel plays yet, the list leads with the most new hours, a suggestion whose content is all on a channel already is hidden behind ""Show them"", and ""Everything Else"" offers one station of every movie and show no channel plays. ""Almost there"" under the list names what came close (""Horror: 6.5 h, needs 8""). Settings gains ""Station suggestions"" with the amount each kind of channel needs; it replaces the ""Include small channels"" box on the suggestions page. A library of nothing but short clips (a Home Videos library of bumps or idents) is now read, kept out of the library figures, never made a channel, and offered as ""Bumper clips from"" so the stations you create play those clips in their breaks. API: POST Suggestions/Preview, GET Suggestions/Report, BumperLibraryId on Create, Draft and Preview."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

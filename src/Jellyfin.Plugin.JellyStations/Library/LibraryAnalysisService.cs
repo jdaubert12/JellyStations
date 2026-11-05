@@ -21,6 +21,7 @@ public sealed class LibraryAnalysisService
     private readonly object _lock = new();
     private LibraryAnalysisDto? _cached;
     private IReadOnlyList<LibraryFact>? _facts;
+    private IReadOnlyList<CollectionFact>? _collections;
 
     public LibraryAnalysisService(ILibraryManager libraryManager, LibraryContentResolver resolver, ILogger<LibraryAnalysisService> logger)
     {
@@ -39,10 +40,12 @@ public sealed class LibraryAnalysisService
             }
 
             var started = DateTime.UtcNow;
-            var facts = CollectFacts();
+            var others = new List<LibraryFact>();
+            var facts = CollectFacts(others);
             var collections = CollectCollections();
             _facts = facts;
-            _cached = LibraryAnalyzer.Analyze(facts, collections, DateTime.UtcNow);
+            _collections = collections;
+            _cached = LibraryAnalyzer.Analyze(facts, collections, DateTime.UtcNow, others);
             _logger.LogInformation(
                 "JellyStations: analyzed library: {Movies} movie(s), {Episodes} episode(s) in {Series} series, {Collections} collection(s) in {Ms} ms",
                 _cached.Totals.Movies,
@@ -68,17 +71,32 @@ public sealed class LibraryAnalysisService
         }
     }
 
+    /// <summary>The box sets behind the analysis and what each holds, collected with it and cached for as long.</summary>
+    public IReadOnlyList<CollectionFact> Collections()
+    {
+        lock (_lock)
+        {
+            Facts();
+            return _collections ?? Array.Empty<CollectionFact>();
+        }
+    }
+
     public void Invalidate()
     {
         lock (_lock)
         {
             _cached = null;
             _facts = null;
+            _collections = null;
         }
     }
 
-    /// <summary>Movies and episodes per library, with episode genre/tag/rating inherited from the series when missing.</summary>
-    private List<LibraryFact> CollectFacts()
+    /// <summary>
+    /// Movies and episodes per library, with episode genre/tag/rating inherited from the series when missing. Plain
+    /// videos (a "Home videos" library, a folder of bumps) go to <paramref name="others"/>: they are not programs,
+    /// but the analysis counts them to recognise a clip library.
+    /// </summary>
+    private List<LibraryFact> CollectFacts(List<LibraryFact> others)
     {
         var facts = new List<LibraryFact>();
         var seen = new HashSet<Guid>();
@@ -108,7 +126,7 @@ public sealed class LibraryAnalysisService
             {
                 items = _libraryManager.GetItemList(new InternalItemsQuery
                 {
-                    IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Episode },
+                    IncludeItemTypes = new[] { BaseItemKind.Movie, BaseItemKind.Episode, BaseItemKind.Video },
                     ParentId = libraryId,
                     IsVirtualItem = false,
                     Recursive = true,
@@ -176,7 +194,7 @@ public sealed class LibraryAnalysisService
                     }
                 }
 
-                facts.Add(fact);
+                (video is Movie or Episode ? facts : others).Add(fact);
             }
         }
 

@@ -4,7 +4,7 @@ Working plan for scheduling and curation features. Phase 1 is the agreed next th
 Later phases are candidates, roughly ordered by payoff per effort; reorder freely.
 Phase 7 (smarter stations: embeddings, watch history, optional local model) is the current plan; step 2a, the air log with series continuity and the seam at a revision bump, was built 2026-11-02 as 1.25.0.0 from the design in `docs/HISTORY-SCHEDULING.md` (local note, not in the repo; the recency weighting it first proposed stays cut).
 Phase 8 (weather channel) steps 1-6 shipped in 1.14.0.0 (2026-10-23); radar 1.18.0.0 and forecast radar 1.19.0.0 (2026-10-26); step 7: alerts screen (NWS), title cards, music levelling (loudnorm), weather time blocks (with block repeats) and weather in the breaks on ordinary stations built 2026-10-27 as 1.20.0.0; almanac still open.
-Phase 9 (better suggestions and channel templates, planned 2026-10-27) is in progress: B1 station templates built 2026-10-28 as 1.21.0.0; A1 (finish what gets created) built 2026-11-01 as 1.24.0.0; A2 (preview a day) is next.
+Phase 9 (better suggestions and channel templates, planned 2026-10-27) is in progress: B1 station templates built 2026-10-28 as 1.21.0.0; A1 (finish what gets created) built 2026-11-01 as 1.24.0.0; A2 (preview a day), A3 (smarter rules), A4 (coverage aware) and A5 (near misses and thresholds) built 2026-11-05 as 1.27.0.0; B2 (built-in block templates) is next. A6 waits on Phase 7.
 Feature survey of the other projects' trackers and communities, 2026-11-02, with a ranked list of candidates not yet planned: `docs/FEATURE-SURVEY-2026-11.md` (local note, not in the repo).
 
 Conventions for every step:
@@ -644,24 +644,57 @@ draft goes through `StationTemplates.ApplyTo` to pick up a look and its breaks.
    unsaved station with the options applied; the pencil on each row opens it in the editor with
    the logo drawn in the browser as a pending upload. There is no global bumper-source setting, so
    bumpers come from the template (its clips are part of the look) rather than from a clip library.
-2. **Preview a day.** `POST /JellyStations/Schedule/Preview` already takes a station body, so each
-   suggestion row can expand to its next 24 hours before anyone commits. Small.
-3. **Smarter rules.** Done so far (2026-10-30): franchises from the provider's collection name
-   (see Phase 3), and a "Classic Movies" station (`era:classics`) for every movie made before 1970
-   when they total 8 h, since the decade rule needs 8 h per decade and old films rarely manage it
-   one decade at a time (`SuggestionThresholds.ClassicsMinHours` / `ClassicsBeforeYear`). Still
-   open: split a genre into movies and TV when both clear the threshold; group several
-   mid-size sitcoms into one "Comfort reruns" station instead of one channel per show or nothing;
-   decade channels for TV; a documentary channel; an anime channel from the genre or tag; a studio
-   or network channel once the analyzer collects studios (Phase 7 step 4 adds the source kind);
-   flag items under a few minutes as bumper candidates and suggest a bumper source rather than a
-   station. Each rule is a pure function with tests. Small-medium.
-4. **Coverage aware.** Rank and badge suggestions by the hours no enabled station already plays
-   (reuse `LibraryCoverage`), hide ones whose content is fully covered instead of only matching on
-   the name, and offer a "Not on a channel" leftovers station. Small.
-5. **Near misses and thresholds.** Show "Horror: 6.5 h, needs 8" under the list, and put the
-   per-rule thresholds (`SuggestionThresholds`) in Settings in place of the single small-library
-   toggle. Small.
+2. **Preview a day — DONE 2026-11-05 (1.27.0.0).** `POST Suggestions/Preview` (`Key` plus the same
+   options as Draft, `hours` in the query) runs `StationSuggestionService.Draft` through
+   `StationService.Preview`, so the template's breaks and the time zone are in the result. The clock
+   button on a suggestion row opens the next 24 hours under it (`toggleSuggestionPreview`, the
+   editor's `renderSchedule` without the "On air" mark); changing the time zone or the look rebuilds
+   the open ones. The shuffle seed is the station id, which a suggestion only gets at Create, so the
+   panel says it is a sample day; a stable id per key would make repeat previews identical but still
+   not match the created station.
+3. **Smarter rules — DONE 2026-11-05 (1.27.0.0)**, bar the studio channel. Earlier (2026-10-30):
+   franchises from the provider's collection name (see Phase 3), and a "Classic Movies" station
+   (`era:classics`) for every movie made before 1970 when they total 8 h, since the decade rule
+   needs 8 h per decade and old films rarely manage it one decade at a time. Added in
+   `StationSuggester.Build`, each a pure rule with tests (`SuggestionRulesTests`):
+   - a genre splits into `genre-movies:X` ("X Movies") and `genre-tv:X` ("X TV") when its movie
+     hours and its episode hours each clear `GenreMinHours`; otherwise the one `genre:X` as before;
+   - themes (`theme:anime`, `theme:documentary`) from the `Themes` table of genre and tag
+     aliases. A theme fires only with a tag or with two or more genres behind it (a lone genre is
+     the genre rule's job), counts the largest single alias as its hours (items carry several) and
+     takes its genres away from the genre rule;
+   - `comfort-reruns` ("Comfort Reruns"): series that pass `IsComfortRerun` (Comedy or Sitcom, at
+     least 5 episodes averaging 35 minutes or less, not rated for small children), when there are
+     `ComfortMinSeries` of them with `ComfortMinHours` between them;
+   - `decade-tv:<decade>` ("1990s TV") from `SeriesStatDto.Year`, two or more shows and
+     `DecadeMinHours`;
+   - clip libraries: `LibraryAnalysisService` now also reads plain `Video` items (what a Home
+     Videos library holds), and `LibraryAnalyzer` flags a library as a clip library when it has no
+     episodes, at least 3 items and 80 % of them 3 minutes or under. Such a library is left out of
+     every other aggregate, is never a station source, and is offered on the page as "Bumper clips
+     from" (`SuggestionOptionsDto.BumperLibraryId` → `StationSuggestionService.UseBumpers`, which
+     gives a station with no break and no padding a 2-minute break).
+   Still open: a studio or network channel, once the analyzer collects studios (Phase 7 step 4
+   adds the source kind).
+4. **Coverage aware — DONE 2026-11-05 (1.27.0.0).** `SuggestionCoverage` (Library) resolves each
+   suggested station's sources against the cached facts (`FactIndex.ItemsOf`: library, genre, tag,
+   series, box set and single-item sources with the kind, rating, year and season filters and the
+   excluded tags; playlists match nothing) and compares them with `StationService.ItemsOnChannels`
+   (the compiled `PlayedItems` of the enabled stations, the same set the coverage report uses).
+   Each suggestion gets exact `Hours`, `NewHours` and `Covered`; with at least one channel each
+   category is ordered by new hours, the page badges "x h new" and hides covered ones behind a
+   "Show them" link. `Leftovers` builds the `leftovers` station ("Everything Else", category "Not
+   on a channel"): hand-picked movie sources plus whole series with any episode off the air, when
+   they total `LeftoversMinHours`. It resolves from facts, not by compiling each suggestion, so
+   the report stays cheap; a station whose filters the index does not model would read slightly
+   off, which the tests pin for the kinds the suggester emits.
+5. **Near misses and thresholds — DONE 2026-11-05 (1.27.0.0).** `SuggestionThresholds` moved to
+   Models and lives in `GlobalSettings.Suggestions` (thirteen values, `Normalize()` clamps them on
+   save); Settings has a "Station suggestions" section and the "Include small channels" box is
+   gone (`minHours` / `minEpisodes` remain as query overrides). `StationSuggester.Build` returns
+   `NearMisses` for every rule that reached half of what it needs (`NearMissShare`), closest
+   first, at most 20; `GET Suggestions/Report` carries them with the clip libraries and the
+   thresholds in force, and the page lists them under "Almost there" with a link to Settings.
 6. **Theme channels and household weighting** are Phase 7 steps 1 and 2 (embeddings, watch
    history); larger, and after the above.
 

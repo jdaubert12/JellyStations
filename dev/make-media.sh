@@ -37,3 +37,11 @@ mkdir -p "$M/movies/Ident A (2024)" "$M/movies/Ident B (2024)" "$M/movies/Outro 
 gen "movies/Ident A (2024)/Ident A (2024).mp4" 10 640x360 880
 gen "movies/Ident B (2024)/Ident B (2024).mp4" 15 640x360 988
 gen "movies/Outro A (2024)/Outro A (2024).mp4" 20 640x360 1047
+
+# A folder of bumps on its own, added as a "Home videos" library named Bumps: plain videos, which the library
+# analysis recognises as a clip library and the suggestions offer as a bumper source.
+mkdir -p "$M/bumps"
+gen "bumps/Station ident 1.mp4" 8 640x360 660
+gen "bumps/Station ident 2.mp4" 12 640x360 740
+gen "bumps/Coming up next.mp4" 20 640x360 830
+gen "bumps/We will be right back.mp4" 30 640x360 932

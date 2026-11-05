@@ -55,6 +55,31 @@ public sealed class StationService
 
     public CompiledStation? GetCompiled(Guid id) => _compiled.Get(id);
 
+    /// <summary>
+    /// The movies, episodes and clips some station plays, from the compiled content of every enabled station (every
+    /// station with <paramref name="includeDisabled"/>), and how many stations were counted.
+    /// </summary>
+    public (HashSet<Guid> Items, int Channels) ItemsOnChannels(bool includeDisabled = false)
+    {
+        var items = new HashSet<Guid>();
+        var channels = 0;
+        foreach (var station in _stations.GetAll().Where(s => includeDisabled || s.Enabled))
+        {
+            if (_compiled.Get(station.Id) is not { } compiled)
+            {
+                continue;
+            }
+
+            channels++;
+            foreach (var item in compiled.PlayedItems)
+            {
+                items.Add(item.ItemId);
+            }
+        }
+
+        return (items, channels);
+    }
+
     public EncodingProfile EffectiveProfile(Station station) => station.Encoding ?? _settings.Get().DefaultEncoding;
 
     /// <summary>The logo bug the station draws: its own, or the plugin-wide default.</summary>

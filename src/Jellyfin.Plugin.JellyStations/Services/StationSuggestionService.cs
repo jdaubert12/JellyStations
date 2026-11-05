@@ -2,6 +2,7 @@ using System.Globalization;
 using Jellyfin.Plugin.JellyStations.Api.Dto;
 using Jellyfin.Plugin.JellyStations.Library;
 using Jellyfin.Plugin.JellyStations.Models;
+using Jellyfin.Plugin.JellyStations.Scheduling;
 using Jellyfin.Plugin.JellyStations.Storage;
 using Jellyfin.Plugin.JellyStations.Weather.Screens;
 using Microsoft.Extensions.Logging;
@@ -28,15 +29,49 @@ public sealed class StationSuggestionService
         _logger = logger;
     }
 
+    /// <summary>Every suggestion, the ones the channels already cover included (see <see cref="StationSuggestionDto.Covered"/>).</summary>
     public List<StationSuggestionDto> List(bool refresh = false, double? minHours = null, int? minEpisodes = null)
+        => Report(refresh, minHours, minEpisodes).Suggestions;
+
+    /// <summary>
+    /// The rules run over the library with the thresholds from Settings, set against what the enabled stations
+    /// already play: each suggestion's new hours, the fully covered ones flagged, the "Everything Else" station for
+    /// what no channel plays, the rules that fell just short, and the clip libraries to offer as bumpers.
+    /// </summary>
+    public SuggestionReportDto Report(bool refresh = false, double? minHours = null, int? minEpisodes = null)
     {
-        return StationSuggester.Suggest(_analysis.Get(refresh), _stations.GetAll().Select(s => s.Name), Thresholds(minHours, minEpisodes));
+        var analysis = _analysis.Get(refresh);
+        var facts = _analysis.Facts();
+        var settings = _settings.Get();
+        var thresholds = Thresholds(settings.Suggestions, minHours, minEpisodes);
+        var names = _stations.GetAll().Select(s => s.Name).ToList();
+        var set = StationSuggester.Build(analysis, names, thresholds);
+        var (onChannels, channels) = _service.ItemsOnChannels();
+        SuggestionCoverage.Apply(set.Suggestions, new FactIndex(facts, _analysis.Collections()), onChannels, settings.ExcludedTags);
+        var leftovers = SuggestionCoverage.Leftovers(facts, LibraryAnalyzer.ClipLibraryIds(analysis.Libraries), onChannels, channels, thresholds.LeftoversMinHours, names, settings.ExcludedTags);
+        if (leftovers is not null)
+        {
+            set.Suggestions.Add(leftovers);
+        }
+
+        return new SuggestionReportDto
+        {
+            Suggestions = set.Suggestions,
+            NearMisses = set.NearMisses,
+            ClipLibraries = analysis.Libraries.Where(l => l.ClipLibrary).ToList(),
+            Thresholds = thresholds,
+            Channels = channels
+        };
     }
 
-    /// <summary>Default thresholds, or lowered ones for a small library (minHours applies to every hours rule).</summary>
-    public static SuggestionThresholds Thresholds(double? minHours, int? minEpisodes)
+    /// <summary>
+    /// The thresholds from Settings, or lowered ones when a caller asks (minHours applies to every hours rule,
+    /// minEpisodes to the episodes a series needs).
+    /// </summary>
+    public static SuggestionThresholds Thresholds(SuggestionThresholds? saved, double? minHours, int? minEpisodes)
     {
-        var t = new SuggestionThresholds();
+        var t = JsonFileStore.Clone(saved ?? new SuggestionThresholds());
+        t.Normalize();
         if (minHours is > 0)
         {
             var h = Math.Max(0.01, minHours.Value);
@@ -45,6 +80,8 @@ public sealed class StationSuggestionService
             t.FamilyMoviesMinHours = h;
             t.DecadeMinHours = h;
             t.ClassicsMinHours = h;
+            t.ComfortMinHours = h;
+            t.LeftoversMinHours = Math.Min(t.LeftoversMinHours, h);
             t.SeasonalMinHours = Math.Min(t.SeasonalMinHours, h);
         }
 
@@ -70,8 +107,20 @@ public sealed class StationSuggestionService
 
         var existing = _stations.GetAll();
         var used = UsedNumbers(existing);
-        var draft = Prepare(suggestion.Station, NextFree(request.FirstChannelNumber ?? NextChannelNumber(existing), used), TimeZone(request.TimeZoneId, existing), Template(request.TemplateId));
+        var draft = Prepare(suggestion.Station, NextFree(request.FirstChannelNumber ?? NextChannelNumber(existing), used), TimeZone(request.TimeZoneId, existing), Template(request.TemplateId), BumperSource(request.BumperLibraryId));
         return draft;
+    }
+
+    /// <summary>
+    /// What one suggestion would air between two instants if it were created now with the same options. Nothing is
+    /// saved. Null when there is no such suggestion. A shuffle is seeded by the station id, which a suggestion only
+    /// gets when it is created, so this is a sample of the channel (its mix, lengths and breaks) and not the exact
+    /// order of its first day.
+    /// </summary>
+    public IReadOnlyList<ScheduleEntry>? Preview(SuggestionDraftRequestDto request, DateTime fromUtc, DateTime toUtc)
+    {
+        var draft = Draft(request);
+        return draft is null ? null : _service.Preview(draft, fromUtc, toUtc);
     }
 
     /// <summary>
@@ -92,6 +141,12 @@ public sealed class StationSuggestionService
             result.Errors.Add("No station template has the id " + id.ToString("N") + "; the stations were created plain.");
         }
 
+        var bumpers = BumperSource(request.BumperLibraryId);
+        if (request.BumperLibraryId is { } lib && lib != Guid.Empty && bumpers is null)
+        {
+            result.Errors.Add("No library has the id " + lib.ToString("N") + "; the stations were created without its clips as bumpers.");
+        }
+
         foreach (var key in (request.Keys ?? new List<string>()).Where(k => !string.IsNullOrWhiteSpace(k)).Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (!suggestions.TryGetValue(key, out var suggestion))
@@ -107,7 +162,7 @@ public sealed class StationSuggestionService
             }
 
             next = NextFree(next, used);
-            var draft = Prepare(suggestion.Station, next, tz, template);
+            var draft = Prepare(suggestion.Station, next, tz, template, bumpers);
             Station created;
             try
             {
@@ -131,8 +186,11 @@ public sealed class StationSuggestionService
         return result;
     }
 
-    /// <summary>The suggester's station with its identity filled in and, with a template, that template's look.</summary>
-    private static Station Prepare(Station suggested, int number, string timeZoneId, StationTemplate? template)
+    /// <summary>
+    /// The suggester's station with its identity filled in, with a template that template's look, and with a
+    /// bumper library its clips in the breaks (see <see cref="UseBumpers"/>).
+    /// </summary>
+    private static Station Prepare(Station suggested, int number, string timeZoneId, StationTemplate? template, ContentSource? bumpers)
     {
         var draft = JsonFileStore.Clone(suggested);
         draft.Id = Guid.Empty;
@@ -144,7 +202,40 @@ public sealed class StationSuggestionService
             StationTemplates.ApplyLook(template, draft);
         }
 
+        if (bumpers is not null)
+        {
+            UseBumpers(draft, bumpers);
+        }
+
         return draft;
+    }
+
+    /// <summary>
+    /// Switches the station's bumpers on with <paramref name="clips"/> as their only source, keeping whatever else
+    /// the look set (break length, clip cap, pre-roll, post-roll, weather). A station that leaves no gap between
+    /// programs (no break, no padding) gets a two-minute break, or the clips would never air.
+    /// </summary>
+    public static void UseBumpers(Station station, ContentSource clips)
+    {
+        station.Bumpers ??= new BumperConfig();
+        station.Bumpers.Enabled = true;
+        station.Bumpers.Sources = new List<ContentSource> { JsonFileStore.Clone(clips) };
+        if (station.Bumpers.BreakMinutes <= 0 && !station.PaddingByLength && station.PaddingGridMinutes <= 0)
+        {
+            station.Bumpers.BreakMinutes = 2;
+        }
+    }
+
+    /// <summary>A Library source for the bumper library asked for, or null when none was asked for or it is not a library.</summary>
+    private ContentSource? BumperSource(Guid? libraryId)
+    {
+        if (libraryId is not { } id || id == Guid.Empty)
+        {
+            return null;
+        }
+
+        var library = _analysis.Get().Libraries.FirstOrDefault(l => l.Id == id);
+        return library is null ? null : new ContentSource { Kind = SourceKind.Library, ItemId = library.Id, DisplayName = library.Name };
     }
 
     /// <summary>Draws the generated card for a created station and stores it as its logo. False when drawing failed.</summary>

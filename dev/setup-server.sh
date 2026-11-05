@@ -58,6 +58,10 @@ if ! echo "$have" | grep -q '"Name":"Shows"'; then
   curl -sf -X POST "$BASE/Library/VirtualFolders?name=Shows&collectionType=tvshows&refreshLibrary=false&paths=%2Fmedia%2Ftv" -H "$H" -H 'Content-Type: application/json' -d "$opts"
   echo "Added Shows library"
 fi
+if ! echo "$have" | grep -q '"Name":"Bumps"'; then
+  curl -sf -X POST "$BASE/Library/VirtualFolders?name=Bumps&collectionType=homevideos&refreshLibrary=false&paths=%2Fmedia%2Fbumps" -H "$H" -H 'Content-Type: application/json' -d "$opts"
+  echo "Added Bumps library"
+fi
 
 curl -sf -X POST "$BASE/Library/Refresh" -H "$H"
 echo "Scanning library..."

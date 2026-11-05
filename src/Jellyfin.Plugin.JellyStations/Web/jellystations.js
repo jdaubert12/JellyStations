@@ -93,6 +93,8 @@
     sourceDefaults: null, // filters the preset applies to every source added to the pool
     settings: null,       // GlobalSettings as last loaded in the settings view
     suggestions: [],
+    suggestReport: null,
+    suggestShowCovered: false,
     blockTemplates: [],
     stationTemplates: [] // saved + built-in, as GET StationTemplates lists them
   };
@@ -2789,7 +2791,9 @@
     });
   }
 
-  function renderSchedule(container, entries, hours) {
+  /** opts.markNow = false leaves out the "On air" row highlight, for a station that does not exist yet. */
+  function renderSchedule(container, entries, hours, opts) {
+    const markNow = !opts || opts.markNow !== false;
     clear(container);
     if (!entries.length) {
       container.appendChild(el('div', { className: 'tvs-info', text: 'Nothing is scheduled in the next ' + hours + ' hours. Check that the station has content.' }));
@@ -2824,7 +2828,7 @@
       if (isBumper) {
         classes.push('bumper');
       }
-      if (start.getTime() <= now && now < end.getTime()) {
+      if (markNow && start.getTime() <= now && now < end.getTime()) {
         classes.push('now');
       }
       const programCell = el('td', null, el('span', { text: entryTitle(e) }));
@@ -3667,41 +3671,57 @@
       look.appendChild(el('option', { value: t.Id, text: t.Name + (t.BuiltIn ? '' : ' (saved)') }));
     });
     look.value = state.stationTemplates.some(t => t.Id === chosen) ? chosen : '';
+    renderSuggestBumpers();
   }
 
-  /** The shared options for Create and Draft: numbering, zone, template, logo and the thresholds the list used. */
+  /** Libraries of short clips become a choice of bumpers for the created stations, with a line saying they were found. */
+  function renderSuggestBumpers() {
+    const clips = (state.suggestReport && state.suggestReport.ClipLibraries) || [];
+    const select = $('#tvsSuggestBumpers');
+    const chosen = select.value || '';
+    clear(select);
+    select.appendChild(el('option', { value: '', text: 'The template\u2019s own (none when plain)' }));
+    clips.forEach(l => select.appendChild(el('option', { value: l.Id, text: l.Name + ' (' + plural(l.Clips, 'clip') + ')' })));
+    select.value = clips.some(l => l.Id === chosen) ? chosen : '';
+    show($('#tvsSuggestBumperWrap'), clips.length > 0);
+    const info = $('#tvsSuggestClips');
+    show(info, clips.length > 0);
+    if (clips.length) {
+      const names = clips.map(l => '\u201c' + l.Name + '\u201d (' + plural(l.Clips, 'clip') + ')').join(', ');
+      info.textContent = (clips.length === 1 ? 'The library ' + names + ' looks like idents and bumps' : 'These libraries look like idents and bumps: ' + names)
+        + ', so no channel is suggested from ' + (clips.length === 1 ? 'it' : 'them') + '. Pick ' + (clips.length === 1 ? 'it' : 'one') + ' under \u201cBumper clips from\u201d to play its clips in the breaks of the stations you create.';
+    }
+  }
+
+  /** The shared options for Create, Draft and Preview: numbering, zone, template, bumper clips and logo. */
   function suggestOptions() {
-    const q = suggestQuery(false);
     const first = parseInt(val('#tvsSuggestFirst'), 10);
     return {
       TimeZoneId: val('#tvsSuggestTimeZone') || guessTimeZone(),
       FirstChannelNumber: !isNaN(first) && first > 0 ? first : null,
       TemplateId: val('#tvsSuggestTemplate') || null,
-      Logo: checked('#tvsSuggestLogo'),
-      MinHours: q.minHours || null,
-      MinEpisodes: q.minEpisodes || null
+      BumperLibraryId: val('#tvsSuggestBumpers') || null,
+      Logo: checked('#tvsSuggestLogo')
     };
   }
 
+  /** The suggestions with what the channels already play counted in, the near misses and the clip libraries. */
   function fetchSuggestions(refresh) {
-    return api('GET', 'Suggestions', null, suggestQuery(refresh)).then(list => {
-      state.suggestions = Array.isArray(list) ? list : [];
+    return api('GET', 'Suggestions/Report', null, refresh ? { refresh: true } : null).then(report => {
+      state.suggestReport = report || {};
+      state.suggestions = Array.isArray(state.suggestReport.Suggestions) ? state.suggestReport.Suggestions : [];
     });
-  }
-
-  /** Query for the suggestions endpoint: optional re-scan and the lowered thresholds for small libraries. */
-  function suggestQuery(refresh) {
-    const q = {};
-    if (refresh) { q.refresh = true; }
-    if (checked('#tvsSuggestSmall')) { q.minHours = 1; q.minEpisodes = 5; }
-    return q;
   }
 
   function renderSuggestions() {
     const box = clear($('#tvsSuggestList'));
     renderErrorBox($('#tvsSuggestError'), null);
-    const list = state.suggestions;
-    show($('#tvsSuggestEmpty'), list.length === 0);
+    const report = state.suggestReport || {};
+    const covered = state.suggestions.filter(s => s.Covered);
+    const list = state.suggestShowCovered ? state.suggestions : state.suggestions.filter(s => !s.Covered);
+    show($('#tvsSuggestEmpty'), state.suggestions.length === 0);
+    renderSuggestCovered(covered.length);
+    renderNearMisses(report.NearMisses || []);
     const categories = [];
     list.forEach(s => {
       if (categories.indexOf(s.Category) < 0) {
@@ -3713,22 +3733,73 @@
       list.filter(s => s.Category === cat).forEach(s => {
         const cb = el('input', { type: 'checkbox', 'data-key': s.Key });
         cb.disabled = !!s.Exists;
+        const preview = el('div', { className: 'tvs-history tvs-suggest-preview', hidden: true });
+        preview._suggestion = s;
         const row = el('div', { className: 'listItem' }, [
           el('label', { className: 'tvs-suggest-pick' }, cb),
           el('div', { className: 'listItemBody two-line' }, [
             el('div', { className: 'listItemBodyText' }, [
               el('span', { text: s.Name }),
               badge(MODE_LABEL[s.Station.Mode] || s.Station.Mode, 'on'),
+              newHoursBadge(s, report.Channels),
               s.Exists ? badge('Already exists', 'off') : null
             ]),
-            el('div', { className: 'listItemBodyText secondary', text: s.Hours + ' h · ' + s.Description })
+            el('div', { className: 'listItemBodyText secondary', text: s.Hours + ' h · ' + s.Description }),
+            preview
           ]),
+          iconButton('schedule', 'Preview a day (what this channel would play in the next 24 hours)', () => toggleSuggestionPreview(s, preview)),
           iconButton('edit', 'Change this station in the editor before creating it', () => editSuggestion(s))
         ]);
         box.appendChild(row);
       });
     });
     updateSuggestCount();
+  }
+
+  /** How much of a suggestion no channel plays yet, said only when some of it already is on one. */
+  function newHoursBadge(s, channels) {
+    if (!channels || s.Exists) {
+      return null;
+    }
+    if (s.Covered) {
+      return badge('Already on your channels', 'off', 'Your enabled stations play everything this one would.');
+    }
+    return s.NewHours < s.Hours
+      ? badge(fmtHours(s.NewHours) + ' new', 'live', fmtHours(s.NewHours) + ' of its ' + fmtHours(s.Hours) + ' is on no channel yet; your enabled stations already play the rest.')
+      : null;
+  }
+
+  /** The line under the list that says how many suggestions are hidden because the channels play all of them. */
+  function renderSuggestCovered(count) {
+    const box = clear($('#tvsSuggestCovered'));
+    show(box, count > 0);
+    if (!count) {
+      return;
+    }
+    box.appendChild(el('span', { text: state.suggestShowCovered
+      ? plural(count, 'suggestion') + ' above ' + (count === 1 ? 'is' : 'are') + ' already played in full by your channels. '
+      : plural(count, 'suggestion') + ' ' + (count === 1 ? 'is' : 'are') + ' hidden because your channels already play everything in ' + (count === 1 ? 'it' : 'them') + '. ' }));
+    box.appendChild(el('button', { type: 'button', className: 'tvs-linkbtn', text: state.suggestShowCovered ? 'Hide them' : 'Show them', onClick: () => {
+      state.suggestShowCovered = !state.suggestShowCovered;
+      renderSuggestions();
+    } }));
+  }
+
+  /** "Horror: 6.5 h, needs 8": the rules that fell short, with the way to Settings where the minimums live. */
+  function renderNearMisses(near) {
+    const box = clear($('#tvsSuggestNear'));
+    show(box, near.length > 0);
+    if (!near.length) {
+      return;
+    }
+    box.appendChild(el('h3', { className: 'sectionTitle', text: 'Almost there' }));
+    box.appendChild(el('div', { className: 'tvs-secondary', text: 'These came close to a channel of their own. Add a little more, or lower what a suggestion needs.' }));
+    box.appendChild(el('ul', null, near.map(n => el('li', { text: n.Name + ': ' + nearAmount(n.Have, n.Unit) + ', needs ' + n.Need }))));
+    box.appendChild(textButton('Change what a suggestion needs', openSettings));
+  }
+
+  function nearAmount(value, unit) {
+    return unit === 'h' ? fmtHours(value) : value + ' ' + unit;
   }
 
   function selectedSuggestionKeys() {
@@ -3761,6 +3832,46 @@
         renderErrorBox($('#tvsSuggestError'), notes.length ? notes : null);
       });
     }));
+  }
+
+  /** Expands a suggestion row to the next 24 hours it would play with the options above; nothing is created. */
+  function toggleSuggestionPreview(s, panel) {
+    if (!panel.hidden) {
+      panel.hidden = true;
+      panel._request = null; // a reply still on its way is dropped
+      return;
+    }
+    panel.hidden = false;
+    loadSuggestionPreview(s, panel);
+  }
+
+  function loadSuggestionPreview(s, panel) {
+    const body = suggestOptions();
+    body.Key = s.Key;
+    const request = panel._request = {};
+    clear(panel).appendChild(el('div', { className: 'tvs-secondary', text: 'Building preview…' }));
+    api('POST', 'Suggestions/Preview', body, { hours: 24 }).then(entries => {
+      if (panel._request !== request) {
+        return;
+      }
+      clear(panel).appendChild(el('div', { className: 'tvs-history-head' }, [
+        el('span', { className: 'tvs-secondary', text: 'A sample day with the time zone, look and bumper clips chosen above. Nothing is created yet, and a shuffled channel draws its order again when it is.' }),
+        iconButton('close', 'Hide preview', () => toggleSuggestionPreview(s, panel))
+      ]));
+      const wrap = el('div', { className: 'tvs-tablewrap' });
+      panel.appendChild(wrap);
+      renderSchedule(wrap, Array.isArray(entries) ? entries : [], 24, { markNow: false });
+    }).catch(err => {
+      if (panel._request !== request) {
+        return;
+      }
+      readErrors(err).then(messages => renderWarnList(clear(panel), 'Preview failed: ', messages));
+    });
+  }
+
+  /** The time zone and the look change what a suggestion would play, so open previews are built again. */
+  function refreshSuggestionPreviews() {
+    $all('#tvsSuggestList .tvs-suggest-preview').filter(p => !p.hidden).forEach(p => loadSuggestionPreview(p._suggestion, p));
   }
 
   /** Opens a suggestion in the editor as a new, unsaved station with the options applied and a drawn logo ready to upload on save. */
@@ -4715,6 +4826,8 @@
     setChecked('#tvsShowText', s.ShowTextOnSlate !== false);
     setChecked('#tvsShowLogo', s.ShowLogoOnSlate !== false);
     setVal('#tvsGlobalExcludedTags', Array.isArray(s.ExcludedTags) ? s.ExcludedTags.join(', ') : '');
+    const sug = s.Suggestions || {};
+    SUGGESTION_FIELDS.forEach(f => setVal(f.id, sug[f.key] !== undefined && sug[f.key] !== null ? sug[f.key] : f.fallback));
     renderTemplateRows('BlockTemplates', Array.isArray(s.BlockTemplates) ? s.BlockTemplates : []);
     renderTemplateRows('StationTemplates', Array.isArray(s.StationTemplates) ? s.StationTemplates : []);
   }
@@ -4742,7 +4855,33 @@
     }));
   }
 
+  /** The suggestion minimums on the Settings page: input, GlobalSettings.Suggestions property, default. */
+  const SUGGESTION_FIELDS = [
+    { id: '#tvsSugGenre', key: 'GenreMinHours', fallback: 8, label: 'A genre' },
+    { id: '#tvsSugSeries', key: 'SeriesMinEpisodes', fallback: 20, whole: true, label: 'A series of its own' },
+    { id: '#tvsSugKids', key: 'KidsMinHours', fallback: 4, label: 'Kids TV' },
+    { id: '#tvsSugFamily', key: 'FamilyMoviesMinHours', fallback: 6, label: 'Family Movies' },
+    { id: '#tvsSugDecade', key: 'DecadeMinHours', fallback: 8, label: 'A decade' },
+    { id: '#tvsSugClassics', key: 'ClassicsMinHours', fallback: 8, label: 'Classic Movies' },
+    { id: '#tvsSugClassicsYear', key: 'ClassicsBeforeYear', fallback: 1970, whole: true, label: 'Classics are older than' },
+    { id: '#tvsSugComfort', key: 'ComfortMinHours', fallback: 6, label: 'Comfort Reruns (hours)' },
+    { id: '#tvsSugComfortSeries', key: 'ComfortMinSeries', fallback: 3, whole: true, label: 'Comfort Reruns (shows)' },
+    { id: '#tvsSugFranchise', key: 'FranchiseMinTitles', fallback: 3, whole: true, label: 'A franchise marathon' },
+    { id: '#tvsSugCollection', key: 'CollectionMinItems', fallback: 2, whole: true, label: 'A collection' },
+    { id: '#tvsSugSeasonal', key: 'SeasonalMinHours', fallback: 1, label: 'A seasonal channel' },
+    { id: '#tvsSugLeftovers', key: 'LeftoversMinHours', fallback: 4, label: 'Everything Else' }
+  ];
+
   function saveSettings() {
+    const suggestions = {};
+    const suggestionErrors = [];
+    SUGGESTION_FIELDS.forEach(f => {
+      const n = f.whole ? parseInt(val(f.id), 10) : parseFloat(val(f.id));
+      if (isNaN(n) || n <= 0) {
+        suggestionErrors.push('Station suggestions: \u201c' + f.label + '\u201d must be a number above 0.');
+      }
+      suggestions[f.key] = n;
+    });
     const payload = {
       DefaultEncoding: state.settingsEncoding.get(),
       LogoOverlay: state.settingsOverlay.get(),
@@ -4755,10 +4894,11 @@
       SlateBackgroundColor: val('#tvsSlateColor') || '#101010',
       ShowTextOnSlate: checked('#tvsShowText'),
       ShowLogoOnSlate: checked('#tvsShowLogo'),
-      ExcludedTags: parseTagList(val('#tvsGlobalExcludedTags'))
+      ExcludedTags: parseTagList(val('#tvsGlobalExcludedTags')),
+      Suggestions: suggestions
       // Block and station templates are kept server side; PUT Settings leaves them as they are.
     };
-    const errors = [];
+    const errors = suggestionErrors;
     if (isNaN(payload.LingerSeconds)) {
       errors.push('Linger seconds must be a number.');
     }
@@ -5590,11 +5730,13 @@
   function wireSuggestAndCoverageHandlers() {
     on('#tvsBtnSuggestPreset', 'click', openPresets);
     on('#tvsBtnSuggestRefresh', 'click', () => openSuggestions(true));
-    on('#tvsSuggestSmall', 'change', () => openSuggestions(false));
     on('#tvsBtnSuggestBack', 'click', () => showView('list'));
     on('#tvsBtnSuggestCreate', 'click', createSelectedSuggestions);
     on('#tvsSuggestList', 'change', updateSuggestCount);
     on('#tvsSuggestFirst', 'input', () => { $('#tvsSuggestFirst').dataset.touched = '1'; });
+    on('#tvsSuggestTimeZone', 'change', refreshSuggestionPreviews);
+    on('#tvsSuggestTemplate', 'change', refreshSuggestionPreviews);
+    on('#tvsSuggestBumpers', 'change', refreshSuggestionPreviews);
     on('#tvsBtnCoverageRefresh', 'click', () => openCoverage(true));
     on('#tvsCoverageDisabled', 'change', () => openCoverage(false));
     on('#tvsBtnCoverageBack', 'click', () => showView('list'));

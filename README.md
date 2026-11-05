@@ -547,9 +547,38 @@ the box set), or failing that any set of titles that share a prefix. Tick the on
 time zone and from the first channel number set above the list (numbers already in use are skipped),
 and with the breaks and look of the station template picked under **Look and breaks from**, if any:
 its bumpers, pre-roll and post-roll, weather in the breaks, logo overlay, up next card, encoding,
-padding, card text and family hours, over the suggestion's own content. The pencil on a suggestion
-opens it in the editor as an unsaved station with those options applied, to change before it is
-created. Everything is editable afterwards like any other station.
+padding, card text and family hours, over the suggestion's own content. The clock on a suggestion
+opens **a sample day**: the next 24 hours it would play with those options, before anything is
+created (a shuffled channel draws its order again when it is created, so the mix, lengths and breaks
+are what you will get, not the exact running order). The pencil opens it in the editor as an unsaved
+station with those options applied, to change before it is created. Everything is editable afterwards
+like any other station.
+
+More rules look past the plain genre and series channels. A genre with enough hours in movies and
+again in episodes becomes two channels ("Comedy Movies" and "Comedy TV") instead of one. **Anime** and
+**Documentaries** each gather every genre and tag that spell the same thing. **Comfort Reruns** puts
+the half-hour comedies together (three or more shows, six hours), whether or not any of them could
+carry a channel alone. Shows get decade channels too ("1990s TV"), from the year each began.
+
+Suggestions know what is already on the air. Each one shows how many of its hours no enabled channel
+plays ("12 h new"), the list leads with the most new hours in each group, and a suggestion whose
+content is all on a channel already is hidden behind a **Show them** link rather than offered again.
+When channels exist and enough is left over, **Everything Else** offers one station of every movie
+and show no channel plays.
+
+Under the list, **Almost there** names what came close: "Horror: 6.5 h, needs 8". The amounts a
+suggestion needs are in **Settings**, under **Station suggestions** (hours for a genre, a kids
+channel, family movies, a decade, the classics and the year they end, comfort reruns, a seasonal
+channel and the leftovers station; episodes for a series of its own; titles for a franchise; items
+for a collection). Lower them for a small library.
+
+A library that holds nothing but short clips (no episodes, and at least four in five of its videos
+three minutes or under) is treated as bumper material, not programs: it stays out of the genre,
+decade and rating figures, gets no channel, and the page offers it under **Bumper clips from**.
+Pick it and every station created, previewed or opened from the page plays those clips in its
+breaks (a station with no break and no padding gets a two-minute break to play them in). Bumper
+folders need a **Home Videos and Photos** library to show up in Jellyfin at all; a Movies or Shows
+library drops files it cannot match to a title.
 
 **Not on a channel** on the dashboard lists the movies and shows no channel plays, from the compiled
 content of every enabled station (clips used as bumpers or idents count as on it). Tick titles and
@@ -619,6 +648,10 @@ by title, genre, rating or library.
   encoding for nobody; the reader count tells the truth within seconds.
 - **Max concurrent sessions**: cap on simultaneously encoded stations.
 - **Slate**: color and whether to draw text / the station logo on break cards.
+- **Station suggestions**: how much the library must hold before **Suggest stations** proposes each
+  kind of channel (see [Filling out the lineup](#filling-out-the-lineup)). Values out of range are
+  pulled back into it on save. This replaces the "Include small channels" box the suggestions page
+  used to have.
 - **Excluded tags** (plugin-wide), **station templates** and **block templates** are managed here too;
   see [Tags](#tags), [Station templates](#station-templates) and
   [Time block repeats and templates](#time-block-repeats-and-templates).
@@ -681,12 +714,12 @@ usual Jellyfin API key or session token. The ones worth calling by hand:
 
 | Endpoint | What it returns or does |
 |---|---|
-| `GET /JellyStations/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises (the provider's collection name, or shared title prefixes), decades, ratings, tags and libraries. The basis for station suggestions and the health report. |
+| `GET /JellyStations/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises (the provider's collection name, or shared title prefixes), decades, ratings, tags and libraries (each with its `Videos`, `Clips` of three minutes or under, and `ClipLibrary` when it is bumper material, which keeps it out of every other figure). The basis for station suggestions and the health report. |
 | `GET /JellyStations/Health` | Every station that needs attention, as the Status page lists them. |
 | `GET /JellyStations/Stations/{id}/History`, `DELETE .../History` | What the station has aired (per series or film: last start and end, the last episode, the count), latest first, and when the snapshot its current schedule continues from was taken; delete empties the log. |
 | `POST /JellyStations/Stations/{id}/Reshuffle` | Deals the schedule afresh from now as a new revision that continues every series from its next episode and rests what just aired. |
 | `GET /JellyStations/Stations/Export`, `POST /JellyStations/Stations/Import` | The stations plus the saved station and block templates as one document; import takes that document or a bare array of stations. |
-| `GET /JellyStations/Suggestions`, `POST .../Create`, `POST .../Draft` | Stations the library could support (`refresh`, `minHours`, `minEpisodes`); create the ones with the given `Keys` (`FirstChannelNumber`, `TimeZoneId`, `TemplateId` for the look and breaks, `Logo`), returning `Created`, `Errors` and `Warnings`; one suggestion (`Key`) as an unsaved station with the same options applied. |
+| `GET /JellyStations/Suggestions`, `GET .../Report`, `POST .../Create`, `POST .../Draft`, `POST .../Preview` | Stations the library could support, each with `Hours`, `NewHours` (on no enabled channel yet) and `Covered` (`refresh`; the minimums come from Settings, `minHours` replaces every hours minimum and `minEpisodes` the series one for that call); the same list with `NearMisses` (`Name`, `Have`, `Need`, `Unit`), `ClipLibraries`, the `Thresholds` in force and the number of `Channels`; create the ones with the given `Keys` (`FirstChannelNumber`, `TimeZoneId`, `TemplateId` for the look and breaks, `BumperLibraryId` for a clip library to play in the breaks, `Logo`), returning `Created`, `Errors` and `Warnings`; one suggestion (`Key`) as an unsaved station with the same options applied; the next `hours` (default 24) that suggestion would play with those options, as schedule entries, nothing saved. |
 | `GET /JellyStations/StationTemplates`, `GET .../{id}/Draft`, `POST`, `DELETE .../{id}` | Saved station templates first, then the built-in presets; a fresh station draft from one; save (replaces by name or id); delete a saved one. |
 | `GET /JellyStations/Hardware` | Jellyfin's transcoding setting, what the default profile resolves to, the `/dev/dri` nodes and this ffmpeg build's hwaccels, encoders and filters. |
 | `POST /JellyStations/Hardware/Test` | Runs a station's current program through the real chain at full speed and reports the decoder and the speed relative to real time. |

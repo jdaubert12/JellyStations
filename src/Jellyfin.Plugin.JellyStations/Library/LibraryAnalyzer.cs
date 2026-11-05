@@ -9,8 +9,29 @@ public static class LibraryAnalyzer
     private const int KidsMaxRank = 2;   // G / TV-G
     private const int FamilyMaxRank = 3; // PG / TV-PG
 
-    public static LibraryAnalysisDto Analyze(IReadOnlyList<LibraryFact> facts, IReadOnlyList<CollectionFact> collections, DateTime nowUtc)
+    /// <summary>The longest item that still counts as a clip (an ident, a bump, a trailer).</summary>
+    public const int ClipMaxMinutes = 3;
+
+    /// <summary>A clip library has at least this many items.</summary>
+    public const int ClipLibraryMinItems = 3;
+
+    /// <summary>The share of a library's items that must be clips for it to be a clip library.</summary>
+    public const double ClipLibraryShare = 0.8;
+
+    /// <param name="facts">Every movie and episode.</param>
+    /// <param name="collections">The box sets and what they hold.</param>
+    /// <param name="nowUtc">Timestamp for the report.</param>
+    /// <param name="otherVideos">Plain videos (neither movie nor episode), which only count toward the library figures.</param>
+    public static LibraryAnalysisDto Analyze(IReadOnlyList<LibraryFact> facts, IReadOnlyList<CollectionFact> collections, DateTime nowUtc, IReadOnlyList<LibraryFact>? otherVideos = null)
     {
+        var libraries = Libraries(facts, otherVideos ?? Array.Empty<LibraryFact>());
+        var clipLibraries = ClipLibraryIds(libraries);
+        if (clipLibraries.Count > 0)
+        {
+            // Idents and bumps are not programs: they stay out of every hours and count figure below.
+            facts = facts.Where(f => !InAny(f, clipLibraries)).ToList();
+        }
+
         var movies = facts.Where(f => f.IsMovie).ToList();
         var episodes = facts.Where(f => !f.IsMovie).ToList();
         var result = new LibraryAnalysisDto
@@ -72,21 +93,51 @@ public static class LibraryAnalyzer
             .ToList();
         result.Ratings = Ratings(movies, episodes);
         result.Tags = Tags(movies, episodes);
-        result.Libraries = facts
+        result.Libraries = libraries;
+
+        return result;
+    }
+
+    /// <summary>The ids of the libraries flagged <see cref="LibraryStatDto.ClipLibrary"/>.</summary>
+    public static HashSet<Guid> ClipLibraryIds(IEnumerable<LibraryStatDto> libraries)
+        => libraries.Where(l => l.ClipLibrary).Select(l => l.Id).ToHashSet();
+
+    private static bool InAny(LibraryFact fact, HashSet<Guid> libraries) => fact.LibraryId is { } id && libraries.Contains(id);
+
+    /// <summary>
+    /// Per-library counts over movies, episodes and plain videos. A library is a clip library when it has no
+    /// episodes, at least <see cref="ClipLibraryMinItems"/> items, and <see cref="ClipLibraryShare"/> of them run
+    /// <see cref="ClipMaxMinutes"/> minutes or less.
+    /// </summary>
+    private static List<LibraryStatDto> Libraries(IReadOnlyList<LibraryFact> facts, IReadOnlyList<LibraryFact> otherVideos)
+    {
+        var clipTicks = TimeSpan.FromMinutes(ClipMaxMinutes).Ticks;
+        var others = otherVideos.Where(f => f.LibraryId.HasValue).ToLookup(f => f.LibraryId!.Value);
+        return facts
             .Where(f => f.LibraryId.HasValue)
-            .GroupBy(f => f.LibraryId!.Value)
-            .Select(g => new LibraryStatDto
+            .Select(f => f.LibraryId!.Value)
+            .Concat(others.Select(g => g.Key))
+            .Distinct()
+            .Select(id =>
             {
-                Id = g.Key,
-                Name = g.First().LibraryName ?? string.Empty,
-                Movies = g.Count(f => f.IsMovie),
-                Episodes = g.Count(f => !f.IsMovie),
-                Hours = Hours(g)
+                var own = facts.Where(f => f.LibraryId == id).ToList();
+                var plain = others[id].ToList();
+                var all = own.Concat(plain).ToList();
+                var stat = new LibraryStatDto
+                {
+                    Id = id,
+                    Name = all.Select(f => f.LibraryName).FirstOrDefault(n => !string.IsNullOrWhiteSpace(n)) ?? string.Empty,
+                    Movies = own.Count(f => f.IsMovie),
+                    Episodes = own.Count(f => !f.IsMovie),
+                    Videos = plain.Count,
+                    Clips = all.Count(f => f.RuntimeTicks <= clipTicks),
+                    Hours = Hours(all)
+                };
+                stat.ClipLibrary = stat.Episodes == 0 && all.Count >= ClipLibraryMinItems && stat.Clips >= all.Count * ClipLibraryShare;
+                return stat;
             })
             .OrderBy(l => l.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
-
-        return result;
     }
 
     private static List<GenreStatDto> Genres(List<LibraryFact> movies, List<LibraryFact> episodes)

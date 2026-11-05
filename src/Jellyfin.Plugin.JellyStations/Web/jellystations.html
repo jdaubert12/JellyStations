@@ -43,6 +43,15 @@
       #JellyStationsPage .tvs-season { margin: .8em 0 1.2em; }
       #JellyStationsPage .tvs-suggest-pick { display: flex; align-items: center; padding: 0 .6em 0 .2em; }
       #JellyStationsPage .tvs-suggest-pick input { width: 1.2em; height: 1.2em; }
+      #JellyStationsPage .tvs-suggest-preview .tvs-tablewrap { max-height: 26em; overflow-y: auto; }
+      #JellyStationsPage .tvs-suggest-preview .tvs-history-head .tvs-secondary { flex: 1 1 auto; }
+      #JellyStationsPage .listItem:has(.tvs-suggest-preview:not([hidden])) { align-items: flex-start; }
+      #JellyStationsPage .tvs-suggest-near { margin-top: 1.2em; }
+      #JellyStationsPage .tvs-suggest-near ul { margin: .3em 0 .6em; padding-left: 1.3em; columns: 2 18em; }
+      #JellyStationsPage .tvs-suggest-near li { opacity: .85; font-size: .95em; break-inside: avoid; }
+      #JellyStationsPage .tvs-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 1.5em; }
+      #JellyStationsPage .tvs-grid3 > * { min-width: 0; }
+      @media (max-width: 900px) { #JellyStationsPage .tvs-grid3 { grid-template-columns: 1fr; } }
       #JellyStationsPage .tvs-suggest-options { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .4em 1.2em; margin: .6em 0 1em; }
       #JellyStationsPage .tvs-suggest-option { margin: 0; min-width: 11em; }
       #JellyStationsPage .tvs-suggest-option input[type=number] { width: 9em; }
@@ -241,7 +250,6 @@
             <h2 class="sectionTitle">Suggested stations</h2>
             <span id="tvsSuggestCount" class="tvs-secondary"></span>
             <button is="emby-button" type="button" id="tvsBtnSuggestCreate" class="raised button-submit emby-button"><span>Create selected</span></button>
-            <label class="emby-checkbox-label" style="width:auto;margin:0 .5em"><input is="emby-checkbox" type="checkbox" id="tvsSuggestSmall"><span>Include small channels (1 h / 5 episodes)</span></label>
             <button is="emby-button" type="button" id="tvsBtnSuggestRefresh" class="raised emby-button" title="Re-scan the library"><span>Re-scan library</span></button>
             <button is="emby-button" type="button" id="tvsBtnSuggestBack" class="raised emby-button"><span>Back to list</span></button>
           </div>
@@ -249,7 +257,7 @@
             <div class="tvs-welcome-title">Welcome to JellyStations</div>
             <div>Here is what your library could support, ready to go. Tick the channels you like and press <strong>Create selected</strong>; each one can be changed later. Prefer to build your own? <button type="button" id="tvsBtnSuggestPreset" class="tvs-linkbtn">Start from a preset</button>.</div>
           </div>
-          <div class="fieldDescription">Built from what is in the library: genres and series with enough hours, kids and family content by rating, franchises found from titles, collections, decades and holiday tags. Tick the ones you want and press <strong>Create selected</strong>, or press the pencil on one to change it in the editor first. Each new station gets a drawn logo, and a template gives them all the same breaks and look.</div>
+          <div class="fieldDescription">Built from what is in the library: genres (a movie channel and a TV channel when there is enough of both), series, half-hour comedies together, kids and family content by rating, anime and documentaries, franchises, collections, decades of movies and of shows, and holiday tags. What your channels already play is taken into account: a suggestion says how much of it is new, and one with nothing new is hidden. Tick the ones you want and press <strong>Create selected</strong>, press the clock on one to see a sample day of what it would play, or the pencil to change it in the editor first. Each new station gets a drawn logo, and a template gives them all the same breaks and look.</div>
           <div class="tvs-suggest-options">
             <div class="inputContainer tvs-suggest-option">
               <label class="inputLabel inputLabelUnfocused" for="tvsSuggestFirst">First channel number</label>
@@ -263,11 +271,18 @@
               <label class="selectLabel" for="tvsSuggestTemplate">Look and breaks from</label>
               <select is="emby-select" id="tvsSuggestTemplate" class="emby-select"></select>
             </div>
+            <div id="tvsSuggestBumperWrap" class="selectContainer tvs-suggest-option tvs-hidden">
+              <label class="selectLabel" for="tvsSuggestBumpers">Bumper clips from</label>
+              <select is="emby-select" id="tvsSuggestBumpers" class="emby-select"></select>
+            </div>
             <label class="emby-checkbox-label tvs-suggest-option tvs-suggest-check"><input is="emby-checkbox" type="checkbox" id="tvsSuggestLogo" checked><span>Draw a logo for each</span></label>
           </div>
+          <div id="tvsSuggestClips" class="tvs-info tvs-hidden"></div>
           <div id="tvsSuggestError" class="tvs-error tvs-hidden"></div>
-          <div id="tvsSuggestEmpty" class="tvs-empty tvs-hidden">Nothing to suggest yet. Add more movies or shows, or lower your expectations.</div>
+          <div id="tvsSuggestEmpty" class="tvs-empty tvs-hidden">Nothing to suggest yet. Add more movies or shows, or lower what a suggestion needs in Settings.</div>
           <div id="tvsSuggestList" class="paperList"></div>
+          <div id="tvsSuggestCovered" class="tvs-info tvs-hidden"></div>
+          <div id="tvsSuggestNear" class="tvs-suggest-near tvs-hidden"></div>
         </div>
 
         <!-- ===================== Not on a channel ===================== -->
@@ -995,6 +1010,55 @@
             <div class="inputContainer">
               <input is="emby-input" id="tvsGlobalExcludedTags" label="Excluded tags (all stations)" type="text" autocomplete="off" placeholder="e.g. christmas">
               <div class="fieldDescription">Comma-separated library tags kept off every station unless the station opts out. Hand-picked items and Tag sources for the same tag still play, so a seasonal "everything tagged christmas" station keeps working. Changing this recompiles all stations.</div>
+            </div>
+          </div>
+
+          <div class="verticalSection tvs-section">
+            <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">auto_awesome</span>Station suggestions</h3>
+            <div class="fieldDescription" style="margin-bottom:.8em">How much the library must hold before <strong>Suggest stations</strong> proposes a channel. Lower them for a small library; the suggestions page lists what came close.</div>
+            <div class="tvs-grid3">
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsSugGenre" label="A genre (hours)" type="number" min="0.1" max="10000" step="0.5">
+                <div class="fieldDescription">Also anime and documentaries. A genre with this much in movies and again in episodes becomes two channels.</div>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsSugSeries" label="A series of its own (episodes)" type="number" min="1" max="10000" step="1">
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsSugKids" label="Kids TV (hours rated G or below)" type="number" min="0.1" max="10000" step="0.5">
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsSugFamily" label="Family Movies (hours rated PG or below)" type="number" min="0.1" max="10000" step="0.5">
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsSugDecade" label="A decade (hours)" type="number" min="0.1" max="10000" step="0.5">
+                <div class="fieldDescription">Movies from one decade, or shows that began in it.</div>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsSugClassics" label="Classic Movies (hours)" type="number" min="0.1" max="10000" step="0.5">
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsSugClassicsYear" label="Classics are older than (year)" type="number" min="1900" max="2100" step="1">
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsSugComfort" label="Comfort Reruns (hours)" type="number" min="0.1" max="10000" step="0.5">
+                <div class="fieldDescription">Half-hour comedies together.</div>
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsSugComfortSeries" label="Comfort Reruns (shows)" type="number" min="2" max="100" step="1">
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsSugFranchise" label="A franchise marathon (titles)" type="number" min="2" max="100" step="1">
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsSugCollection" label="A collection (items)" type="number" min="1" max="1000" step="1">
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsSugSeasonal" label="A seasonal channel (hours)" type="number" min="0.1" max="10000" step="0.5">
+              </div>
+              <div class="inputContainer">
+                <input is="emby-input" id="tvsSugLeftovers" label="Everything Else (hours not on a channel)" type="number" min="0.1" max="10000" step="0.5">
+              </div>
             </div>
           </div>
 

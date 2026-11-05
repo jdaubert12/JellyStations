@@ -42,6 +42,8 @@ public sealed class SettingsController : ControllerBase
         settings.LogoOverlay.Normalize();
         settings.UpNextCard ??= new UpNextCardConfig();
         settings.UpNextCard.Normalize();
+        settings.Suggestions ??= new SuggestionThresholds();
+        settings.Suggestions.Normalize();
         var errors = StationService.ValidateEncoding(settings.DefaultEncoding);
         if (settings.LingerSeconds < 0 || settings.LingerSeconds > 600)
         {

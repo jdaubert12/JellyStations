@@ -155,5 +155,18 @@ public sealed class LibraryStatDto
 
     public int Episodes { get; set; }
 
+    /// <summary>Plain videos that are neither movies nor episodes (a "Home videos" or mixed library).</summary>
+    public int Videos { get; set; }
+
+    /// <summary>Items of any kind no longer than <see cref="Library.LibraryAnalyzer.ClipMaxMinutes"/> minutes.</summary>
+    public int Clips { get; set; }
+
+    /// <summary>
+    /// True when the library holds short clips and nothing else to speak of (idents, bumps, trailers): no episodes
+    /// and nearly every item a clip. Its items are left out of every other figure in the analysis, and the
+    /// suggestions offer it as a bumper source instead of putting it on a channel.
+    /// </summary>
+    public bool ClipLibrary { get; set; }
+
     public double Hours { get; set; }
 }

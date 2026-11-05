@@ -76,22 +76,7 @@ public sealed class LibraryController : ControllerBase
     [HttpGet("Coverage")]
     public ActionResult<CoverageDto> Coverage([FromQuery] bool includeDisabled = false, [FromQuery] bool refresh = false)
     {
-        var onChannels = new HashSet<Guid>();
-        var channels = 0;
-        foreach (var station in _stations.GetAll().Where(s => includeDisabled || s.Enabled))
-        {
-            if (_stations.GetCompiled(station.Id) is not { } compiled)
-            {
-                continue;
-            }
-
-            channels++;
-            foreach (var item in compiled.PlayedItems)
-            {
-                onChannels.Add(item.ItemId);
-            }
-        }
-
+        var (onChannels, channels) = _stations.ItemsOnChannels(includeDisabled);
         return Ok(LibraryCoverage.Build(_analysis.Facts(refresh), onChannels, channels, DateTime.UtcNow));
     }
 }
