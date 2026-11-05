@@ -217,6 +217,16 @@ analyzer, then suggestion rules and the dashboard view on top of it.
   streaming fault (unopenable file, early ffmpeg exit with its last stderr line, overlay or slate
   failure, ffmpeg not starting) is kept per station in `StreamSessionManager` after the session
   ends and shown on the station row until dismissed (`POST Stations/{id}/Stream/ClearError`).
+  **Problem files — DONE 2026-11-05 (1.29.0.0).** The row keeps one fault per station and loses it at a
+  restart; `ProblemFileLog` (Services, `problem-files.json`, one entry per path, 500 at most) keeps the
+  files themselves. `FfmpegRestreamer` reports a file that cannot be opened, a quick failure left after
+  every fallback, an early end (with where it stopped), three or more damage lines
+  (`FfmpegStderr.IsDamage`, counted by `SegmentTelemetry` after `SeekSettle`) and a per-program GPU
+  decoder failure (retracted when the device turns out to be at fault); `ClipFolderScanner` reports its
+  unreadable files. A whole clean play from the start removes an entry, any clean play one that could
+  not be opened; `Recheck` drops files that are gone or changed in size or date. `GET/DELETE
+  ProblemFiles` and a Problem files section on the Status view. Not done: library items skipped at
+  compile time for no runtime or path stay in Health as counts; a re-probe or test decode on demand.
 - **Health report — DONE 2026-10-19.** The compiler records what every source found and kept
   (`CompiledStation.Sources`); `StationHealth` (pure, tested) turns the last compile into
   warnings: sources that matched nothing or contributed nothing, under a day of unique content,

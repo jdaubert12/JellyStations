@@ -362,6 +362,44 @@ public sealed class StatusDto
     public List<SessionStatusDto> Sessions { get; set; } = new();
 }
 
+/// <summary>The files that gave trouble on air or in a folder scan.</summary>
+public sealed class ProblemFilesDto
+{
+    public List<ProblemFileDto> Files { get; set; } = new();
+
+    /// <summary>How many files this request's recheck took off the list (removed, replaced or readable again).</summary>
+    public int Settled { get; set; }
+}
+
+public sealed class ProblemFileDto
+{
+    /// <summary>What the file goes by in DELETE ProblemFiles/{id}: a hash of its path.</summary>
+    public string Id { get; set; } = string.Empty;
+
+    public string Path { get; set; } = string.Empty;
+
+    public string Title { get; set; } = string.Empty;
+
+    public ProblemKind Kind { get; set; }
+
+    /// <summary>The kind in a few words.</summary>
+    public string Problem { get; set; } = string.Empty;
+
+    /// <summary>ffmpeg's own line, or where the file stopped.</summary>
+    public string? Detail { get; set; }
+
+    /// <summary>The station it last happened on; null for a folder scan.</summary>
+    public Guid? StationId { get; set; }
+
+    public string? StationName { get; set; }
+
+    public DateTime FirstUtc { get; set; }
+
+    public DateTime LastUtc { get; set; }
+
+    public int Count { get; set; }
+}
+
 public sealed class SessionStatusDto
 {
     public Guid StationId { get; set; }

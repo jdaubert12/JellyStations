@@ -5144,10 +5144,12 @@
     if (showSpinner) {
       loading(true);
     }
-    return Promise.all([api('GET', 'Status'), api('GET', 'Health')]).then(results => {
+    // Opening the page or pressing Refresh now also has the server look at the listed files; the 5 s timer does not.
+    return Promise.all([api('GET', 'Status'), api('GET', 'Health'), api('GET', 'ProblemFiles', undefined, showSpinner ? { recheck: true } : undefined)]).then(results => {
       renderErrorBox($('#tvsStatusError'), null);
       renderStatus(results[0] || {});
       renderHealth(results[1] || {});
+      renderProblemFiles(results[2] || {});
       $('#tvsStatusUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
     }).catch(showErrorsIn($('#tvsStatusError'))).then(() => {
       if (showSpinner) {
@@ -5189,6 +5191,44 @@
         actions
       ]));
     });
+  }
+
+  /** The Status view's list of files to fix: what aired badly or could not be read, and where each file is. */
+  function renderProblemFiles(report) {
+    const box = clear($('#tvsProblemFiles'));
+    const files = Array.isArray(report.Files) ? report.Files : [];
+    if (!files.length) {
+      box.appendChild(el('div', { className: 'tvs-ok', text: '✓ No problem files: nothing that aired or was scanned has given trouble' + (report.Settled ? ' (' + plural(report.Settled, 'file') + ' just came off the list: replaced, removed or readable again)' : '') + '.' }));
+      return;
+    }
+    box.appendChild(el('div', { className: 'tvs-problem-head' }, [
+      el('span', { className: 'tvs-secondary', text: plural(files.length, 'file') + ' to look at' + (report.Settled ? '; ' + plural(report.Settled, 'file') + ' just came off the list' : '') + '.' }),
+      textButton('Clear the list', () => withBusy('Could not clear the list', () => apiNoBody('DELETE', 'ProblemFiles').then(() => loadStatus(false))))
+    ]));
+    const table = el('table', { className: 'tvs-table tvs-problem-table' });
+    table.appendChild(tableHead(['File', 'Problem', 'Station', 'Last seen', '']));
+    const tbody = el('tbody');
+    files.forEach(f => {
+      tbody.appendChild(el('tr', null, [
+        el('td', null, [
+          el('div', { text: f.Title || '(untitled)' }),
+          el('div', { className: 'tvs-secondary tvs-path', text: f.Path || '' })
+        ]),
+        el('td', null, [
+          el('div', { text: f.Problem || f.Kind || '' }),
+          f.Detail ? el('div', { className: 'tvs-secondary tvs-path', text: f.Detail }) : null
+        ]),
+        el('td', { text: f.StationName || (f.Kind === 'Unreadable' ? 'folder scan' : '–') }),
+        el('td', { className: 'nowrap' }, [
+          el('div', { text: fmtDateTime(f.LastUtc) }),
+          f.Count > 1 ? el('div', { className: 'tvs-secondary', text: f.Count + ' times since ' + fmtDateTime(f.FirstUtc) }) : null
+        ]),
+        el('td', null, iconButton('close', 'Dismiss (it comes back if it gives trouble again)', () =>
+          withBusy('Could not dismiss the file', () => apiNoBody('DELETE', 'ProblemFiles/' + f.Id).then(() => loadStatus(false)))))
+      ]));
+    });
+    table.appendChild(tbody);
+    box.appendChild(table);
   }
 
   /** Re-scans one station from the Health section and reloads the view. */

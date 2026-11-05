@@ -6,7 +6,9 @@ public sealed class SegmentTelemetry
     private string? _decoderFallback;
     private string? _lastWarning;
     private string? _firstError;
+    private string? _firstDamage;
     private int _warnings;
+    private int _damage;
 
     public SegmentTelemetry(string title, bool isSlate, string hardwareDecode, string videoEncoder, bool toneMapping, bool sourceIsHdr, bool overlay)
     {
@@ -53,8 +55,16 @@ public sealed class SegmentTelemetry
 
     public string? LastWarning => Volatile.Read(ref _lastWarning);
 
+    /// <summary>
+    /// Lines in which a decoder or demuxer reported damage in the file, once the start has settled: a seek into the
+    /// middle of a file lands between key frames and draws a few such lines from a file with nothing wrong.
+    /// </summary>
+    public int Damage => Volatile.Read(ref _damage);
+
+    public string? FirstDamage => Volatile.Read(ref _firstDamage);
+
     /// <summary>Feeds one stderr line. ffmpeg runs at warning level, so every line counts as a warning.</summary>
-    public void Observe(string line)
+    public void Observe(string line, DateTime? nowUtc = null)
     {
         var trimmed = line.Trim();
         if (trimmed.Length == 0)
@@ -68,6 +78,12 @@ public sealed class SegmentTelemetry
         {
             Interlocked.CompareExchange(ref _firstError, trimmed, null);
         }
+        if (!IsSlate && FfmpegStderr.IsDamage(trimmed) && (nowUtc ?? DateTime.UtcNow) - StartedUtc >= FfmpegStderr.SeekSettle)
+        {
+            Interlocked.Increment(ref _damage);
+            Interlocked.CompareExchange(ref _firstDamage, trimmed, null);
+        }
+
         if (HardwareDecode.Length > 0 && _decoderFallback is null && FfmpegStderr.IsHardwareDecodeFallback(trimmed))
         {
             Interlocked.CompareExchange(ref _decoderFallback, trimmed, null);
@@ -97,6 +113,42 @@ public static class FfmpegStderr
         "could not dynamically load libva",
         "failed to open the drm device"
     };
+
+    /// <summary>How long after a program starts its decode complaints are put down to the seek rather than to the file.</summary>
+    public static readonly TimeSpan SeekSettle = TimeSpan.FromSeconds(4);
+
+    /// <summary>This many damage lines in one program and the file is reported; fewer is a single glitch not worth a re-encode.</summary>
+    public const int DamageLinesToReport = 3;
+
+    // What decoders and demuxers print when the data itself is bad, as opposed to a setting or a stream they skip.
+    private static readonly string[] DamageMarkers =
+    {
+        "error while decoding",
+        "concealing",
+        "corrupt",
+        "invalid nal unit size",
+        "invalid data found",
+        "decode_slice_header error",
+        "error submitting",
+        "damaged",
+        "ended prematurely",
+        "partial file",
+        "truncat"
+    };
+
+    /// <summary>True when the line says the file's data is damaged.</summary>
+    public static bool IsDamage(string line)
+    {
+        foreach (var marker in DamageMarkers)
+        {
+            if (line.Contains(marker, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>A line that names a cause rather than a consequence ("Nothing was written into output file" is the consequence).</summary>
     public static bool LooksLikeError(string line) =>

@@ -240,6 +240,61 @@ public sealed class StatusController : ControllerBase
     }
 }
 
+/// <summary>The files that gave trouble on air or in a folder scan, for the Status page.</summary>
+[ApiController]
+[Route("JellyStations/ProblemFiles")]
+[Authorize(Policy = Policies.RequiresElevation)]
+[Produces(MediaTypeNames.Application.Json)]
+public sealed class ProblemFilesController : ControllerBase
+{
+    private readonly ProblemFileLog _problems;
+
+    public ProblemFilesController(ProblemFileLog problems)
+    {
+        _problems = problems;
+    }
+
+    /// <summary>
+    /// The list, latest trouble first. With <paramref name="recheck"/> the files are looked at first and the ones that
+    /// were removed, replaced, or can be opened again are dropped; that touches the disk, so the page asks for it
+    /// when it opens and not on its timer.
+    /// </summary>
+    [HttpGet]
+    public ActionResult<ProblemFilesDto> Get([FromQuery] bool recheck = false)
+    {
+        var settled = recheck ? _problems.Recheck() : 0;
+        return Ok(new ProblemFilesDto
+        {
+            Settled = settled,
+            Files = _problems.List().Select(f => new ProblemFileDto
+            {
+                Id = ProblemFileLog.IdFor(f.Path),
+                Path = f.Path,
+                Title = f.Title,
+                Kind = f.Kind,
+                Problem = ProblemFileLog.Describe(f.Kind),
+                Detail = f.Detail,
+                StationId = f.StationId,
+                StationName = f.StationName,
+                FirstUtc = DateTime.SpecifyKind(f.FirstUtc, DateTimeKind.Utc),
+                LastUtc = DateTime.SpecifyKind(f.LastUtc, DateTimeKind.Utc),
+                Count = f.Count
+            }).ToList()
+        });
+    }
+
+    /// <summary>Takes one file off the list. It comes back if it gives trouble again.</summary>
+    [HttpDelete("{id}")]
+    public IActionResult Dismiss([FromRoute] string id) => _problems.Dismiss(id) ? NoContent() : NotFound();
+
+    [HttpDelete]
+    public IActionResult Clear()
+    {
+        _problems.Clear();
+        return NoContent();
+    }
+}
+
 [ApiController]
 [Route("JellyStations/Hardware")]
 [Authorize(Policy = Policies.RequiresElevation)]

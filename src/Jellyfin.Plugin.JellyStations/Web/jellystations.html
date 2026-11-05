@@ -207,6 +207,9 @@
       #JellyStationsPage .tvs-enc { display: flex; flex-wrap: wrap; gap: .25em .3em; align-items: center; }
       #JellyStationsPage .tvs-enc .tvs-badge { margin-left: 0; }
       #JellyStationsPage .tvs-badge.bad { background: rgba(244,67,54,.22); border-color: rgba(244,67,54,.7); }
+      #JellyStationsPage .tvs-path { word-break: break-all; }
+      #JellyStationsPage .tvs-problem-head { display: flex; flex-wrap: wrap; gap: .8em; align-items: center; margin-bottom: .4em; }
+      #JellyStationsPage .tvs-problem-table td:first-child { width: 38%; min-width: 14em; }
       #JellyStationsPage .tvs-problem { margin: .3em 0 0; padding: .35em .8em; border-radius: 4px; font-size: .9em; }
       #JellyStationsPage .tvs-problem.warn { border: 1px solid rgba(255,152,0,.7); background: rgba(255,152,0,.12); }
       #JellyStationsPage .tvs-problem.bad { border: 1px solid rgba(244,67,54,.7); background: rgba(244,67,54,.12); }
@@ -1123,6 +1126,11 @@
             <h3 class="sectionTitle">Health</h3>
             <div class="fieldDescription">What the last scan of each station found (nightly, or when you press Refresh content): sources that matched nothing, stations with under a day of unique content, and items skipped for a missing runtime, path or file.</div>
             <div id="tvsHealth"></div>
+          </div>
+          <div class="verticalSection">
+            <h3 class="sectionTitle">Problem files</h3>
+            <div class="fieldDescription">Files to fix: ones that were missing or could not be opened when their program came up, that ffmpeg could not play, that stopped before their listed end, that played with decode errors, that the GPU decoder failed on, or that a clip folder scan could not read. The list is kept when a stream stops and across restarts. A file leaves it when it next plays through cleanly from its start, or when it has been replaced or removed (looked at when this page opens and on Refresh now).</div>
+            <div id="tvsProblemFiles" class="tvs-tablewrap"></div>
           </div>
           <div class="verticalSection">
             <h3 class="sectionTitle">Active sessions</h3>

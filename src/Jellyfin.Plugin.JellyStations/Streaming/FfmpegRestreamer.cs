@@ -38,6 +38,8 @@ public sealed class FfmpegRestreamer : IDisposable
     private readonly HashSet<string> _softwarePrograms = new(StringComparer.Ordinal);
     private readonly Func<ScheduleEntry, DateTime, EncodingProfile, WeatherSegment?>? _weather;
     private readonly SubtitleExtractor? _subtitles;
+    private readonly Services.ProblemFileLog? _problems;
+    private readonly List<string> _hardwareProblemPaths = new();
     private int _weatherFailures;
     private string? _lastStderr;
     private ProcessRunner? _current;
@@ -74,9 +76,11 @@ public sealed class FfmpegRestreamer : IDisposable
         string? cardsDir = null,
         string? timeZoneId = null,
         Func<ScheduleEntry, DateTime, EncodingProfile, WeatherSegment?>? weather = null,
-        SubtitleExtractor? subtitles = null)
+        SubtitleExtractor? subtitles = null,
+        Services.ProblemFileLog? problems = null)
     {
         _subtitles = subtitles;
+        _problems = problems;
         _weather = weather;
         _upNext = upNext ?? new UpNextCardConfig();
         _cardsDir = cardsDir ?? Path.Combine(Path.GetTempPath(), "JellyStations", "cards");
@@ -193,6 +197,7 @@ public sealed class FfmpegRestreamer : IDisposable
     {
         var consecutiveFailures = 0;
         string? lastFailedProgramId = null;
+        string? unopenedProgramId = null;
 
         while (!ct.IsCancellationRequested)
         {
@@ -238,6 +243,12 @@ public sealed class FfmpegRestreamer : IDisposable
                     {
                         _logger.LogWarning("JellyStations [{Station}]: cannot open {Title}: {Reason}", _stationName, entry.Item.DisplayTitle, openProblem);
                         Fault(entry.Item.DisplayTitle + ": " + openProblem);
+                        // The card for a long program is drawn in pieces and the file is tried again between them: one airing, one report.
+                        if (entry.ProgramId != unopenedProgramId)
+                        {
+                            unopenedProgramId = entry.ProgramId;
+                            Problem(segment?.Part.Path, entry.Item, ProblemKind.CannotOpen, openProblem);
+                        }
                     }
 
                     var text = entry.Kind == EntryKind.Slate ? _cardText : Station.DefaultCardText;
@@ -325,12 +336,21 @@ public sealed class FfmpegRestreamer : IDisposable
                     if (deviceProblem)
                     {
                         _hardwareDecodeSupported = false;
+                        // The device, not the files: take back what was put down to the first file it failed on.
+                        foreach (var blamed in _hardwareProblemPaths)
+                        {
+                            _problems?.Retract(blamed, ProblemKind.HardwareDecode);
+                        }
+
+                        _hardwareProblemPaths.Clear();
                         _logger.LogWarning("JellyStations [{Station}]: ffmpeg exited with {Code} with {Kind} decoding; continuing with software decoding", _stationName, exitCode, profile.HardwareDecode);
                         Fault(profile.HardwareDecode + " hardware decoding failed on " + item.DisplayTitle + " (ffmpeg exit " + exitCode + "); software decoding until the stream restarts" + Detail(detail));
                     }
                     else
                     {
                         _softwarePrograms.Add(entry.ProgramId);
+                        _hardwareProblemPaths.Add(part.Part.Path);
+                        Problem(part.Part.Path, item, ProblemKind.HardwareDecode, profile.HardwareDecode + " decoding stopped with ffmpeg exit " + exitCode + Detail(detail));
                         _logger.LogWarning("JellyStations [{Station}]: ffmpeg exited with {Code} with {Kind} decoding on {Title}; replaying it with software decoding", _stationName, exitCode, profile.HardwareDecode, item.DisplayTitle);
                         Fault(profile.HardwareDecode + " could not decode " + item.DisplayTitle + " (ffmpeg exit " + exitCode + "); this program plays with software decoding" + Detail(detail));
                     }
@@ -372,6 +392,7 @@ public sealed class FfmpegRestreamer : IDisposable
                     _logger.LogWarning("JellyStations [{Station}]: ffmpeg exited with {Code} after {Seconds:0.0}s for {Path}", _stationName, exitCode, ran.TotalSeconds, item.Path);
                     Fault(item.DisplayTitle + ": ffmpeg exited with code " + exitCode + " after " + ran.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture)
                         + "s (" + part.Part.Path + ")" + Detail(_lastStderr));
+                    Problem(part.Part.Path, item, ProblemKind.WouldNotPlay, "ffmpeg exit " + exitCode + Detail(_telemetry?.FirstError ?? _lastStderr));
                     if (consecutiveFailures >= 5)
                     {
                         _logger.LogError("JellyStations [{Station}]: 5 consecutive encoder failures; showing a slate for 60s", _stationName);
@@ -389,10 +410,21 @@ public sealed class FfmpegRestreamer : IDisposable
                     consecutiveFailures = 0;
                     lastFailedProgramId = entry.ProgramId;
                     _logger.LogInformation("JellyStations [{Station}]: {Title} ended early (exit {Code}); filling until scheduled end", _stationName, item.DisplayTitle, exitCode);
+                    Problem(part.Part.Path, item, ProblemKind.EndedEarly, EndedEarlyDetail(segmentEnd - DateTime.UtcNow, seek + ran, exitCode, _telemetry?.FirstDamage ?? _telemetry?.FirstError));
                 }
                 else
                 {
                     consecutiveFailures = 0;
+                    var damage = _telemetry?.Damage ?? 0;
+                    if (damage >= FfmpegStderr.DamageLinesToReport)
+                    {
+                        Problem(part.Part.Path, item, ProblemKind.DecodeErrors, damage.ToString(CultureInfo.InvariantCulture) + " lines of decode errors, the first: " + _telemetry?.FirstDamage);
+                    }
+                    else if (!softwareAfterFailure)
+                    {
+                        // Played to its end from the start and uncut: whatever was wrong with it before is not any more.
+                        _problems?.PlayedClean(part.Part.Path, whole: !cut && seek < MinSegment && damage == 0);
+                    }
 
                     // The file ran out a hair before the clock (metadata runtime vs. real length): wait it out rather
                     // than re-spawning ffmpeg for a fraction of a second until the offset moves on.
@@ -440,6 +472,16 @@ public sealed class FfmpegRestreamer : IDisposable
         software.HardwareDecode = string.Empty;
         return software;
     }
+
+    /// <summary>Puts a file on the Status page's list of files to fix.</summary>
+    private void Problem(string? path, PlayableItem item, ProblemKind kind, string? detail)
+        => _problems?.Report(path, item.DisplayTitle, kind, detail, _stationId, _stationName);
+
+    /// <summary>Where a file stopped and how much of it was still owed, with ffmpeg's reason when it gave one.</summary>
+    internal static string EndedEarlyDetail(TimeSpan early, TimeSpan position, int exitCode, string? reason)
+        => "Stopped about " + position.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture) + " in, " + early.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
+           + " short of its listed length" + (exitCode == 0 ? string.Empty : " (ffmpeg exit " + exitCode.ToString(CultureInfo.InvariantCulture) + ")")
+           + (reason is null ? ": the file is shorter than Jellyfin has it, or cut off" : ": " + reason);
 
     /// <summary>": detail" for a fault message, or nothing when there is no detail.</summary>
     private static string Detail(string? detail) => detail is null ? string.Empty : ": " + detail;

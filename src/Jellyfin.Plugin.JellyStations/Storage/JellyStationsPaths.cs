@@ -41,6 +41,7 @@ public sealed class JellyStationsPaths
         MusicIndexFile = Path.Combine(Root, "music-index.json");
         ClipIndexFile = Path.Combine(Root, "clip-index.json");
         MusicLoudnessFile = Path.Combine(Root, "music-loudness.json");
+        ProblemFilesFile = Path.Combine(Root, "problem-files.json");
     }
 
     /// <summary>Cached weather reports and the rendered weather screens, per place and station.</summary>
@@ -63,6 +64,9 @@ public sealed class JellyStationsPaths
 
     /// <summary>Probed lengths and stream facts of clip folder files, keyed by path.</summary>
     public string ClipIndexFile { get; }
+
+    /// <summary>Files that gave trouble on air or in a folder scan, for the Status page.</summary>
+    public string ProblemFilesFile { get; }
 
     /// <summary>Loudness measurements of music files, keyed by path.</summary>
     public string MusicLoudnessFile { get; }

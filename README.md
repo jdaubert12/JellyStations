@@ -550,6 +550,26 @@ seconds of a station's current program through the real decode, filter and encod
 speed and reports which decoder ffmpeg attached and the speed relative to real time, so you can
 try a decoder before putting it on a profile.
 
+**Problem files** on the same page is the list of files to fix. An encoder's own log goes when its
+stream stops; this list stays, across restarts too. A file is put on it, with its path, ffmpeg's own
+line and the station, when:
+
+- it was **missing or could not be opened** when its program came up (the channel showed a card);
+- **ffmpeg could not play it** and gave up within seconds, after the encoder's fallbacks (software
+  decoding, no tone mapping, no card, no logo) had been tried;
+- it **stopped before its listed end**: the file is cut off, or shorter than the length Jellyfin has
+  for it (refresh its metadata). The entry says how far in it stopped and how much was owed;
+- it **played with decode errors**: three or more lines from the decoder about damaged data, not
+  counting the first seconds after a seek into the middle of a file, which draw a few from sound files;
+- the **GPU decoder failed on it** although its format is one the decoder takes, so it played in
+  software (taken back if the next program fails the same way, which means the device, not the file);
+- a **clip folder scan could not read it** as a video.
+
+A file leaves the list when it next plays through cleanly from its start (a viewer tuning in past the
+damage proves nothing), when it has been replaced or removed, which the page looks for when it opens
+and on **Refresh now**, or when you dismiss it; a dismissed file comes back if it gives trouble again.
+If one ffmpeg error shows on every file, the cause is the encoder or the device rather than the files.
+
 ### Filling out the lineup
 
 **Suggest stations** on the dashboard turns the library analysis into ready-made channels: genres and
@@ -734,6 +754,7 @@ usual Jellyfin API key or session token. The ones worth calling by hand:
 | `GET /JellyStations/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises (the provider's collection name, or shared title prefixes), decades, ratings, tags and libraries (each with its `Videos`, `Clips` of three minutes or under, and `ClipLibrary` when it is bumper material, which keeps it out of every other figure). The basis for station suggestions and the health report. |
 | `GET /JellyStations/Library/ClipFolder?path=` | A folder as a bumper source would see it: `ResolvedPath` (an absolute path, or a name under the plugin's bumpers folder), whether it `Exists` and how many `Videos` it holds. Nothing is probed. A folder source on a station is `{ "Kind": "Folder", "Path": "/media/bumps" }` in `Bumpers.Sources`, `Bumpers.PreRoll.Sources` or `Bumpers.PostRoll.Sources`. |
 | `GET /JellyStations/Health` | Every station that needs attention, as the Status page lists them. |
+| `GET /JellyStations/ProblemFiles`, `DELETE .../ProblemFiles/{id}`, `DELETE .../ProblemFiles` | The files that gave trouble on air or in a folder scan, latest first: `Path`, `Title`, `Kind` (`CannotOpen`, `WouldNotPlay`, `EndedEarly`, `DecodeErrors`, `HardwareDecode`, `Unreadable`), `Problem` (the kind in words), `Detail`, `StationName`, `FirstUtc`, `LastUtc`, `Count`. `recheck=true` first drops the files that were removed, replaced or can be opened again and reports how many as `Settled`. Delete dismisses one file by its `Id`, or empties the list. |
 | `GET /JellyStations/Stations/{id}/History`, `DELETE .../History` | What the station has aired (per series or film: last start and end, the last episode, the count), latest first, and when the snapshot its current schedule continues from was taken; delete empties the log. |
 | `POST /JellyStations/Stations/{id}/Reshuffle` | Deals the schedule afresh from now as a new revision that continues every series from its next episode and rests what just aired. |
 | `GET /JellyStations/Stations/Export`, `POST /JellyStations/Stations/Import` | The stations plus the saved station and block templates as one document; import takes that document or a bare array of stations. |

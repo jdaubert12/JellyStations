@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.28.0.0"
+$version = "1.29.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Bumper clips from a folder. The bumper, pre-roll and post-roll sources in the station editor take a folder on the server as well as library items: type its path under the search box and press ""Add folder"". Every video file in it and its subfolders becomes a clip, so idents and bumps no longer need a Jellyfin library (a Movies or Shows library drops files it cannot match to a title). A name without a path is a folder under data/JellyStations/bumpers in the Jellyfin data folder. Each file is read once with ffprobe and remembered until it changes; a file that cannot be read is listed with the station's excluded items. New files are picked up when the station's content is refreshed (nightly, or Refresh content). API: Path on a Folder content source, GET Library/ClipFolder."
+    changelog = "Problem files on the Status page. A file that gives trouble on a channel is now remembered after the stream stops and across restarts, with its path, what went wrong, ffmpeg's own line and the station: a file that was missing or could not be opened, one ffmpeg could not play, one that stopped before its listed end (cut off, or shorter than Jellyfin has it), one that played with decode errors, one the GPU decoder failed on, and a clip folder file ffprobe could not read. A file leaves the list when it next plays through cleanly from its start, when it has been replaced or removed (looked at when the page opens and on Refresh now), or when you dismiss it. API: GET and DELETE ProblemFiles, DELETE ProblemFiles/{id}."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

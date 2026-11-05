@@ -54,19 +54,22 @@ public sealed class ClipFolderScanner
     private readonly Func<string, IndexEntry> _probe;
     private readonly ILogger _logger;
     private readonly object _lock = new();
+    private readonly Services.ProblemFileLog? _problems;
     private Dictionary<string, IndexEntry>? _index;
 
-    public ClipFolderScanner(JellyStationsPaths paths, MediaProbe probe, ILogger<ClipFolderScanner> logger)
+    public ClipFolderScanner(JellyStationsPaths paths, MediaProbe probe, ILogger<ClipFolderScanner> logger, Services.ProblemFileLog? problems = null)
     {
         _indexFile = paths.ClipIndexFile;
         _bumpersDir = paths.BumpersDir;
         _logger = logger;
         _probe = file => Probe(probe, file);
+        _problems = problems;
     }
 
     /// <summary>For tests: an index file and a bumpers folder of the caller's, and a stand-in for ffprobe.</summary>
-    public ClipFolderScanner(string indexFile, string bumpersDir, Func<string, IndexEntry> probe, ILogger logger)
+    public ClipFolderScanner(string indexFile, string bumpersDir, Func<string, IndexEntry> probe, ILogger logger, Services.ProblemFileLog? problems = null)
     {
+        _problems = problems;
         _indexFile = indexFile;
         _bumpersDir = bumpersDir;
         _probe = probe;
@@ -218,6 +221,8 @@ public sealed class ClipFolderScanner
                 }
             }
 
+            var unreadable = new List<string>();
+            var readable = new List<string>();
             foreach (var file in files)
             {
                 if (!current.TryGetValue(file, out var entry))
@@ -228,12 +233,17 @@ public sealed class ClipFolderScanner
                 if (entry.Playable())
                 {
                     scan.Clips.Add(ToPlayable(file, entry));
+                    readable.Add(file);
                 }
                 else
                 {
+                    unreadable.Add(file);
                     scan.Unreadable.Add(new ExcludedItem { ItemId = IdFor(file), Name = Path.GetFileName(file), Reason = ExclusionReason.Unreadable });
                 }
             }
+
+            // The Status page lists the files a person has to fix, with their paths; the exclusion only has the name.
+            _problems?.FolderScanned(unreadable, readable);
         }
 
         return scan;
