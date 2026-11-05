@@ -33,7 +33,7 @@ public class SubtitleBurnInTests
         var args = FfmpegArgsBuilder.ForFile(Item(), TimeSpan.Zero, null, TimeSpan.Zero, Profile, subtitles: FfmpegArgsBuilder.SubtitleInput.Text("/config/data/JellyStations/subtitles/abc.ass"));
 
         var vf = ValueAfter(args, "-vf");
-        Assert.Contains("flags=bicubic,subtitles=filename='/config/data/JellyStations/subtitles/abc.ass',pad=1280:720", vf);
+        Assert.Contains("flags=bicubic,setsar=1,subtitles=filename='/config/data/JellyStations/subtitles/abc.ass',pad=1280:720", vf);
         Assert.DoesNotContain("setpts", vf);
         Assert.DoesNotContain("-filter_complex", args);
     }
@@ -75,7 +75,7 @@ public class SubtitleBurnInTests
 
         Assert.DoesNotContain("-vf", args);
         var graph = ValueAfter(args, "-filter_complex");
-        Assert.StartsWith("[0:v][0:s:1]overlay=eof_action=pass:repeatlast=0[subbed];[subbed]scale=1280:720", graph);
+        Assert.StartsWith("[0:v][0:s:1]overlay=eof_action=pass:repeatlast=0[subbed];[subbed]scale=w='min(1280,", graph);
         Assert.DoesNotContain("subtitles=", graph);
         Assert.DoesNotContain("setpts", graph);
         Assert.EndsWith("[v]", graph);

@@ -356,11 +356,16 @@ public sealed class StreamSessionManager : IDisposable
         return new Guid(hash.AsSpan(0, 16)).ToString("N");
     }
 
-    /// <summary>What a viewer's decoder has to handle: codec, frame size, rate and range. Bitrate and preset do not count.</summary>
+    /// <summary>
+    /// What a viewer's decoder has to handle: codec, frame size, rate and range. Bitrate and preset do not count.
+    /// The "-sq" marks the square-pixel output: before it a station's frame carried its source's pixel shape, and a
+    /// probe taken during a DVD-shaped program was cached as anamorphic (aspect "3776:2391") and announced for every
+    /// program after. The changed signature gives each station a new id and so a fresh probe.
+    /// </summary>
     public static string OutputSignature(EncodingProfile profile)
         => profile.OutputCodec + "-" + profile.Width.ToString(System.Globalization.CultureInfo.InvariantCulture)
            + "x" + profile.Height.ToString(System.Globalization.CultureInfo.InvariantCulture) + "p" + profile.Fps.ToString(System.Globalization.CultureInfo.InvariantCulture)
-           + (profile.IsHdrOutput ? "-hdr10" : "-sdr");
+           + (profile.IsHdrOutput ? "-hdr10" : "-sdr") + "-sq";
 
     /// <summary>The media source description shared by PlaybackInfo and the opened stream.</summary>
     public static MediaSourceInfo BuildMediaSource(Station station, EncodingProfile profile)

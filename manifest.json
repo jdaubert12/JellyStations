@@ -9,6 +9,14 @@
         "imageUrl":  "",
         "versions":  [
                          {
+                             "version":  "1.26.1.0",
+                             "changelog":  "Square pixels on every program. A source with non-square pixels (DVD rips, 720x480 or 720x576 shown as 4:3 or 16:9) was fitted by its stored size and its pixel shape was passed into the channel\u0027s stream, so the picture came out the wrong width, the shape changed from program to program, and Jellyfin\u0027s cached probe could announce the whole channel as anamorphic; some players (seen with Moonfin on tvOS) then showed the picture squeezed. The picture is now fitted by its display aspect ratio and every program leaves as the same square-pixel frame. Each station gets a new stream id once, so Jellyfin probes it afresh instead of serving the old anamorphic description (the first tune-in after the update takes about 3 seconds longer). When the encoder produces no data within 20 seconds of a tune-in, the server log now carries a warning that names the file and ffmpeg\u0027s last lines.",
+                             "targetAbi":  "12.0.0.0",
+                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.26.1.0/JellyStations_1.26.1.0.zip",
+                             "checksum":  "bc5c90a021cd0ff58736f0e8627cec37",
+                             "timestamp":  "2026-11-05T02:56:59Z"
+                         },
+                         {
                              "version":  "1.26.0.0",
                              "changelog":  "Plugin-wide defaults for the logo bug and the \"Up next\" card. Settings gains a \"Logo bug and Up next card\" section with the same controls a station has; every station follows them unless it sets its own on the Logo step of its editor (\"Set the logo bug for this station\", \"Set the Up next card for this station\"), where the hint says what the default currently is and the form starts from it. Saving a changed default restarts only the streams of the stations that follow it. \"Use on every station\" next to each default drops the stations\u0027 own settings so all of them follow it again (POST /JellyStations/Settings/ClearOverrides/{LogoOverlay|UpNextCard}). Existing stations are brought over once at startup: a bug or card that was off now follows the default (which starts off, so nothing changes on the air), one that was on stays the station\u0027s own; imported stations and saved templates from older versions are treated the same. In the JSON a station without its own carries no logoOverlay / upNextCard, and GET /JellyStations/Settings returns both defaults; the station list says which stations set their own (OwnLogoOverlay, OwnUpNextCard).",
                              "targetAbi":  "12.0.0.0",

@@ -97,6 +97,15 @@ public sealed class StationStreamSession : ILiveStream
         }
         catch (OperationCanceledException) when (!openCancellationToken.IsCancellationRequested)
         {
+            // ffmpeg's own lines are only logged at debug level; without them here a stalled start says nothing
+            // about its cause (a file it cannot seek in, a decoder that hangs, a track with no data).
+            var said = restreamer.RecentErrors;
+            _logger.LogWarning(
+                "JellyStations [{Station}]: no data from the encoder within 20 seconds (ffmpeg {State}, {Title}); it said: {Lines}",
+                StationName,
+                restreamer.CurrentPid is null ? "not running" : "still running",
+                restreamer.CurrentEntry?.Item?.Path ?? "no program",
+                said.Count == 0 ? "nothing" : string.Join(" | ", said.Skip(Math.Max(0, said.Count - 8))));
             throw new TimeoutException("JellyStations: the encoder for '" + StationName + "' produced no data within 20 seconds. Check ffmpeg path and media file access.");
         }
     }

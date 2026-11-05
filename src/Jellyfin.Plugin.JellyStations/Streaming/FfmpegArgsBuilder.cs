@@ -578,7 +578,7 @@ public static partial class FfmpegArgsBuilder
 
     /// <summary>
     /// Scale (letterboxed, to even dimensions: zscale refuses a 4:2:0 picture of odd size, which a 2.40:1 film at
-    /// 1280 wide would otherwise be) to the profile, constant frame rate, then the output range's pixel format and tags. On an
+    /// 1280 wide would otherwise be; square pixels, see <see cref="ScaleToFit"/>) to the profile, constant frame rate, then the output range's pixel format and tags. On an
     /// SDR profile an HDR source is first tone mapped to BT.709 (the zscale/tonemap chain Jellyfin uses for software
     /// tone mapping) and stripped of its HDR side data. On an HDR10 profile an SDR source is converted into PQ, a PQ
     /// source is kept in 10 bits with its mastering metadata, and an HLG source is converted to PQ. The HDR input
@@ -593,7 +593,7 @@ public static partial class FfmpegArgsBuilder
             sb.Append(deinterlace).Append(',');
         }
 
-        sb.Append(CultureInfo.InvariantCulture, $"scale={p.Width}:{p.Height}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic");
+        sb.Append(ScaleToFit(p));
         var hdrSource = !string.IsNullOrEmpty(hdrTransfer);
         if (p.IsHdrOutput)
         {
@@ -624,6 +624,17 @@ public static partial class FfmpegArgsBuilder
         sb.Append(CultureInfo.InvariantCulture, $",pad={p.Width}:{p.Height}:(ow-iw)/2:(oh-ih)/2,fps={p.Fps},{OutputTail(p)}");
         return sb.ToString();
     }
+
+    /// <summary>
+    /// The picture fitted inside the profile's frame in square pixels, to even dimensions. The fit goes by the
+    /// display aspect ratio (dar), not the stored one: a DVD's 720x480 is 4:3 or 16:9 depending on its pixel shape,
+    /// and fitting the stored size left the picture the wrong width with the pixel shape carried into the output,
+    /// where it changed from program to program and players that take the shape from the first one (or from
+    /// Jellyfin's cached probe) showed it squeezed. Every program now leaves as the same square-pixel frame.
+    /// Written as expressions because the scaler's reset_sar option is not in ffmpeg 7.
+    /// </summary>
+    public static string ScaleToFit(EncodingProfile p)
+        => string.Create(CultureInfo.InvariantCulture, $"scale=w='min({p.Width},2*round({p.Height}*dar/2))':h='min({p.Height},2*round({p.Width}/dar/2))':flags=bicubic,setsar=1");
 
     /// <summary>
     /// The deinterlacer for a file under the profile, or null when it is to play as is: bwdif (field motion aware,

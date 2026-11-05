@@ -46,8 +46,8 @@ public class MediaSourceDeclarationTests
     [Fact]
     public void OutputSignature_NamesCodecSizeRateAndRange()
     {
-        Assert.Equal("h264-1920x1080p30-sdr", StreamSessionManager.OutputSignature(new EncodingProfile { Width = 1920, Height = 1080, Fps = 30 }));
-        Assert.Equal("hevc-3840x2160p60-hdr10", StreamSessionManager.OutputSignature(new EncodingProfile { Width = 3840, Height = 2160, Fps = 60, VideoEncoder = "hevc_qsv", OutputRange = EncodingProfile.OutputHdr10 }));
+        Assert.Equal("h264-1920x1080p30-sdr-sq", StreamSessionManager.OutputSignature(new EncodingProfile { Width = 1920, Height = 1080, Fps = 30 }));
+        Assert.Equal("hevc-3840x2160p60-hdr10-sq", StreamSessionManager.OutputSignature(new EncodingProfile { Width = 3840, Height = 2160, Fps = 60, VideoEncoder = "hevc_qsv", OutputRange = EncodingProfile.OutputHdr10 }));
     }
 
     [Fact]

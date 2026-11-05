@@ -9,7 +9,7 @@ namespace Jellyfin.Plugin.JellyStations.Tests.Streaming;
 /// <summary>An HDR10 profile: every graph leaves as 10-bit BT.2020 PQ and the channel is declared as HEVC Main 10.</summary>
 public class HdrOutputTests
 {
-    private const string Scale = "scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic";
+    private const string Scale = "scale=w='min(1280,2*round(720*dar/2))':h='min(720,2*round(1280/dar/2))':flags=bicubic,setsar=1";
     private const string PadFps = "pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30";
     private const string HdrTags = "setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc:range=tv";
     private const string SdrToPq = "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,format=yuv420p10le,zscale=t=smpte2084:p=bt2020:m=bt2020nc:r=tv:npl=100";

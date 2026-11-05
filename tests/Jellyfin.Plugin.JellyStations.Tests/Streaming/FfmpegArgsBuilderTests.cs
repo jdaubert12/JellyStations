@@ -10,7 +10,7 @@ public class FfmpegArgsBuilderTests
 
     private const string SdrOptions = "-color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv";
     private const string SdrTags = "setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709:range=tv";
-    private const string PlainChain = "scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p," + SdrTags;
+    private const string PlainChain = "scale=w='min(1280,2*round(720*dar/2))':h='min(720,2*round(1280/dar/2))':flags=bicubic,setsar=1,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p," + SdrTags;
     private const string TonemapChain = "format=yuv420p10le,zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0:peak=100,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,sidedata=mode=delete";
 
     private static PlayableItem Item(bool hasAudio = true, bool hdr = false, string transfer = "smpte2084", bool interlaced = false) => new()
@@ -32,6 +32,17 @@ public class FfmpegArgsBuilderTests
         var args = FfmpegArgsBuilder.ForFile(Item(interlaced: true), TimeSpan.Zero, null, TimeSpan.Zero, Profile);
 
         Assert.Equal(Bwdif + "," + PlainChain, ValueAfter(args, "-vf"));
+    }
+
+    [Fact]
+    public void Picture_IsFittedByDisplayAspect_AndLeavesInSquarePixels()
+    {
+        // A DVD's 720x480 is 4:3 or 16:9 by its pixel shape; fitting the stored size and passing the shape on
+        // left a frame whose pixel shape changed from program to program.
+        var filter = FfmpegArgsBuilder.VideoFilter(new EncodingProfile { Width = 1920, Height = 1080 });
+
+        Assert.StartsWith("scale=w='min(1920,2*round(1080*dar/2))':h='min(1080,2*round(1920/dar/2))':flags=bicubic,setsar=1,pad=1920:1080:", filter, StringComparison.Ordinal);
+        Assert.DoesNotContain("force_original_aspect_ratio", filter, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -139,7 +150,7 @@ public class FfmpegArgsBuilderTests
         var vf = ValueAfter(args, "-vf");
 
         Assert.Equal(
-            "scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic,setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc," + TonemapChain + ",pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p," + SdrTags,
+            "scale=w='min(1280,2*round(720*dar/2))':h='min(720,2*round(1280/dar/2))':flags=bicubic,setsar=1,setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc," + TonemapChain + ",pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p," + SdrTags,
             vf);
     }
 
@@ -164,7 +175,7 @@ public class FfmpegArgsBuilderTests
         var overlay = new FfmpegArgsBuilder.LogoOverlayInput("/data/logo.png", LogoCorner.TopRight, 70, 8);
         var graph = ValueAfter(FfmpegArgsBuilder.ForFile(Item(hdr: true), TimeSpan.Zero, null, TimeSpan.Zero, Profile, overlay), "-filter_complex");
 
-        Assert.Contains("[0:v]scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic,setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc," + TonemapChain, graph, StringComparison.Ordinal);
+        Assert.Contains("[0:v]scale=w='min(1280,2*round(720*dar/2))':h='min(720,2*round(1280/dar/2))':flags=bicubic,setsar=1,setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc," + TonemapChain, graph, StringComparison.Ordinal);
         Assert.EndsWith("[base][logo]overlay=W-w-20:20:format=yuv420[v]", graph, StringComparison.Ordinal);
     }
 
@@ -181,7 +192,7 @@ public class FfmpegArgsBuilderTests
         Assert.Equal("yuv420p", ValueAfter(args, "-pix_fmt"));
 
         var graph = ValueAfter(args, "-filter_complex");
-        Assert.StartsWith("[0:v]scale=1280:720", graph, StringComparison.Ordinal);
+        Assert.StartsWith("[0:v]scale=w='min(1280,", graph, StringComparison.Ordinal);
         Assert.Contains("[1:v]scale=-1:57,format=rgba,colorchannelmixer=aa=0.70[logo]", graph, StringComparison.Ordinal);
         Assert.EndsWith("[base][logo]overlay=W-w-20:20:format=yuv420[v]", graph, StringComparison.Ordinal);
     }
