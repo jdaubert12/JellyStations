@@ -56,7 +56,10 @@ public enum SourceKind
     /// <summary>One audio track (weather channel music).</summary>
     Audio,
 
-    /// <summary>A folder of audio files on the server (weather channel music); not a library item.</summary>
+    /// <summary>
+    /// A folder of files on the server, not a library item: video clips for the bumpers and the pre-roll and
+    /// post-roll positions (<see cref="ContentSource.Path"/>), and the label of a weather channel's music folder.
+    /// </summary>
     Folder
 }
 
@@ -98,5 +101,8 @@ public enum ExclusionReason
     TagExcluded,
 
     /// <summary>Shorter than the station's minimum runtime.</summary>
-    TooShort
+    TooShort,
+
+    /// <summary>A file in a clip folder that ffprobe could not read as a video with a length.</summary>
+    Unreadable
 }

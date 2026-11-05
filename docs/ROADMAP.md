@@ -150,6 +150,16 @@ the station row's excluded count rises by one.
 - **Bumpers and interstitials — DONE 2026-10-14.** Per-station toggle, clip sources, max clip
   length, optional reserved break after every program; gaps fill with seeded clips and fall back to
   the station card, whose text is now configurable per station.
+  **Clips from a folder — DONE 2026-11-05 (1.28.0.0).** A bumper, pre-roll or post-roll source can be
+  `SourceKind.Folder` with `ContentSource.Path` (absolute, or a name under `data/JellyStations/bumpers`).
+  `ClipFolderScanner` (Library) lists the video files, probes each once with ffprobe for what a library
+  item would carry (length, audio, codec, profile, bit depth, pixel format, interlacing, HDR transfer)
+  and keeps the answers in `clip-index.json` by path, size and modification time; ids are a hash of the
+  path, so exclusions and the air log hold. `LibraryContentResolver.Expand` takes the clips from it,
+  unreadable files become `ExclusionReason.Unreadable`. `MediaProbe` now holds the ffprobe/ffmpeg
+  lookup and runner the music folder scanner had. Folders are rejected as program sources
+  (`StationService.FolderSourceErrors`). Not done: a folder choice under "Bumper clips from" on the
+  suggestions page (a template with folder bumpers covers it), a directory browser in the editor.
 - **Logo overlay on video — DONE 2026-10-15.** ffmpeg `overlay` filter with the station logo in a
   chosen corner, per-station toggle, opacity and size; default off. If the filter fails the stream
   carries on without it for that session.

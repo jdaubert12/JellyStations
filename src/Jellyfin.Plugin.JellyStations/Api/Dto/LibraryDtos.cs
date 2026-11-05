@@ -73,3 +73,18 @@ public sealed class TrackLanguageDto
     /// <summary>How many of the files carry a track in this language.</summary>
     public int Files { get; set; }
 }
+
+/// <summary>A folder of clips on the server, checked before it is added as a bumper source.</summary>
+public sealed class ClipFolderDto
+{
+    /// <summary>Gets or sets the folder as it was typed.</summary>
+    public string Path { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the full path the name leads to on the server.</summary>
+    public string ResolvedPath { get; set; } = string.Empty;
+
+    public bool Exists { get; set; }
+
+    /// <summary>Gets or sets the number of video files under it, subfolders included.</summary>
+    public int Videos { get; set; }
+}

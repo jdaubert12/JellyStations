@@ -53,7 +53,8 @@
     NotVideo: 'Not a video item',
     UserExcluded: 'Excluded on this station',
     TagExcluded: 'Excluded by tag',
-    TooShort: 'Shorter than the station minimum'
+    TooShort: 'Shorter than the station minimum',
+    Unreadable: 'Could not be read as a video'
   };
   const RESOLUTIONS = [['1920x1080', '1920 × 1080 (1080p)'], ['1280x720', '1280 × 720 (720p)'], ['854x480', '854 × 480 (480p)'], ['custom', 'Custom']];
   const ENCODERS = [['libx264', 'libx264 (software)'], ['h264_nvenc', 'h264_nvenc (NVIDIA)'], ['h264_qsv', 'h264_qsv (Intel Quick Sync)'], ['h264_vaapi', 'h264_vaapi (VA-API)'], ['libx265', 'libx265 (software, HEVC)'], ['hevc_nvenc', 'hevc_nvenc (NVIDIA, HEVC)'], ['hevc_qsv', 'hevc_qsv (Intel Quick Sync, HEVC)'], ['hevc_vaapi', 'hevc_vaapi (VA-API, HEVC)'], ['custom', 'Custom…']];
@@ -1572,7 +1573,7 @@
 
   /** True for source kinds that expand to a list the rating / year filters apply to. */
   function hasTuningFilters(src) {
-    return src.Kind !== 'Movie' && src.Kind !== 'Episode';
+    return src.Kind !== 'Movie' && src.Kind !== 'Episode' && src.Kind !== 'Folder';
   }
 
   /** True when a container source should offer the movies / shows filter. */
@@ -1889,14 +1890,14 @@
     setChecked('#tvsBumpersEnabled', !!d.Bumpers.Enabled);
     setVal('#tvsBumperBreak', d.Bumpers.BreakMinutes || 0);
     setVal('#tvsBumperMax', d.Bumpers.MaxClipMinutes || 5);
-    sourcesPicker($('#tvsBumperPicker'), () => state.draft.Bumpers.Sources);
+    sourcesPicker($('#tvsBumperPicker'), () => state.draft.Bumpers.Sources, { folders: true });
     setChecked('#tvsPreRollEnabled', !!d.Bumpers.PreRoll.Enabled);
     setChecked('#tvsPostRollEnabled', !!d.Bumpers.PostRoll.Enabled);
     setChecked('#tvsBumperWeatherEnabled', !!d.Bumpers.Weather.Enabled);
     setVal('#tvsBumperWeatherMinutes', d.Bumpers.Weather.Minutes || 2);
     setVal('#tvsBumperWeatherPosition', d.Bumpers.Weather.Position || 'BeforeProgram');
-    sourcesPicker($('#tvsPreRollPicker'), () => state.draft.Bumpers.PreRoll.Sources);
-    sourcesPicker($('#tvsPostRollPicker'), () => state.draft.Bumpers.PostRoll.Sources);
+    sourcesPicker($('#tvsPreRollPicker'), () => state.draft.Bumpers.PreRoll.Sources, { folders: true });
+    sourcesPicker($('#tvsPostRollPicker'), () => state.draft.Bumpers.PostRoll.Sources, { folders: true });
     renderSeasonRows();
     renderWeatherPanel();
     state.content = null;
@@ -2263,7 +2264,7 @@
     const parts = [name, number];
     const d = state.draft;
     if (d) {
-      const add = sources => (sources || []).forEach(s => parts.push(s.DisplayName || s.Genre || s.Tag || s.ItemId || s.Kind || ''));
+      const add = sources => (sources || []).forEach(s => parts.push(s.DisplayName || s.Genre || s.Tag || s.Path || s.ItemId || s.Kind || ''));
       add(d.Pool && d.Pool.Sources);
       ((d.Slots && d.Slots.Blocks) || []).forEach(b => add(b.Sources));
       add(d.Slots && d.Slots.Filler && d.Slots.Filler.Sources);
@@ -4257,6 +4258,9 @@
   }
 
   function sourceKey(source) {
+    if (source.Kind === 'Folder') {
+      return 'Folder:' + String(source.Path || '').trim().replace(/[\\/]+$/, '').toLowerCase();
+    }
     return source.Kind + ':' + (source.Kind === 'Genre' ? String(source.Genre || '').toLowerCase() : source.Kind === 'Tag' ? String(source.Tag || '').toLowerCase() : (source.ItemId || ''));
   }
 
@@ -4278,7 +4282,7 @@
   /** Inline editor for one source: season range / specials, movies-shows filter, weight; `changed` runs after each edit, `done` closes it. */
   function renderSourceEditor(source, changed, done) {
     const box = el('div', { className: 'tvs-source-editor' });
-    const name = source.DisplayName || source.Genre || source.Tag || '';
+    const name = source.DisplayName || source.Genre || source.Tag || source.Path || '';
     box.appendChild(el('div', { className: 'title', text: 'Tune “' + name + '”' }));
 
     function numberField(label, value, onChange) {
@@ -4334,6 +4338,10 @@
       box.appendChild(numberField('To year', source.YearTo, n => { source.YearTo = n; }));
     }
 
+    if (source.Kind === 'Folder') {
+      box.appendChild(el('div', { className: 'tvs-secondary', text: 'Every video file in ' + (source.Path || 'the folder') + ' and its subfolders. The files are read straight from the disk, so there is nothing to filter on.' }));
+    }
+
     // Audio and subtitle tracks for this source's items: an anime series can play in Japanese with English
     // subtitles burned in while the rest of the station keeps the station's language.
     const audio = languageSelect(source.AudioLanguage, 'Station default', v => { source.AudioLanguage = v; changed(); });
@@ -4343,9 +4351,11 @@
     onlyIf.addEventListener('change', () => { source.SubtitlesOnlyIfAudioMissing = onlyIf.checked; changed(); });
     const onlyIfLabel = el('label', { className: 'f row' }, [onlyIf, el('span', { text: 'Only when the audio language is missing' })]);
     onlyIfLabel.hidden = !source.SubtitleLanguage;
-    box.appendChild(el('label', { className: 'f', title: 'Which audio track to play when a file has more than one' }, [el('span', { text: 'Audio' }), audio.select]));
-    box.appendChild(el('label', { className: 'f', title: 'Subtitles drawn into the picture for every viewer' }, [el('span', { text: 'Subtitles' }), subs.select]));
-    box.appendChild(onlyIfLabel);
+    if (source.Kind !== 'Folder') {
+      box.appendChild(el('label', { className: 'f', title: 'Which audio track to play when a file has more than one' }, [el('span', { text: 'Audio' }), audio.select]));
+      box.appendChild(el('label', { className: 'f', title: 'Subtitles drawn into the picture for every viewer' }, [el('span', { text: 'Subtitles' }), subs.select]));
+      box.appendChild(onlyIfLabel);
+    }
     if (source.ItemId) {
       api('GET', 'Library/Items/' + source.ItemId + '/Languages').then(found => {
         if (found && Array.isArray(found.Audio) && found.Audio.length) { audio.fill(found.Audio); }
@@ -4401,6 +4411,48 @@
     container.appendChild(inputWrap);
     container.appendChild(status);
     container.appendChild(results);
+
+    // A folder of clips on the server, for the pickers that take one: no Jellyfin library needed for the files.
+    const folderInput = el('input', { type: 'text', className: 'emby-input', autocomplete: 'off', placeholder: 'Or a folder of clips on the server, e.g. /media/bumps' });
+    const folderStatus = el('div', { className: 'tvs-info' });
+    function addFolder() {
+      const path = folderInput.value.trim();
+      if (!path) {
+        folderStatus.textContent = 'Type the path of the folder first.';
+        return;
+      }
+      const source = { Kind: 'Folder', Path: path, ItemKinds: [], Weight: 1, DisplayName: path };
+      if (isSelected(source)) {
+        folderStatus.textContent = 'That folder is already added.';
+        return;
+      }
+      folderStatus.textContent = 'Checking…';
+      api('GET', 'Library/ClipFolder', undefined, { path: path }).then(info => {
+        if (!info || !info.Exists) {
+          folderStatus.textContent = 'The server has no folder at ' + ((info && info.ResolvedPath) || path) + '. Use the path as the Jellyfin server sees it (in a container, the path the folder is mounted at).';
+          return;
+        }
+        opts.onAdd(source);
+        folderInput.value = '';
+        renderChips();
+        folderStatus.textContent = info.Videos
+          ? 'Added ' + info.ResolvedPath + ': ' + plural(info.Videos, 'video file') + '.'
+          : 'Added ' + info.ResolvedPath + ', which holds no video files yet.';
+      }).catch(err => readErrors(err).then(messages => {
+        folderStatus.textContent = 'Could not check the folder: ' + messages.join(' ');
+      }));
+    }
+    if (opts.folders && mode === 'sources') {
+      folderInput.addEventListener('keydown', ev => {
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          addFolder();
+        }
+      });
+      container.appendChild(el('div', { className: 'tvs-folder-row' }, [el('div', { className: 'inputContainer' }, folderInput), textButton('Add folder', addFolder)]));
+      container.appendChild(el('div', { className: 'fieldDescription', text: 'Every video file in the folder and its subfolders becomes a clip; Jellyfin needs no library for it. A name without a path means a folder under data/JellyStations/bumpers/ in the Jellyfin data folder. New files are picked up when the station’s content is refreshed (nightly, or Refresh content).' }));
+      container.appendChild(folderStatus);
+    }
 
     function renderKinds() {
       clear(kindRow);
@@ -4492,7 +4544,7 @@
         const badge = sourceBadge(source);
         const children = [
           el('span', { className: 'kind', text: KIND_LABEL[source.Kind] || source.Kind }),
-          el('span', { className: 'label', text: source.DisplayName || source.Genre || source.Tag || source.ItemId || '?' })
+          el('span', { className: 'label', text: source.DisplayName || source.Genre || source.Tag || source.Path || source.ItemId || '?' })
         ];
         if (badge) {
           children.push(el('span', { className: 'badge', text: badge }));

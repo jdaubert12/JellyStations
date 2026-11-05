@@ -34,10 +34,12 @@ public sealed class JellyStationsPaths
         SubtitlesDir = Path.Combine(Root, "subtitles");
         WeatherDir = Path.Combine(Root, "weather");
         MusicDir = Path.Combine(Root, "music");
+        BumpersDir = Path.Combine(Root, "bumpers");
         AssetsDir = Path.Combine(Root, "assets");
         HistoryDir = Path.Combine(Root, "history");
         SettingsFile = Path.Combine(Root, "settings.json");
         MusicIndexFile = Path.Combine(Root, "music-index.json");
+        ClipIndexFile = Path.Combine(Root, "clip-index.json");
         MusicLoudnessFile = Path.Combine(Root, "music-loudness.json");
     }
 
@@ -47,6 +49,9 @@ public sealed class JellyStationsPaths
     /// <summary>Audio files people drop in for weather channel music (one subfolder per station or shared).</summary>
     public string MusicDir { get; }
 
+    /// <summary>Video clips people drop in for the breaks (one subfolder per set), named by a Folder bumper source.</summary>
+    public string BumpersDir { get; }
+
     /// <summary>Fonts and other files the plugin unpacks from its own assembly for ffmpeg to read.</summary>
     public string AssetsDir { get; }
 
@@ -55,6 +60,9 @@ public sealed class JellyStationsPaths
 
     /// <summary>Probed durations and tags of music folder files, keyed by path.</summary>
     public string MusicIndexFile { get; }
+
+    /// <summary>Probed lengths and stream facts of clip folder files, keyed by path.</summary>
+    public string ClipIndexFile { get; }
 
     /// <summary>Loudness measurements of music files, keyed by path.</summary>
     public string MusicLoudnessFile { get; }
@@ -74,6 +82,10 @@ public sealed class JellyStationsPaths
     /// <summary>A folder name under <see cref="MusicDir"/>, or an absolute path, as the person typed it.</summary>
     public string ResolveMusicFolder(string folder)
         => Path.IsPathRooted(folder) ? folder : Path.Combine(MusicDir, folder);
+
+    /// <summary>A folder name under <see cref="BumpersDir"/>, or an absolute path, as the person typed it.</summary>
+    public string ResolveClipFolder(string folder)
+        => Path.IsPathRooted(folder) ? folder : Path.Combine(BumpersDir, folder);
 
     /// <summary>Rendered "Up next" cards, one file per program as it is about to play; rewritten constantly.</summary>
     public string CardsDir { get; }
@@ -133,6 +145,7 @@ public sealed class JellyStationsPaths
         Directory.CreateDirectory(SubtitlesDir);
         Directory.CreateDirectory(WeatherDir);
         Directory.CreateDirectory(MusicDir);
+        Directory.CreateDirectory(BumpersDir);
         Directory.CreateDirectory(AssetsDir);
         Directory.CreateDirectory(HistoryDir);
     }

@@ -14,6 +14,12 @@ public sealed class ContentSource
     /// <summary>Tag name for the Tag kind (case-insensitive).</summary>
     public string? Tag { get; set; }
 
+    /// <summary>
+    /// For the Folder kind (bumper, pre-roll and post-roll sources): a folder of video files on the server, an
+    /// absolute path or a name under the plugin's bumpers folder. Every video file under it is a clip.
+    /// </summary>
+    public string? Path { get; set; }
+
     /// <summary>For Genre, Playlist, BoxSet and Library kinds: which item kinds to include (Movie, Episode). Empty = both.</summary>
     public List<SourceKind> ItemKinds { get; set; } = new();
 

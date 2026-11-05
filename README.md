@@ -60,6 +60,21 @@ right before the next program, and a **post-roll** clip that opens the break aft
 its own sources, or from the bumper sources when it has none; both come out of the existing break, so
 programs still start on the grid, and a position is skipped quietly when no clip fits.
 
+A source for any of the three can be a **folder on the server** instead of something in the library:
+type its path under the search box and press **Add folder**. Every video file in the folder and its
+subfolders becomes a clip, named after the file, so idents and bumps need no Jellyfin library at all
+(a Movies or Shows library drops files it cannot match to a title, and a Home Videos library puts
+them on the home screen). Use the path as the server sees it; with Docker that is the path the folder
+is mounted at inside the container. A name without a path means a folder under
+`data/JellyStations/bumpers/` in the Jellyfin data folder. The plugin reads each file once with
+ffprobe (its length, sound, codec, interlacing, HDR) and remembers the answer until the file changes,
+so only the first refresh after adding clips takes longer. A file that cannot be read as a video is
+listed with the station's excluded items, and a folder that is missing or empty shows as an empty
+source in the station's health. New files are picked up when the station's content is refreshed
+(nightly, or **Refresh content**), the same as library sources. Folder clips have no tags, ratings or
+track choices to tune, only a weight; a single clip can still be left out from the station's content
+list. A folder can be a bumper, pre-roll or post-roll source only, not a program source.
+
 **Local weather in the breaks** puts a short run of the [weather channel](#weather-channel)'s screens
 (title card, current conditions, radar, forecasts…) into every break that has at least 45 seconds of
 room, up to a length you set (1 to 10 minutes), either at the end of the break right before the next
@@ -576,9 +591,11 @@ A library that holds nothing but short clips (no episodes, and at least four in 
 three minutes or under) is treated as bumper material, not programs: it stays out of the genre,
 decade and rating figures, gets no channel, and the page offers it under **Bumper clips from**.
 Pick it and every station created, previewed or opened from the page plays those clips in its
-breaks (a station with no break and no padding gets a two-minute break to play them in). Bumper
-folders need a **Home Videos and Photos** library to show up in Jellyfin at all; a Movies or Shows
-library drops files it cannot match to a title.
+breaks (a station with no break and no padding gets a two-minute break to play them in). As a
+library, a folder of bumps needs the **Home Videos and Photos** type to show up in Jellyfin at all (a
+Movies or Shows library drops files it cannot match to a title). Clips kept in a plain folder instead
+(see [Bumpers and station cards](#bumpers-and-station-cards)) reach suggested stations through a
+station template whose bumpers name that folder, picked under **Look and breaks from**.
 
 **Not on a channel** on the dashboard lists the movies and shows no channel plays, from the compiled
 content of every enabled station (clips used as bumpers or idents count as on it). Tick titles and
@@ -715,6 +732,7 @@ usual Jellyfin API key or session token. The ones worth calling by hand:
 | Endpoint | What it returns or does |
 |---|---|
 | `GET /JellyStations/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises (the provider's collection name, or shared title prefixes), decades, ratings, tags and libraries (each with its `Videos`, `Clips` of three minutes or under, and `ClipLibrary` when it is bumper material, which keeps it out of every other figure). The basis for station suggestions and the health report. |
+| `GET /JellyStations/Library/ClipFolder?path=` | A folder as a bumper source would see it: `ResolvedPath` (an absolute path, or a name under the plugin's bumpers folder), whether it `Exists` and how many `Videos` it holds. Nothing is probed. A folder source on a station is `{ "Kind": "Folder", "Path": "/media/bumps" }` in `Bumpers.Sources`, `Bumpers.PreRoll.Sources` or `Bumpers.PostRoll.Sources`. |
 | `GET /JellyStations/Health` | Every station that needs attention, as the Status page lists them. |
 | `GET /JellyStations/Stations/{id}/History`, `DELETE .../History` | What the station has aired (per series or film: last start and end, the last episode, the count), latest first, and when the snapshot its current schedule continues from was taken; delete empties the log. |
 | `POST /JellyStations/Stations/{id}/Reshuffle` | Deals the schedule afresh from now as a new revision that continues every series from its next episode and rests what just aired. |

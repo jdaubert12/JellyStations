@@ -18,11 +18,13 @@ public sealed class LibraryContentResolver
 {
     private readonly ILibraryManager _libraryManager;
     private readonly ILogger<LibraryContentResolver> _logger;
+    private readonly ClipFolderScanner? _clips;
 
-    public LibraryContentResolver(ILibraryManager libraryManager, ILogger<LibraryContentResolver> logger)
+    public LibraryContentResolver(ILibraryManager libraryManager, ILogger<LibraryContentResolver> logger, ClipFolderScanner? clips = null)
     {
         _libraryManager = libraryManager;
         _logger = logger;
+        _clips = clips;
     }
 
     /// <summary>
@@ -30,7 +32,9 @@ public sealed class LibraryContentResolver
     /// dropped from every source except hand-picked Movie/Episode sources and a Tag source for that same tag; each is
     /// recorded once in <paramref name="excluded"/> (and snapshotted in <paramref name="tagExcluded"/> when given).
     /// An item hand-picked anywhere in <paramref name="sources"/> is never tag-dropped by another source, whatever the
-    /// order, so adding a movie on purpose always wins over a tag that would otherwise hide it.
+    /// order, so adding a movie on purpose always wins over a tag that would otherwise hide it. A Folder source is
+    /// not a library query: its clips come from <see cref="ClipFolderScanner"/>, carry no tags, and the files that
+    /// could not be read are recorded in <paramref name="excluded"/>.
     /// </summary>
     public List<PlayableItem> Expand(
         IEnumerable<ContentSource> sources,
@@ -51,7 +55,37 @@ public sealed class LibraryContentResolver
             var tracks = TrackPreferences.For(source, audioLanguage);
             var found = 0;
             var alreadyListed = 0;
-            foreach (var item in ExpandSource(source))
+            if (source.Kind == SourceKind.Folder)
+            {
+                var scan = _clips?.Scan(source.Path) ?? new ClipFolderScan();
+                found = scan.Files;
+                foreach (var unreadable in scan.Unreadable)
+                {
+                    // Reported once; met again through an overlapping folder it counts as listed, like a clip would.
+                    if (seen.Add(unreadable.ItemId))
+                    {
+                        excluded.Add(unreadable);
+                    }
+                    else
+                    {
+                        alreadyListed++;
+                    }
+                }
+
+                foreach (var clip in scan.Clips)
+                {
+                    if (seen.Add(clip.ItemId))
+                    {
+                        block.Add(clip);
+                    }
+                    else
+                    {
+                        alreadyListed++;
+                    }
+                }
+            }
+
+            foreach (var item in source.Kind == SourceKind.Folder ? Array.Empty<BaseItem>() : ExpandSource(source))
             {
                 found++;
                 if (!seen.Add(item.Id))

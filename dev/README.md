@@ -24,7 +24,7 @@ join-in-progress offsets can be checked by eye). Regenerate them with the comman
 `dev/make-media.sh` if the folder is empty. `dev/config` and `dev/cache` are the container's
 state and are git-ignored.
 
-Plugin data on the test server: `dev/config/data/JellyStations/`. Plugin DLL: `dev/config/plugins/JellyStations_1.27.0.0/`.
+Plugin data on the test server: `dev/config/data/JellyStations/`. Plugin DLL: `dev/config/plugins/JellyStations_1.28.0.0/`.
 
 ## Stream test
 

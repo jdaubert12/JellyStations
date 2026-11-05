@@ -20,9 +20,11 @@ public sealed class LibraryController : ControllerBase
     private readonly LibraryAnalysisService _analysis;
     private readonly StationService _stations;
     private readonly LibraryContentResolver _resolver;
+    private readonly ClipFolderScanner _clips;
 
-    public LibraryController(LibrarySearchService search, LibraryAnalysisService analysis, StationService stations, LibraryContentResolver resolver)
+    public LibraryController(LibrarySearchService search, LibraryAnalysisService analysis, StationService stations, LibraryContentResolver resolver, ClipFolderScanner clips)
     {
+        _clips = clips;
         _search = search;
         _analysis = analysis;
         _stations = stations;
@@ -60,6 +62,23 @@ public sealed class LibraryController : ControllerBase
 
     [HttpGet("Libraries")]
     public ActionResult<IEnumerable<LibraryFolderDto>> Libraries() => Ok(_search.Libraries());
+
+    /// <summary>
+    /// A folder on the server as a bumper source would see it: where the name leads (an absolute path, or a folder
+    /// under the plugin's bumpers folder), whether it is there and how many video files it holds. Nothing is probed.
+    /// </summary>
+    [HttpGet("ClipFolder")]
+    public ActionResult<ClipFolderDto> ClipFolder([FromQuery] string? path)
+    {
+        var files = _clips.Files(path);
+        return Ok(new ClipFolderDto
+        {
+            Path = Text.TrimOrNull(path) ?? string.Empty,
+            ResolvedPath = _clips.Resolve(path) ?? string.Empty,
+            Exists = files is not null,
+            Videos = files?.Count ?? 0
+        });
+    }
 
     /// <summary>
     /// One pass over the library: hours per genre, series with episode counts and ratings, collections, franchises

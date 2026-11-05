@@ -111,7 +111,7 @@ public sealed class SourceExpansion
     public static string Describe(ContentSource source)
     {
         var name = !string.IsNullOrWhiteSpace(source.DisplayName) ? source.DisplayName
-            : source.Genre ?? source.Tag ?? source.ItemId?.ToString("N") ?? "?";
+            : source.Genre ?? source.Tag ?? source.Path ?? source.ItemId?.ToString("N") ?? "?";
         var filters = new List<string>();
         if (!string.IsNullOrWhiteSpace(source.MaxRating))
         {

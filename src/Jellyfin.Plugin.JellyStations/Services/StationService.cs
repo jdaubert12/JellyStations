@@ -681,6 +681,7 @@ public sealed class StationService
         {
             src.ItemKinds ??= new List<SourceKind>();
             src.Tag = Text.TrimOrNull(src.Tag);
+            src.Path = src.Kind == SourceKind.Folder ? Text.TrimOrNull(src.Path) : null;
             src.Weight = Math.Clamp(src.Weight, 1, 10);
             (src.SeasonFrom, src.SeasonTo) = CleanRange(src.SeasonFrom, src.SeasonTo, 1);
             src.MaxRating = Library.RatingLadder.Rank(src.MaxRating) is null ? null : Library.RatingLadder.Normalize(src.MaxRating);
@@ -705,6 +706,42 @@ public sealed class StationService
         }
 
         return from.HasValue && to.HasValue && from > to ? (to, from) : (from, to);
+    }
+
+    /// <summary>
+    /// A folder of clips is break material: it needs a path, and it cannot be a program source (the pool, the
+    /// filler or a time block play library items, which the guide, the coverage report and the suggestions know).
+    /// </summary>
+    public static List<string> FolderSourceErrors(Station s)
+    {
+        var errors = new List<string>();
+        void NoFolders(List<ContentSource>? sources, string where)
+        {
+            if (sources?.Any(x => x.Kind == SourceKind.Folder) == true)
+            {
+                errors.Add(where + ": a folder of clips can only be a bumper, pre-roll or post-roll source.");
+            }
+        }
+
+        void NeedsPath(List<ContentSource>? sources, string where)
+        {
+            if (sources?.Any(x => x.Kind == SourceKind.Folder && string.IsNullOrWhiteSpace(x.Path)) == true)
+            {
+                errors.Add(where + ": a folder source needs the folder's path.");
+            }
+        }
+
+        NoFolders(s.Pool?.Sources, "Pool");
+        NoFolders(s.Slots?.Filler?.Sources, "Filler");
+        foreach (var block in s.Slots?.Blocks ?? new List<SlotBlock>())
+        {
+            NoFolders(block.Sources, string.IsNullOrWhiteSpace(block.Name) ? "Block" : "Block \"" + block.Name + "\"");
+        }
+
+        NeedsPath(s.Bumpers?.Sources, "Bumpers");
+        NeedsPath(s.Bumpers?.PreRoll?.Sources, "Pre-roll");
+        NeedsPath(s.Bumpers?.PostRoll?.Sources, "Post-roll");
+        return errors;
     }
 
     private List<string> Validate(Station s, Station? existing)
@@ -750,6 +787,8 @@ public sealed class StationService
         {
             errors.Add($"Unknown time zone '{s.TimeZoneId}'.");
         }
+
+        errors.AddRange(FolderSourceErrors(s));
 
         if (s.Mode == ScheduleMode.Pool && s.Pool.Sources.Count == 0)
         {

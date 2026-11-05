@@ -49,6 +49,8 @@
       #JellyStationsPage .tvs-suggest-near { margin-top: 1.2em; }
       #JellyStationsPage .tvs-suggest-near ul { margin: .3em 0 .6em; padding-left: 1.3em; columns: 2 18em; }
       #JellyStationsPage .tvs-suggest-near li { opacity: .85; font-size: .95em; break-inside: avoid; }
+      #JellyStationsPage .tvs-folder-row { display: flex; gap: .6em; align-items: flex-end; margin-top: .6em; }
+      #JellyStationsPage .tvs-folder-row .inputContainer { flex: 1; margin-bottom: 0; }
       #JellyStationsPage .tvs-grid3 { display: grid; grid-template-columns: repeat(3, 1fr); column-gap: 1.5em; }
       #JellyStationsPage .tvs-grid3 > * { min-width: 0; }
       @media (max-width: 900px) { #JellyStationsPage .tvs-grid3 { grid-template-columns: 1fr; } }
@@ -795,7 +797,7 @@
                 <input is="emby-checkbox" type="checkbox" id="tvsBumpersEnabled">
                 <span>Fill gaps with short clips</span>
               </label>
-              <div class="fieldDescription checkboxFieldDescription">Idents, trailers or bumpers play in the gaps between programs. When this is off, or no clip fits a gap, the station card is shown instead. Clips do not appear in the guide.</div>
+              <div class="fieldDescription checkboxFieldDescription">Idents, trailers or bumpers play in the gaps between programs. When this is off, or no clip fits a gap, the station card is shown instead. Clips do not appear in the guide. They can come from the library (search below) or straight from a folder on the server.</div>
             </div>
             <div id="tvsBumperOptions">
               <div id="tvsBumperPicker"></div>

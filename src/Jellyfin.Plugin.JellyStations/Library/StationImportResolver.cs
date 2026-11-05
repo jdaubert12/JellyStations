@@ -73,6 +73,12 @@ public sealed class StationImportResolver
         {
             var source = sources[i];
             var name = source.DisplayName ?? string.Empty;
+            if (source.Kind == SourceKind.Folder)
+            {
+                // A path, not a library item: nothing to match. A folder this server lacks shows up as an empty source.
+                continue;
+            }
+
             if (source.Kind is SourceKind.Genre or SourceKind.Tag)
             {
                 if (source.LibraryId.HasValue && !Exists(source.LibraryId.Value))
@@ -136,7 +142,7 @@ public sealed class StationImportResolver
 
     private static string Describe(ContentSource s)
     {
-        var label = s.DisplayName ?? s.Genre ?? s.Tag ?? s.ItemId?.ToString("N") ?? "?";
+        var label = s.DisplayName ?? s.Genre ?? s.Tag ?? s.Path ?? s.ItemId?.ToString("N") ?? "?";
         return s.Kind.ToString().ToLowerInvariant() + " \"" + label + "\"";
     }
 

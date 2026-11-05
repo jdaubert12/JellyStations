@@ -24,6 +24,8 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<SettingsRepository>();
         serviceCollection.AddSingleton<AirLogRepository>();
 
+        serviceCollection.AddSingleton<MediaProbe>();
+        serviceCollection.AddSingleton<ClipFolderScanner>();
         serviceCollection.AddSingleton<LibraryContentResolver>();
         serviceCollection.AddSingleton<MusicFolderScanner>();
         serviceCollection.AddSingleton<MusicLoudnessService>();

@@ -1,12 +1,9 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Storage;
-using Jellyfin.Plugin.JellyStations.Streaming;
-using MediaBrowser.Controller.MediaEncoding;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.JellyStations.Library;
@@ -24,17 +21,15 @@ public sealed class MusicFolderScanner
     };
 
     private readonly JellyStationsPaths _paths;
-    private readonly IMediaEncoder _mediaEncoder;
-    private readonly SettingsRepository _settings;
+    private readonly MediaProbe _probe;
     private readonly ILogger<MusicFolderScanner> _logger;
     private readonly object _lock = new();
     private Dictionary<string, IndexEntry>? _index;
 
-    public MusicFolderScanner(JellyStationsPaths paths, IMediaEncoder mediaEncoder, SettingsRepository settings, ILogger<MusicFolderScanner> logger)
+    public MusicFolderScanner(JellyStationsPaths paths, MediaProbe probe, ILogger<MusicFolderScanner> logger)
     {
         _paths = paths;
-        _mediaEncoder = mediaEncoder;
-        _settings = settings;
+        _probe = probe;
         _logger = logger;
     }
 
@@ -162,34 +157,8 @@ public sealed class MusicFolderScanner
         return _index;
     }
 
-    private string? ProbePath()
-    {
-        var probe = _mediaEncoder.ProbePath;
-        if (!string.IsNullOrWhiteSpace(probe) && File.Exists(probe))
-        {
-            return probe;
-        }
-
-        // Next to the ffmpeg in use (an override may point at a build with its own ffprobe).
-        var ffmpeg = FfmpegPath();
-        var dir = Path.GetDirectoryName(ffmpeg);
-        if (dir is not null)
-        {
-            foreach (var name in new[] { "ffprobe", "ffprobe.exe" })
-            {
-                var candidate = Path.Combine(dir, name);
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-            }
-        }
-
-        return null;
-    }
-
     /// <summary>The ffmpeg in use: the settings override, else Jellyfin's.</summary>
-    public string FfmpegPath() => StreamSessionManager.ResolveFfmpegPath(_settings.Get().FfmpegPathOverride, _mediaEncoder.EncoderPath);
+    public string FfmpegPath() => _probe.FfmpegPath();
 
     /// <summary>Length and tags of one file; a zero runtime means it could not be read and the file is skipped.</summary>
     public IndexEntry Probe(string file)
@@ -197,16 +166,16 @@ public sealed class MusicFolderScanner
         var entry = new IndexEntry();
         try
         {
-            var probe = ProbePath();
+            var probe = _probe.ProbePath();
             if (probe is not null)
             {
-                var output = Run(probe, new[] { "-v", "error", "-show_entries", "format=duration:format_tags=title,artist,album_artist", "-of", "json", file }, stderr: false);
+                var output = MediaProbe.Run(probe, new[] { "-v", "error", "-show_entries", "format=duration:format_tags=title,artist,album_artist", "-of", "json", file }, stderr: false);
                 ParseProbeJson(output, entry);
             }
 
             if (entry.RuntimeTicks <= 0)
             {
-                var output = Run(FfmpegPath(), new[] { "-hide_banner", "-nostdin", "-i", file }, stderr: true);
+                var output = MediaProbe.Run(FfmpegPath(), new[] { "-hide_banner", "-nostdin", "-i", file }, stderr: true);
                 ParseFfmpegInfo(output, entry);
             }
         }
@@ -303,40 +272,5 @@ public sealed class MusicFolderScanner
                 entry.Artist = value;
             }
         }
-    }
-
-    private static string Run(string exe, IReadOnlyList<string> args, bool stderr)
-    {
-        var psi = new ProcessStartInfo(exe)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true
-        };
-        foreach (var a in args)
-        {
-            psi.ArgumentList.Add(a);
-        }
-
-        using var proc = Process.Start(psi) ?? throw new InvalidOperationException("could not start " + exe);
-        var outTask = proc.StandardOutput.ReadToEndAsync();
-        var errTask = proc.StandardError.ReadToEndAsync();
-        if (!proc.WaitForExit(15000))
-        {
-            try
-            {
-                proc.Kill(true);
-            }
-            catch (Exception)
-            {
-                // Already gone.
-            }
-
-            throw new TimeoutException(exe + " did not finish within 15 s");
-        }
-
-        Task.WaitAll(outTask, errTask);
-        return stderr ? errTask.Result : outTask.Result;
     }
 }

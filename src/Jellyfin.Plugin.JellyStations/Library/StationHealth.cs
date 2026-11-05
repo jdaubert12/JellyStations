@@ -149,6 +149,7 @@ public static class StationHealth
         ExclusionReason.UserExcluded => "excluded on this station",
         ExclusionReason.TagExcluded => "excluded by tag",
         ExclusionReason.TooShort => "shorter than the station's minimum runtime",
+        ExclusionReason.Unreadable => "could not be read as a video",
         _ => reason.ToString()
     };
 }
