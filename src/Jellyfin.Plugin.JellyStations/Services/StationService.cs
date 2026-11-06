@@ -950,6 +950,12 @@ public sealed class StationService
             errors.Add("deinterlacing must be " + string.Join(", ", EncodingProfile.DeinterlaceModes) + ".");
         }
 
+        var scaler = (p.Scaler ?? string.Empty).Trim().ToLowerInvariant();
+        if (scaler.Length > 0 && !EncodingProfile.Scalers.Contains(scaler, StringComparer.Ordinal))
+        {
+            errors.Add("scaling must be " + string.Join(", ", EncodingProfile.Scalers) + ".");
+        }
+
         return errors;
     }
 

@@ -152,7 +152,7 @@ public static partial class FfmpegArgsBuilder
             step++;
         }
 
-        var upscale = w == p.Width && h == p.Height ? string.Empty : string.Create(CultureInfo.InvariantCulture, $"scale={p.Width}:{p.Height}:flags=bicubic,");
+        var upscale = w == p.Width && h == p.Height ? string.Empty : string.Create(CultureInfo.InvariantCulture, $"scale={p.Width}:{p.Height}:flags={p.ScalerFlags()},");
         sb.Append(CultureInfo.InvariantCulture, $"[{current}]{upscale}{SdrGraphToOutput(p)}{EncoderUploadSuffix(p)}[v]");
         return sb.ToString();
     }

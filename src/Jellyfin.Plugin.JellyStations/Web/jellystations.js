@@ -61,6 +61,8 @@
   const OUTPUT_RANGES = [['sdr', 'SDR (BT.709, 8-bit)'], ['hdr10', 'HDR10 (BT.2020 PQ, 10-bit HEVC)']];
   const HW_DECODERS = [['auto', 'Follow Jellyfin'], ['', 'None (software)'], ['qsv', 'Intel Quick Sync (qsv)'], ['vaapi', 'VA-API'], ['cuda', 'NVIDIA (cuda)'], ['videotoolbox', 'Apple VideoToolbox'], ['d3d11va', 'Windows (d3d11va)']];
   const DEINTERLACE_MODES = [['auto', 'When the file is interlaced'], ['always', 'Always'], ['off', 'Off']];
+  // EncodingProfile.Scalers: how a program is resized to the channel's frame.
+  const SCALERS = [['bicubic', 'Bicubic (default)'], ['lanczos', 'Lanczos (sharper)'], ['spline', 'Spline (smooth)'], ['bilinear', 'Bilinear (softest)']];
   const STATUS_INTERVAL_MS = 5000;
   const LIST_INTERVAL_MS = 60000;
 
@@ -1885,7 +1887,23 @@
     Object.keys(REVEALS).forEach(syncReveal);
   }
 
+  /**
+   * Fills the editor from state.draft. While it runs the form is half this station and half whatever it showed
+   * before, so readDraft must not read it back: a source list that holds single movies or episodes beside a wider
+   * source asks the server what is already covered as soon as it is drawn, and that request reads the draft. It used
+   * to read the form, which overwrote every field filled later (the station's own encoding, and after a bumper
+   * list the mode, time zone and more) with stale values that the editor then showed and a save kept.
+   */
   function renderEditor() {
+    state.fillingEditor = true;
+    try {
+      fillEditor();
+    } finally {
+      state.fillingEditor = false;
+    }
+  }
+
+  function fillEditor() {
     const d = state.draft;
     const isNew = isNewDraft();
 
@@ -2485,6 +2503,10 @@
 
   function readDraft() {
     const d = state.draft;
+    if (state.fillingEditor) {
+      // The form is still being filled from the draft (see renderEditor): the draft is the truth, the form is not yet.
+      return toPayload(d);
+    }
     d.Name = val('#tvsName').trim();
     d.ChannelNumber = val('#tvsChannel').trim();
     d.CallSign = val('#tvsCallSign').trim() || null;
@@ -4759,7 +4781,7 @@
     return {
       Width: 1280, Height: 720, Fps: 30, VideoBitrateKbps: 3500, AudioBitrateKbps: 160,
       VideoEncoder: 'libx264', OutputRange: 'sdr', Preset: 'veryfast', H264Profile: 'high', H264Level: '4.1', GopSeconds: 2,
-      HardwareDecode: 'auto', HardwareDevice: '', Deinterlace: 'auto',
+      HardwareDecode: 'auto', HardwareDevice: '', Deinterlace: 'auto', Scaler: 'bicubic',
       ExtraInputArgs: '', ExtraOutputArgs: '', AudioLanguagePreference: 'eng'
     };
   }
@@ -4841,6 +4863,7 @@
         '</div>' +
         inputHtml(p + 'fps', 'Frame rate (fps)', 'number', { min: 1, max: 120, step: 1 }, 'Constant output frame rate. 24 suits a film station (most movies are 23.976 fps and judder when converted to 30); 30 suits series; 60 only for 60 fps sources.') +
         selectHtml(p + 'deint', 'Deinterlacing', DEINTERLACE_MODES, 'Interlaced files (DVD rips, broadcast captures) are deinterlaced before scaling, so the combing never reaches the stream. "When the file is interlaced" follows the field order Jellyfin probed; "Always" is for files whose flags are missing; "Off" plays them as they are. Standard-definition files cost almost nothing; 1080i costs some CPU per station. On a 50 or 60 fps profile every field becomes a frame, so video-shot material keeps its motion.') +
+        selectHtml(p + 'scaler', 'Scaling', SCALERS, 'How a program is resized to the channel\'s picture size, whether it is scaled up or down. Bicubic is the usual choice. Lanczos keeps more edge detail, most visible when a smaller source is scaled up, at close to twice the scaling work and with faint halos on very hard edges such as subtitles and cartoons. Spline is smooth and the costliest; bilinear is the softest. None adds detail the file does not have, and the cost is small next to the encode.') +
         inputHtml(p + 'gop', 'Keyframe interval (seconds)', 'number', { min: 1, max: 30, step: 1 }, 'GOP length. Shorter makes channel changes faster at a small bitrate cost.') +
         inputHtml(p + 'vbr', 'Video bitrate (kbps)', 'number', { min: 100, max: 100000, step: 50 }, 'Target bitrate for the video stream. 3500 is plenty for 720p and 8000 for 1080p, and 4K HEVC wants around 20000; more only inflates every client\'s download and Jellyfin\'s transcodes.') +
         inputHtml(p + 'abr', 'Audio bitrate (kbps)', 'number', { min: 32, max: 1024, step: 8 }, 'AAC audio bitrate.') +
@@ -4949,6 +4972,8 @@
         q('hwdev').value = e.HardwareDevice || '';
         const deint = e.Deinterlace == null ? 'auto' : String(e.Deinterlace).trim().toLowerCase();
         q('deint').value = DEINTERLACE_MODES.some(o => o[0] === deint) ? deint : 'auto';
+        const scaler = String(e.Scaler || '').trim().toLowerCase();
+        q('scaler').value = SCALERS.some(o => o[0] === scaler) ? scaler : 'bicubic';
         q('inArgs').value = e.ExtraInputArgs || '';
         q('outArgs').value = e.ExtraOutputArgs || '';
         bitrateFollows = holdsSuggestedBitrate();
@@ -4971,6 +4996,7 @@
           HardwareDecode: q('hwdec').value,
           HardwareDevice: q('hwdev').value.trim(),
           Deinterlace: q('deint').value,
+          Scaler: q('scaler').value,
           ExtraInputArgs: q('inArgs').value.trim(),
           ExtraOutputArgs: q('outArgs').value.trim(),
           AudioLanguagePreference: q('lang').value.trim()

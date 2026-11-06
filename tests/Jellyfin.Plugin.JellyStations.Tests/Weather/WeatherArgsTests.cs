@@ -72,6 +72,9 @@ public class WeatherArgsTests
         Assert.Contains("fontsize=54:fontcolor=white:x=80:y=988", f); // the clock on the 1080 grid, scaled up with the picture
         Assert.Single(System.Text.RegularExpressions.Regex.Matches(f, "scale=3840:2160"));
         Assert.EndsWith("scale=3840:2160:flags=bicubic,format=yuv420p," + FfmpegArgsBuilder.SdrTags + "[v]", f);
+
+        var sharp = Filter(FfmpegArgsBuilder.ForWeather(Segment(music: false), TimeSpan.Zero, new EncodingProfile { Width = 3840, Height = 2160, Fps = 30, Scaler = "lanczos" }));
+        Assert.EndsWith("scale=3840:2160:flags=lanczos,format=yuv420p," + FfmpegArgsBuilder.SdrTags + "[v]", sharp);
     }
 
     [Fact]

@@ -632,9 +632,10 @@ public static partial class FfmpegArgsBuilder
     /// where it changed from program to program and players that take the shape from the first one (or from
     /// Jellyfin's cached probe) showed it squeezed. Every program now leaves as the same square-pixel frame.
     /// Written as expressions because the scaler's reset_sar option is not in ffmpeg 7.
+    /// The algorithm is the profile's <see cref="EncodingProfile.Scaler"/>.
     /// </summary>
     public static string ScaleToFit(EncodingProfile p)
-        => string.Create(CultureInfo.InvariantCulture, $"scale=w='min({p.Width},2*round({p.Height}*dar/2))':h='min({p.Height},2*round({p.Width}/dar/2))':flags=bicubic,setsar=1");
+        => string.Create(CultureInfo.InvariantCulture, $"scale=w='min({p.Width},2*round({p.Height}*dar/2))':h='min({p.Height},2*round({p.Width}/dar/2))':flags={p.ScalerFlags()},setsar=1");
 
     /// <summary>
     /// The deinterlacer for a file under the profile, or null when it is to play as is: bwdif (field motion aware,

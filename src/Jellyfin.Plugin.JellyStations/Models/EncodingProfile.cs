@@ -78,6 +78,34 @@ public sealed class EncodingProfile
         _ => fileInterlaced
     };
 
+    /// <summary>
+    /// How a program is resized to the channel's frame, up or down: <see cref="ScalerBicubic"/> (the default),
+    /// <see cref="ScalerLanczos"/> (sharper, close to twice the scaling CPU, can ring on hard edges),
+    /// <see cref="ScalerSpline"/> (smooth, the costliest) or <see cref="ScalerBilinear"/> (softest). ffmpeg's
+    /// software scaler in every case; the cost is small beside the encode.
+    /// </summary>
+    public string Scaler { get; set; } = ScalerBicubic;
+
+    public const string ScalerBicubic = "bicubic";
+
+    public const string ScalerLanczos = "lanczos";
+
+    public const string ScalerSpline = "spline";
+
+    public const string ScalerBilinear = "bilinear";
+
+    public static readonly string[] Scalers = { ScalerBicubic, ScalerLanczos, ScalerSpline, ScalerBilinear };
+
+    /// <summary>
+    /// The scale filter's flags value for this profile. Only a listed name gets into ffmpeg's filter text; blank or
+    /// anything else (a profile from before the setting, a hand-edited file) is bicubic.
+    /// </summary>
+    public string ScalerFlags()
+    {
+        var name = (Scaler ?? string.Empty).Trim().ToLowerInvariant();
+        return Array.IndexOf(Scalers, name) >= 0 ? name : ScalerBicubic;
+    }
+
     public const string OutputSdr = "sdr";
 
     public const string OutputHdr10 = "hdr10";

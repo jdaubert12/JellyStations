@@ -6,6 +6,34 @@ namespace Jellyfin.Plugin.JellyStations.Tests.Streaming;
 
 public class FfmpegArgsBuilderTests
 {
+    [Theory]
+    [InlineData("lanczos", "lanczos")]
+    [InlineData("Spline", "spline")]
+    [InlineData(" bilinear ", "bilinear")]
+    [InlineData("bicubic", "bicubic")]
+    [InlineData("", "bicubic")]
+    [InlineData(null, "bicubic")]
+    [InlineData("lanczos,setsar=2", "bicubic")]
+    public void TheProfilesScaler_IsTheScaleFiltersAlgorithm_AndOnlyAListedOneGetsIn(string? scaler, string flags)
+    {
+        var p = new EncodingProfile { Width = 1920, Height = 1080, Scaler = scaler! };
+
+        Assert.Equal("scale=w='min(1920,2*round(1080*dar/2))':h='min(1080,2*round(1920/dar/2))':flags=" + flags + ",setsar=1", FfmpegArgsBuilder.ScaleToFit(p));
+        Assert.Contains(":flags=" + flags + ",setsar=1", FfmpegArgsBuilder.VideoFilter(p));
+    }
+
+    [Fact]
+    public void ValidateEncoding_TakesTheListedScalers_AndRefusesOthers()
+    {
+        foreach (var scaler in EncodingProfile.Scalers)
+        {
+            Assert.Empty(Jellyfin.Plugin.JellyStations.Services.StationService.ValidateEncoding(new EncodingProfile { Scaler = scaler }));
+        }
+
+        Assert.Equal("bicubic", new EncodingProfile().Scaler);
+        Assert.Contains(Jellyfin.Plugin.JellyStations.Services.StationService.ValidateEncoding(new EncodingProfile { Scaler = "nearest" }), e => e.StartsWith("scaling must be", StringComparison.Ordinal));
+    }
+
     private static readonly EncodingProfile Profile = new() { HardwareDecode = string.Empty }; // 1280x720, software
 
     private const string SdrOptions = "-color_primaries bt709 -color_trc bt709 -colorspace bt709 -color_range tv";

@@ -658,6 +658,13 @@ by title, genre, rating or library.
     decode path; standard definition costs almost nothing, 1080i some CPU per station. On a 50 or
     60 fps profile every field becomes a frame, so video-shot material keeps its motion. Film on
     NTSC DVD (telecined) plays fine but a one-time re-encode with inverse telecine looks better.
+  - *Scaling*: the algorithm that resizes every program to the channel's size, up or down.
+    Bicubic (default) is the usual choice. Lanczos keeps more edge detail, most visible when a
+    smaller source is scaled up, at close to twice the scaling work and with faint halos on very
+    hard edges (subtitles, cartoons). Spline is smooth and the costliest, bilinear the softest.
+    It is ffmpeg's software scaler in every case; none adds detail the file does not have, and
+    the cost is small next to the encode (about 7 ms of CPU per 4K frame with Lanczos against 4
+    with bicubic on the test machine).
   - *Bitrate*: 3500 kbps is plenty for 720p and 8000 for 1080p. Higher only inflates every
     client's download and any transcode Jellyfin still has to do.
   - *Resolution*: 4K (3840 × 2160), 1080p, 720p, 480p or a custom size. A channel has one size:

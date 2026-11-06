@@ -252,6 +252,10 @@ analyzer, then suggestion rules and the dashboard view on top of it.
   `EncodingProfile.Deinterlace` says so (`auto` follows the file, `always`, `off`); one frame per
   field pair, or per field on a 50/60 fps profile. Bitmap subtitles are laid over the deinterlaced
   picture. Settings and the station override get the select; the hardware test deinterlaces too.
+- **Choice of scaler — DONE 2026-11-06 (1.31.0.0).** `EncodingProfile.Scaler` (bicubic default,
+  lanczos, spline, bilinear) is the `flags=` of `ScaleToFit` and of the weather graph's upscale;
+  `ScalerFlags()` lets only a listed name into the filter text. Software swscale throughout; no
+  GPU scaling filter and no sharpening or learned upscaler (either would be a separate step).
 - **4K channels — DONE 2026-11-06 (1.30.0.0).** A channel has one frame size (the media source id
   and Jellyfin's cached probe carry it), so a 4K movie cannot switch a 1080p station to 4K; the
   whole station is 4K or it is not. The Resolution select offers 3840 × 2160;
