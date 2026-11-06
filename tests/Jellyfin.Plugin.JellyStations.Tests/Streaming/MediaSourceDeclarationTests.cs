@@ -50,6 +50,37 @@ public class MediaSourceDeclarationTests
         Assert.Equal("hevc-3840x2160p60-hdr10-sq", StreamSessionManager.OutputSignature(new EncodingProfile { Width = 3840, Height = 2160, Fps = 60, VideoEncoder = "hevc_qsv", OutputRange = EncodingProfile.OutputHdr10 }));
     }
 
+    [Theory]
+    [InlineData(1280, 720, 30, "4.1", "4.1")]
+    [InlineData(1920, 1080, 30, "4.1", "4.1")]
+    [InlineData(1920, 1080, 60, "4.1", "4.2")]
+    [InlineData(3840, 2160, 30, "4.1", "5.1")]
+    [InlineData(3840, 2160, 60, "4.1", "5.2")]
+    [InlineData(3840, 2160, 30, "5.2", "5.2")] // a higher level asked for is kept
+    [InlineData(3840, 2160, 30, "41", "5.1")] // x264's "41" spelling of 4.1
+    [InlineData(1920, 1080, 30, "42", "42")]
+    [InlineData(640, 360, 30, "3.0", "3.0")]
+    [InlineData(854, 480, 30, "3.0", "3.1")]
+    [InlineData(3840, 2160, 30, "auto", "auto")] // not a number: left to the encoder
+    public void H264Level_IsRaisedToWhatTheFrameNeeds(int width, int height, int fps, string configured, string expected)
+    {
+        var profile = new EncodingProfile { Width = width, Height = height, Fps = fps, H264Level = configured };
+
+        Assert.Equal(expected, profile.H264LevelForFrame());
+    }
+
+    [Fact]
+    public void Source_DeclaresTheLevelTheStreamCarries()
+    {
+        var station = new Station { Id = Guid.NewGuid(), Name = "S" };
+        double? LevelOf(EncodingProfile p) => StreamSessionManager.BuildMediaSource(station, p).MediaStreams.Single(s => s.Type == MediaStreamType.Video).Level;
+
+        Assert.Equal(41, LevelOf(new EncodingProfile { Width = 1920, Height = 1080, Fps = 30 }));
+        Assert.Equal(51, LevelOf(new EncodingProfile { Width = 3840, Height = 2160, Fps = 30 }));
+        Assert.Equal(42, LevelOf(new EncodingProfile { Width = 1920, Height = 1080, Fps = 30, H264Level = "42" }));
+        Assert.Equal(153, LevelOf(new EncodingProfile { Width = 3840, Height = 2160, Fps = 30, VideoEncoder = "hevc_qsv" }));
+    }
+
     [Fact]
     public void StationResolver_AcceptsChannelIdsAndMediaSourceIds()
     {

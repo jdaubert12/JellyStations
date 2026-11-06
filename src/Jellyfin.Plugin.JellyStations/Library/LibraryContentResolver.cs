@@ -280,9 +280,15 @@ public sealed class LibraryContentResolver
         }
     }
 
-    /// <summary>Rating and year filters for every source kind except explicit Movie/Episode picks.</summary>
+    /// <summary>Rating, year and picture-size filters for every source kind except explicit Movie/Episode picks.</summary>
     private IEnumerable<BaseItem> Tuned(IEnumerable<BaseItem> items, ContentSource source)
-        => FilterYears(FilterRatings(items, source, SeriesOf), source, SeriesOf);
+        => FilterResolution(FilterYears(FilterRatings(items, source, SeriesOf), source, SeriesOf), source);
+
+    /// <summary>Applies MinResolution to the size Jellyfin probed for each file; a file without one is dropped when it is set.</summary>
+    public static IEnumerable<BaseItem> FilterResolution(IEnumerable<BaseItem> items, ContentSource source)
+        => PictureSize.Normalize(source.MinResolution) is { } tier
+            ? items.Where(i => PictureSize.Meets(i.Width, i.Height, tier))
+            : items;
 
     private static BaseItem? SeriesOf(BaseItem item)
     {

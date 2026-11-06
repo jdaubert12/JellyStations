@@ -160,6 +160,8 @@ public sealed class LibraryAnalysisService
                     Rating = video.OfficialRating,
                     Year = video.ProductionYear,
                     RuntimeTicks = runtime.Value,
+                    Width = video.Width,
+                    Height = video.Height,
                     CollectionName = (video as Movie)?.CollectionName,
                     Genres = video.Genres?.ToList() ?? new List<string>(),
                     Tags = video.Tags?.ToList() ?? new List<string>(),

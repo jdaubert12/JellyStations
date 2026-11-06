@@ -203,6 +203,13 @@ public sealed class StationHealthDto
     /// <summary>Human-readable problems; empty when the station is healthy.</summary>
     public List<string> Warnings { get; set; } = new();
 
+    /// <summary>
+    /// The entries of <see cref="Warnings"/> that are about the station's own encoding profile (settled in its
+    /// editor's encoding form, not by adding content). A station on the default encoding has none: the default's
+    /// are reported once, in <see cref="HealthReportDto.DefaultEncodingWarnings"/>.
+    /// </summary>
+    public List<string> EncodingWarnings { get; set; } = new();
+
     /// <summary>Weather channel: hours of music before it repeats; null for other stations.</summary>
     public double? MusicHours { get; set; }
 
@@ -216,6 +223,12 @@ public sealed class HealthReportDto
     public List<StationHealthDto> Stations { get; set; } = new();
 
     public int StationsWithWarnings { get; set; }
+
+    /// <summary>What is likely to disappoint about the default encoding in Settings; empty when it is sound.</summary>
+    public List<string> DefaultEncodingWarnings { get; set; } = new();
+
+    /// <summary>How many stations air with the default encoding (have none of their own).</summary>
+    public int StationsOnDefaultEncoding { get; set; }
 }
 
 public sealed class ScheduleEntryDto

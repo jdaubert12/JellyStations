@@ -115,9 +115,13 @@ Settings drops every station's own card (or bug) so all of them follow the defau
 Every content source can be tuned from its chip (the ✎ button): series sources take a **season range**
 and a **skip specials** switch; genre, playlist, collection and library sources can be limited to
 **movies only** or **shows only**; every expanding source can take a **max rating** ("PG / TV-PG" and
-below, with an "allow unrated" switch) and a **year range**; and any source gets a **weight** (×1 to
+below, with an "allow unrated" switch), a **year range** and a smallest **picture** size (4K only,
+1080p or better, 720p or better); and any source gets a **weight** (×1 to
 ×10) that controls how often it appears compared with the other sources. Episodes without their own
-rating use the series rating, and the year filter uses the show's year for episodes. Pools can also
+rating use the series rating, and the year filter uses the show's year for episodes. The picture
+filter goes by the size Jellyfin read from each file, by width or height (a 3840×1600 scope film is
+4K), and leaves out files whose size it does not know; "4K only" on a station set to 4K means nothing
+is scaled up. Pools can also
 run **marathons**: play 2 to N episodes of a show back to back before switching.
 
 Every source also has an **Audio** and a **Subtitles** choice, so an anime series can play in
@@ -223,7 +227,12 @@ station's **Weather** section, which the editor shows while such a block exists.
 top of every hour" is a 5-minute weather block at 06:00 repeating every 60 minutes until 23:00.
 
 A time block can be saved as a **template** (bookmark button on the block) and added to any station
-from the dropdown next to "Add block". Templates are managed in Settings.
+from the dropdown next to "Add block". Templates are managed in Settings. The same dropdown offers
+four **starter blocks** that ship with the plugin: Saturday morning cartoons (Saturday 07:00, four
+hours, each show's episodes in order), Prime-time movie (every day 20:00, three hours, shuffled), Late
+night (every day 23:00, three hours) and Weather on the hour (five minutes of the weather screens
+every hour from 06:00 to 23:00). They carry the days, time and play order but no sources; add those on
+the block. A template saved under a starter's name takes its place.
 
 ### Station templates
 
@@ -533,7 +542,8 @@ or items that had to be skipped (hover the excluded count for the reasons). If s
 problem, the row keeps the last error in red until you dismiss it: a file that could not be opened,
 with permission denied told apart from a missing file or an unmounted folder, or an encoder that
 quit early, with ffmpeg's last log line. **Status** has a Health section listing every station
-that needs attention.
+that needs attention, and the default encoding when it is likely to disappoint (see *Encoding
+check* under the encoding settings).
 
 ### Status page and hardware
 
@@ -650,6 +660,23 @@ by title, genre, rating or library.
     NTSC DVD (telecined) plays fine but a one-time re-encode with inverse telecine looks better.
   - *Bitrate*: 3500 kbps is plenty for 720p and 8000 for 1080p. Higher only inflates every
     client's download and any transcode Jellyfin still has to do.
+  - *Resolution*: 4K (3840 × 2160), 1080p, 720p, 480p or a custom size. A channel has one size:
+    a 4K movie on a 1080p station is scaled down, and on a 4K station everything smaller is
+    scaled up (limit the sources to "4K only" to avoid that). 4K wants an HEVC encoder and around
+    20000 kbps. With libx264 the H.264 level is raised by itself when the size and frame rate
+    need more than the one set (4.2 for 1080p at 60 fps, 5.1 for 4K).
+  - *Encoding check*: the form says so, as you type, when a profile is likely to disappoint, and
+    names the bitrate that suits: 4K from an H.264 encoder (few players take it, so most viewers
+    get a transcode); a video bitrate too low for the picture (under 10000 kbps at 4K, 6000 at
+    1440p, 3000 at 1080p, 1500 at 720p, 600 below that; HEVC about two thirds as much; half as
+    much again at 50 or 60 fps); one so high it only costs bandwidth (two and a half times the
+    figure that suits, e.g. 20000 kbps left behind on a station that went back to 1080p); audio
+    under 96 kbps. A station with its own profile shows an **Encoding** badge on its row; the
+    Status page lists it under Health, and lists a weak default once, with a button to Settings.
+    Picking a size in the Resolution list also moves the video bitrate to the figure that suits
+    it (3500 at 720p, 8000 at 1080p, 20000 at 4K; less with an HEVC encoder below 4K) while the
+    field still holds the suggested figure for the size you are leaving; a bitrate you set
+    yourself is left alone.
   - *Hardware decoding*: "Follow Jellyfin" (default) mirrors Dashboard > Playback > Transcoding
     (QSV, VA-API, NVDEC/CUDA, VideoToolbox or D3D11VA) and its device; or pick one and give the
     render node or adapter. Decoding is where 4K HEVC costs its CPU; scaling, tone mapping and
@@ -753,12 +780,13 @@ usual Jellyfin API key or session token. The ones worth calling by hand:
 |---|---|
 | `GET /JellyStations/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises (the provider's collection name, or shared title prefixes), decades, ratings, tags and libraries (each with its `Videos`, `Clips` of three minutes or under, and `ClipLibrary` when it is bumper material, which keeps it out of every other figure). The basis for station suggestions and the health report. |
 | `GET /JellyStations/Library/ClipFolder?path=` | A folder as a bumper source would see it: `ResolvedPath` (an absolute path, or a name under the plugin's bumpers folder), whether it `Exists` and how many `Videos` it holds. Nothing is probed. A folder source on a station is `{ "Kind": "Folder", "Path": "/media/bumps" }` in `Bumpers.Sources`, `Bumpers.PreRoll.Sources` or `Bumpers.PostRoll.Sources`. |
-| `GET /JellyStations/Health` | Every station that needs attention, as the Status page lists them. |
+| `GET /JellyStations/Health` | Every station that needs attention, as the Status page lists them. Each station's `EncodingWarnings` are the entries of its `Warnings` about its own encoding profile; `DefaultEncodingWarnings` are those of the default encoding, once, with `StationsOnDefaultEncoding`. |
 | `GET /JellyStations/ProblemFiles`, `DELETE .../ProblemFiles/{id}`, `DELETE .../ProblemFiles` | The files that gave trouble on air or in a folder scan, latest first: `Path`, `Title`, `Kind` (`CannotOpen`, `WouldNotPlay`, `EndedEarly`, `DecodeErrors`, `HardwareDecode`, `Unreadable`), `Problem` (the kind in words), `Detail`, `StationName`, `FirstUtc`, `LastUtc`, `Count`. `recheck=true` first drops the files that were removed, replaced or can be opened again and reports how many as `Settled`. Delete dismisses one file by its `Id`, or empties the list. |
 | `GET /JellyStations/Stations/{id}/History`, `DELETE .../History` | What the station has aired (per series or film: last start and end, the last episode, the count), latest first, and when the snapshot its current schedule continues from was taken; delete empties the log. |
 | `POST /JellyStations/Stations/{id}/Reshuffle` | Deals the schedule afresh from now as a new revision that continues every series from its next episode and rests what just aired. |
 | `GET /JellyStations/Stations/Export`, `POST /JellyStations/Stations/Import` | The stations plus the saved station and block templates as one document; import takes that document or a bare array of stations. |
 | `GET /JellyStations/Suggestions`, `GET .../Report`, `POST .../Create`, `POST .../Draft`, `POST .../Preview` | Stations the library could support, each with `Hours`, `NewHours` (on no enabled channel yet) and `Covered` (`refresh`; the minimums come from Settings, `minHours` replaces every hours minimum and `minEpisodes` the series one for that call); the same list with `NearMisses` (`Name`, `Have`, `Need`, `Unit`), `ClipLibraries`, the `Thresholds` in force and the number of `Channels`; create the ones with the given `Keys` (`FirstChannelNumber`, `TimeZoneId`, `TemplateId` for the look and breaks, `BumperLibraryId` for a clip library to play in the breaks, `Logo`), returning `Created`, `Errors` and `Warnings`; one suggestion (`Key`) as an unsaved station with the same options applied; the next `hours` (default 24) that suggestion would play with those options, as schedule entries, nothing saved. |
+| `GET /JellyStations/BlockTemplates`, `GET .../BuiltIn`, `POST`, `DELETE .../{id}` | Saved block templates; the starter blocks no saved template has replaced; save (replaces by name or id); delete a saved one. |
 | `GET /JellyStations/StationTemplates`, `GET .../{id}/Draft`, `POST`, `DELETE .../{id}` | Saved station templates first, then the built-in presets; a fresh station draft from one; save (replaces by name or id); delete a saved one. |
 | `GET /JellyStations/Hardware` | Jellyfin's transcoding setting, what the default profile resolves to, the `/dev/dri` nodes and this ffmpeg build's hwaccels, encoders and filters. |
 | `POST /JellyStations/Hardware/Test` | Runs a station's current program through the real chain at full speed and reports the decoder and the speed relative to real time. |

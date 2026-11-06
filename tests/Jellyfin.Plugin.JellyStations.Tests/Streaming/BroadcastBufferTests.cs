@@ -1,3 +1,4 @@
+using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Streaming;
 using Xunit;
 
@@ -90,6 +91,48 @@ public class BroadcastBufferTests
         buffer.ClearPreRoll();
 
         Assert.False(buffer.HasKeyframe);
+    }
+
+    [Fact]
+    public void PreRoll_FollowsTheBitrate_SoAKeyFrameIntervalAlwaysFits()
+    {
+        static EncodingProfile Profile(int kbps, int gop = 2) => new() { VideoBitrateKbps = kbps, AudioBitrateKbps = 160, GopSeconds = gop };
+
+        Assert.Equal(BroadcastBuffer.MinPreRollBytes, BroadcastBuffer.PreRollFor(Profile(3500)));
+        // 4K at 20000 kbps: one 2-second interval is 5 MB of video alone, which the old fixed 2 MB could not hold.
+        var uhd = BroadcastBuffer.PreRollFor(Profile(20000));
+        Assert.InRange(uhd, 10 * 1024 * 1024, 12 * 1024 * 1024);
+        Assert.True(BroadcastBuffer.PreRollFor(Profile(20000, gop: 4)) > uhd);
+        Assert.Equal(BroadcastBuffer.MaxPreRollBytes, BroadcastBuffer.PreRollFor(Profile(50000, gop: 30)));
+    }
+
+    [Fact]
+    public void Subscribe_OnAHighBitrateStream_StillStartsAtTheKeyFrame()
+    {
+        // 6 MB between key frames, in small chunks (more of them than the live queue holds): with a pre-roll sized
+        // for it the reader gets the tables and the key frame; with the 2 MB default the key frame is long gone.
+        var key = Video(pusi: true, rai: true, cc: 0);
+        var filler = Enumerable.Repeat(Video(pusi: false, rai: false, cc: 1), 10).SelectMany(p => p).ToArray();
+        var chunks = 6 * 1024 * 1024 / filler.Length;
+
+        void Fill(BroadcastBuffer buffer)
+        {
+            buffer.Write(Concat(Pat(), Pmt(0x1B), key));
+            for (var i = 0; i < chunks; i++)
+            {
+                buffer.Write(filler);
+            }
+        }
+
+        var sized = new BroadcastBuffer(16 * 1024 * 1024);
+        Fill(sized);
+        Assert.True(sized.HasKeyframe);
+        var got = Read(sized.Subscribe(), 188 * 3);
+        Assert.Equal(Concat(Pat(), Pmt(0x1B), key), got);
+
+        var small = new BroadcastBuffer();
+        Fill(small);
+        Assert.False(small.HasKeyframe);
     }
 
     [Fact]

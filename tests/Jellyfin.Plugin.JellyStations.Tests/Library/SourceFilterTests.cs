@@ -94,6 +94,50 @@ public class SourceFilterTests
         Assert.Empty(LibraryContentResolver.FilterYears(new BaseItem[] { ep }, src, _ => new Series { ProductionYear = 2003 }));
     }
 
+    private static Movie Sized(string name, int width, int height) => new() { Name = name, Width = width, Height = height };
+
+    [Fact]
+    public void FilterResolution_KeepsFilesThatReachTheTier_ByWidthOrHeight()
+    {
+        var items = new List<BaseItem>
+        {
+            Sized("uhd", 3840, 2160), Sized("uhd scope", 3840, 1600), Sized("uhd 4:3", 2880, 2160),
+            Sized("fhd", 1920, 1080), Sized("fhd scope", 1920, 800), Sized("hd", 1280, 720), Sized("dvd", 720, 480), Sized("unknown", 0, 0)
+        };
+
+        Assert.Equal(items.Count, LibraryContentResolver.FilterResolution(items, new ContentSource { Kind = SourceKind.Library }).Count());
+        Assert.Equal(items.Count, LibraryContentResolver.FilterResolution(items, new ContentSource { Kind = SourceKind.Library, MinResolution = "nonsense" }).Count());
+        Assert.Equal(
+            new[] { "uhd", "uhd scope", "uhd 4:3" },
+            LibraryContentResolver.FilterResolution(items, new ContentSource { Kind = SourceKind.Library, MinResolution = "4K" }).Select(i => i.Name));
+        Assert.Equal(
+            new[] { "uhd", "uhd scope", "uhd 4:3", "fhd", "fhd scope" },
+            LibraryContentResolver.FilterResolution(items, new ContentSource { Kind = SourceKind.Library, MinResolution = "1080p" }).Select(i => i.Name));
+        Assert.Equal(
+            6,
+            LibraryContentResolver.FilterResolution(items, new ContentSource { Kind = SourceKind.Library, MinResolution = "720p" }).Count());
+    }
+
+    [Theory]
+    [InlineData("4K", "4k")]
+    [InlineData(" UHD ", "4k")]
+    [InlineData("2160p", "4k")]
+    [InlineData("1080", "1080p")]
+    [InlineData("720p", "720p")]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    [InlineData("480p", null)]
+    public void PictureSize_NormalizesSpellings(string? value, string? expected)
+        => Assert.Equal(expected, PictureSize.Normalize(value));
+
+    [Fact]
+    public void SourceLabel_NamesThePictureSizeFilter()
+    {
+        var source = new ContentSource { Kind = SourceKind.Library, DisplayName = "Movies", MinResolution = "4k", YearFrom = 2010 };
+
+        Assert.Equal("Library \"Movies\" (2010 to ..., 4K only)", SourceExpansion.Describe(source));
+    }
+
     [Fact]
     public void FilterKinds_LimitsContainersToMoviesOrEpisodes()
     {

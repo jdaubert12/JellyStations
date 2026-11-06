@@ -56,7 +56,7 @@
     TooShort: 'Shorter than the station minimum',
     Unreadable: 'Could not be read as a video'
   };
-  const RESOLUTIONS = [['1920x1080', '1920 × 1080 (1080p)'], ['1280x720', '1280 × 720 (720p)'], ['854x480', '854 × 480 (480p)'], ['custom', 'Custom']];
+  const RESOLUTIONS = [['3840x2160', '3840 × 2160 (4K)'], ['1920x1080', '1920 × 1080 (1080p)'], ['1280x720', '1280 × 720 (720p)'], ['854x480', '854 × 480 (480p)'], ['custom', 'Custom']];
   const ENCODERS = [['libx264', 'libx264 (software)'], ['h264_nvenc', 'h264_nvenc (NVIDIA)'], ['h264_qsv', 'h264_qsv (Intel Quick Sync)'], ['h264_vaapi', 'h264_vaapi (VA-API)'], ['libx265', 'libx265 (software, HEVC)'], ['hevc_nvenc', 'hevc_nvenc (NVIDIA, HEVC)'], ['hevc_qsv', 'hevc_qsv (Intel Quick Sync, HEVC)'], ['hevc_vaapi', 'hevc_vaapi (VA-API, HEVC)'], ['custom', 'Custom…']];
   const OUTPUT_RANGES = [['sdr', 'SDR (BT.709, 8-bit)'], ['hdr10', 'HDR10 (BT.2020 PQ, 10-bit HEVC)']];
   const HW_DECODERS = [['auto', 'Follow Jellyfin'], ['', 'None (software)'], ['qsv', 'Intel Quick Sync (qsv)'], ['vaapi', 'VA-API'], ['cuda', 'NVIDIA (cuda)'], ['videotoolbox', 'Apple VideoToolbox'], ['d3d11va', 'Windows (d3d11va)']];
@@ -97,6 +97,7 @@
     suggestReport: null,
     suggestShowCovered: false,
     blockTemplates: [],
+    starterBlocks: [],   // built-in block templates no saved one has replaced, as GET BlockTemplates/BuiltIn lists them
     stationTemplates: [] // saved + built-in, as GET StationTemplates lists them
   };
 
@@ -1166,6 +1167,12 @@
       if (empty.length) {
         metaLine.appendChild(warn(plural(empty.length, 'empty source'), empty.join('\n')));
       }
+      // The station's own encoding will not serve viewers well (a bitrate that starves or overfeeds the picture,
+      // H.264 at 4K, thin audio); the sentences are the server's. A weak default shows on the Status page instead.
+      const encoding = Array.isArray(health.EncodingWarnings) ? health.EncodingWarnings : [];
+      if (encoding.length) {
+        metaLine.appendChild(warn('Encoding', encoding.join('\n')));
+      }
     }
     body.appendChild(metaLine);
 
@@ -1562,8 +1569,13 @@
     src.SubtitlesOnlyIfAudioMissing = !!src.SubtitlesOnlyIfAudioMissing;
     if (src.YearFrom !== undefined && src.YearFrom !== null && !(src.YearFrom > 0)) { src.YearFrom = null; }
     if (src.YearTo !== undefined && src.YearTo !== null && !(src.YearTo > 0)) { src.YearTo = null; }
+    const size = String(src.MinResolution || '').trim().toLowerCase();
+    src.MinResolution = PICTURE_SIZES.some(c => c[0] === size) ? size || null : null;
     return src;
   }
+
+  // Smallest picture a source takes (ContentSource.MinResolution): value, choice in the editor, text on the chip.
+  const PICTURE_SIZES = [['', 'Any size', ''], ['4k', '4K only', '4K only'], ['1080p', '1080p or better', '1080p+'], ['720p', '720p or better', '720p+']];
 
   const RATING_CHOICES = [
     ['', 'Any rating'], ['TV-Y', 'TV-Y'], ['TV-Y7', 'TV-Y7'], ['G', 'G / TV-G'], ['PG', 'PG / TV-PG'],
@@ -1609,6 +1621,9 @@
     }
     if (src.YearFrom || src.YearTo) {
       parts.push((src.YearFrom || '…') + '–' + (src.YearTo || '…'));
+    }
+    if (src.MinResolution && hasTuningFilters(src)) {
+      parts.push((PICTURE_SIZES.find(c => c[0] === src.MinResolution) || [])[2] || src.MinResolution);
     }
     if (src.AudioLanguage) {
       parts.push('audio ' + src.AudioLanguage);
@@ -3189,7 +3204,7 @@
   /** A new block from the template picked in the Add block dropdown, or a blank one. */
   function newBlockFromSelectedTemplate() {
     const templateId = val('#tvsBlockTemplateSelect');
-    const template = state.blockTemplates.find(t => t.Id === templateId);
+    const template = state.blockTemplates.concat(availableStarterBlocks()).find(t => t.Id === templateId);
     return template ? blockFromTemplate(template) : newBlock();
   }
 
@@ -3540,13 +3555,18 @@
   // ------------------------------------------------------------------------------------------
 
   function loadBlockTemplates() {
-    return api('GET', 'BlockTemplates').then(list => {
-      state.blockTemplates = Array.isArray(list) ? list : [];
-      renderBlockTemplateSelect();
-    }).catch(() => {
-      state.blockTemplates = [];
+    const list = path => api('GET', path).then(found => (Array.isArray(found) ? found : [])).catch(() => []);
+    return Promise.all([list('BlockTemplates'), list('BlockTemplates/BuiltIn')]).then(lists => {
+      state.blockTemplates = lists[0];
+      state.starterBlocks = lists[1];
       renderBlockTemplateSelect();
     });
+  }
+
+  /** The starter blocks whose names no saved template has taken (a template saved since the last load included). */
+  function availableStarterBlocks() {
+    const taken = state.blockTemplates.map(t => (t.Name || '').trim().toLowerCase());
+    return state.starterBlocks.filter(t => taken.indexOf((t.Name || '').trim().toLowerCase()) < 0);
   }
 
   function renderBlockTemplateSelect() {
@@ -3554,8 +3574,14 @@
     if (!select) {
       return;
     }
-    clear(select).appendChild(el('option', { value: '', text: state.blockTemplates.length ? 'Blank block' : 'Blank block (no templates saved)' }));
-    state.blockTemplates.forEach(t => select.appendChild(el('option', { value: t.Id, text: 'Template: ' + t.Name + ' – ' + blockSummary(t) })));
+    clear(select).appendChild(el('option', { value: '', text: 'Blank block' }));
+    const group = (label, templates) => {
+      if (templates.length) {
+        select.appendChild(el('optgroup', { label: label }, templates.map(t => el('option', { value: t.Id, text: t.Name + ' – ' + blockSummary(t) }))));
+      }
+    };
+    group('Saved templates', state.blockTemplates);
+    group('Starter blocks', availableStarterBlocks());
   }
 
   function blockFromTemplate(t) {
@@ -4336,6 +4362,10 @@
       box.appendChild(unratedLabel);
       box.appendChild(numberField('From year', source.YearFrom, n => { source.YearFrom = n; }));
       box.appendChild(numberField('To year', source.YearTo, n => { source.YearTo = n; }));
+      const size = el('select', { className: 'emby-select' }, PICTURE_SIZES.map(c => el('option', { value: c[0], text: c[1] })));
+      size.value = source.MinResolution || '';
+      size.addEventListener('change', () => { source.MinResolution = size.value || null; changed(); });
+      box.appendChild(el('label', { className: 'f', title: 'Take only files at least this large, by the size Jellyfin read from each file. "4K only" keeps a 4K channel from scaling smaller files up.' }, [el('span', { text: 'Picture' }), size]));
     }
 
     if (source.Kind === 'Folder') {
@@ -4734,11 +4764,77 @@
     };
   }
 
+  // The bitrate guide by picture size, as EncodingProfile.BitrateGuide on the server: [more than this many pixels,
+  // low and suits for H.264, low and suits for HEVC], kbps at up to 30 fps.
+  const BITRATE_GUIDE = [
+    [2560 * 1440, 10000, 30000, 10000, 20000],
+    [1920 * 1080, 6000, 12000, 4000, 8000],
+    [1280 * 720, 3000, 8000, 2000, 5000],
+    [854 * 480, 1500, 3500, 1000, 2500],
+    [0, 600, 1500, 400, 1000]
+  ];
+
+  function isHevcEncoder(name) {
+    const encoder = String(name || '').trim();
+    return encoder.toLowerCase().indexOf('hevc') === 0 || encoder.indexOf('265') >= 0;
+  }
+
+  /**
+   * The video bitrates (kbps) the guide gives a size, frame rate and codec, as EncodingProfile.BitrateGuideFor on the
+   * server: under low the picture is starved, from excess up the bitrate only costs bandwidth, and target is the
+   * figure to aim for (HEVC's on a 4K profile, whose H.264 encoder the form says to replace).
+   */
+  function bitrateGuide(width, height, fps, hevc) {
+    const row = BITRATE_GUIDE.find(r => width * height > r[0]) || BITRATE_GUIDE[BITRATE_GUIDE.length - 1];
+    const factor = fps >= 50 ? 1.5 : 1;
+    const suits = Math.round((hevc ? row[4] : row[2]) * factor);
+    const uhd = width * height > 2560 * 1440;
+    return {
+      low: Math.round((hevc ? row[3] : row[1]) * factor),
+      excess: Math.round(suits * 2.5),
+      target: uhd && !hevc ? Math.round(suits * 2 / 3) : suits
+    };
+  }
+
+  /** What is likely to disappoint on an encoding profile; the same sentences as EncodingProfile.Concerns on the server. */
+  function encodingConcerns(e) {
+    const concerns = [];
+    const width = parseInt(e.Width, 10) || 0;
+    const height = parseInt(e.Height, 10) || 0;
+    const fps = parseInt(e.Fps, 10) || 0;
+    const video = parseInt(e.VideoBitrateKbps, 10);
+    const audio = parseInt(e.AudioBitrateKbps, 10);
+    if (!(width > 0 && height > 0)) {
+      return concerns;
+    }
+    const encoder = String(e.VideoEncoder || '').trim();
+    const hevc = isHevcEncoder(encoder);
+    const uhd = width * height > 2560 * 1440;
+    const label = (uhd ? '4K' : height + 'p') + (fps >= 50 ? fps : '');
+    if (uhd && encoder && !hevc) {
+      concerns.push('4K with ' + encoder + ' is H.264, which few players take at this size, so most viewers get a Jellyfin transcode. Pick an HEVC encoder.');
+    }
+    const guide = bitrateGuide(width, height, fps, hevc);
+    const target = 'Around ' + guide.target + ' kbps suits ' + label + (uhd || hevc ? ' HEVC' : '') + '.';
+    if (isFinite(video)) {
+      if (video < guide.low) {
+        concerns.push(label + ' at ' + video + ' kbps will look soft and blocky. ' + target);
+      } else if (video >= guide.excess) {
+        concerns.push(label + ' at ' + video + " kbps is more than the picture can use; it only makes every client's download and Jellyfin's transcodes larger. " + target);
+      }
+    }
+    if (isFinite(audio) && audio < 96) {
+      concerns.push('Audio at ' + audio + ' kbps will sound thin. 128 kbps or more suits AAC stereo.');
+    }
+    return concerns;
+  }
+
   function createEncodingForm(container, prefix) {
     const p = prefix + '_';
     container.innerHTML =
+      '<div id="' + p + 'concerns"></div>' +
       '<div class="tvs-grid2">' +
-        selectHtml(p + 'res', 'Resolution', RESOLUTIONS, 'Every program is scaled (letterboxed) to this size.') +
+        selectHtml(p + 'res', 'Resolution', RESOLUTIONS, 'Every program is scaled (letterboxed) to this size; smaller sources are scaled up. 4K wants an HEVC encoder and a much higher bitrate, and clients that cannot play it get a Jellyfin transcode. Picking a size also moves the video bitrate to the figure that suits it, unless you have set your own.') +
         '<div class="tvs-grid2">' +
           inputHtml(p + 'width', 'Width', 'number', { min: 16, max: 7680, step: 2 }) +
           inputHtml(p + 'height', 'Height', 'number', { min: 16, max: 4320, step: 2 }) +
@@ -4746,14 +4842,14 @@
         inputHtml(p + 'fps', 'Frame rate (fps)', 'number', { min: 1, max: 120, step: 1 }, 'Constant output frame rate. 24 suits a film station (most movies are 23.976 fps and judder when converted to 30); 30 suits series; 60 only for 60 fps sources.') +
         selectHtml(p + 'deint', 'Deinterlacing', DEINTERLACE_MODES, 'Interlaced files (DVD rips, broadcast captures) are deinterlaced before scaling, so the combing never reaches the stream. "When the file is interlaced" follows the field order Jellyfin probed; "Always" is for files whose flags are missing; "Off" plays them as they are. Standard-definition files cost almost nothing; 1080i costs some CPU per station. On a 50 or 60 fps profile every field becomes a frame, so video-shot material keeps its motion.') +
         inputHtml(p + 'gop', 'Keyframe interval (seconds)', 'number', { min: 1, max: 30, step: 1 }, 'GOP length. Shorter makes channel changes faster at a small bitrate cost.') +
-        inputHtml(p + 'vbr', 'Video bitrate (kbps)', 'number', { min: 100, max: 100000, step: 50 }, 'Target bitrate for the video stream. 3500 is plenty for 720p and 8000 for 1080p; more only inflates every client\'s download and Jellyfin\'s transcodes.') +
+        inputHtml(p + 'vbr', 'Video bitrate (kbps)', 'number', { min: 100, max: 100000, step: 50 }, 'Target bitrate for the video stream. 3500 is plenty for 720p and 8000 for 1080p, and 4K HEVC wants around 20000; more only inflates every client\'s download and Jellyfin\'s transcodes.') +
         inputHtml(p + 'abr', 'Audio bitrate (kbps)', 'number', { min: 32, max: 1024, step: 8 }, 'AAC audio bitrate.') +
         selectHtml(p + 'enc', 'Video encoder', ENCODERS, 'Hardware encoders need the matching drivers and may need extra input arguments (e.g. -hwaccel).') +
         inputHtml(p + 'encCustom', 'Custom encoder name', 'text', {}, 'Exact ffmpeg encoder name, e.g. h264_amf or hevc_amf.') +
         selectHtml(p + 'range', 'Output', OUTPUT_RANGES, 'SDR: 8-bit BT.709, plays everywhere. HDR10: the whole channel is 10-bit BT.2020 PQ HEVC Main 10. HDR sources keep their range, SDR programs, slates, cards and weather screens are converted into it at SDR brightness; needs an HEVC encoder, HDR-capable clients direct play it and Jellyfin tone maps it for the rest (turn on tone mapping under Dashboard > Playback > Transcoding).') +
         inputHtml(p + 'preset', 'Preset', 'text', {}, 'Speed/quality preset. libx264, libx265 and Quick Sync take ultrafast … veryslow (Quick Sync has veryfast … veryslow; ultrafast and superfast become veryfast). NVENC takes p1 … p7, x264 words are translated (veryfast is p2). VA-API, AMF and VideoToolbox have no preset. Leave blank for the encoder default.') +
         inputHtml(p + 'profile', 'H.264 profile', 'text', {}, 'baseline, main or high (libx264 only; HEVC encoders take main, or main10 on an HDR10 profile).') +
-        inputHtml(p + 'level', 'H.264 level', 'text', {}, 'For example 4.1 (libx264 only).') +
+        inputHtml(p + 'level', 'H.264 level', 'text', {}, 'For example 4.1 (libx264 only). Raised by itself when the resolution and frame rate need more: 4.2 for 1080p at 60 fps, 5.1 for 4K.') +
         inputHtml(p + 'lang', 'Preferred audio language', 'text', { maxlength: 3 }, 'ISO 639-2 code (eng, spa, jpn…) used to pick the audio track when compiling.') +
         selectHtml(p + 'hwdec', 'Hardware decoding', HW_DECODERS, 'Decodes the source on the GPU (the heavy part for 4K HEVC); scaling, HDR tone mapping and the logo still run in software. "Follow Jellyfin" uses Dashboard > Playback > Transcoding. ffmpeg falls back to software when the device cannot be used.') +
         inputHtml(p + 'hwdev', 'Hardware device', 'text', {}, 'Render node or adapter for decoding and VA-API encoding, e.g. /dev/dri/renderD128. Empty uses the device Jellyfin is configured with.') +
@@ -4777,15 +4873,54 @@
       const value = q('res').value;
       if (value !== 'custom') {
         const parts = value.split('x');
+        followBitrate(parseInt(parts[0], 10), parseInt(parts[1], 10));
         q('width').value = parts[0];
         q('height').value = parts[1];
       }
     });
+
+    // Picking a size moves the video bitrate to the figure that suits it, as long as the bitrate is still a
+    // suggested one: the figure the guide gives the profile as loaded or as last typed, the shipped default, or one
+    // this form put there. A bitrate the user chose themselves is left alone, whatever size is picked later; the
+    // note above the form speaks up if it is off.
+    let bitrateFollows = false;
+
+    function currentEncoder() {
+      return q('enc').value === 'custom' ? q('encCustom').value : q('enc').value;
+    }
+
+    function holdsSuggestedBitrate() {
+      const width = parseInt(q('width').value, 10) || 0;
+      const height = parseInt(q('height').value, 10) || 0;
+      const current = parseInt(q('vbr').value, 10);
+      if (!(width > 0 && height > 0)) {
+        return false;
+      }
+      const shipped = defaultEncoding();
+      return current === bitrateGuide(width, height, parseInt(q('fps').value, 10) || 0, isHevcEncoder(currentEncoder())).target
+        || (width === shipped.Width && height === shipped.Height && current === shipped.VideoBitrateKbps);
+    }
+
+    function followBitrate(width, height) {
+      if (bitrateFollows && width > 0 && height > 0) {
+        q('vbr').value = bitrateGuide(width, height, parseInt(q('fps').value, 10) || 0, isHevcEncoder(currentEncoder())).target;
+      }
+    }
+
+    q('vbr').addEventListener('input', () => { bitrateFollows = holdsSuggestedBitrate(); });
     q('width').addEventListener('input', syncResolutionSelect);
     q('height').addEventListener('input', syncResolutionSelect);
     q('enc').addEventListener('change', syncEncoderVisibility);
 
-    return {
+    // The 4K warnings follow every edit; these listeners run after the ones above, so the size is already in place.
+    function syncConcerns() {
+      const box = clear(q('concerns'));
+      encodingConcerns(form.get()).forEach(text => box.appendChild(el('div', { className: 'tvs-problem warn', text: text })));
+    }
+    container.addEventListener('input', syncConcerns);
+    container.addEventListener('change', syncConcerns);
+
+    const form = {
       set(profile) {
         const e = Object.assign(defaultEncoding(), profile || {});
         q('width').value = e.Width;
@@ -4816,6 +4951,8 @@
         q('deint').value = DEINTERLACE_MODES.some(o => o[0] === deint) ? deint : 'auto';
         q('inArgs').value = e.ExtraInputArgs || '';
         q('outArgs').value = e.ExtraOutputArgs || '';
+        bitrateFollows = holdsSuggestedBitrate();
+        syncConcerns();
       },
       get() {
         const encoder = q('enc').value === 'custom' ? q('encCustom').value.trim() : q('enc').value;
@@ -4840,6 +4977,7 @@
         };
       }
     };
+    return form;
   }
 
   // ------------------------------------------------------------------------------------------
@@ -5167,11 +5305,27 @@
       return;
     }
     const troubled = stations.filter(h => Array.isArray(h.Warnings) && h.Warnings.length);
+    // The default encoding is one thing to fix in Settings, however many stations follow it.
+    const defaults = Array.isArray(report.DefaultEncodingWarnings) ? report.DefaultEncodingWarnings : [];
+    const defaultCard = defaults.length ? el('div', { className: 'tvs-health' }, [
+      el('div', { className: 'tvs-health-head' }, [
+        el('span', { className: 'tvs-health-name', text: 'Default encoding' }),
+        el('span', { className: 'tvs-secondary', text: '  used by ' + plural(report.StationsOnDefaultEncoding || 0, 'station') })
+      ]),
+      el('ul', { className: 'tvs-health-list' }, defaults.map(w => el('li', { text: w }))),
+      el('div', { className: 'tvs-health-actions' }, [textButton('Open Settings', openSettings)])
+    ]) : null;
     if (!troubled.length) {
+      if (defaultCard) {
+        box.appendChild(defaultCard);
+      }
       box.appendChild(el('div', { className: 'tvs-ok', text: '✓ All ' + plural(stations.length, 'station') + ' look healthy: every source has items, each has a day or more of unique content, and nothing was skipped.' }));
       return;
     }
     box.appendChild(el('div', { className: 'tvs-secondary', text: troubled.length + ' of ' + plural(stations.length, 'station') + ' need' + (troubled.length === 1 ? 's' : '') + ' attention.' }));
+    if (defaultCard) {
+      box.appendChild(defaultCard);
+    }
     troubled.forEach(h => {
       const head = el('div', { className: 'tvs-health-head' }, [
         el('span', { className: 'tvs-secondary', text: 'Ch ' + (h.ChannelNumber || '?') + '  ' }),
@@ -5181,9 +5335,12 @@
       ]);
       // A fix for each kind of warning: re-scan when items were skipped or nothing was scanned yet, otherwise open the station.
       const needsRefresh = h.Warnings.some(w => /^Not compiled|skipped:/.test(w));
+      // A warning about the station's own encoding is settled in its editor's encoding form, not by adding content.
+      const ownEncoding = Array.isArray(h.EncodingWarnings) ? h.EncodingWarnings : [];
+      const onlyEncoding = h.Warnings.every(w => ownEncoding.indexOf(w) >= 0);
       const actions = el('div', { className: 'tvs-health-actions' }, [
         needsRefresh ? textButton('Refresh content', () => refreshStationContent(h.StationId, h.Name)) : null,
-        textButton(needsRefresh ? 'Edit station' : 'Add content', () => openEditor(h.StationId))
+        textButton(needsRefresh || onlyEncoding ? 'Edit station' : 'Add content', () => openEditor(h.StationId))
       ]);
       box.appendChild(el('div', { className: 'tvs-health' }, [
         head,

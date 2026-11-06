@@ -15,7 +15,7 @@ public sealed class StationStreamSession : ILiveStream
     private readonly object _lock = new();
     private readonly Func<BroadcastBuffer, FfmpegRestreamer> _restreamerFactory;
     private readonly ILogger _logger;
-    private BroadcastBuffer _buffer = new();
+    private readonly BroadcastBuffer _buffer;
     private FfmpegRestreamer? _restreamer;
     private bool _disposed;
 
@@ -24,8 +24,10 @@ public sealed class StationStreamSession : ILiveStream
         string stationName,
         MediaSourceInfo mediaSource,
         Func<BroadcastBuffer, FfmpegRestreamer> restreamerFactory,
-        ILogger logger)
+        ILogger logger,
+        int preRollBytes = BroadcastBuffer.MinPreRollBytes)
     {
+        _buffer = new BroadcastBuffer(preRollBytes);
         StationId = stationId;
         StationName = stationName;
         MediaSource = mediaSource;

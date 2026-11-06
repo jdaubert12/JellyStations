@@ -23,6 +23,12 @@ public sealed class LibraryFact
 
     public long RuntimeTicks { get; set; }
 
+    /// <summary>Picture width as Jellyfin probed it; 0 when not known.</summary>
+    public int Width { get; set; }
+
+    /// <summary>Picture height as Jellyfin probed it; 0 when not known.</summary>
+    public int Height { get; set; }
+
     /// <summary>For a movie: the collection its metadata provider places it in ("James Bond Collection"), box set or not.</summary>
     public string? CollectionName { get; set; }
 

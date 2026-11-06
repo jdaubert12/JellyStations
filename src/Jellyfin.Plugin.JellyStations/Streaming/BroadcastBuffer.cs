@@ -11,14 +11,20 @@ namespace Jellyfin.Plugin.JellyStations.Streaming;
 /// </summary>
 public sealed class BroadcastBuffer
 {
+    /// <summary>The smallest pre-roll: what every channel kept before the pre-roll followed the bitrate.</summary>
+    public const int MinPreRollBytes = 2 * 1024 * 1024;
+
+    /// <summary>The largest pre-roll one station may hold in memory.</summary>
+    public const int MaxPreRollBytes = 64 * 1024 * 1024;
+
     private const int TsPacket = 188;
-    private const int PreRollBytes = 2 * 1024 * 1024;
     private const int ConsumerQueueChunks = 1024;
 
     private const int PatPid = 0;
     private const byte StreamTypeH264 = 0x1B;
     private const byte StreamTypeHevc = 0x24;
 
+    private readonly int _preRollBytes;
     private readonly object _lock = new();
     private readonly LinkedList<Chunk> _preRoll = new();
     private readonly List<Channel<ReadOnlyMemory<byte>>> _consumers = new();
@@ -34,6 +40,25 @@ public sealed class BroadcastBuffer
     private int _pmtPid = -1;
     private int _videoPid = -1;
     private byte _videoStreamType;
+
+    /// <param name="preRollBytes">How much of the stream to keep for a joining reader; see <see cref="PreRollFor"/>.</param>
+    public BroadcastBuffer(int preRollBytes = MinPreRollBytes)
+    {
+        _preRollBytes = Math.Clamp(preRollBytes, MinPreRollBytes, MaxPreRollBytes);
+    }
+
+    /// <summary>
+    /// The pre-roll a profile needs so a key frame is always in it: two key frame intervals at the encoder's peak
+    /// rate. A fixed 2 MB held a whole interval only up to about 8000 kbps; on a 4K channel at 20000 kbps the key
+    /// frame had left the pre-roll for most of every interval, and a reader joining then (a viewer, Jellyfin's probe)
+    /// started mid-GOP with nothing to decode until the next one.
+    /// </summary>
+    public static int PreRollFor(Models.EncodingProfile profile)
+    {
+        var bytesPerSecond = ((profile.VideoBitrateKbps * 1.1) + profile.AudioBitrateKbps) * 1000 / 8;
+        var bytes = bytesPerSecond * Math.Max(1, profile.GopSeconds) * 2;
+        return (int)Math.Clamp(bytes, MinPreRollBytes, MaxPreRollBytes);
+    }
 
     public long TotalBytes { get; private set; }
 
@@ -134,15 +159,18 @@ public sealed class BroadcastBuffer
     /// <summary>Creates a reader that first receives the pre-roll and then live data.</summary>
     public ConsumerStream Subscribe()
     {
-        var channel = Channel.CreateBounded<ReadOnlyMemory<byte>>(new BoundedChannelOptions(ConsumerQueueChunks)
-        {
-            FullMode = BoundedChannelFullMode.DropOldest,
-            SingleReader = true,
-            SingleWriter = false
-        });
-
+        Channel<ReadOnlyMemory<byte>> channel;
         lock (_lock)
         {
+            // Room for the whole pre-roll on top of the live queue: a queue that drops its oldest chunks while the
+            // pre-roll is handed over would drop the tables and the key frame the reader is to start from.
+            channel = Channel.CreateBounded<ReadOnlyMemory<byte>>(new BoundedChannelOptions(ConsumerQueueChunks + _preRoll.Count + 1)
+            {
+                FullMode = BoundedChannelFullMode.DropOldest,
+                SingleReader = true,
+                SingleWriter = false
+            });
+
             var node = _pat is not null && _pmt is not null ? FirstKeyframeNode() : null;
             if (node is not null)
             {
@@ -260,7 +288,7 @@ public sealed class BroadcastBuffer
     {
         _preRoll.AddLast(new Chunk(chunk, startsAtKeyframe));
         _preRollSize += chunk.Length;
-        while (_preRollSize > PreRollBytes && _preRoll.First is not null)
+        while (_preRollSize > _preRollBytes && _preRoll.First is not null)
         {
             _preRollSize -= _preRoll.First.Value.Data.Length;
             _preRoll.RemoveFirst();

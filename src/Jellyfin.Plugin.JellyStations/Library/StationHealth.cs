@@ -21,8 +21,10 @@ public static class StationHealth
     /// <summary>
     /// Judges a station from its last compile. <paramref name="weatherChannel"/> is the weather channel an ordinary
     /// station with a weather block or weather in the breaks shows (null = none exists); ignored for other stations.
+    /// <paramref name="profile"/> is the station's own encoding (null when it follows the default, whose concerns
+    /// the health report states once); what is likely to disappoint about it is warned about.
     /// </summary>
-    public static StationHealthDto Build(Station station, CompiledStation? compiled, Station? weatherChannel = null, double minUniqueHours = MinUniqueHours)
+    public static StationHealthDto Build(Station station, CompiledStation? compiled, Station? weatherChannel = null, double minUniqueHours = MinUniqueHours, EncodingProfile? profile = null)
     {
         var dto = new StationHealthDto
         {
@@ -51,6 +53,12 @@ public static class StationHealth
             dto.Warnings.Add(source.Found == 0
                 ? source.Section + ": " + source.Label + " matched nothing in the library."
                 : source.Section + ": " + source.Label + " found " + source.Found + " item(s) but none were usable (excluded, no runtime, or already listed by an earlier source).");
+        }
+
+        if (profile is not null)
+        {
+            dto.EncodingWarnings = profile.Concerns();
+            dto.Warnings.AddRange(dto.EncodingWarnings);
         }
 
         if (station.Mode == ScheduleMode.Weather)

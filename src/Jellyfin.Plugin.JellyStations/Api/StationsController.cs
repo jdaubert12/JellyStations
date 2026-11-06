@@ -69,7 +69,7 @@ public sealed class StationsController : ControllerBase
                 Next = resolved is null ? new List<ScheduleEntryDto>() : NextPrograms(s.Id, now),
                 LastError = fault?.Message,
                 LastErrorUtc = fault?.Utc,
-                Health = StationHealth.Build(s, compiled, _stations.WeatherChannelFor(s))
+                Health = StationHealth.Build(s, compiled, _stations.WeatherChannelFor(s), profile: s.Encoding)
             };
         });
         return Ok(result.ToList());

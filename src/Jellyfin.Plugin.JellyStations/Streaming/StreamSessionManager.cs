@@ -172,7 +172,8 @@ public sealed class StreamSessionManager : IDisposable
                 _weather is null ? null : (entry, now, p) => _weather.BuildSegment(station.Id, now, entry, p),
                 new SubtitleExtractor(ffmpeg, _paths.SubtitlesDir, logger),
                 _problems),
-            logger);
+            logger,
+            BroadcastBuffer.PreRollFor(profile));
 
         session.MediaSource.Path = _appHost.GetApiUrlForLocalAccess() + "/LiveTv/LiveStreamFiles/" + session.UniqueId + "/stream.ts";
         session.Released += (_, _) => OnReleased(session);
@@ -380,7 +381,7 @@ public sealed class StreamSessionManager : IDisposable
         // HEVC levels as ffprobe reports them (4.1 = 123, 5.1 = 153); H.264 "4.1" as 41.
         var level = hevc
             ? (profile.Width * (long)profile.Height * profile.Fps > 1920L * 1080 * 30 ? 153 : 123)
-            : double.TryParse(profile.H264Level, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var l) ? (double?)Math.Round(l * 10) : null;
+            : double.TryParse(profile.H264LevelForFrame(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var l) ? (double?)Math.Round(l >= 7 ? l : l * 10) : null;
         return new MediaSourceInfo
         {
             Id = MediaSourceId(station, profile),

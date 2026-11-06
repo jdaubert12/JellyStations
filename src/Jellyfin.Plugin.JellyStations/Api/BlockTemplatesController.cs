@@ -1,5 +1,6 @@
 using System.Net.Mime;
 using Jellyfin.Plugin.JellyStations.Api.Dto;
+using Jellyfin.Plugin.JellyStations.Library;
 using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Storage;
 using MediaBrowser.Common.Api;
@@ -24,6 +25,10 @@ public sealed class BlockTemplatesController : ControllerBase
 
     [HttpGet]
     public ActionResult<IEnumerable<SlotBlock>> List() => Ok(Templates(_settings.Get()));
+
+    /// <summary>The starter blocks that ship with the plugin, minus those a saved template of the same name replaces.</summary>
+    [HttpGet("BuiltIn")]
+    public ActionResult<IEnumerable<SlotBlock>> BuiltIn() => Ok(BlockTemplates.Available(Templates(_settings.Get())));
 
     /// <summary>Adds a template, or replaces the one with the same name (case-insensitive). Returns the full list.</summary>
     [HttpPost]
@@ -63,6 +68,12 @@ public sealed class BlockTemplatesController : ControllerBase
         template.Days ??= new List<DayOfWeek>();
         template.Sources ??= new List<ContentSource>();
         if (template.Id == Guid.Empty)
+        {
+            template.Id = Guid.NewGuid();
+        }
+
+        // A copy of a starter block is the user's own template, not the starter under its fixed id.
+        if (BlockTemplates.BuiltIn.Any(b => b.Id == template.Id))
         {
             template.Id = Guid.NewGuid();
         }

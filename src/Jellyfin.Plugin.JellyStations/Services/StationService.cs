@@ -82,6 +82,9 @@ public sealed class StationService
 
     public EncodingProfile EffectiveProfile(Station station) => station.Encoding ?? _settings.Get().DefaultEncoding;
 
+    /// <summary>The plugin-wide encoding every station without its own airs with.</summary>
+    public EncodingProfile DefaultProfile() => _settings.Get().DefaultEncoding ?? new EncodingProfile();
+
     /// <summary>The logo bug the station draws: its own, or the plugin-wide default.</summary>
     public LogoOverlayConfig EffectiveLogoOverlay(Station station) => station.LogoOverlay ?? _settings.Get().LogoOverlay ?? new LogoOverlayConfig();
 
@@ -687,6 +690,7 @@ public sealed class StationService
             src.MaxRating = Library.RatingLadder.Rank(src.MaxRating) is null ? null : Library.RatingLadder.Normalize(src.MaxRating);
             src.Ratings = (src.Ratings ?? new List<string>()).Select(Library.RatingLadder.Normalize).Where(r => r is not null).Select(r => r!).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             (src.YearFrom, src.YearTo) = CleanRange(src.YearFrom, src.YearTo, 1800);
+            src.MinResolution = PictureSize.Normalize(src.MinResolution);
         }
 
         return sources;

@@ -107,7 +107,7 @@ public sealed class SourceExpansion
         AlreadyListed = alreadyListed
     };
 
-    /// <summary>'Series "Bluey"', plus the rating or year filter in brackets when the source has one, so an empty result explains itself.</summary>
+    /// <summary>'Series "Bluey"', plus the rating, year or picture-size filter in brackets when the source has one, so an empty result explains itself.</summary>
     public static string Describe(ContentSource source)
     {
         var name = !string.IsNullOrWhiteSpace(source.DisplayName) ? source.DisplayName
@@ -125,6 +125,11 @@ public sealed class SourceExpansion
         if (source.YearFrom.HasValue || source.YearTo.HasValue)
         {
             filters.Add((source.YearFrom?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "...") + " to " + (source.YearTo?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "..."));
+        }
+
+        if (PictureSize.Describe(source.MinResolution) is { } size)
+        {
+            filters.Add(size);
         }
 
         return source.Kind + " \"" + name + "\"" + (filters.Count > 0 ? " (" + string.Join(", ", filters) + ")" : string.Empty);

@@ -696,7 +696,7 @@ public static partial class FfmpegArgsBuilder
             args.Add("-profile:v");
             args.Add(p.H264Profile);
             args.Add("-level");
-            args.Add(p.H264Level);
+            args.Add(p.H264LevelForFrame());
             args.Add("-x264-params");
             args.Add("scenecut=0:open-gop=0");
         }

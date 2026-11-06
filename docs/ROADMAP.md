@@ -4,7 +4,7 @@ Working plan for scheduling and curation features. Phase 1 is the agreed next th
 Later phases are candidates, roughly ordered by payoff per effort; reorder freely.
 Phase 7 (smarter stations: embeddings, watch history, optional local model) is the current plan; step 2a, the air log with series continuity and the seam at a revision bump, was built 2026-11-02 as 1.25.0.0 from the design in `docs/HISTORY-SCHEDULING.md` (local note, not in the repo; the recency weighting it first proposed stays cut).
 Phase 8 (weather channel) steps 1-6 shipped in 1.14.0.0 (2026-10-23); radar 1.18.0.0 and forecast radar 1.19.0.0 (2026-10-26); step 7: alerts screen (NWS), title cards, music levelling (loudnorm), weather time blocks (with block repeats) and weather in the breaks on ordinary stations built 2026-10-27 as 1.20.0.0; almanac still open.
-Phase 9 (better suggestions and channel templates, planned 2026-10-27) is in progress: B1 station templates built 2026-10-28 as 1.21.0.0; A1 (finish what gets created) built 2026-11-01 as 1.24.0.0; A2 (preview a day), A3 (smarter rules), A4 (coverage aware) and A5 (near misses and thresholds) built 2026-11-05 as 1.27.0.0; B2 (built-in block templates) is next. A6 waits on Phase 7.
+Phase 9 (better suggestions and channel templates, planned 2026-10-27) is in progress: B1 station templates built 2026-10-28 as 1.21.0.0; A1 (finish what gets created) built 2026-11-01 as 1.24.0.0; A2 (preview a day), A3 (smarter rules), A4 (coverage aware) and A5 (near misses and thresholds) built 2026-11-05 as 1.27.0.0; B2 (built-in block templates) built 2026-11-06 as 1.30.0.0; B3 (week layouts) is next. A6 waits on Phase 7.
 Feature survey of the other projects' trackers and communities, 2026-11-02, with a ranked list of candidates not yet planned: `docs/FEATURE-SURVEY-2026-11.md` (local note, not in the repo).
 
 Conventions for every step:
@@ -252,6 +252,29 @@ analyzer, then suggestion rules and the dashboard view on top of it.
   `EncodingProfile.Deinterlace` says so (`auto` follows the file, `always`, `off`); one frame per
   field pair, or per field on a 50/60 fps profile. Bitmap subtitles are laid over the deinterlaced
   picture. Settings and the station override get the select; the hardware test deinterlaces too.
+- **4K channels — DONE 2026-11-06 (1.30.0.0).** A channel has one frame size (the media source id
+  and Jellyfin's cached probe carry it), so a 4K movie cannot switch a 1080p station to 4K; the
+  whole station is 4K or it is not. The Resolution select offers 3840 × 2160;
+  `EncodingProfile.H264LevelForFrame` raises libx264's level to what the size and rate need (5.1
+  for 4K30, 4.2 for 1080p60) for the encoder and the declared media source;
+  `EncodingProfile.Concerns` (4K from an H.264 encoder; a bitrate under or far over
+  `BitrateGuideFor` the size, frame rate and codec; audio under 96 kbps; widened from 4K to every
+  size the same day) shows atop the encoding form, as health warnings on a station with its own
+  profile (`StationHealthDto.EncodingWarnings`) and once for the default
+  (`HealthReportDto.DefaultEncodingWarnings`); `ContentSource.MinResolution` (`PictureSize`: 4k, 1080p, 720p, by
+  Jellyfin's probed width or height) filters every expanding source, in the compiler and in
+  `FactIndex`. Found by the 4K stream check on dev (libx264, 20000 kbps) and fixed in the same
+  release: `BroadcastBuffer`'s pre-roll was a fixed 2 MB, under one keyframe interval above about
+  8000 kbps, so a join began mid-GOP; it is now `PreRollFor(profile)`, two intervals at the
+  profile's bitrate (2 to 64 MB), and a joining reader's queue has room for all of it. Weather
+  screens are drawn at 1080 lines at most (`WeatherChannelService.ScreenSize`) and the weather graph
+  runs at that size with one upscale at its end; drawing a segment is capped at `DrawBudget` (6 s),
+  the segment is cut at the screens done and the rest are drawn off the stream's thread
+  (`DrawAhead`), so a cold tune-in no longer runs into the 20 s open timeout. Not checked: an HEVC
+  or hardware 4K encode (dev has no GPU), and a real player on a 4K stream. Still open: a "4K
+  Movies" suggestion (the facts carry width and height now), a hint when a 4K station's content is
+  mostly smaller, and the 2 to 4 s without frames between weather segments when the next one starts
+  late (seen at 4K with software encoding; the segment change itself is older than this release).
 
 ---
 
@@ -733,9 +756,13 @@ draft goes through `StationTemplates.ApplyTo` to pick up a look and its breaks.
    array. "Duplicate" on the station row copies content and logo. 11 tests in
    `StationTemplatesTests`. Still open: a card on the New station page for deleting a saved template
    (Settings only for now).
-2. **Built-in block templates.** Ship a starter set alongside the saved ones: Saturday morning
-   cartoons, prime-time movie, late night, and "weather on the hour" (a 5-minute weather block
-   repeating every 60 minutes, which the block repeats from 1.20.0.0 make a one-liner). Small.
+2. **Built-in block templates — DONE 2026-11-06 (1.30.0.0).** `BlockTemplates.BuiltIn` (Library) is
+   the starter set with fixed ids: Saturday morning cartoons, Prime-time movie, Late night and
+   Weather on the hour (a 5-minute weather block repeating every 60 minutes from 06:00 to 23:00).
+   They carry days, time, length and play order, no sources (item ids do not travel; step 4 below).
+   `GET /JellyStations/BlockTemplates/BuiltIn` lists the ones no saved template has replaced by name
+   (`Available`); the saved list and its endpoints are unchanged. The dropdown next to "Add block"
+   groups "Saved templates" and "Starter blocks". 4 tests in `BlockTemplatesTests`.
 3. **Week layouts.** A multi-block template that paints a whole broadcast week at once (morning
    kids, daytime reruns, prime-time movie, late night), sources left empty or filled by the genre
    rules from A3. This is the bridge between the two features: "Classic broadcast week" offered by

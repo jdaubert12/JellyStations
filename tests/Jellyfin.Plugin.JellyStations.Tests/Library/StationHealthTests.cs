@@ -84,6 +84,93 @@ public class StationHealthTests
     }
 
     [Fact]
+    public void A4KProfile_WarnsAboutH264AndALowBitrate_AndNothingElseDoes()
+    {
+        var compiled = Compiled(Items.SeriesRun("Show", 30, 60).ToArray());
+        EncodingProfile Uhd(string encoder, int kbps) => new() { Width = 3840, Height = 2160, VideoEncoder = encoder, VideoBitrateKbps = kbps };
+
+        Assert.True(StationHealth.Build(Station(), compiled, profile: new EncodingProfile { Width = 1920, Height = 1080 }).Healthy);
+        Assert.True(StationHealth.Build(Station(), compiled, profile: Uhd("hevc_qsv", 20000)).Healthy);
+
+        var weak = StationHealth.Build(Station(), compiled, profile: Uhd("libx264", 3500));
+        Assert.Equal(2, weak.Warnings.Count);
+        Assert.Contains("libx264 is H.264", weak.Warnings[0]);
+        Assert.Contains("3500 kbps", weak.Warnings[1]);
+
+        var starved = Assert.Single(StationHealth.Build(Station(), compiled, profile: Uhd("libx265", 8000)).Warnings);
+        Assert.Contains("8000 kbps", starved);
+        Assert.Contains("H.264", Assert.Single(StationHealth.Build(Station(), compiled, profile: Uhd("h264_qsv", 25000)).Warnings));
+    }
+
+    [Fact]
+    public void TheShippedDefaultProfile_AndTheUsualLadder_RaiseNothing()
+    {
+        Assert.Empty(new EncodingProfile().Concerns());
+        Assert.Empty(new EncodingProfile { Width = 1280, Height = 720, VideoBitrateKbps = 3500 }.Concerns());
+        Assert.Empty(new EncodingProfile { Width = 1920, Height = 1080, VideoBitrateKbps = 8000 }.Concerns());
+        Assert.Empty(new EncodingProfile { Width = 1920, Height = 1080, VideoBitrateKbps = 5000, VideoEncoder = "hevc_qsv" }.Concerns());
+        Assert.Empty(new EncodingProfile { Width = 854, Height = 480, VideoBitrateKbps = 1500 }.Concerns());
+        Assert.Empty(new EncodingProfile { Width = 3840, Height = 2160, VideoBitrateKbps = 20000, VideoEncoder = "hevc_nvenc" }.Concerns());
+    }
+
+    [Theory]
+    [InlineData(1920, 1080, 30, "libx264", 2500, "1080p at 2500 kbps will look soft and blocky. Around 8000 kbps suits 1080p.")]
+    [InlineData(1920, 1080, 30, "libx264", 3000, null)]
+    [InlineData(1920, 1080, 30, "hevc_qsv", 1800, "1080p at 1800 kbps will look soft and blocky. Around 5000 kbps suits 1080p HEVC.")]
+    [InlineData(1920, 1080, 60, "libx264", 3500, "1080p60 at 3500 kbps will look soft and blocky. Around 12000 kbps suits 1080p60.")]
+    [InlineData(1280, 720, 30, "libx264", 1000, "720p at 1000 kbps will look soft and blocky. Around 3500 kbps suits 720p.")]
+    [InlineData(1280, 720, 30, "h264_nvenc", 1500, null)]
+    [InlineData(2560, 1440, 30, "libx264", 3500, "1440p at 3500 kbps will look soft and blocky. Around 12000 kbps suits 1440p.")]
+    [InlineData(1600, 900, 30, "libx264", 2000, "900p at 2000 kbps will look soft and blocky. Around 8000 kbps suits 900p.")]
+    [InlineData(854, 480, 30, "libx264", 400, "480p at 400 kbps will look soft and blocky. Around 1500 kbps suits 480p.")]
+    [InlineData(3840, 2160, 60, "hevc_qsv", 12000, "4K60 at 12000 kbps will look soft and blocky. Around 30000 kbps suits 4K60 HEVC.")]
+    [InlineData(3840, 2160, 30, "libx264", 3500, "4K at 3500 kbps will look soft and blocky. Around 20000 kbps suits 4K HEVC.")]
+    public void ABitrateTooLowForThePicture_IsNamedWithTheFigureThatSuitsIt(int width, int height, int fps, string encoder, int kbps, string? expected)
+    {
+        var concerns = new EncodingProfile { Width = width, Height = height, Fps = fps, VideoEncoder = encoder, VideoBitrateKbps = kbps }.Concerns();
+
+        if (expected is null)
+        {
+            Assert.Empty(concerns);
+        }
+        else
+        {
+            Assert.Contains(expected, concerns);
+        }
+    }
+
+    [Fact]
+    public void ABitrateLeftFromALargerChannel_IsCalledWasteful_AndThinAudioIsNamed()
+    {
+        // 20000 kbps left behind when a 4K station went back to 1080p.
+        var left = Assert.Single(new EncodingProfile { Width = 1920, Height = 1080, VideoBitrateKbps = 20000 }.Concerns());
+        Assert.Equal("1080p at 20000 kbps is more than the picture can use; it only makes every client's download and Jellyfin's transcodes larger. Around 8000 kbps suits 1080p.", left);
+        Assert.Empty(new EncodingProfile { Width = 1920, Height = 1080, VideoBitrateKbps = 16000 }.Concerns());
+        Assert.Empty(new EncodingProfile { Width = 1920, Height = 1080, Fps = 60, VideoBitrateKbps = 20000 }.Concerns());
+        // An H.264 4K channel is sent to HEVC, never told its bitrate is too much.
+        Assert.DoesNotContain(new EncodingProfile { Width = 3840, Height = 2160, VideoEncoder = "libx264", VideoBitrateKbps = 50000 }.Concerns(), c => c.Contains("more than", StringComparison.Ordinal));
+
+        var thin = Assert.Single(new EncodingProfile { AudioBitrateKbps = 64 }.Concerns());
+        Assert.Equal("Audio at 64 kbps will sound thin. 128 kbps or more suits AAC stereo.", thin);
+        Assert.Empty(new EncodingProfile { AudioBitrateKbps = 96 }.Concerns());
+    }
+
+    [Fact]
+    public void EncodingWarnings_AreTheStationsOwn_AndListedApart()
+    {
+        var compiled = Compiled(Items.SeriesRun("Show", 30, 60).ToArray());
+
+        // No profile handed in: the station follows the default, whose concerns the report states once.
+        var following = StationHealth.Build(Station(), compiled);
+        Assert.True(following.Healthy);
+        Assert.Empty(following.EncodingWarnings);
+
+        var own = StationHealth.Build(Station(), compiled, profile: new EncodingProfile { Width = 1920, Height = 1080, VideoBitrateKbps = 1500 });
+        Assert.Equal(own.EncodingWarnings, own.Warnings);
+        Assert.Contains("1080p at 1500 kbps", Assert.Single(own.EncodingWarnings));
+    }
+
+    [Fact]
     public void UniqueHours_CountEachItemOnce_AcrossSections_IgnoringBumpers()
     {
         var a = Items.Movie("A", 60);

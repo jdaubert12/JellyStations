@@ -160,14 +160,19 @@ public sealed class StatusController : ControllerBase
     [HttpGet("Health")]
     public ActionResult<HealthReportDto> Health()
     {
-        var stations = _stations.GetAll()
-            .Select(s => StationHealth.Build(s, _stations.GetCompiled(s.Id), _stations.WeatherChannelFor(s)))
+        var all = _stations.GetAll();
+        var stations = all
+            .Select(s => StationHealth.Build(s, _stations.GetCompiled(s.Id), _stations.WeatherChannelFor(s), profile: s.Encoding))
             .ToList();
+        // A weak default is one thing to fix in Settings, not a warning on every station that follows it.
+        var onDefault = all.Count(s => s.Encoding is null);
         return Ok(new HealthReportDto
         {
             GeneratedUtc = DateTime.UtcNow.ToString("O"),
             Stations = stations,
-            StationsWithWarnings = stations.Count(s => !s.Healthy)
+            StationsWithWarnings = stations.Count(s => !s.Healthy),
+            DefaultEncodingWarnings = onDefault > 0 ? _stations.DefaultProfile().Concerns() : new List<string>(),
+            StationsOnDefaultEncoding = onDefault
         });
     }
 

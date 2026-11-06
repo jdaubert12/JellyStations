@@ -22,6 +22,28 @@ public sealed class WeatherChannelService
     /// <summary>A segment runs about this long; one ffmpeg process per segment.</summary>
     public static readonly TimeSpan TargetSegment = TimeSpan.FromMinutes(4);
 
+    /// <summary>How long a segment's screens may take to draw before the segment is cut short at the ones done.</summary>
+    public static readonly TimeSpan DrawBudget = TimeSpan.FromSeconds(6);
+
+    /// <summary>The tallest picture a screen is drawn at; a larger channel has ffmpeg scale the screens up.</summary>
+    public const int MaxScreenHeight = 1080;
+
+    /// <summary>
+    /// The size the screens of a profile are drawn at: the output size up to 1080 lines, the same shape beyond. A
+    /// segment of four places with radar is 80 screens or more, all drawn before ffmpeg starts; at 3840x2160 that
+    /// took over half a minute on a cold cache, longer than a tune-in waits for the first bytes.
+    /// </summary>
+    public static (int Width, int Height) ScreenSize(EncodingProfile profile)
+    {
+        if (profile.Height <= MaxScreenHeight)
+        {
+            return (profile.Width, profile.Height);
+        }
+
+        var width = (int)Math.Round(profile.Width * (double)MaxScreenHeight / profile.Height);
+        return (width + (width % 2), MaxScreenHeight);
+    }
+
     private readonly StationRepository _stations;
     private readonly CompiledStationRepository _compiled;
     private readonly WeatherService _weather;
@@ -32,6 +54,7 @@ public sealed class WeatherChannelService
     private readonly WeatherAssets _assets;
     private readonly JellyStationsPaths _paths;
     private readonly ILogger<WeatherChannelService> _logger;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, byte> _drawingAhead = new();
 
     public WeatherChannelService(StationRepository stations, CompiledStationRepository compiled, WeatherService weather, RadarService radar, AlertService alerts, MusicLoudnessService loudness, WeatherScreenRenderer renderer, WeatherAssets assets, JellyStationsPaths paths, ILogger<WeatherChannelService> logger)
     {
@@ -97,7 +120,6 @@ public sealed class WeatherChannelService
         }
 
         var segStart = kept[0].StartUtc;
-        var segEnd = kept[^1].EndUtc;
 
         var places = locations.Select((l, i) =>
         {
@@ -108,8 +130,8 @@ public sealed class WeatherChannelService
         var logoPath = config.ShowLogo && !string.IsNullOrEmpty(station.LogoFileName) ? _paths.LogoFile(station.LogoFileName) : null;
         var unixStart = (long)Math.Floor((segStart - DateTime.UnixEpoch).TotalSeconds);
 
-        var slides = new List<WeatherSlide>(kept.Count);
-        foreach (var s in kept)
+        var (screenWidth, screenHeight) = ScreenSize(profile);
+        WeatherSlide Draw(TimedScreen s)
         {
             var place = s.Screen.LocationIndex >= 0 && s.Screen.LocationIndex < places.Count ? places[s.Screen.LocationIndex] : null;
             var offset = place is null ? (long)zone.GetUtcOffset(nowUtc).TotalSeconds : PlaceOffsetSeconds(place, zone, nowUtc);
@@ -117,13 +139,31 @@ public sealed class WeatherChannelService
             if (sequence is { } seq)
             {
                 var listPath = RadarSequence(station.Id, seq.Loop, seq.Frames, s, place!, places, config, nowUtc, zone, logoPath, profile, attribution);
-                slides.Add(new WeatherSlide(listPath, s.Duration.TotalSeconds, unixStart + offset, IsSequence: true));
-                continue;
+                return new WeatherSlide(listPath, s.Duration.TotalSeconds, unixStart + offset, IsSequence: true);
             }
 
-            var request = new ScreenRequest(s.Screen.Kind, place, places, config, nowUtc, zone, logoPath, profile.Width, profile.Height, attribution);
-            var path = _renderer.Render(station.Id, request);
-            slides.Add(new WeatherSlide(path, s.Duration.TotalSeconds, unixStart + offset));
+            var request = new ScreenRequest(s.Screen.Kind, place, places, config, nowUtc, zone, logoPath, screenWidth, screenHeight, attribution);
+            return new WeatherSlide(_renderer.Render(station.Id, request), s.Duration.TotalSeconds, unixStart + offset);
+        }
+
+        var slides = new List<WeatherSlide>(kept.Count);
+        var segEnd = segStart;
+        var drawing = System.Diagnostics.Stopwatch.StartNew();
+        foreach (var s in kept)
+        {
+            // Nothing plays while the screens are drawn. When that runs long (a new hour or new reports redraw every
+            // screen, a radar loop is a dozen of them), the segment ends at the screens drawn so far, the rest are
+            // drawn while it plays, and the next segment carries on from there. The first screen is always drawn.
+            if (slides.Count > 0 && drawing.Elapsed > DrawBudget)
+            {
+                _logger.LogDebug("JellyStations weather [{Station}]: drawing ran {Seconds:0.0} s, segment cut at {Count} of {All} screens", Text.ForLog(station.Name), drawing.Elapsed.TotalSeconds, slides.Count, kept.Count);
+                var until = segStart + TargetSegment + TargetSegment;
+                DrawAhead(station.Id, screens.Skip(slides.Count).TakeWhile(x => x.StartUtc < until).ToList(), s => Draw(s));
+                break;
+            }
+
+            segEnd = s.EndUtc;
+            slides.Add(Draw(s));
         }
 
         var audio = new List<WeatherAudio>();
@@ -168,6 +208,37 @@ public sealed class WeatherChannelService
     }
 
     /// <summary>
+    /// Draws the screens the coming segments will show, off the stream's thread, so they find them drawn. One run
+    /// per station at a time; a failure only means the next segment draws that screen itself.
+    /// </summary>
+    private void DrawAhead(Guid stationId, IReadOnlyList<TimedScreen> screens, Action<TimedScreen> draw)
+    {
+        if (screens.Count == 0 || !_drawingAhead.TryAdd(stationId, 0))
+        {
+            return;
+        }
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                foreach (var s in screens)
+                {
+                    draw(s);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "JellyStations weather: drawing ahead stopped");
+            }
+            finally
+            {
+                _drawingAhead.TryRemove(stationId, out _);
+            }
+        });
+    }
+
+    /// <summary>
     /// One music piece as ffmpeg plays it: levelled by its measured gain, faded in when the track really starts here
     /// and out when it really ends here (never at a segment cut, which the next segment continues seamlessly).
     /// </summary>
@@ -200,6 +271,7 @@ public sealed class WeatherChannelService
         var framePaths = new string?[frames.Count];
         var entries = new List<(string Path, double Seconds)>(plan.Count);
         var zoom = WebMercator.ZoomOf(loop.Zoom);
+        var (screenWidth, screenHeight) = ScreenSize(profile);
         foreach (var (index, seconds) in plan)
         {
             var path = framePaths[index];
@@ -207,7 +279,7 @@ public sealed class WeatherChannelService
             {
                 var frame = frames[index];
                 var radar = new RadarFrameRequest(loop.SourceId, loop.SourceName, loop.Attribution, frame.TimeUtc, frame.Path, index, frames.Count, zoom, loop.RunUtc);
-                var request = new ScreenRequest(s.Screen.Kind, place, places, config, nowUtc, zone, logoPath, profile.Width, profile.Height, attribution, radar);
+                var request = new ScreenRequest(s.Screen.Kind, place, places, config, nowUtc, zone, logoPath, screenWidth, screenHeight, attribution, radar);
                 framePaths[index] = path = _renderer.Render(stationId, request);
             }
 
@@ -219,8 +291,11 @@ public sealed class WeatherChannelService
         var listPath = Path.Combine(_paths.WeatherScreensDir(stationId), name);
         if (!File.Exists(listPath))
         {
+            // Written aside and moved into place: the stream's thread and the draw-ahead may reach the same list.
             Directory.CreateDirectory(Path.GetDirectoryName(listPath)!);
-            File.WriteAllText(listPath, text);
+            var aside = listPath + "." + Guid.NewGuid().ToString("N")[..8] + ".tmp";
+            File.WriteAllText(aside, text);
+            File.Move(aside, listPath, overwrite: true);
         }
 
         return listPath;

@@ -98,6 +98,25 @@ public class SuggestionCoverageTests
     }
 
     [Fact]
+    public void A_source_limited_to_4K_plays_only_the_4K_files()
+    {
+        var w = new World();
+        w.Heat.Width = 3840;
+        w.Heat.Height = 1600;
+        w.Elf.Width = 1920;
+        w.Elf.Height = 1080;
+        var index = w.Index;
+
+        var uhd = Source(SourceKind.Library, MoviesLib);
+        uhd.MinResolution = "4k";
+        Assert.Equal(w.Heat.Id, Assert.Single(index.ItemsOf(Pool(uhd)))); // files of unknown size do not pass
+
+        var fhd = Source(SourceKind.Library, MoviesLib);
+        fhd.MinResolution = "1080p";
+        Assert.Equal(new[] { w.Heat.Id, w.Elf.Id }.ToHashSet(), index.ItemsOf(Pool(fhd)));
+    }
+
+    [Fact]
     public void Genre_tag_series_collection_and_lineup_match_the_facts()
     {
         var w = new World();

@@ -57,6 +57,12 @@ public sealed class ContentSource
 
     public int? YearTo { get; set; }
 
+    /// <summary>
+    /// Smallest picture the source takes, one of <see cref="PictureSize.Tiers"/> ("4k" = 4K files only, so a 4K
+    /// channel upscales nothing). Null = any. Files whose size Jellyfin has not probed are dropped when set.
+    /// </summary>
+    public string? MinResolution { get; set; }
+
     /// <summary>For Genre and Tag kinds: optional library to restrict to.</summary>
     public Guid? LibraryId { get; set; }
 

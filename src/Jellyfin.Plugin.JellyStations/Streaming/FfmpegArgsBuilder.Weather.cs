@@ -14,7 +14,8 @@ public static partial class FfmpegArgsBuilder
     /// loop comes in as a concat-demuxer list of frames with durations and is filled to the frame rate instead),
     /// the screens are joined with xfade cross-fades at the screen boundaries, and drawtext adds the clock (ffmpeg's
     /// own time expansion with a per-place offset, so it ticks live) and the music credit. The music pieces are
-    /// seeked and cut at the demuxer and concatenated; silence when there is none.
+    /// seeked and cut at the demuxer and concatenated; silence when there is none. A channel taller than 1080 lines
+    /// gets the same graph at 1080 lines, scaled up as its last step.
     /// </summary>
     public static List<string> ForWeather(WeatherSegment seg, TimeSpan tsOffset, EncodingProfile p)
     {
@@ -90,12 +91,16 @@ public static partial class FfmpegArgsBuilder
         var n = seg.Slides.Count;
         var fade = n > 1 ? WeatherSegment.FadeSeconds : 0;
 
+        // The whole graph runs at the size the screens are drawn at and is scaled up once at the end: on a 4K
+        // channel, cross-fading 30 screens at 3840x2160 put the encoder seconds behind before the first frame.
+        var (w, h) = Weather.WeatherChannelService.ScreenSize(p);
+
         // Each screen as a stream of exactly its on-air length (plus the fade it hands the next screen).
         for (var i = 0; i < n; i++)
         {
             var length = seg.Slides[i].Seconds + (i < n - 1 ? fade : 0);
             var timing = seg.Slides[i].IsSequence ? "fps=" + p.Fps.ToString(CultureInfo.InvariantCulture) : "loop=loop=-1:size=1:start=0";
-            sb.Append(CultureInfo.InvariantCulture, $"[{i}:v]scale={p.Width}:{p.Height}:force_original_aspect_ratio=decrease,pad={p.Width}:{p.Height}:(ow-iw)/2:(oh-ih)/2,format=yuv420p,{timing},settb=1/{p.Fps},setpts=N/({p.Fps}*TB),trim=end={N(length)}[s{i}];");
+            sb.Append(CultureInfo.InvariantCulture, $"[{i}:v]scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,format=yuv420p,{timing},settb=1/{p.Fps},setpts=N/({p.Fps}*TB),trim=end={N(length)}[s{i}];");
         }
 
         // Cross-fade each screen into the next at the boundary; the offsets are the cumulative screen lengths.
@@ -109,7 +114,7 @@ public static partial class FfmpegArgsBuilder
         }
 
         // The live clock: one drawtext per distinct offset, switched on for the screens that use it.
-        var scale = p.Height / 1080.0;
+        var scale = h / 1080.0;
         var font = EscapeFilterPath(seg.FontPath);
         var clockFormat = Weather.Units.DrawtextClockFormat(seg.TwentyFourHourClock);
         double t = 0;
@@ -147,7 +152,8 @@ public static partial class FfmpegArgsBuilder
             step++;
         }
 
-        sb.Append(CultureInfo.InvariantCulture, $"[{current}]{SdrGraphToOutput(p)}{EncoderUploadSuffix(p)}[v]");
+        var upscale = w == p.Width && h == p.Height ? string.Empty : string.Create(CultureInfo.InvariantCulture, $"scale={p.Width}:{p.Height}:flags=bicubic,");
+        sb.Append(CultureInfo.InvariantCulture, $"[{current}]{upscale}{SdrGraphToOutput(p)}{EncoderUploadSuffix(p)}[v]");
         return sb.ToString();
     }
 

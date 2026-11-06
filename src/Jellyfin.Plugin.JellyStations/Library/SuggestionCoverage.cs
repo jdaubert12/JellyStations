@@ -8,8 +8,8 @@ namespace Jellyfin.Plugin.JellyStations.Library;
 /// <summary>
 /// Which movies and episodes a station definition would play, worked out from <see cref="LibraryFact"/>s alone so
 /// it needs no library and no compile. It follows <see cref="LibraryContentResolver"/> for the source kinds the
-/// suggester writes (library, genre, tag, series, collection, hand-picked titles, with their rating, year, kind
-/// and season filters and the excluded tags); a playlist or a single season is not known to the facts and matches
+/// suggester writes (library, genre, tag, series, collection, hand-picked titles, with their rating, year, kind,
+/// season and picture-size filters and the excluded tags); a playlist or a single season is not known to the facts and matches
 /// nothing. Good enough to say how much of a suggestion the channels already play.
 /// </summary>
 public sealed class FactIndex
@@ -107,6 +107,11 @@ public sealed class FactIndex
         }
 
         items = Years(Ratings(items, source), source);
+        if (PictureSize.Normalize(source.MinResolution) is { } tier)
+        {
+            items = items.Where(f => PictureSize.Meets(f.Width, f.Height, tier));
+        }
+
         var drop = LibraryContentResolver.EffectiveExcludedTags(source, excludedTags);
         return drop.Count == 0 ? items : items.Where(f => !f.Tags.Any(drop.Contains));
     }

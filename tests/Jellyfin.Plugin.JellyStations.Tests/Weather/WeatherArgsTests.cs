@@ -64,6 +64,17 @@ public class WeatherArgsTests
     }
 
     [Fact]
+    public void OnA4KProfile_TheGraphRunsAt1080Lines_AndIsScaledUpOnce()
+    {
+        var f = Filter(FfmpegArgsBuilder.ForWeather(Segment(music: false), TimeSpan.Zero, new EncodingProfile { Width = 3840, Height = 2160, Fps = 30 }));
+
+        Assert.Contains("[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=yuv420p,loop=", f);
+        Assert.Contains("fontsize=54:fontcolor=white:x=80:y=988", f); // the clock on the 1080 grid, scaled up with the picture
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(f, "scale=3840:2160"));
+        Assert.EndsWith("scale=3840:2160:flags=bicubic,format=yuv420p," + FfmpegArgsBuilder.SdrTags + "[v]", f);
+    }
+
+    [Fact]
     public void Clock_IsDrawnPerOffset_WithMergedWindows()
     {
         var f = Filter(FfmpegArgsBuilder.ForWeather(Segment(music: false), TimeSpan.Zero, Profile()));
@@ -158,5 +169,17 @@ public class WeatherArgsTests
     {
         Assert.Equal("Now playing: Local Forecast – Kevin MacLeod", WeatherChannelService.CreditText(new MusicTrack { Title = "Local Forecast", Artist = "Kevin MacLeod" }));
         Assert.Equal("Now playing: Local Forecast", WeatherChannelService.CreditText(new MusicTrack { Title = "Local Forecast", Artist = " " }));
+    }
+
+    [Theory]
+    [InlineData(1280, 720, 1280, 720)]
+    [InlineData(1920, 1080, 1920, 1080)]
+    [InlineData(2560, 1440, 1920, 1080)]
+    [InlineData(3840, 2160, 1920, 1080)]
+    [InlineData(2880, 2160, 1440, 1080)]
+    public void Screens_AreDrawnAtTheOutputSize_UpTo1080Lines(int width, int height, int drawnWidth, int drawnHeight)
+    {
+        // A 4K channel scales 1080-line screens up in ffmpeg; drawing 80 of them at 4K outlasted the tune-in wait.
+        Assert.Equal((drawnWidth, drawnHeight), WeatherChannelService.ScreenSize(new EncodingProfile { Width = width, Height = height }));
     }
 }
