@@ -45,3 +45,24 @@ gen "bumps/Station ident 1.mp4" 8 640x360 660
 gen "bumps/Station ident 2.mp4" 12 640x360 740
 gen "bumps/Coming up next.mp4" 20 640x360 830
 gen "bumps/We will be right back.mp4" 30 640x360 932
+
+# Interlacing baked into progressive frames, for the picture check: a DVD-sized cartoon with 3:2 pulldown woven
+# in (top field first), video-rate fields woven in (bottom field first), the same drawings clean, and a starved
+# progressive encode that idet alone would call interlaced. Every file is flagged progressive.
+mkdir -p "$M/tv/Combed Show/Season 01"
+combed() {
+  local out="$1" rate="$2" step="$3" filter="$4" video="$5"
+  local toon="color=c=0x2a6fb0:s=720x480:r=$rate[bg];color=c=0xf0c020:s=160x200:r=$rate[b1];color=c=0xd03030:s=90x90:r=$rate[b2];[bg][b1]overlay=x='mod(floor(n/$step)*14,720)':y=120[t];[t][b2]overlay=x='600-mod(floor(n/$step)*9,600)':y=300,format=yuv420p[out0]"
+  MSYS_NO_PATHCONV=1 docker run --rm -v "$M:/media" --entrypoint /usr/lib/jellyfin-ffmpeg/ffmpeg jellyfin/jellyfin:12.2 \
+    -y -loglevel error -f lavfi -i "$toon" -f lavfi -i "sine=frequency=500:sample_rate=48000" -t 150 \
+    -vf "$filter" $video -c:a aac -b:a 96k "/media/tv/Combed Show/Season 01/$out"
+  echo "made $out"
+}
+X265="-c:v libx265 -preset veryfast -crf 24 -x265-params log-level=error"
+combed "Combed Show S01E01.mkv" 24000/1001 2 "telecine=first_field=top:pattern=23" "$X265"
+combed "Combed Show S01E02.mkv" 60000/1001 1 "interlace=scan=bff:lowpass=off,setfield=prog" "-r 30000/1001 $X265"
+combed "Combed Show S01E03.mkv" 30000/1001 3 "null" "$X265"
+MSYS_NO_PATHCONV=1 docker run --rm -v "$M:/media" --entrypoint /usr/lib/jellyfin-ffmpeg/ffmpeg jellyfin/jellyfin:12.2 \
+  -y -loglevel error -f lavfi -i "testsrc2=s=720x480:r=30000/1001" -f lavfi -i "sine=frequency=600:sample_rate=48000" -t 150 \
+  -c:v libx264 -preset veryfast -b:v 150k -pix_fmt yuv420p -c:a aac -b:a 96k "/media/tv/Combed Show/Season 01/Combed Show S01E04.mkv"
+echo "made Combed Show S01E04.mkv"

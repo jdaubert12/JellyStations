@@ -18,6 +18,7 @@ public sealed class JellyStationsHostedService : IHostedService
     private readonly Weather.Radar.RadarService _radar;
     private readonly Weather.Alerts.AlertService _alerts;
     private readonly Library.MusicLoudnessService _loudness;
+    private readonly Library.InterlaceCheckService _interlace;
     private readonly Music.MusicPackService _packs;
     private readonly AirLogRecorder _airLog;
     private readonly ILogger<JellyStationsHostedService> _logger;
@@ -25,11 +26,12 @@ public sealed class JellyStationsHostedService : IHostedService
     private HashSet<Guid>? _inSeason;
     private Timer? _seasonTimer;
 
-    public JellyStationsHostedService(JellyStationsPaths paths, StationService stations, StreamSessionManager sessions, GuideRefreshService guide, WeatherService weather, Weather.Radar.RadarService radar, Weather.Alerts.AlertService alerts, Library.MusicLoudnessService loudness, Music.MusicPackService packs, AirLogRecorder airLog, ILogger<JellyStationsHostedService> logger)
+    public JellyStationsHostedService(JellyStationsPaths paths, StationService stations, StreamSessionManager sessions, GuideRefreshService guide, WeatherService weather, Weather.Radar.RadarService radar, Weather.Alerts.AlertService alerts, Library.MusicLoudnessService loudness, Music.MusicPackService packs, AirLogRecorder airLog, ILogger<JellyStationsHostedService> logger, Library.InterlaceCheckService interlace)
     {
         _weather = weather;
         _airLog = airLog;
         _loudness = loudness;
+        _interlace = interlace;
         _radar = radar;
         _alerts = alerts;
         _packs = packs;
@@ -104,6 +106,7 @@ public sealed class JellyStationsHostedService : IHostedService
             _radar.Start();
             _alerts.Start();
             _loudness.Start();
+            _interlace.Start();
             _airLog.Start();
             _seasonTimer = new Timer(_ => SafeCheckSeasons(), null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10));
             _logger.LogInformation(
@@ -126,6 +129,7 @@ public sealed class JellyStationsHostedService : IHostedService
         _radar.Dispose();
         _alerts.Dispose();
         _loudness.Dispose();
+        _interlace.Dispose();
         _packs.Dispose();
         _airLog.Dispose();
         _sessions.StopAll();

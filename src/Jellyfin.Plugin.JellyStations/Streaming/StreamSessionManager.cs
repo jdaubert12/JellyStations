@@ -29,6 +29,7 @@ public sealed class StreamSessionManager : IDisposable
     private readonly ILoggerFactory _loggerFactory;
     private readonly Weather.WeatherChannelService? _weather;
     private readonly Services.ProblemFileLog? _problems;
+    private readonly Library.InterlaceCheckService? _interlace;
     private readonly ILogger<StreamSessionManager> _logger;
     private readonly ConcurrentDictionary<Guid, StationFault> _faults = new();
     private readonly System.Threading.Timer _watchdog;
@@ -42,8 +43,10 @@ public sealed class StreamSessionManager : IDisposable
         IServerConfigurationManager configuration,
         ILoggerFactory loggerFactory,
         Weather.WeatherChannelService? weather = null,
-        Services.ProblemFileLog? problems = null)
+        Services.ProblemFileLog? problems = null,
+        Library.InterlaceCheckService? interlace = null)
     {
+        _interlace = interlace;
         _weather = weather;
         _problems = problems;
         _resolver = resolver;
@@ -171,7 +174,8 @@ public sealed class StreamSessionManager : IDisposable
                 station.TimeZoneId,
                 _weather is null ? null : (entry, now, p) => _weather.BuildSegment(station.Id, now, entry, p),
                 new SubtitleExtractor(ffmpeg, _paths.SubtitlesDir, logger),
-                _problems),
+                _problems,
+                _interlace),
             logger,
             BroadcastBuffer.PreRollFor(profile));
 

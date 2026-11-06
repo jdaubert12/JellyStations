@@ -83,7 +83,8 @@ public static partial class FfmpegArgsBuilder
     /// <param name="upNext">An "Up next" card to draw near the end of the segment, or null.</param>
     /// <param name="subtitles">Subtitles to burn into the picture, or null.</param>
     /// <param name="interlaced">True when the file's video is interlaced; the profile's deinterlace mode decides what is done about it.</param>
-    public static List<string> ForSource(string path, bool hasAudio, int? audioStreamIndex, string? hdrTransfer, TimeSpan seek, TimeSpan? duration, TimeSpan tsOffset, EncodingProfile p, LogoOverlayInput? overlay = null, string? videoCodec = null, UpNextCardInput? upNext = null, SubtitleInput? subtitles = null, bool interlaced = false)
+    /// <param name="fieldOrder">"tff" or "bff" when the field order is known from a look at the picture (the frames of such a file carry no flags to read it from); null to go by the frames.</param>
+    public static List<string> ForSource(string path, bool hasAudio, int? audioStreamIndex, string? hdrTransfer, TimeSpan seek, TimeSpan? duration, TimeSpan tsOffset, EncodingProfile p, LogoOverlayInput? overlay = null, string? videoCodec = null, UpNextCardInput? upNext = null, SubtitleInput? subtitles = null, bool interlaced = false, string? fieldOrder = null)
     {
         var args = new List<string>();
         Common(args);
@@ -129,11 +130,11 @@ public static partial class FfmpegArgsBuilder
         var subtitleSeek = seek > InputSeekThreshold ? seek : TimeSpan.Zero;
         if (overlay is null && upNext is null && subtitles?.IsBitmap != true)
         {
-            AddFilteredStreams(args, "0:v:0", audioMap, VideoFilter(p, hdrTransfer, subtitles, subtitleSeek, interlaced) + EncoderUploadSuffix(p));
+            AddFilteredStreams(args, "0:v:0", audioMap, VideoFilter(p, hdrTransfer, subtitles, subtitleSeek, interlaced, fieldOrder) + EncoderUploadSuffix(p));
         }
         else
         {
-            AddGraphStreams(args, p, ComposeFilter(p, hdrTransfer, overlay, logoIndex, upNext, cardIndex, subtitles, subtitleSeek, interlaced), "v", audioMap);
+            AddGraphStreams(args, p, ComposeFilter(p, hdrTransfer, overlay, logoIndex, upNext, cardIndex, subtitles, subtitleSeek, interlaced, fieldOrder), "v", audioMap);
         }
 
         Output(args, p, tsOffset);
@@ -145,7 +146,7 @@ public static partial class FfmpegArgsBuilder
     /// image: it only needs placing and switching on for its window (the overlay filter's enable expression, in
     /// seconds since the segment started; -output_ts_offset is applied later, at the muxer).
     /// </summary>
-    public static string ComposeFilter(EncodingProfile p, string? hdrTransfer, LogoOverlayInput? overlay, int logoIndex, UpNextCardInput? upNext, int cardIndex, SubtitleInput? subtitles = null, TimeSpan subtitleSeek = default, bool interlaced = false)
+    public static string ComposeFilter(EncodingProfile p, string? hdrTransfer, LogoOverlayInput? overlay, int logoIndex, UpNextCardInput? upNext, int cardIndex, SubtitleInput? subtitles = null, TimeSpan subtitleSeek = default, bool interlaced = false, string? fieldOrder = null)
     {
         var sb = new StringBuilder();
         if (subtitles?.IsBitmap == true)
@@ -154,7 +155,7 @@ public static partial class FfmpegArgsBuilder
             // same input as the video, so seeking keeps them in step; when the track runs out the picture goes on alone.
             // An interlaced picture is deinterlaced first, so the subtitles are not run through the deinterlacer.
             var source = "0:v";
-            if (DeinterlaceFilter(p, interlaced) is { } deinterlace)
+            if (DeinterlaceFilter(p, interlaced, fieldOrder) is { } deinterlace)
             {
                 sb.Append(CultureInfo.InvariantCulture, $"[0:v]{deinterlace}[deint];");
                 source = "deint";
@@ -164,7 +165,7 @@ public static partial class FfmpegArgsBuilder
         }
         else
         {
-            sb.Append(CultureInfo.InvariantCulture, $"[0:v]{VideoFilter(p, hdrTransfer, subtitles, subtitleSeek, interlaced)}[base]");
+            sb.Append(CultureInfo.InvariantCulture, $"[0:v]{VideoFilter(p, hdrTransfer, subtitles, subtitleSeek, interlaced, fieldOrder)}[base]");
         }
 
         var current = "base";
@@ -509,7 +510,7 @@ public static partial class FfmpegArgsBuilder
     /// would be, as fast as the machine can, with ffmpeg at verbose level so it names the decoder it attached, and no
     /// output but ffmpeg's own final statistics (speed=... tells how far from real time the machine is).
     /// </summary>
-    public static List<string> ForProbe(string path, string? hdrTransfer, EncodingProfile p, int seconds, TimeSpan seek, string? videoCodec = null, bool interlaced = false)
+    public static List<string> ForProbe(string path, string? hdrTransfer, EncodingProfile p, int seconds, TimeSpan seek, string? videoCodec = null, bool interlaced = false, string? fieldOrder = null)
     {
         var args = new List<string>();
         Common(args, "verbose");
@@ -522,7 +523,7 @@ public static partial class FfmpegArgsBuilder
         args.Add("-map");
         args.Add("0:v:0");
         args.Add("-vf");
-        args.Add(VideoFilter(p, hdrTransfer, interlaced: interlaced) + EncoderUploadSuffix(p));
+        args.Add(VideoFilter(p, hdrTransfer, interlaced: interlaced, fieldOrder: fieldOrder) + EncoderUploadSuffix(p));
         VideoCodec(args, p);
         args.Add("-f");
         args.Add("null");
@@ -585,10 +586,10 @@ public static partial class FfmpegArgsBuilder
     /// properties are stated outright so zscale does not depend on the file's tags. An interlaced source is
     /// deinterlaced first, at full vertical resolution, when the profile asks for it.
     /// </summary>
-    public static string VideoFilter(EncodingProfile p, string? hdrTransfer = null, SubtitleInput? subtitles = null, TimeSpan subtitleSeek = default, bool interlaced = false)
+    public static string VideoFilter(EncodingProfile p, string? hdrTransfer = null, SubtitleInput? subtitles = null, TimeSpan subtitleSeek = default, bool interlaced = false, string? fieldOrder = null)
     {
         var sb = new StringBuilder();
-        if (DeinterlaceFilter(p, interlaced) is { } deinterlace)
+        if (DeinterlaceFilter(p, interlaced, fieldOrder) is { } deinterlace)
         {
             sb.Append(deinterlace).Append(',');
         }
@@ -642,10 +643,12 @@ public static partial class FfmpegArgsBuilder
     /// better than yadif at a modest cost), running before the scaler so it sees whole fields. One frame per field
     /// pair, or one per field on a 50/60 fps profile so video-shot material keeps its motion; the fps filter after
     /// the scaler conforms either to the profile's rate. Decoded frames are in system memory on every decode path
-    /// (the hardware decoders hand them back), so no upload or download is involved.
+    /// (the hardware decoders hand them back), so no upload or download is involved. The field order is read from
+    /// each frame's flags, except for a file whose fields were found by looking at the picture: its frames are
+    /// flagged progressive (bwdif would assume top field first), so the order found is stated ("tff" or "bff").
     /// </summary>
-    public static string? DeinterlaceFilter(EncodingProfile p, bool interlaced)
-        => p.Deinterlaces(interlaced) ? "bwdif=mode=" + (p.Fps >= 50 ? "send_field" : "send_frame") + ":parity=auto:deint=all" : null;
+    public static string? DeinterlaceFilter(EncodingProfile p, bool interlaced, string? fieldOrder = null)
+        => p.Deinterlaces(interlaced) ? "bwdif=mode=" + (p.Fps >= 50 ? "send_field" : "send_frame") + ":parity=" + (fieldOrder is "tff" or "bff" ? fieldOrder : "auto") + ":deint=all" : null;
 
     /// <summary>
     /// libass rendering of a subtitle file onto the scaled (and tone mapped) picture. After an input seek the frames'

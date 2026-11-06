@@ -39,6 +39,7 @@ public sealed class FfmpegRestreamer : IDisposable
     private readonly Func<ScheduleEntry, DateTime, EncodingProfile, WeatherSegment?>? _weather;
     private readonly SubtitleExtractor? _subtitles;
     private readonly Services.ProblemFileLog? _problems;
+    private readonly Library.InterlaceCheckService? _interlace;
     private readonly List<string> _hardwareProblemPaths = new();
     private int _weatherFailures;
     private string? _lastStderr;
@@ -77,8 +78,10 @@ public sealed class FfmpegRestreamer : IDisposable
         string? timeZoneId = null,
         Func<ScheduleEntry, DateTime, EncodingProfile, WeatherSegment?>? weather = null,
         SubtitleExtractor? subtitles = null,
-        Services.ProblemFileLog? problems = null)
+        Services.ProblemFileLog? problems = null,
+        Library.InterlaceCheckService? interlace = null)
     {
+        _interlace = interlace;
         _subtitles = subtitles;
         _problems = problems;
         _weather = weather;
@@ -292,11 +295,19 @@ public sealed class FfmpegRestreamer : IDisposable
                 // An HDR10 channel needs the source's transfer to keep or convert it; an SDR channel only to tone map it.
                 var transfer = hdrOutput || tonemap ? part.Part.HdrTransfer : null;
                 var subtitles = await SubtitleInputAsync(part.Part, ct).ConfigureAwait(false);
-                var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, transfer, seek, duration, NextTsOffset(), profile, overlay, part.Part.VideoCodec, upNext, subtitles, part.Part.IsInterlaced);
+                // A file flagged progressive whose picture carries fields all the same (found by the background check)
+                // is deinterlaced like a flagged one, with the field order the check saw.
+                var foundFields = profile.DeinterlacesByFile ? _interlace?.FoundFieldOrder(part.Part) : null;
+                var args = FfmpegArgsBuilder.ForSource(part.Part.Path, part.Part.HasAudio, part.Part.AudioStreamIndex, transfer, seek, duration, NextTsOffset(), profile, overlay, part.Part.VideoCodec, upNext, subtitles, part.Part.IsInterlaced || foundFields is not null, foundFields);
                 PrepareNextSubtitles(entry, ct);
+                if (profile.DeinterlacesByFile && _interlace is not null && NextProgramAfter(entry)?.Item is { } upcoming)
+                {
+                    // Whatever airs next is looked at first, so a file the check has not reached yet is settled before its turn.
+                    _interlace.Prioritize(upcoming);
+                }
 
                 _logger.LogInformation(
-                    "JellyStations [{Station}]: playing {Title}{Part} from {Seek} ({Remaining} remaining){Hdr}{Hw}{Card}{Subs}",
+                    "JellyStations [{Station}]: playing {Title}{Part} from {Seek} ({Remaining} remaining){Hdr}{Hw}{Card}{Subs}{Deint}",
                     _stationName,
                     item.DisplayTitle,
                     item.IsMultiPart ? " part " + (part.Index + 1) + "/" + item.Parts.Count : string.Empty,
@@ -305,7 +316,8 @@ public sealed class FfmpegRestreamer : IDisposable
                     hdrOutput ? (part.Part.IsHdr ? ", HDR10 out" : ", SDR source into HDR10") : tonemap ? ", tone mapping HDR to SDR" : string.Empty,
                     hardwareDecode ? ", " + profile.HardwareDecode + " decoding" : softwareReason is null ? string.Empty : ", software decoding (" + softwareReason + ")",
                     upNext is null ? string.Empty : ", up next card at " + string.Join(", ", upNext.Windows.Select(w => w.From.ToString("0", CultureInfo.InvariantCulture) + "s")),
-                    subtitles is null ? (part.Part.HasSubtitles ? ", subtitles unavailable" : string.Empty) : subtitles.IsBitmap ? ", bitmap subtitles" : ", subtitles burned in");
+                    subtitles is null ? (part.Part.HasSubtitles ? ", subtitles unavailable" : string.Empty) : subtitles.IsBitmap ? ", bitmap subtitles" : ", subtitles burned in",
+                    foundFields is not null ? ", deinterlacing (interlacing found in the picture, " + foundFields + ")" : profile.Deinterlaces(part.Part.IsInterlaced) ? ", deinterlacing" : string.Empty);
                 _logger.LogDebug("JellyStations ffmpeg {Args}", FfmpegArgsBuilder.ToLogString(args));
                 _telemetry = new SegmentTelemetry(item.DisplayTitle, isSlate: false, profile.HardwareDecode, profile.VideoEncoder, tonemap, part.Part.IsHdr, overlay is not null)
                 {

@@ -166,9 +166,9 @@ public static class HardwareProbe
     }
 
     /// <summary>Transcodes a few seconds of the file the way a program segment would be, and reads ffmpeg's account of it.</summary>
-    public static async Task<HardwareTestResult> TestAsync(string ffmpegPath, EncodingProfile profile, string path, string? hdrTransfer, string? videoCodec, TimeSpan seek, int seconds, CancellationToken ct, bool interlaced = false)
+    public static async Task<HardwareTestResult> TestAsync(string ffmpegPath, EncodingProfile profile, string path, string? hdrTransfer, string? videoCodec, TimeSpan seek, int seconds, CancellationToken ct, bool interlaced = false, string? fieldOrder = null)
     {
-        var args = FfmpegArgsBuilder.ForProbe(path, hdrTransfer, profile, seconds, seek, videoCodec, interlaced);
+        var args = FfmpegArgsBuilder.ForProbe(path, hdrTransfer, profile, seconds, seek, videoCodec, interlaced, fieldOrder);
         var requested = profile.HardwareDecode ?? string.Empty;
         var sw = Stopwatch.StartNew();
         RunResult run;

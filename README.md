@@ -580,6 +580,28 @@ damage proves nothing), when it has been replaced or removed, which the page loo
 and on **Refresh now**, or when you dismiss it; a dismissed file comes back if it gives trouble again.
 If one ffmpeg error shows on every file, the cause is the encoder or the device rather than the files.
 
+**Picture check** on the same page covers the files whose flags are wrong. A DVD or broadcast source
+that was encoded without deinterlacing has its fields woven into frames: the file says progressive,
+Jellyfin's Media Info says "Interlaced: No", and the lines of interlacing are in the picture all the
+same. Every file a station plays that could be one (flagged progressive, SDR, up to 1080 lines, at 25
+or 30 frames a second) is looked at once, in the background: up to three six-second samples through
+ffmpeg's `idet` filter, at low priority on two threads, well under a second a file on the test
+machine. A file counts when at least a quarter of the sampled frames that gave a verdict show fields
+and 85% of those agree on one field order; grain and starved encodes make single frames look
+interlaced too, but in both orders, and are left alone. The answers are kept in
+`interlace-check.json` until a file changes.
+
+- The files found are deinterlaced on stations whose Deinterlacing is "When the file is interlaced",
+  with the field order found, from the next time they come up; the program up next on a running
+  channel is looked at first. Stations set to "Always" or "Off" are not looked at.
+- The section shows how far the check has got and lists the files found, with the share of the
+  sample that showed fields. A file wrongly found (none in testing) can only be overruled per
+  station, with "Off".
+- What it cannot do: undo interlacing that was scaled or blended after weaving (the fields are gone;
+  such a file reads as progressive), or restore film cadence. A film-sourced file with 3:2 pulldown
+  baked in plays without lines but keeps the pulldown judder; a re-encode from the original with
+  inverse telecine is the better picture. Fixing the library copy itself is a re-encode either way.
+
 ### Filling out the lineup
 
 **Suggest stations** on the dashboard turns the library analysis into ready-made channels: genres and
@@ -653,8 +675,9 @@ by title, genre, rating or library.
     must not change between programs.
   - *Deinterlacing*: interlaced files (DVD rips, broadcast captures) are deinterlaced before
     scaling, so the combing never reaches the stream. "When the file is interlaced" (default)
-    follows the field order Jellyfin probed and recorded at compile time; "Always" is for files
-    whose flags are missing; "Off" plays them as they are. It runs in software (`bwdif`) on every
+    goes by the flags Jellyfin probed and recorded at compile time and, for files flagged
+    progressive, by a look at the picture itself (the **Picture check** on the Status page);
+    "Always" deinterlaces every file; "Off" plays them as they are. It runs in software (`bwdif`) on every
     decode path; standard definition costs almost nothing, 1080i some CPU per station. On a 50 or
     60 fps profile every field becomes a frame, so video-shot material keeps its motion. Film on
     NTSC DVD (telecined) plays fine but a one-time re-encode with inverse telecine looks better.
@@ -787,6 +810,7 @@ usual Jellyfin API key or session token. The ones worth calling by hand:
 |---|---|
 | `GET /JellyStations/Library/Analysis` | One-pass summary of the library: hours per genre, every series with episode count and rating, collections, franchises (the provider's collection name, or shared title prefixes), decades, ratings, tags and libraries (each with its `Videos`, `Clips` of three minutes or under, and `ClipLibrary` when it is bumper material, which keeps it out of every other figure). The basis for station suggestions and the health report. |
 | `GET /JellyStations/Library/ClipFolder?path=` | A folder as a bumper source would see it: `ResolvedPath` (an absolute path, or a name under the plugin's bumpers folder), whether it `Exists` and how many `Videos` it holds. Nothing is probed. A folder source on a station is `{ "Kind": "Folder", "Path": "/media/bumps" }` in `Bumpers.Sources`, `Bumpers.PreRoll.Sources` or `Bumpers.PostRoll.Sources`. |
+| `GET /JellyStations/PictureCheck` | The look at each file's picture for interlacing its flags do not show: `Files` it applies to, `Checked`, `Failed`, `Pending`, `FoundCount` and `Found` (up to 200: `Title`, `Path`, `FieldOrder` `tff` or `bff`, `Share` of the sampled frames that showed fields). Read from memory; nothing is probed by the request. |
 | `GET /JellyStations/Health` | Every station that needs attention, as the Status page lists them. Each station's `EncodingWarnings` are the entries of its `Warnings` about its own encoding profile; `DefaultEncodingWarnings` are those of the default encoding, once, with `StationsOnDefaultEncoding`. |
 | `GET /JellyStations/ProblemFiles`, `DELETE .../ProblemFiles/{id}`, `DELETE .../ProblemFiles` | The files that gave trouble on air or in a folder scan, latest first: `Path`, `Title`, `Kind` (`CannotOpen`, `WouldNotPlay`, `EndedEarly`, `DecodeErrors`, `HardwareDecode`, `Unreadable`), `Problem` (the kind in words), `Detail`, `StationName`, `FirstUtc`, `LastUtc`, `Count`. `recheck=true` first drops the files that were removed, replaced or can be opened again and reports how many as `Settled`. Delete dismisses one file by its `Id`, or empties the list. |
 | `GET /JellyStations/Stations/{id}/History`, `DELETE .../History` | What the station has aired (per series or film: last start and end, the last episode, the count), latest first, and when the snapshot its current schedule continues from was taken; delete empties the log. |

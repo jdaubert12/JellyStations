@@ -70,6 +70,10 @@ public sealed class EncodingProfile
 
     public static readonly string[] DeinterlaceModes = { DeinterlaceAuto, DeinterlaceAlways, DeinterlaceOff };
 
+    /// <summary>True in the auto mode, where each file decides: its interlaced flag, or the fields a look at its picture found.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool DeinterlacesByFile => Deinterlaces(true) && !Deinterlaces(false);
+
     /// <summary>True when a file is to be deinterlaced under this profile; blank or unknown modes count as auto.</summary>
     public bool Deinterlaces(bool fileInterlaced) => (Deinterlace ?? string.Empty).Trim().ToLowerInvariant() switch
     {

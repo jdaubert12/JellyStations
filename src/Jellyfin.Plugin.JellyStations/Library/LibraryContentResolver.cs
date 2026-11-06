@@ -764,6 +764,8 @@ public sealed class LibraryContentResolver
         {
             file.HdrTransfer = HdrTransferOf(videoStream);
             file.IsInterlaced = videoStream.IsInterlaced;
+            file.VideoHeight = videoStream.Height > 0 ? videoStream.Height : null;
+            file.FrameRate = (videoStream.RealFrameRate ?? videoStream.AverageFrameRate) is float fps && fps > 0 ? Math.Round(fps, 3) : null;
             file.VideoCodec = Text.TrimOrNull(videoStream.Codec)?.ToLowerInvariant();
             file.VideoProfile = Text.TrimOrNull(videoStream.Profile);
             file.VideoBitDepth = videoStream.BitDepth > 0 ? videoStream.BitDepth : null;

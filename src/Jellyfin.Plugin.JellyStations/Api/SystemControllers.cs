@@ -300,6 +300,25 @@ public sealed class ProblemFilesController : ControllerBase
     }
 }
 
+/// <summary>The background look at each file's picture for interlacing its flags do not show: how far it has got and what it found.</summary>
+[ApiController]
+[Route("JellyStations/PictureCheck")]
+[Authorize(Policy = Policies.RequiresElevation)]
+[Produces(MediaTypeNames.Application.Json)]
+public sealed class PictureCheckController : ControllerBase
+{
+    private readonly InterlaceCheckService _check;
+
+    public PictureCheckController(InterlaceCheckService check)
+    {
+        _check = check;
+    }
+
+    /// <summary>Counts from memory and the files found; nothing on disk is touched.</summary>
+    [HttpGet]
+    public ActionResult<InterlaceCheckService.Summary> Get() => Ok(_check.Summarize());
+}
+
 [ApiController]
 [Route("JellyStations/Hardware")]
 [Authorize(Policy = Policies.RequiresElevation)]
@@ -310,9 +329,11 @@ public sealed class HardwareController : ControllerBase
     private readonly StationService _stations;
     private readonly SettingsRepository _settings;
     private readonly IScheduleResolver _resolver;
+    private readonly InterlaceCheckService _interlace;
 
-    public HardwareController(StreamSessionManager sessions, StationService stations, SettingsRepository settings, IScheduleResolver resolver)
+    public HardwareController(StreamSessionManager sessions, StationService stations, SettingsRepository settings, IScheduleResolver resolver, InterlaceCheckService interlace)
     {
+        _interlace = interlace;
         _sessions = sessions;
         _stations = stations;
         _settings = settings;
@@ -455,7 +476,9 @@ public sealed class HardwareController : ControllerBase
             }
         }
 
-        var result = await HardwareProbe.TestAsync(ffmpegPath, profile, part.Path, part.HdrTransfer, part.VideoCodec, seek, seconds, ct, part.IsInterlaced).ConfigureAwait(false);
+        // As on air: a file the picture check found fields in is deinterlaced in the auto mode.
+        var foundFields = profile.DeinterlacesByFile ? _interlace.FoundFieldOrder(part) : null;
+        var result = await HardwareProbe.TestAsync(ffmpegPath, profile, part.Path, part.HdrTransfer, part.VideoCodec, seek, seconds, ct, part.IsInterlaced || foundFields is not null, foundFields).ConfigureAwait(false);
         if (skipReason is not null)
         {
             result = result.WithDecoderSkipped(request.HardwareDecode ?? (station.Encoding ?? _settings.Get().DefaultEncoding).HardwareDecode, skipReason);

@@ -252,6 +252,22 @@ analyzer, then suggestion rules and the dashboard view on top of it.
   `EncodingProfile.Deinterlace` says so (`auto` follows the file, `always`, `off`); one frame per
   field pair, or per field on a 50/60 fps profile. Bitmap subtitles are laid over the deinterlaced
   picture. Settings and the station override get the select; the hardware test deinterlaces too.
+- **Picture check for unflagged interlacing — DONE 2026-11-06 (1.32.0.0).** Found on the real
+  server: a 716x480 HEVC re-encode of a DVD cartoon, flagged progressive ("Interlaced: No") with the
+  combing in the picture, which `auto` passed by. `InterlaceCheckService` samples each candidate
+  (`IsCandidate`: not flagged, SDR, up to 1088 lines, 24.5 to 30.5 fps, on an enabled station whose
+  profile `DeinterlacesByFile`) with `idet` over `SamplePlan` (three 6 s stretches at 20/50/80%, a
+  short file once from its start; two clean stretches end it early) and `Judge`s the summed
+  single-frame counts: 25% of the determined frames interlaced and 85% of those in one field order
+  (a starved or grainy progressive encode reads about 70% "interlaced" but half TFF, half BFF).
+  Verdicts live in `interlace-check.json` by path, size and date; the restreamer asks
+  `FoundFieldOrder` per program (one stat) and passes the order to `DeinterlaceFilter` as
+  `parity=tff|bff`, since the frames carry no flags for `auto` to read, and `Prioritize`s the
+  program up next. Compiled format 5 records `VideoHeight` and `FrameRate` per file (library probe
+  and the clip folder's ffprobe) so film-rate and 4K files are never sampled. `GET PictureCheck`
+  and a Status section report progress and the files found. Not done: inverse telecine for
+  film-sourced files (bwdif removes the lines, the 3:2 judder stays), a per-file overrule, and a
+  check of the thresholds against a large real library.
 - **Choice of scaler — DONE 2026-11-06 (1.31.0.0).** `EncodingProfile.Scaler` (bicubic default,
   lanczos, spline, bilinear) is the `flags=` of `ScaleToFit` and of the weather graph's upscale;
   `ScalerFlags()` lets only a listed name into the filter text. Software swscale throughout; no

@@ -99,6 +99,12 @@ public sealed class ClipFolderScanner
 
         public bool IsInterlaced { get; set; }
 
+        /// <summary>Picture height in lines; null in entries written before 1.32.</summary>
+        public int? VideoHeight { get; set; }
+
+        /// <summary>Frames a second; null in entries written before 1.32.</summary>
+        public double? FrameRate { get; set; }
+
         public string? HdrTransfer { get; set; }
 
         /// <summary>Whether the file can play as a clip: a picture and a known length.</summary>
@@ -260,6 +266,8 @@ public sealed class ClipFolderScanner
         HasAudio = entry.HasAudio,
         HdrTransfer = entry.HdrTransfer,
         IsInterlaced = entry.IsInterlaced,
+        VideoHeight = entry.VideoHeight,
+        FrameRate = entry.FrameRate,
         VideoCodec = entry.VideoCodec,
         VideoProfile = entry.VideoProfile,
         VideoBitDepth = entry.VideoBitDepth,
@@ -307,7 +315,7 @@ public sealed class ClipFolderScanner
         {
             var output = MediaProbe.Run(
                 probe,
-                new[] { "-v", "error", "-show_entries", "format=duration:stream=codec_type,codec_name,profile,pix_fmt,bits_per_raw_sample,field_order,color_transfer:stream_disposition=attached_pic", "-of", "json", file },
+                new[] { "-v", "error", "-show_entries", "format=duration:stream=codec_type,codec_name,profile,pix_fmt,bits_per_raw_sample,field_order,color_transfer,height,r_frame_rate:stream_disposition=attached_pic", "-of", "json", file },
                 stderr: false);
             ParseProbeJson(output, entry);
         }
@@ -356,6 +364,8 @@ public sealed class ClipFolderScanner
                     entry.PixelFormat = Str(stream, "pix_fmt")?.ToLowerInvariant();
                     entry.VideoBitDepth = BitDepth(Number(stream, "bits_per_raw_sample"), entry.PixelFormat);
                     entry.IsInterlaced = Str(stream, "field_order")?.ToLowerInvariant() is "tt" or "bb" or "tb" or "bt";
+                    entry.VideoHeight = Number(stream, "height") is { } lines && lines > 0 ? (int)lines : null;
+                    entry.FrameRate = Rate(Str(stream, "r_frame_rate"));
                     entry.HdrTransfer = Str(stream, "color_transfer")?.ToLowerInvariant() is "smpte2084" or "arib-std-b67"
                         ? Str(stream, "color_transfer")!.ToLowerInvariant()
                         : null;
@@ -439,6 +449,24 @@ public sealed class ClipFolderScanner
 
     private static string? Str(JsonElement element, string name)
         => element.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? Text.TrimOrNull(v.GetString()) : null;
+
+    /// <summary>ffprobe's frame rate ("30000/1001", "25/1") in frames a second; null when there is none ("0/0").</summary>
+    public static double? Rate(string? fraction)
+    {
+        var parts = (fraction ?? string.Empty).Split('/');
+        if (parts.Length == 0 || !double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out var top))
+        {
+            return null;
+        }
+
+        var bottom = 1d;
+        if (parts.Length > 1 && !double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out bottom))
+        {
+            return null;
+        }
+
+        return top > 0 && bottom > 0 ? Math.Round(top / bottom, 3) : null;
+    }
 
     /// <summary>A number ffprobe wrote as a number or, as it does for most fields, as a string.</summary>
     private static double? Number(JsonElement element, string name)

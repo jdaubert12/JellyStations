@@ -4862,7 +4862,7 @@
           inputHtml(p + 'height', 'Height', 'number', { min: 16, max: 4320, step: 2 }) +
         '</div>' +
         inputHtml(p + 'fps', 'Frame rate (fps)', 'number', { min: 1, max: 120, step: 1 }, 'Constant output frame rate. 24 suits a film station (most movies are 23.976 fps and judder when converted to 30); 30 suits series; 60 only for 60 fps sources.') +
-        selectHtml(p + 'deint', 'Deinterlacing', DEINTERLACE_MODES, 'Interlaced files (DVD rips, broadcast captures) are deinterlaced before scaling, so the combing never reaches the stream. "When the file is interlaced" follows the field order Jellyfin probed; "Always" is for files whose flags are missing; "Off" plays them as they are. Standard-definition files cost almost nothing; 1080i costs some CPU per station. On a 50 or 60 fps profile every field becomes a frame, so video-shot material keeps its motion.') +
+        selectHtml(p + 'deint', 'Deinterlacing', DEINTERLACE_MODES, 'Interlaced files (DVD rips, broadcast captures) are deinterlaced before scaling, so the combing never reaches the stream. "When the file is interlaced" goes by the flags Jellyfin probed and, for files flagged progressive, by a look at the picture itself (Picture check on the Status page lists what it found); "Always" deinterlaces every file; "Off" plays them as they are. Standard-definition files cost almost nothing; 1080i costs some CPU per station. On a 50 or 60 fps profile every field becomes a frame, so video-shot material keeps its motion.') +
         selectHtml(p + 'scaler', 'Scaling', SCALERS, 'How a program is resized to the channel\'s picture size, whether it is scaled up or down. Bicubic is the usual choice. Lanczos keeps more edge detail, most visible when a smaller source is scaled up, at close to twice the scaling work and with faint halos on very hard edges such as subtitles and cartoons. Spline is smooth and the costliest; bilinear is the softest. None adds detail the file does not have, and the cost is small next to the encode.') +
         inputHtml(p + 'gop', 'Keyframe interval (seconds)', 'number', { min: 1, max: 30, step: 1 }, 'GOP length. Shorter makes channel changes faster at a small bitrate cost.') +
         inputHtml(p + 'vbr', 'Video bitrate (kbps)', 'number', { min: 100, max: 100000, step: 50 }, 'Target bitrate for the video stream. 3500 is plenty for 720p and 8000 for 1080p, and 4K HEVC wants around 20000; more only inflates every client\'s download and Jellyfin\'s transcodes.') +
@@ -5309,11 +5309,12 @@
       loading(true);
     }
     // Opening the page or pressing Refresh now also has the server look at the listed files; the 5 s timer does not.
-    return Promise.all([api('GET', 'Status'), api('GET', 'Health'), api('GET', 'ProblemFiles', undefined, showSpinner ? { recheck: true } : undefined)]).then(results => {
+    return Promise.all([api('GET', 'Status'), api('GET', 'Health'), api('GET', 'ProblemFiles', undefined, showSpinner ? { recheck: true } : undefined), api('GET', 'PictureCheck')]).then(results => {
       renderErrorBox($('#tvsStatusError'), null);
       renderStatus(results[0] || {});
       renderHealth(results[1] || {});
       renderProblemFiles(results[2] || {});
+      renderPictureCheck(results[3] || {});
       $('#tvsStatusUpdated').textContent = 'Updated ' + new Date().toLocaleTimeString();
     }).catch(showErrorsIn($('#tvsStatusError'))).then(() => {
       if (showSpinner) {
@@ -5412,6 +5413,55 @@
     });
     table.appendChild(tbody);
     box.appendChild(table);
+  }
+
+  /** The Status view's picture check: how many files have been looked at for interlacing their flags do not show, and which carry it. */
+  function renderPictureCheck(report) {
+    const box = clear($('#tvsPictureCheck'));
+    const total = report.Files || 0;
+    if (!total) {
+      box.appendChild(el('div', { className: 'tvs-secondary', text: 'Nothing to look at: no station that deinterlaces "When the file is interlaced" plays a file that could hide interlacing (flagged progressive, up to 1080 lines, at 25 or 30 frames a second).' }));
+      return;
+    }
+    const pending = report.Pending || 0;
+    const failed = report.Failed || 0;
+    const found = report.FoundCount || 0;
+    const progress = (report.Checked || 0) + ' of ' + plural(total, 'file') + ' looked at'
+      + (pending ? '; ' + pending + ' to go, in the background' : '')
+      + (failed ? '; ' + plural(failed, 'file') + ' could not be read (tried again in a day)' : '') + '.';
+    if (!found) {
+      box.appendChild(el('div', { className: pending ? 'tvs-secondary' : 'tvs-ok', text: (pending ? '' : '✓ ') + progress + ' None so far carries interlacing its flags do not show.' }));
+      return;
+    }
+    const files = Array.isArray(report.Found) ? report.Found : [];
+    box.appendChild(el('div', { className: 'tvs-problem-head' }, [
+      el('span', { className: 'tvs-secondary', text: progress + ' ' + plural(found, 'file') + (found === 1 ? ' carries' : ' carry') + ' interlacing the flags do not show and ' + (found === 1 ? 'is' : 'are') + ' deinterlaced on air.' }),
+      textButton(state.showPictureCheck ? 'Hide the files' : 'Show the files', () => {
+        state.showPictureCheck = !state.showPictureCheck;
+        renderPictureCheck(report);
+      })
+    ]));
+    if (!state.showPictureCheck) {
+      return;
+    }
+    const table = el('table', { className: 'tvs-table tvs-problem-table' });
+    table.appendChild(tableHead(['File', 'Field order', 'Frames showing it']));
+    const tbody = el('tbody');
+    files.forEach(f => {
+      tbody.appendChild(el('tr', null, [
+        el('td', null, [
+          el('div', { text: f.Title || '(untitled)' }),
+          el('div', { className: 'tvs-secondary tvs-path', text: f.Path || '' })
+        ]),
+        el('td', { text: f.FieldOrder === 'bff' ? 'Bottom first' : 'Top first' }),
+        el('td', { text: Math.round((f.Share || 0) * 100) + '% of the sample' })
+      ]));
+    });
+    table.appendChild(tbody);
+    box.appendChild(table);
+    if (found > files.length) {
+      box.appendChild(el('div', { className: 'tvs-secondary', text: 'The first ' + files.length + ' of ' + found + ' by title.' }));
+    }
   }
 
   /** Re-scans one station from the Health section and reloads the view. */

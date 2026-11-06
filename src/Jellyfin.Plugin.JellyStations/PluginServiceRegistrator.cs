@@ -30,6 +30,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<LibraryContentResolver>();
         serviceCollection.AddSingleton<MusicFolderScanner>();
         serviceCollection.AddSingleton<MusicLoudnessService>();
+        serviceCollection.AddSingleton<InterlaceCheckService>();
         serviceCollection.AddSingleton<MusicResolver>();
         serviceCollection.AddSingleton<StationCompiler>();
 
