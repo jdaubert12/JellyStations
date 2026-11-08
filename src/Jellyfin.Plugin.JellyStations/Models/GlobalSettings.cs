@@ -45,6 +45,9 @@ public sealed class GlobalSettings
     /// <summary>Station templates saved from a station editor (everything but the content). The built-in presets are not stored.</summary>
     public List<StationTemplate> StationTemplates { get; set; } = new();
 
+    /// <summary>Week layouts saved from a station's blocks (see <see cref="WeekLayout"/>). The built-in ones are not stored.</summary>
+    public List<WeekLayout> WeekLayouts { get; set; } = new();
+
     /// <summary>How much content each suggestion rule needs before it proposes a station.</summary>
     public SuggestionThresholds Suggestions { get; set; } = new();
 }

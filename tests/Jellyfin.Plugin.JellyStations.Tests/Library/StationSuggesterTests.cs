@@ -70,6 +70,12 @@ public class StationSuggesterTests
         var list = StationSuggester.Suggest(Analysis(), new[] { "comedy" });
         var keys = list.Select(s => s.Key).ToList();
 
+        // The broadcast weeks come first (WeekLayoutsTests covers them); the rules follow in their fixed order.
+        var layouts = keys.TakeWhile(k => k.StartsWith("layout:", StringComparison.Ordinal)).Count();
+        Assert.InRange(layouts, 1, WeekLayouts.BuiltIn.Count);
+        Assert.All(list.Take(layouts), s => Assert.Equal("Broadcast week", s.Category));
+        keys = keys.Skip(layouts).ToList();
+
         Assert.Equal(
             new[] { "kids", "family-movies", "genre:Comedy", "series:" + Bluey.ToString("N"), "franchise:Harry Potter", "franchise:Rocky", "franchise-nights", "collection:" + Bond.ToString("N"), "decade:1980", "era:classics", "seasonal:Holiday" },
             keys);

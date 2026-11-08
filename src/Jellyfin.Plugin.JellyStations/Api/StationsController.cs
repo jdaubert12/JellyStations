@@ -92,7 +92,7 @@ public sealed class StationsController : ControllerBase
     }
 
     /// <summary>
-    /// Every station plus the saved station and block templates, as one JSON document suitable for backup or for
+    /// Every station plus the saved station templates, block templates and week layouts, as one JSON document suitable for backup or for
     /// POST Import. Built-in station templates are not included.
     /// </summary>
     [HttpGet("Export")]
@@ -103,7 +103,8 @@ public sealed class StationsController : ControllerBase
         {
             Stations = _stations.GetAll().ToList(),
             StationTemplates = (settings.StationTemplates ?? new List<StationTemplate>()).Select(t => JsonFileStore.Clone(t)).ToList(),
-            BlockTemplates = settings.BlockTemplates ?? new List<SlotBlock>()
+            BlockTemplates = settings.BlockTemplates ?? new List<SlotBlock>(),
+            WeekLayouts = (settings.WeekLayouts ?? new List<WeekLayout>()).Select(l => JsonFileStore.Clone(l)).ToList()
         });
     }
 
@@ -163,12 +164,13 @@ public sealed class StationsController : ControllerBase
     }
 
     /// <summary>
-    /// Saved templates from the document replace the stored ones with the same name or id. Item references in a
-    /// station template's bumper clips and blocks go through the same by-name matching as a station's.
+    /// Saved templates and week layouts from the document replace the stored ones with the same name or id. Item
+    /// references in a station template's bumper clips and blocks, a block template or a layout's blocks go through
+    /// the same by-name matching as a station's.
     /// </summary>
     private void ImportTemplates(StationExportDocument document, ImportResultDto result)
     {
-        if (document.StationTemplates.Count == 0 && document.BlockTemplates.Count == 0)
+        if (document.StationTemplates.Count == 0 && document.BlockTemplates.Count == 0 && document.WeekLayouts.Count == 0)
         {
             return;
         }
@@ -215,6 +217,23 @@ public sealed class StationsController : ControllerBase
         }
 
         settings.BlockTemplates = blockTemplates.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+        var layouts = settings.WeekLayouts ??= new List<WeekLayout>();
+        foreach (var layout in document.WeekLayouts)
+        {
+            if (string.IsNullOrWhiteSpace(layout.Name))
+            {
+                result.Errors.Add("(unnamed week layout): a week layout needs a name.");
+                continue;
+            }
+
+            var clean = WeekLayoutsController.Upsert(layouts, layout);
+            var blocks = clean.Blocks.Select(b => b.Block).ToList();
+            AddResolution(result, _importResolver.Resolve(new Station { Slots = new SlotsConfig { Blocks = blocks } }), "week layout " + clean.Name);
+            result.WeekLayouts.Add(clean.Name);
+        }
+
+        settings.WeekLayouts = layouts.OrderBy(l => l.Name, StringComparer.OrdinalIgnoreCase).ToList();
         _settings.Save(settings);
     }
 

@@ -10,7 +10,7 @@ joining whatever is airing right now, exactly like broadcast television.
 - [How it works](#how-it-works)
 - [Scheduling modes](#scheduling-modes)
 - [Station features](#station-features): bumpers and cards, logo, "Up next" card, content filters,
-  tags, family hours, seasonal stations, padding, block repeats, station templates, export and import
+  tags, family hours, seasonal stations, padding, block repeats, station templates, week layouts, export and import
 - [Weather channel](#weather-channel): screens, forecasts, music, music packs
 - [HDR channels](#hdr-channels): an HDR10 station, what it needs, what clients get
 - [Requirements](#requirements)
@@ -226,13 +226,33 @@ weather channel's guide title), with the places, look and music of the weather c
 station's **Weather** section, which the editor shows while such a block exists. "The weather at the
 top of every hour" is a 5-minute weather block at 06:00 repeating every 60 minutes until 23:00.
 
-A time block can be saved as a **template** (bookmark button on the block) and added to any station
-from the dropdown next to "Add block". Templates are managed in Settings. The same dropdown offers
-four **starter blocks** that ship with the plugin: Saturday morning cartoons (Saturday 07:00, four
-hours, each show's episodes in order), Prime-time movie (every day 20:00, three hours, shuffled), Late
-night (every day 23:00, three hours) and Weather on the hour (five minutes of the weather screens
-every hour from 06:00 to 23:00). They carry the days, time and play order but no sources; add those on
-the block. A template saved under a starter's name takes its place.
+A time block can be saved as a **template** (bookmark button on the block; it asks for a name and
+whether to **keep the sources**, so a template can carry its shows or only its days, time and order)
+and added to any station from the dropdown next to "Add block". When a template with sources is
+added, any source whose id this server does not know (a template imported from another server, or a
+library that was removed and added again) is matched by title the way Import does, and what cannot
+be matched is dropped and said. Templates are managed in Settings. The same dropdown offers four
+**starter blocks** that ship with the plugin: Saturday morning cartoons (Saturday 07:00, four hours,
+each show's episodes in order), Prime-time movie (every day 20:00, three hours, shuffled), Late night
+(every day 23:00, three hours) and Weather on the hour (five minutes of the weather screens every
+hour from 06:00 to 23:00). They carry the days, time and play order but no sources; add those on the
+block. A template saved under a starter's name takes its place.
+
+### Week layouts
+
+A **week layout** is a whole broadcast week of time blocks in one piece. Three ship with the plugin:
+**Classic broadcast week** (cartoons on weekday mornings and all Saturday morning, reruns through the
+day, a Sunday matinee, a movie every night at eight and grown-up shows late, with nothing above PG-13
+before eight in the evening), **Movies all day** (a family matinee every afternoon, the main feature
+at eight, a late movie, shuffled films in between) and **Kids by day, grown-ups by night** (cartoons
+after school and on Saturday morning, a family movie on Friday and Saturday nights, grown-up shows
+from ten, everything rated PG or below in between). The dropdown next to "Add block" lists them
+under "Week layouts": picking one and pressing Add block adds every block at once, without sources,
+for you to fill; the week grid shows the shape. **Save blocks as layout** (next to Add block) keeps a
+station's blocks, and in Shuffle mode its family hours, as a layout of your own, with or without the
+sources; one saved under a built-in's name takes its place, and Settings lists and deletes them. The
+built-in layouts are also what [Suggest stations](#filling-out-the-lineup) offers first, each block
+filled from the library.
 
 ### Station templates
 
@@ -249,9 +269,10 @@ a copy with the content and logo included, under the next channel number.
 
 ### Export and import
 
-**Export** downloads every station plus the saved station and block templates as one JSON file;
-**Import** creates or updates stations from such a file (matched by id, then by name) and replaces
-templates with the same name, which makes station sets easy to back up, share, or hand-edit. A bare
+**Export** downloads every station plus the saved station templates, block templates and week
+layouts as one JSON file; **Import** creates or updates stations from such a file (matched by id,
+then by name) and replaces templates and layouts with the same name, which makes station sets easy
+to back up, share, or hand-edit. A bare
 JSON array of stations, the pre-1.21 export format, still imports. Hand-picked items (movies, series,
 seasons, episodes, collections, playlists, libraries) are matched by title when their ids are unknown
 on the importing server, so a station file from another server, or one of the examples under
@@ -604,8 +625,16 @@ interlaced too, but in both orders, and are left alone. The answers are kept in
 
 ### Filling out the lineup
 
-**Suggest stations** on the dashboard turns the library analysis into ready-made channels: genres and
-series with enough hours, a kids channel and family movies by rating, franchise marathons and a
+**Suggest stations** on the dashboard turns the library analysis into ready-made channels. First come
+the **broadcast weeks**: each [week layout](#week-layouts) as a station, its pool everything the
+library has (or movies, or everything rated PG or below, as the layout says) and each block filled
+by what it is for: everything rated G or below for the cartoons, the half-hour comedies for the
+daytime reruns (every show when there are fewer than three), movies rated PG or below for the
+matinee, movies for the prime-time slot, PG-13 and TV-14 and up for late night. A block needs as
+much content as the plain rule for it would (the same minimums from Settings); one the library has
+nothing for is left out and named in the description, and a layout keeps its place only with two
+blocks or more. A layout you saved with its sources is offered the same way. Then the rules: genres
+and series with enough hours, a kids channel and family movies by rating, franchise marathons and a
 "Franchise Nights" slots station, collections, decades, a "Classic Movies" channel for everything made
 before 1970, and seasonal channels from holiday tags. A franchise is any group of movies the metadata
 provider puts in one collection (TMDB's "James Bond Collection", whether or not you let Jellyfin build
@@ -746,9 +775,9 @@ by title, genre, rating or library.
   kind of channel (see [Filling out the lineup](#filling-out-the-lineup)). Values out of range are
   pulled back into it on save. This replaces the "Include small channels" box the suggestions page
   used to have.
-- **Excluded tags** (plugin-wide), **station templates** and **block templates** are managed here too;
-  see [Tags](#tags), [Station templates](#station-templates) and
-  [Time block repeats and templates](#time-block-repeats-and-templates).
+- **Excluded tags** (plugin-wide), **station templates**, **block templates** and **week layouts** are
+  managed here too; see [Tags](#tags), [Station templates](#station-templates),
+  [Time block repeats and templates](#time-block-repeats-and-templates) and [Week layouts](#week-layouts).
 
 ## Troubleshooting
 
@@ -817,7 +846,8 @@ usual Jellyfin API key or session token. The ones worth calling by hand:
 | `POST /JellyStations/Stations/{id}/Reshuffle` | Deals the schedule afresh from now as a new revision that continues every series from its next episode and rests what just aired. |
 | `GET /JellyStations/Stations/Export`, `POST /JellyStations/Stations/Import` | The stations plus the saved station and block templates as one document; import takes that document or a bare array of stations. |
 | `GET /JellyStations/Suggestions`, `GET .../Report`, `POST .../Create`, `POST .../Draft`, `POST .../Preview` | Stations the library could support, each with `Hours`, `NewHours` (on no enabled channel yet) and `Covered` (`refresh`; the minimums come from Settings, `minHours` replaces every hours minimum and `minEpisodes` the series one for that call); the same list with `NearMisses` (`Name`, `Have`, `Need`, `Unit`), `ClipLibraries`, the `Thresholds` in force and the number of `Channels`; create the ones with the given `Keys` (`FirstChannelNumber`, `TimeZoneId`, `TemplateId` for the look and breaks, `BumperLibraryId` for a clip library to play in the breaks, `Logo`), returning `Created`, `Errors` and `Warnings`; one suggestion (`Key`) as an unsaved station with the same options applied; the next `hours` (default 24) that suggestion would play with those options, as schedule entries, nothing saved. |
-| `GET /JellyStations/BlockTemplates`, `GET .../BuiltIn`, `POST`, `DELETE .../{id}` | Saved block templates; the starter blocks no saved template has replaced; save (replaces by name or id); delete a saved one. |
+| `GET /JellyStations/BlockTemplates`, `GET .../BuiltIn`, `POST`, `DELETE .../{id}`, `POST .../{id}/Apply` | Saved block templates; the starter blocks no saved template has replaced; save (replaces by name or id); delete a saved one; a template or starter as a block ready for a station (fresh id, sources whose ids are unknown here matched by name, the rest dropped and listed as `Resolved` / `Unmatched`). |
+| `GET /JellyStations/WeekLayouts`, `GET .../{id}`, `POST`, `DELETE .../{id}`, `POST .../{id}/Apply` | Saved week layouts first, then the built-in ones; one layout; save a station's blocks as a layout (`Name`, `Station`, `KeepSources`; replaces by name or id); delete a saved one; the layout's blocks ready for a station, matched like a block template's. |
 | `GET /JellyStations/StationTemplates`, `GET .../{id}/Draft`, `POST`, `DELETE .../{id}` | Saved station templates first, then the built-in presets; a fresh station draft from one; save (replaces by name or id); delete a saved one. |
 | `GET /JellyStations/Hardware` | Jellyfin's transcoding setting, what the default profile resolves to, the `/dev/dri` nodes and this ffmpeg build's hwaccels, encoders and filters. |
 | `POST /JellyStations/Hardware/Test` | Runs a station's current program through the real chain at full speed and reports the decoder and the speed relative to real time. |

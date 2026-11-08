@@ -9,7 +9,10 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace Jellyfin.Plugin.JellyStations.Api;
 
-/// <summary>Saved time blocks (days, time, sources, order) reusable across stations. Stored in the plugin settings.</summary>
+/// <summary>
+/// Saved time blocks (days, time, order, and the sources when the person kept them) reusable across stations.
+/// Stored in the plugin settings.
+/// </summary>
 [ApiController]
 [Route("JellyStations/BlockTemplates")]
 [Authorize(Policy = Policies.RequiresElevation)]
@@ -17,10 +20,12 @@ namespace Jellyfin.Plugin.JellyStations.Api;
 public sealed class BlockTemplatesController : ControllerBase
 {
     private readonly SettingsRepository _settings;
+    private readonly StationImportResolver _resolver;
 
-    public BlockTemplatesController(SettingsRepository settings)
+    public BlockTemplatesController(SettingsRepository settings, StationImportResolver resolver)
     {
         _settings = settings;
+        _resolver = resolver;
     }
 
     [HttpGet]
@@ -29,6 +34,28 @@ public sealed class BlockTemplatesController : ControllerBase
     /// <summary>The starter blocks that ship with the plugin, minus those a saved template of the same name replaces.</summary>
     [HttpGet("BuiltIn")]
     public ActionResult<IEnumerable<SlotBlock>> BuiltIn() => Ok(BlockTemplates.Available(Templates(_settings.Get())));
+
+    /// <summary>
+    /// A saved template or starter block ready to add to a station: a fresh id, item references whose ids are
+    /// unknown here matched by the name stored beside them (a template imported from another server, or a library
+    /// that was re-added), the rest dropped and listed.
+    /// </summary>
+    [HttpPost("{id}/Apply")]
+    public ActionResult<BlockApplyDto> Apply([FromRoute] Guid id)
+    {
+        var template = Templates(_settings.Get()).FirstOrDefault(t => t.Id == id) ?? BlockTemplates.BuiltIn.FirstOrDefault(b => b.Id == id);
+        if (template is null)
+        {
+            return NotFound();
+        }
+
+        var block = JsonFileStore.Clone(template);
+        block.Id = Guid.NewGuid();
+        block.Days ??= new List<DayOfWeek>();
+        block.Sources ??= new List<ContentSource>();
+        var resolution = _resolver.Resolve(new Station { Slots = new SlotsConfig { Blocks = new List<SlotBlock> { block } } });
+        return Ok(new BlockApplyDto { Block = block, Resolved = resolution.Resolved, Unmatched = resolution.Unmatched });
+    }
 
     /// <summary>Adds a template, or replaces the one with the same name (case-insensitive). Returns the full list.</summary>
     [HttpPost]

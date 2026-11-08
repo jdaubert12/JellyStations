@@ -36,7 +36,8 @@ public sealed class StationSuggestionService
     /// <summary>
     /// The rules run over the library with the thresholds from Settings, set against what the enabled stations
     /// already play: each suggestion's new hours, the fully covered ones flagged, the "Everything Else" station for
-    /// what no channel plays, the rules that fell just short, and the clip libraries to offer as bumpers.
+    /// what no channel plays, the rules that fell just short, and the clip libraries to offer as bumpers. The week
+    /// layouts (built-in and saved) are filled from the library and offered first.
     /// </summary>
     public SuggestionReportDto Report(bool refresh = false, double? minHours = null, int? minEpisodes = null)
     {
@@ -45,7 +46,7 @@ public sealed class StationSuggestionService
         var settings = _settings.Get();
         var thresholds = Thresholds(settings.Suggestions, minHours, minEpisodes);
         var names = _stations.GetAll().Select(s => s.Name).ToList();
-        var set = StationSuggester.Build(analysis, names, thresholds);
+        var set = StationSuggester.Build(analysis, names, thresholds, WeekLayouts.Merge(settings.WeekLayouts));
         var (onChannels, channels) = _service.ItemsOnChannels();
         SuggestionCoverage.Apply(set.Suggestions, new FactIndex(facts, _analysis.Collections()), onChannels, settings.ExcludedTags);
         var leftovers = SuggestionCoverage.Leftovers(facts, LibraryAnalyzer.ClipLibraryIds(analysis.Libraries), onChannels, channels, thresholds.LeftoversMinHours, names, settings.ExcludedTags);

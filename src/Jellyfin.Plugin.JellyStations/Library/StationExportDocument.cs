@@ -10,7 +10,7 @@ namespace Jellyfin.Plugin.JellyStations.Library;
 /// </summary>
 public sealed class StationExportDocument
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public int Version { get; set; } = CurrentVersion;
 
@@ -19,6 +19,9 @@ public sealed class StationExportDocument
     public List<StationTemplate> StationTemplates { get; set; } = new();
 
     public List<SlotBlock> BlockTemplates { get; set; } = new();
+
+    /// <summary>Saved week layouts (since version 3).</summary>
+    public List<WeekLayout> WeekLayouts { get; set; } = new();
 
     /// <summary>
     /// Clears the parts of an imported station's encoding profile that reach ffmpeg's command line verbatim: the extra
@@ -89,7 +92,7 @@ public sealed class StationExportDocument
         if (json.ValueKind == JsonValueKind.Object)
         {
             // A single station (the example files are one station each) has no Stations / template lists.
-            if (!HasProperty(json, "Stations") && !HasProperty(json, "StationTemplates") && !HasProperty(json, "BlockTemplates"))
+            if (!HasProperty(json, "Stations") && !HasProperty(json, "StationTemplates") && !HasProperty(json, "BlockTemplates") && !HasProperty(json, "WeekLayouts"))
             {
                 var station = json.Deserialize<Station>(options);
                 return new StationExportDocument { Version = 1, Stations = station is null ? new List<Station>() : new List<Station> { station } };
@@ -99,6 +102,7 @@ public sealed class StationExportDocument
             doc.Stations ??= new List<Station>();
             doc.StationTemplates ??= new List<StationTemplate>();
             doc.BlockTemplates ??= new List<SlotBlock>();
+            doc.WeekLayouts ??= new List<WeekLayout>();
             return doc;
         }
 

@@ -100,6 +100,8 @@
     suggestShowCovered: false,
     blockTemplates: [],
     starterBlocks: [],   // built-in block templates no saved one has replaced, as GET BlockTemplates/BuiltIn lists them
+    weekLayouts: [],     // saved week layouts first, then the built-in ones, as GET WeekLayouts lists them
+    blockSave: null,     // what the inline form under the Time blocks toolbar saves: { block } for a template, {} for a layout
     stationTemplates: [] // saved + built-in, as GET StationTemplates lists them
   };
 
@@ -1029,7 +1031,7 @@
       a.click();
       setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
       const stations = (doc.Stations || []).length;
-      const templates = (doc.StationTemplates || []).length + (doc.BlockTemplates || []).length;
+      const templates = (doc.StationTemplates || []).length + (doc.BlockTemplates || []).length + (doc.WeekLayouts || []).length;
       toast('Exported ' + plural(stations, 'station') + (templates ? ' and ' + plural(templates, 'template') : '') + '.');
     }).catch(err => alertErrors(err, 'Export failed'));
   }
@@ -1048,13 +1050,13 @@
         toast('That file is not valid JSON.');
         return;
       }
-      // An export document ({ Stations, StationTemplates, BlockTemplates }), a bare array of stations, or one station.
-      const body = Array.isArray(parsed) || (parsed && Array.isArray(parsed.Stations)) ? parsed : [parsed];
+      // An export document ({ Stations, StationTemplates, BlockTemplates, WeekLayouts }), a bare array of stations, or one station.
+      const body = Array.isArray(parsed) || (parsed && (Array.isArray(parsed.Stations) || Array.isArray(parsed.WeekLayouts) || Array.isArray(parsed.StationTemplates) || Array.isArray(parsed.BlockTemplates))) ? parsed : [parsed];
       withBusy('Import failed', () => api('POST', 'Stations/Import', body).then(res => {
         const parts = [];
         if (res.Created.length) { parts.push('created ' + res.Created.length); }
         if (res.Updated.length) { parts.push('updated ' + res.Updated.length); }
-        const templates = (res.StationTemplates || []).length + (res.BlockTemplates || []).length;
+        const templates = (res.StationTemplates || []).length + (res.BlockTemplates || []).length + (res.WeekLayouts || []).length;
         if (templates) { parts.push(plural(templates, 'template')); }
         if (res.Errors.length) { parts.push(res.Errors.length + ' failed'); }
         const resolved = res.Resolved || [];
@@ -1805,6 +1807,7 @@
       state.sourceDefaults = sourceDefaults || null;
       state.runtimes = {};
       state.expandedBlocks = {};
+      closeBlockSaveForm();
       state.pendingLogo = pendingLogo || null;
       state.logoLook = 0;
       renderEditor();
@@ -3025,6 +3028,7 @@
     const wrap = clear($('#tvsBlocks'));
     const blocks = state.draft.Slots.Blocks;
     show($('#tvsBlocksEmpty'), blocks.length === 0);
+    show($('#tvsBtnSaveLayout'), blocks.length > 0);
     blocks.forEach((b, i) => wrap.appendChild(blockCard(b, i)));
     renderBlockWarnings();
     renderWeekGrid();
@@ -3212,22 +3216,77 @@
     if (!p.moved) {
       rows = Math.min(2, GRID_ROWS - r0);
     }
-    const block = newBlockFromSelectedTemplate();
-    block.Days = DAYS.slice(c0, c1 + 1);
-    block.StartLocal = pad2(Math.floor(r0 / 2)) + ':' + (r0 % 2 ? '30' : '00');
-    block.DurationMinutes = rows * 30;
-    if (block.Recurrence === 'Dates') {
-      block.Recurrence = 'Weekly';
-    }
-    addExpandedBlock(block);
-    openBlockCard(state.draft.Slots.Blocks.length - 1);
+    newBlockFromSelectedTemplate().then(block => {
+      block.Days = DAYS.slice(c0, c1 + 1);
+      block.StartLocal = pad2(Math.floor(r0 / 2)) + ':' + (r0 % 2 ? '30' : '00');
+      block.DurationMinutes = rows * 30;
+      if (block.Recurrence === 'Dates') {
+        block.Recurrence = 'Weekly';
+      }
+      addExpandedBlock(block);
+      openBlockCard(state.draft.Slots.Blocks.length - 1);
+    });
   }
 
-  /** A new block from the template picked in the Add block dropdown, or a blank one. */
+  /** What the Add block dropdown points at: a saved template or starter block, a week layout, or nothing (a blank block). */
+  function selectedBlockSource() {
+    const value = val('#tvsBlockTemplateSelect') || '';
+    if (value.indexOf('layout:') === 0) {
+      const layout = state.weekLayouts.find(l => l.Id === value.slice(7));
+      return layout ? { layout: layout } : {};
+    }
+    const template = state.blockTemplates.concat(availableStarterBlocks()).find(t => t.Id === value);
+    return template ? { template: template } : {};
+  }
+
+  /**
+   * A new block from the template picked in the Add block dropdown, or a blank one (a week layout is not one block,
+   * so painting with one picked gives a blank block). A template with sources goes through the server, which
+   * matches by name any source whose id is unknown here (a template imported from another server, or a library that
+   * was removed and added again) and drops the rest; what happened is said in a toast.
+   */
   function newBlockFromSelectedTemplate() {
-    const templateId = val('#tvsBlockTemplateSelect');
-    const template = state.blockTemplates.concat(availableStarterBlocks()).find(t => t.Id === templateId);
-    return template ? blockFromTemplate(template) : newBlock();
+    const picked = selectedBlockSource();
+    const t = picked.template;
+    if (!t) {
+      return Promise.resolve(newBlock());
+    }
+    if (!(t.Sources || []).length) {
+      return Promise.resolve(blockFromTemplate(t));
+    }
+    return api('POST', 'BlockTemplates/' + t.Id + '/Apply').then(res => {
+      const notes = matchNotes(res);
+      if (notes) {
+        toast('Template “' + t.Name + '”: ' + notes + '.');
+      }
+      return blockFromTemplate(res && res.Block ? res.Block : t);
+    }).catch(err => {
+      alertErrors(err, 'Could not read the template');
+      return blockFromTemplate(t);
+    });
+  }
+
+  /** "2 sources matched by name, 1 not found here and dropped", or an empty string when every id was known. */
+  function matchNotes(res) {
+    const resolved = (res && res.Resolved) || [];
+    const unmatched = (res && res.Unmatched) || [];
+    const parts = [];
+    if (resolved.length) { parts.push(plural(resolved.length, 'source') + ' matched by name'); }
+    if (unmatched.length) { parts.push(unmatched.length + ' not found here and dropped'); }
+    return parts.join(', ');
+  }
+
+  /** Adds every block of a week layout to the draft, the sources matched by name on the server like a template's. */
+  function addWeekLayout(layout) {
+    withBusy('Could not add the week layout', () => api('POST', 'WeekLayouts/' + layout.Id + '/Apply').then(res => {
+      const blocks = ((res && res.Blocks) || []).map(blockFromTemplate);
+      blocks.forEach(b => state.draft.Slots.Blocks.push(b));
+      setVal('#tvsBlockTemplateSelect', '');
+      renderBlocks();
+      const empty = blocks.some(b => b.Kind !== 'Weather' && !(b.Sources || []).length);
+      const notes = matchNotes(res);
+      toast(plural(blocks.length, 'block') + ' added from “' + layout.Name + '”' + (notes ? ' (' + notes + ')' : '') + (empty ? '. Add the shows and movies to each.' : '.'));
+    }));
   }
 
   /** Appends a block to the draft with its card open, and resets the template dropdown. */
@@ -3295,7 +3354,7 @@
     appendChildren(node, [
       buttons.up,
       buttons.down,
-      iconButton('bookmark', 'Save as template (under the block name)', stop(() => saveBlockTemplate(b))),
+      iconButton('bookmark', 'Save as template, with or without its sources', stop(() => openBlockSaveForm(b))),
       buttons.remove
     ]);
     return { node: node, titleBox: titleBox };
@@ -3578,9 +3637,10 @@
 
   function loadBlockTemplates() {
     const list = path => api('GET', path).then(found => (Array.isArray(found) ? found : [])).catch(() => []);
-    return Promise.all([list('BlockTemplates'), list('BlockTemplates/BuiltIn')]).then(lists => {
+    return Promise.all([list('BlockTemplates'), list('BlockTemplates/BuiltIn'), list('WeekLayouts')]).then(lists => {
       state.blockTemplates = lists[0];
       state.starterBlocks = lists[1];
+      state.weekLayouts = lists[2];
       renderBlockTemplateSelect();
     });
   }
@@ -3604,6 +3664,23 @@
     };
     group('Saved templates', state.blockTemplates);
     group('Starter blocks', availableStarterBlocks());
+    if (state.weekLayouts.length) {
+      select.appendChild(el('optgroup', { label: 'Week layouts (several blocks at once)' }, state.weekLayouts.map(l => el('option', { value: 'layout:' + l.Id, text: l.Name + ' – ' + layoutSummary(l) }))));
+    }
+  }
+
+  /** "6 blocks: Morning cartoons, Saturday morning cartoons, … · with sources · family hours". */
+  function layoutSummary(l) {
+    const blocks = l.Blocks || [];
+    const names = blocks.map(b => (b.Block && b.Block.Name) || 'Block');
+    const parts = [plural(blocks.length, 'block') + (names.length ? ': ' + names.slice(0, 4).join(', ') + (names.length > 4 ? ' and ' + (names.length - 4) + ' more' : '') : '')];
+    if (!l.BuiltIn) {
+      parts.push(blocks.some(b => b.Block && (b.Block.Sources || []).length) ? 'with sources' : 'shape only');
+    }
+    if ((l.DaypartRules || []).length) {
+      parts.push('family hours');
+    }
+    return parts.join(' · ');
   }
 
   function blockFromTemplate(t) {
@@ -3628,19 +3705,72 @@
     });
   }
 
-  function saveBlockTemplate(b) {
-    const name = (b.Name || '').trim();
+  /**
+   * The inline form under the Time blocks toolbar. With a block it saves that block as a template; without one it
+   * saves every block of the draft as a week layout. Either way the sources can be kept (their ids are matched by
+   * name when the template reaches another server) or left out so only the shape travels.
+   */
+  function openBlockSaveForm(block) {
+    state.blockSave = { block: block || null };
+    show($('#tvsLayoutForm'), true);
+    $('#tvsLayoutFormLabel').textContent = block
+      ? 'Save this block as a template:'
+      : 'Save all ' + plural(state.draft.Slots.Blocks.length, 'block') + ' as a week layout:';
+    const name = $('#tvsLayoutName');
+    name.placeholder = block ? 'Template name' : 'Layout name';
+    name.value = block ? (block.Name || '').trim() : ((val('#tvsName') || '').trim() ? (val('#tvsName') || '').trim() + ' week' : '');
+    $('#tvsBtnLayoutSave').querySelector('span').textContent = block ? 'Save template' : 'Save layout';
+    name.focus();
+  }
+
+  function closeBlockSaveForm() {
+    state.blockSave = null;
+    show($('#tvsLayoutForm'), false);
+  }
+
+  function saveFromBlockForm() {
+    const pending = state.blockSave || {};
+    const name = val('#tvsLayoutName').trim();
     if (!name) {
-      toast('Give the block a name first; the template is saved under it.');
+      toast(pending.block ? 'Give the template a name.' : 'Give the layout a name.');
       return;
     }
+    if (pending.block) {
+      saveBlockTemplate(pending.block, name, checked('#tvsLayoutKeepSources'));
+    } else {
+      saveWeekLayout(name, checked('#tvsLayoutKeepSources'));
+    }
+  }
+
+  function saveBlockTemplate(b, name, keepSources) {
     const payload = toPayload({ Slots: { Blocks: [b] } }).Slots.Blocks[0];
     delete payload.Id;
+    payload.Name = name;
+    if (!keepSources) {
+      payload.Sources = [];
+    }
     api('POST', 'BlockTemplates', payload).then(list => {
       state.blockTemplates = Array.isArray(list) ? list : [];
       renderBlockTemplateSelect();
-      toast('Template “' + name + '” saved.');
+      closeBlockSaveForm();
+      toast('Template “' + name + '” saved' + (keepSources ? '' : ' without its sources') + '.');
     }).catch(err => alertErrors(err, 'Could not save template'));
+  }
+
+  function saveWeekLayout(name, keepSources) {
+    if (!state.draft.Slots.Blocks.length) {
+      toast('Add a block first.');
+      return;
+    }
+    const payload = { Name: name, Station: readDraft(), KeepSources: keepSources };
+    const shadowed = state.weekLayouts.some(l => l.BuiltIn && l.Name.toLowerCase() === name.toLowerCase());
+    withBusy('Could not save the layout', () => api('POST', 'WeekLayouts', payload).then(list => {
+      state.weekLayouts = Array.isArray(list) ? list : [];
+      renderBlockTemplateSelect();
+      closeBlockSaveForm();
+      const suggested = keepSources && state.draft.Slots.Blocks.filter(b => b.Kind === 'Weather' || (b.Sources || []).length).length >= 2;
+      toast('Layout “' + name + '” saved' + (shadowed ? ' in place of the built-in one' : '') + '. Find it next to Add block on any station' + (suggested ? ', and under Suggest stations' : '') + '.');
+    }));
   }
 
   /** The two template lists in Settings, keyed by their GlobalSettings property (which is also their API path). */
@@ -3658,6 +3788,13 @@
       icon: () => 'bookmark',
       summary: t => blockSummary(t) + ' · ' + (t.Order || 'Sequential'),
       emptyResponse: true
+    },
+    WeekLayouts: {
+      list: '#tvsLayoutList',
+      empty: '#tvsLayoutEmpty',
+      icon: () => 'view_week',
+      summary: layoutSummary,
+      emptyResponse: false
     }
   };
 
@@ -3789,7 +3926,7 @@
           el('div', { className: 'listItemBody two-line' }, [
             el('div', { className: 'listItemBodyText' }, [
               el('span', { text: s.Name }),
-              badge(MODE_LABEL[s.Station.Mode] || s.Station.Mode, 'on'),
+              badge(suggestionModeLabel(s.Station), 'on'),
               newHoursBadge(s, report.Channels),
               s.Exists ? badge('Already exists', 'off') : null
             ]),
@@ -3803,6 +3940,13 @@
       });
     });
     updateSuggestCount();
+  }
+
+  /** "Shuffle", or "Shuffle + time blocks" for a broadcast week: a pool with blocks on top. */
+  function suggestionModeLabel(station) {
+    const label = MODE_LABEL[station.Mode] || station.Mode;
+    const blocks = (station.Slots && station.Slots.Blocks) || [];
+    return station.Mode === 'Pool' && blocks.length ? label + ' + ' + plural(blocks.length, 'time block') : label;
   }
 
   /** How much of a suggestion no channel plays yet, said only when some of it already is on one. */
@@ -5046,6 +5190,7 @@
     SUGGESTION_FIELDS.forEach(f => setVal(f.id, sug[f.key] !== undefined && sug[f.key] !== null ? sug[f.key] : f.fallback));
     renderTemplateRows('BlockTemplates', Array.isArray(s.BlockTemplates) ? s.BlockTemplates : []);
     renderTemplateRows('StationTemplates', Array.isArray(s.StationTemplates) ? s.StationTemplates : []);
+    renderTemplateRows('WeekLayouts', Array.isArray(s.WeekLayouts) ? s.WeekLayouts : []);
   }
 
   /** How many stations set their own bug or card, next to the "Use on every station" buttons. */
@@ -6158,7 +6303,21 @@
       state.draft.ActiveWindows.push({ Label: '', StartMonth: 12, StartDay: 1, EndMonth: 12, EndDay: 31 });
       renderSeasonRows();
     });
-    on('#tvsBtnAddBlock', 'click', () => addExpandedBlock(newBlockFromSelectedTemplate()));
+    on('#tvsBtnAddBlock', 'click', () => {
+      const picked = selectedBlockSource();
+      if (picked.layout) {
+        addWeekLayout(picked.layout);
+        return;
+      }
+      newBlockFromSelectedTemplate().then(addExpandedBlock);
+    });
+    on('#tvsBtnSaveLayout', 'click', () => openBlockSaveForm(null));
+    on('#tvsBtnLayoutCancel', 'click', closeBlockSaveForm);
+    on('#tvsBtnLayoutSave', 'click', saveFromBlockForm);
+    on('#tvsLayoutName', 'keydown', ev => {
+      if (ev.key === 'Enter') { ev.preventDefault(); saveFromBlockForm(); }
+      if (ev.key === 'Escape') { closeBlockSaveForm(); }
+    });
 
     // Content and previews
     on('#tvsBtnContent', 'click', loadContent);

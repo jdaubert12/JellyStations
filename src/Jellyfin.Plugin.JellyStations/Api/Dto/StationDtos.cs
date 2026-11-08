@@ -117,6 +117,9 @@ public sealed class ImportResultDto
 
     /// <summary>Block templates created or replaced, by name.</summary>
     public List<string> BlockTemplates { get; set; } = new();
+
+    /// <summary>Week layouts created or replaced, by name.</summary>
+    public List<string> WeekLayouts { get; set; } = new();
 }
 
 public sealed class StationSummaryDto

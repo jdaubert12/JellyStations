@@ -19,7 +19,8 @@ public sealed class SuggestionSet
 /// decade channels for movies and for shows and a classics channel, franchise marathons and a "Franchise Nights"
 /// slots station, collection channels, and seasonal channels from holiday tags. A rule that has at least
 /// <see cref="NearMissShare"/> of what it needs reports a near miss instead. Clip libraries (see
-/// <see cref="LibraryStatDto.ClipLibrary"/>) are never a source. Pure, so the rules are testable.
+/// <see cref="LibraryStatDto.ClipLibrary"/>) are never a source. Week layouts (<see cref="WeekLayouts"/>) come
+/// first: a whole broadcast week of blocks, each filled from the library. Pure, so the rules are testable.
 /// </summary>
 public static class StationSuggester
 {
@@ -53,10 +54,14 @@ public static class StationSuggester
         ("Easter", "Easter", 3, 20, 4, 30, new[] { "easter" })
     };
 
-    public static List<StationSuggestionDto> Suggest(LibraryAnalysisDto a, IEnumerable<string> existingNames, SuggestionThresholds? thresholds = null)
-        => Build(a, existingNames, thresholds).Suggestions;
+    public static List<StationSuggestionDto> Suggest(LibraryAnalysisDto a, IEnumerable<string> existingNames, SuggestionThresholds? thresholds = null, IReadOnlyList<WeekLayout>? layouts = null)
+        => Build(a, existingNames, thresholds, layouts).Suggestions;
 
-    public static SuggestionSet Build(LibraryAnalysisDto a, IEnumerable<string> existingNames, SuggestionThresholds? thresholds = null)
+    /// <summary>
+    /// Runs every rule over the analysis. <paramref name="layouts"/> are the week layouts to fill from the library
+    /// (null = the built-in ones); each that can be filled is offered first, under "Broadcast week".
+    /// </summary>
+    public static SuggestionSet Build(LibraryAnalysisDto a, IEnumerable<string> existingNames, SuggestionThresholds? thresholds = null, IReadOnlyList<WeekLayout>? layouts = null)
     {
         var t = thresholds ?? new SuggestionThresholds();
         var existing = new HashSet<string>(existingNames.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.Trim()), StringComparer.OrdinalIgnoreCase);
@@ -92,6 +97,16 @@ public static class StationSuggester
         // A library of idents and bumps is a bumper source, never a channel's content.
         var libraries = a.Libraries.Where(l => !l.ClipLibrary && l.Movies + l.Episodes > 0).ToList();
         var movieLibraries = libraries.Where(l => l.Movies > 0).ToList();
+
+        // Whole broadcast weeks: the layouts' blocks filled from the library, the pool of everything else between them.
+        foreach (var layout in layouts ?? WeekLayouts.BuiltIn)
+        {
+            var filled = WeekLayouts.Suggest(layout, a, t);
+            if (filled is not null)
+            {
+                Add("layout:" + layout.Id.ToString("N"), "Broadcast week", string.IsNullOrWhiteSpace(layout.StationName) ? layout.Name : layout.StationName!, filled.Description, filled.Hours, filled.Station);
+            }
+        }
 
         // Kids and family, by rating across every library.
         if (libraries.Count > 0)

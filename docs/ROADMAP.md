@@ -4,7 +4,7 @@ Working plan for scheduling and curation features. Phase 1 is the agreed next th
 Later phases are candidates, roughly ordered by payoff per effort; reorder freely.
 Phase 7 (smarter stations: embeddings, watch history, optional local model) is the current plan; step 2a, the air log with series continuity and the seam at a revision bump, was built 2026-11-02 as 1.25.0.0 from the design in `docs/HISTORY-SCHEDULING.md` (local note, not in the repo; the recency weighting it first proposed stays cut).
 Phase 8 (weather channel) steps 1-6 shipped in 1.14.0.0 (2026-10-23); radar 1.18.0.0 and forecast radar 1.19.0.0 (2026-10-26); step 7: alerts screen (NWS), title cards, music levelling (loudnorm), weather time blocks (with block repeats) and weather in the breaks on ordinary stations built 2026-10-27 as 1.20.0.0; almanac still open.
-Phase 9 (better suggestions and channel templates, planned 2026-10-27) is in progress: B1 station templates built 2026-10-28 as 1.21.0.0; A1 (finish what gets created) built 2026-11-01 as 1.24.0.0; A2 (preview a day), A3 (smarter rules), A4 (coverage aware) and A5 (near misses and thresholds) built 2026-11-05 as 1.27.0.0; B2 (built-in block templates) built 2026-11-06 as 1.30.0.0; B3 (week layouts) is next. A6 waits on Phase 7.
+Phase 9 (better suggestions and channel templates, planned 2026-10-27) is done bar A6: B1 station templates built 2026-10-28 as 1.21.0.0; A1 (finish what gets created) built 2026-11-01 as 1.24.0.0; A2 (preview a day), A3 (smarter rules), A4 (coverage aware) and A5 (near misses and thresholds) built 2026-11-05 as 1.27.0.0; B2 (built-in block templates) built 2026-11-06 as 1.30.0.0; B3 (week layouts) and B4 (block templates without ids) built 2026-11-08 as 1.33.0.0. A6 waits on Phase 7, which is the plan from here (2b household history first).
 Feature survey of the other projects' trackers and communities, 2026-11-02, with a ranked list of candidates not yet planned: `docs/FEATURE-SURVEY-2026-11.md` (local note, not in the repo).
 
 Conventions for every step:
@@ -783,13 +783,35 @@ draft goes through `StationTemplates.ApplyTo` to pick up a look and its breaks.
    `GET /JellyStations/BlockTemplates/BuiltIn` lists the ones no saved template has replaced by name
    (`Available`); the saved list and its endpoints are unchanged. The dropdown next to "Add block"
    groups "Saved templates" and "Starter blocks". 4 tests in `BlockTemplatesTests`.
-3. **Week layouts.** A multi-block template that paints a whole broadcast week at once (morning
-   kids, daytime reruns, prime-time movie, late night), sources left empty or filled by the genre
-   rules from A3. This is the bridge between the two features: "Classic broadcast week" offered by
-   the suggester would be the single most useful first-run action. Medium.
-4. **Block templates without ids.** A block template keeps item ids today, which do not travel
-   between servers. A "sources optional" flag and title matching on apply, like import does, make
-   templates shareable. Small.
+3. **Week layouts — DONE 2026-11-08 (1.33.0.0).** `WeekLayout` (Models): a named list of
+   `LayoutBlock`s (a `SlotBlock` plus a `LayoutFill`: Kids, Family, FamilyMovies, Movies, Reruns,
+   Grownup, Everything, or None for a block that carries its own sources), a `Filler` fill for the
+   pool between the blocks, `DaypartRules` and a `StationName`. `WeekLayouts` (Library) holds the
+   three built-ins with fixed ids (Classic broadcast week, Movies all day, Kids by day grown-ups by
+   night), `Merge` / `Find` with saved ones shadowing by name like the other templates,
+   `FromStation` (a station's blocks with or without their sources, the pool's family hours; filler
+   Everything), `Blocks` (fresh copies for the editor) and `Suggest`: a Pool station whose pool is the
+   filler fill, each block filled from the analysis by its fill with the same minimums the plain
+   rules use (`KidsMinHours`, `FamilyMoviesMinHours`, `GenreMinHours`, the comfort pair), blocks the
+   library has nothing for dropped and named, null below `MinBlocks` (2). Grown-up content is an
+   allow-list of PG-13 / TV-14 and up on library sources, since sources have no minimum rating.
+   `StationSuggester.Build` takes the layouts (the service passes `Merge(settings.WeekLayouts)`) and
+   offers them first under "Broadcast week", key `layout:<id>`; coverage, preview, draft and create
+   work unchanged, and the page badges "Shuffle + N time blocks". `/JellyStations/WeekLayouts`
+   lists, saves (`SaveWeekLayoutDto`: name, station, KeepSources), deletes and applies
+   (`{id}/Apply`: fresh block ids, sources matched by name through `StationImportResolver`). The
+   editor's Add block dropdown gains a "Week layouts" group that adds every block at once; "Save
+   blocks as layout" opens an inline form (name, keep the sources); Settings lists saved layouts;
+   `StationExportDocument` v3 carries them. 13 tests in `WeekLayoutsTests`. Open: a fill of a saved
+   layout's blocks cannot be set from the page (the API accepts it), and a saved layout is only
+   offered as a station when two of its blocks have sources.
+4. **Block templates without ids — DONE 2026-11-08 (1.33.0.0).** The bookmark on a block opens the
+   same inline form with "Keep the sources": off saves the shape alone, so a template travels with
+   nothing to match. `POST BlockTemplates/{id}/Apply` returns the block with a fresh id and its
+   item references matched by name when their ids are unknown here (the import resolver, so a
+   library removed and re-added or a template from another server still finds its shows), the
+   rest dropped and listed; the editor adds a template with sources through it and says what was
+   matched or dropped. Starter blocks and shape-only templates skip the round trip.
 
 Out of scope here: anything that needs a model (Phase 7) and anything that changes the timeline of
 an existing station; templates and suggestions only ever produce new drafts.

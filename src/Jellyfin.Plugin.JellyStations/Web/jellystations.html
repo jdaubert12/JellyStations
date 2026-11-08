@@ -58,6 +58,7 @@
       #JellyStationsPage .tvs-suggest-option { margin: 0; min-width: 11em; }
       #JellyStationsPage .tvs-suggest-option input[type=number] { width: 9em; }
       #JellyStationsPage .tvs-suggest-check { width: auto; padding-bottom: .6em; }
+      #JellyStationsPage .tvs-inline-check { width: auto; }
       #JellyStationsPage .tvs-inline-btn { margin-left: .8em; padding: .3em .9em; font-size: .85em; }
       #JellyStationsPage .tvs-override-box { margin: .4em 0 0 1.6em; padding-left: 1em; border-left: 2px solid rgba(255,255,255,.15); }
       #JellyStationsPage .tvs-override-row { margin: .4em 0 .8em; }
@@ -262,7 +263,7 @@
             <div class="tvs-welcome-title">Welcome to JellyStations</div>
             <div>Here is what your library could support, ready to go. Tick the channels you like and press <strong>Create selected</strong>; each one can be changed later. Prefer to build your own? <button type="button" id="tvsBtnSuggestPreset" class="tvs-linkbtn">Start from a preset</button>.</div>
           </div>
-          <div class="fieldDescription">Built from what is in the library: genres (a movie channel and a TV channel when there is enough of both), series, half-hour comedies together, kids and family content by rating, anime and documentaries, franchises, collections, decades of movies and of shows, and holiday tags. What your channels already play is taken into account: a suggestion says how much of it is new, and one with nothing new is hidden. Tick the ones you want and press <strong>Create selected</strong>, press the clock on one to see a sample day of what it would play, or the pencil to change it in the editor first. Each new station gets a drawn logo, and a template gives them all the same breaks and look.</div>
+          <div class="fieldDescription">Built from what is in the library: whole broadcast weeks first (cartoons in the morning, reruns by day, a movie at eight, grown-up shows late, each block filled from what you have), then genres (a movie channel and a TV channel when there is enough of both), series, half-hour comedies together, kids and family content by rating, anime and documentaries, franchises, collections, decades of movies and of shows, and holiday tags. What your channels already play is taken into account: a suggestion says how much of it is new, and one with nothing new is hidden. Tick the ones you want and press <strong>Create selected</strong>, press the clock on one to see a sample day of what it would play, or the pencil to change it in the editor first. Each new station gets a drawn logo, and a template gives them all the same breaks and look.</div>
           <div class="tvs-suggest-options">
             <div class="inputContainer tvs-suggest-option">
               <label class="inputLabel inputLabelUnfocused" for="tvsSuggestFirst">First channel number</label>
@@ -482,11 +483,19 @@
             <div id="tvsPanelBlocks" class="tvs-panel" data-steps="3">
               <div class="tvs-toolbar" style="margin-top:1em">
                 <h4 class="tvs-subtitle sectionTitle" style="margin:0">Time blocks</h4>
-                <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsBlockTemplateSelect" title="Start the new block from a saved template or a starter block" style="width:auto;max-width:20em"><option value="">Blank block</option></select>
+                <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsBlockTemplateSelect" title="Start the new block from a saved template or a starter block, or add a whole week layout" style="width:auto;max-width:22em"><option value="">Blank block</option></select>
                 <button is="emby-button" type="button" id="tvsBtnAddBlock" class="raised emby-button"><span>Add block</span></button>
+                <button is="emby-button" type="button" id="tvsBtnSaveLayout" class="raised emby-button tvs-hidden" title="Save every block, with or without its sources, as a week layout to paint onto another station"><span>Save blocks as layout</span></button>
+              </div>
+              <div id="tvsLayoutForm" class="tvs-inline tvs-hidden" style="margin:.4em 0 .6em">
+                <span id="tvsLayoutFormLabel" class="tvs-secondary"></span>
+                <input is="emby-input" id="tvsLayoutName" type="text" placeholder="Layout name" autocomplete="off" style="width:16em">
+                <label class="emby-checkbox-label tvs-inline-check" title="Kept sources are matched by title when the template is used on another server; without them only the days, times and order travel"><input is="emby-checkbox" type="checkbox" id="tvsLayoutKeepSources" checked><span>Keep the sources</span></label>
+                <button is="emby-button" type="button" id="tvsBtnLayoutSave" class="raised button-submit emby-button"><span>Save layout</span></button>
+                <button is="emby-button" type="button" id="tvsBtnLayoutCancel" class="raised emby-button"><span>Cancel</span></button>
               </div>
               <div class="fieldDescription" id="tvsBlocksHelp"></div>
-              <div class="fieldDescription">Click or drag on the week below to add a block (drag sideways to cover several days); click a block to edit it underneath. Times are the station's local time.</div>
+              <div class="fieldDescription">Click or drag on the week below to add a block (drag sideways to cover several days); click a block to edit it underneath. Times are the station's local time. The dropdown also offers week layouts: a whole broadcast week of blocks (cartoons in the morning, reruns by day, a movie at eight, grown-up shows late) added at once, for you to fill.</div>
               <div id="tvsWeekGrid" class="tvs-week"></div>
               <div id="tvsBlockWarnings"></div>
               <div id="tvsBlocksEmpty" class="tvs-secondary tvs-hidden" style="margin:.6em 0">No blocks yet. Add one to schedule content at a specific time on chosen days.</div>
@@ -973,9 +982,16 @@
 
           <div class="verticalSection tvs-section">
             <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">bookmark</span>Block templates</h3>
-            <div class="fieldDescription">Time blocks saved from a station editor with the bookmark button. Pick one from the dropdown next to “Add block” to reuse it on any station. The same dropdown offers four starter blocks (Saturday morning cartoons, Prime-time movie, Late night, Weather on the hour) that come without sources; a template saved under a starter's name takes its place.</div>
+            <div class="fieldDescription">Time blocks saved from a station editor with the bookmark button, with or without their sources. Pick one from the dropdown next to “Add block” to reuse it on any station; sources whose ids this server does not know (a template imported from elsewhere, or a library that was removed and added again) are matched by title as it is added. The same dropdown offers four starter blocks (Saturday morning cartoons, Prime-time movie, Late night, Weather on the hour) that come without sources; a template saved under a starter's name takes its place.</div>
             <div id="tvsTemplateEmpty" class="tvs-secondary">No templates saved yet.</div>
             <div id="tvsTemplateList" class="paperList"></div>
+          </div>
+
+          <div class="verticalSection tvs-section">
+            <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">view_week</span>Week layouts</h3>
+            <div class="fieldDescription">Whole broadcast weeks saved from a station editor with “Save blocks as layout”: every time block, with or without its sources, and the family hours. Pick one from the dropdown next to “Add block” to paint it onto any station; one saved with its sources is also offered under Suggest stations. Three built-in layouts (Classic broadcast week, Movies all day, Kids by day, grown-ups by night) are always there, filled from the library on the suggestions page; a layout saved under a built-in's name takes its place. Layouts travel with Export and Import.</div>
+            <div id="tvsLayoutEmpty" class="tvs-secondary">No week layouts saved yet.</div>
+            <div id="tvsLayoutList" class="paperList"></div>
           </div>
 
           <div class="verticalSection tvs-section">
