@@ -54,6 +54,7 @@
     UserExcluded: 'Excluded on this station',
     TagExcluded: 'Excluded by tag',
     TooShort: 'Shorter than the station minimum',
+    HouseholdWatched: 'Watched by the household recently',
     Unreadable: 'Could not be read as a video'
   };
   const RESOLUTIONS = [['3840x2160', '3840 × 2160 (4K)'], ['1920x1080', '1920 × 1080 (1080p)'], ['1280x720', '1280 × 720 (720p)'], ['854x480', '854 × 480 (480p)'], ['custom', 'Custom']];
@@ -84,6 +85,7 @@
     statusTimer: null,
     coverage: null,       // CoverageDto for the "Not on a channel" page
     content: null,        // PreviewItems result shown in the editor's content table
+    householdUsers: null, // GET Household/Users, fetched once for the Settings page
     weatherStatusFor: undefined, // station whose forecast status the Weather section shows (undefined = not loaded yet)
     openLogs: {},         // session UniqueId -> bool
     deleteTimer: null,
@@ -501,6 +503,7 @@
 
   const LIMITS = {
     cooldownHours: { min: 0, max: 168, def: 0 },
+    householdDays: { min: 0, max: 365, def: 0 },
     marathon: { min: 1, max: Infinity, def: 1 },
     minRuntimeMinutes: { min: 0, max: Infinity, def: 0 },
     bumperBreakMinutes: { min: 0, max: Infinity, def: 0 },
@@ -926,6 +929,56 @@
     winter: { Label: 'Winter', StartMonth: 12, StartDay: 1, EndMonth: 2, EndDay: 28 }
   };
 
+  /**
+   * "Shape the day like a channel": each shape writes the family hours in one go and, on a shuffled station, adds a
+   * prime-time block filled with the pool's sources. Data, like SEASON_PRESETS.
+   */
+  const DAY_SHAPES = {
+    kids: {
+      Label: 'Kids by day',
+      Rules: [{ StartLocal: '06:00', EndLocal: '19:00', MaxRating: 'G', AllowUnrated: false }, { StartLocal: '19:00', EndLocal: '21:00', MaxRating: 'PG', AllowUnrated: false }],
+      Block: null
+    },
+    family: {
+      Label: 'Family evenings',
+      Rules: [{ StartLocal: '06:00', EndLocal: '21:00', MaxRating: 'PG', AllowUnrated: false }],
+      Block: { Name: 'Family movie night', GuideTitle: 'Family Movie Night', Days: ['Friday', 'Saturday'], StartLocal: '19:00', DurationMinutes: 180, Order: 'Shuffle' }
+    },
+    grownup: {
+      Label: 'Grown-up nights',
+      Rules: [{ StartLocal: '06:00', EndLocal: '20:00', MaxRating: 'PG-13', AllowUnrated: false }],
+      Block: { Name: 'Prime-time feature', GuideTitle: 'Prime-Time Feature', Days: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'], StartLocal: '20:00', DurationMinutes: 180, Order: 'Shuffle' }
+    },
+    weekend: {
+      Label: 'Weekend movie marathons',
+      Rules: [],
+      Block: { Name: 'Weekend movie marathon', GuideTitle: 'Weekend Movie Marathon', Days: ['Saturday', 'Sunday'], StartLocal: '13:00', DurationMinutes: 360, Order: 'Shuffle' }
+    }
+  };
+
+  function applyDayShape(key) {
+    const shape = DAY_SHAPES[key];
+    if (!shape || !state.draft) {
+      return;
+    }
+    const d = state.draft;
+    const replaced = d.Pool.DaypartRules.length;
+    d.Pool.DaypartRules = shape.Rules.map(r => Object.assign({}, r));
+    renderDaypartRows();
+    let added = '';
+    if (shape.Block && d.Mode === 'Pool' && !d.Slots.Blocks.some(b => b.Name === shape.Block.Name)) {
+      const block = Object.assign(newBlock(), shape.Block, {
+        Kind: 'Content',
+        Days: shape.Block.Days.slice(),
+        Sources: JSON.parse(JSON.stringify(d.Pool.Sources || []))
+      });
+      addExpandedBlock(block);
+      added = ' and a “' + shape.Block.Name + '” block at ' + shape.Block.StartLocal + ' with the pool\'s sources to trim';
+    }
+    setVal('#tvsDayShape', '');
+    toast(shape.Label + ': ' + (shape.Rules.length ? plural(shape.Rules.length, 'family-hours rule') : 'no family hours') + (replaced ? ' (replacing ' + replaced + ')' : '') + added + '.');
+  }
+
   /** Grid minutes from the padding dropdown; "by length" aligns the anchor to the half hour. */
   function paddingGridMinutes() {
     const v = val('#tvsPadding');
@@ -1193,6 +1246,9 @@
       if (aired) {
         nowText += ' · ' + aired;
       }
+      if (np.Why) {
+        nowText += ' · ' + np.Why;
+      }
     } else {
       nowText = s.Enabled ? 'Now: nothing scheduled – add content or recompile' : 'Now: off air (disabled)';
     }
@@ -1405,6 +1461,7 @@
       ExcludedTags: [],
       UseGlobalExcludedTags: true,
       MinRuntimeMinutes: 0,
+      Household: { SkipFinishedDays: 0, FollowProgress: false },
       Bumpers: { Enabled: false, Sources: [], BreakMinutes: 0, MaxClipMinutes: 5, PreRoll: { Enabled: false, Sources: [] }, PostRoll: { Enabled: false, Sources: [] } },
       CardText: null
     };
@@ -1423,6 +1480,9 @@
     s.Pool.MarathonMax = clampInt(s.Pool.MarathonMax, s.Pool.MarathonMin, Infinity, LIMITS.marathon.def);
     s.Pool.DaypartRules = Array.isArray(s.Pool.DaypartRules) ? s.Pool.DaypartRules : [];
     s.Pool.Sources.forEach(normalizeSource);
+    s.Household = s.Household || {};
+    s.Household.SkipFinishedDays = clampTo(s.Household.SkipFinishedDays, LIMITS.householdDays);
+    s.Household.FollowProgress = !!s.Household.FollowProgress;
     s.Slots = s.Slots || {};
     s.Slots.Blocks = s.Slots.Blocks || [];
     s.Slots.Blocks.forEach(normalizeBlock);
@@ -1923,6 +1983,8 @@
     setVal('#tvsExcludedTags', d.ExcludedTags.join(', '));
     setChecked('#tvsUseGlobalTags', d.UseGlobalExcludedTags !== false);
     setVal('#tvsMinRuntime', d.MinRuntimeMinutes || 0);
+    setVal('#tvsHouseholdDays', d.Household.SkipFinishedDays || 0);
+    setChecked('#tvsHouseholdFollow', !!d.Household.FollowProgress);
     loadBlockTemplates();
     setChecked('#tvsBumpersEnabled', !!d.Bumpers.Enabled);
     setVal('#tvsBumperBreak', d.Bumpers.BreakMinutes || 0);
@@ -2526,6 +2588,8 @@
     d.ExcludedTags = parseTagList(val('#tvsExcludedTags'));
     d.UseGlobalExcludedTags = checked('#tvsUseGlobalTags');
     d.MinRuntimeMinutes = clampTo(val('#tvsMinRuntime'), LIMITS.minRuntimeMinutes);
+    d.Household.SkipFinishedDays = clampTo(val('#tvsHouseholdDays'), LIMITS.householdDays);
+    d.Household.FollowProgress = checked('#tvsHouseholdFollow');
     d.Bumpers.Enabled = checked('#tvsBumpersEnabled');
     d.Bumpers.BreakMinutes = clampTo(val('#tvsBumperBreak'), LIMITS.bumperBreakMinutes);
     d.Bumpers.MaxClipMinutes = clampTo(val('#tvsBumperMax'), LIMITS.bumperMaxClipMinutes);
@@ -2884,8 +2948,9 @@
         programCell.appendChild(el('div', { className: 'tvs-secondary', text: entryTitle(e) }));
       }
       const aired = airedText(e);
-      if (aired) {
-        programCell.appendChild(el('div', { className: 'tvs-secondary', text: aired + (e.ItemLastAiredUtc && e.IsSeries ? ' · this episode ' + fmtAgo(e.ItemLastAiredUtc) : '') }));
+      const why = [e.Why || '', aired ? aired + (e.ItemLastAiredUtc && e.IsSeries ? ' · this episode ' + fmtAgo(e.ItemLastAiredUtc) : '') : ''].filter(Boolean).join(' · ');
+      if (why) {
+        programCell.appendChild(el('div', { className: 'tvs-secondary', text: why }));
       }
       if (classes.indexOf('now') >= 0) {
         programCell.appendChild(badge('On air', 'live'));
@@ -5258,6 +5323,7 @@
     setChecked('#tvsShowText', s.ShowTextOnSlate !== false);
     setChecked('#tvsShowLogo', s.ShowLogoOnSlate !== false);
     setVal('#tvsGlobalExcludedTags', Array.isArray(s.ExcludedTags) ? s.ExcludedTags.join(', ') : '');
+    renderHouseholdUsers(Array.isArray(s.HouseholdUserIds) ? s.HouseholdUserIds : []);
     const sug = s.Suggestions || {};
     SUGGESTION_FIELDS.forEach(f => setVal(f.id, sug[f.key] !== undefined && sug[f.key] !== null ? sug[f.key] : f.fallback));
     renderTemplateRows('BlockTemplates', Array.isArray(s.BlockTemplates) ? s.BlockTemplates : []);
@@ -5305,6 +5371,33 @@
     { id: '#tvsSugLeftovers', key: 'LeftoversMinHours', fallback: 4, label: 'Everything Else' }
   ];
 
+  /**
+   * The "Our household" tick list on the Settings page: every Jellyfin user, those in the saved list ticked. The user
+   * list is fetched once; ids are compared without dashes or case so a saved id always finds its box.
+   */
+  function renderHouseholdUsers(ids) {
+    const host = clear($('#tvsHouseholdUsers'));
+    const key = id => String(id || '').replace(/-/g, '').toLowerCase();
+    const selected = {};
+    ids.forEach(id => { selected[key(id)] = true; });
+    const draw = users => {
+      show($('#tvsHouseholdEmpty'), !users.length);
+      users.forEach(u => {
+        const box = el('input', { type: 'checkbox', value: u.Id });
+        box.checked = !!selected[key(u.Id)];
+        host.appendChild(el('label', { className: 'tvs-day', title: 'Read this user\'s play history' }, [box, el('span', { text: u.Name })]));
+      });
+    };
+    if (state.householdUsers) {
+      draw(state.householdUsers);
+      return;
+    }
+    api('GET', 'Household/Users').then(list => {
+      state.householdUsers = Array.isArray(list) ? list : [];
+      draw(state.householdUsers);
+    }).catch(() => draw([]));
+  }
+
   function saveSettings() {
     const suggestions = {};
     const suggestionErrors = [];
@@ -5328,6 +5421,7 @@
       ShowTextOnSlate: checked('#tvsShowText'),
       ShowLogoOnSlate: checked('#tvsShowLogo'),
       ExcludedTags: parseTagList(val('#tvsGlobalExcludedTags')),
+      HouseholdUserIds: Array.from($all('#tvsHouseholdUsers input[type="checkbox"]')).filter(b => b.checked).map(b => b.value),
       Suggestions: suggestions
       // Block and station templates are kept server side; PUT Settings leaves them as they are.
     };
@@ -6363,6 +6457,7 @@
       state.draft.Pool.DaypartRules.push({ StartLocal: '06:00', EndLocal: '20:00', MaxRating: 'PG', AllowUnrated: false });
       renderDaypartRows();
     });
+    on('#tvsDayShape', 'change', () => applyDayShape(val('#tvsDayShape')));
     on('#tvsSeasonPreset', 'change', () => {
       const key = val('#tvsSeasonPreset');
       if (key && SEASON_PRESETS[key]) {

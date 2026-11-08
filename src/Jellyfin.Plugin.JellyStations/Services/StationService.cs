@@ -22,6 +22,7 @@ public sealed class StationService
     private readonly StreamSessionManager _sessions;
     private readonly JellyStationsPaths _paths;
     private readonly AirLogRecorder _airLog;
+    private readonly IHouseholdHistory? _household;
     private readonly ILogger<StationService> _logger;
     private readonly object _writeLock = new();
 
@@ -35,9 +36,11 @@ public sealed class StationService
         StreamSessionManager sessions,
         JellyStationsPaths paths,
         AirLogRecorder airLog,
-        ILogger<StationService> logger)
+        ILogger<StationService> logger,
+        IHouseholdHistory? household = null)
     {
         _airLog = airLog;
+        _household = household;
         _stations = stations;
         _compiled = compiled;
         _settings = settings;
@@ -152,7 +155,7 @@ public sealed class StationService
             }
 
             var compiled = Compile(draft);
-            compiled.History = HistoryFor(true, null, () => _airLog.Snapshot(draft.Id, DateTime.UtcNow, compiled));
+            SetHistory(compiled, true, null, () => _airLog.Snapshot(draft.Id, DateTime.UtcNow, compiled));
             _compiled.Save(compiled);
             _stations.Save(draft);
             _resolver.Invalidate(draft.Id);
@@ -194,7 +197,7 @@ public sealed class StationService
             }
 
             compiled.Revision = draft.Revision;
-            compiled.History = HistoryFor(scheduleChanged, previous, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled));
+            SetHistory(compiled, scheduleChanged, previous, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled));
             _compiled.Save(compiled);
             _stations.Save(draft);
             _resolver.Invalidate(id);
@@ -265,7 +268,7 @@ public sealed class StationService
                 _stations.Save(station);
             }
 
-            compiled.History = HistoryFor(changed && previous is not null, previous, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled));
+            SetHistory(compiled, changed && previous is not null, previous, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled));
             _compiled.Save(compiled);
             _resolver.Invalidate(id);
             if (changed && triggerGuide)
@@ -359,7 +362,7 @@ public sealed class StationService
             station.Revision++;
             var compiled = Compile(station);
             compiled.Revision = station.Revision;
-            compiled.History = HistoryFor(true, null, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled));
+            SetHistory(compiled, true, null, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled));
             _compiled.Save(compiled);
             _stations.Save(station);
             _resolver.Invalidate(id);
@@ -389,7 +392,7 @@ public sealed class StationService
         var savedCompiled = saved is null ? null : _compiled.Get(draft.Id);
         // A draft a save would not bump reuses the saved snapshot; otherwise it takes a fresh one, as the save would.
         var bumped = saved is null || savedCompiled is null || ScheduleFingerprint(saved) != ScheduleFingerprint(draft) || !StationCompiler.SameContent(savedCompiled, compiled);
-        compiled.History = HistoryFor(bumped, savedCompiled, () => _airLog.Snapshot(draft.Id, DateTime.UtcNow, compiled));
+        SetHistory(compiled, bumped, savedCompiled, () => _airLog.Snapshot(draft.Id, DateTime.UtcNow, compiled));
         return ScheduleResolver.EnumerateInput(ScheduleInput.From(draft, compiled, WeatherSources.ConfigFor(draft, _stations.GetAll())), fromUtc, toUtc);
     }
 
@@ -501,6 +504,7 @@ public sealed class StationService
 
         Add(compiled.UserExcluded, "Excluded", true);
         Add(compiled.TagExcluded, "Excluded by tag", true, byRule: true);
+        Add(compiled.HouseholdExcluded, "Watched recently", true, byRule: true);
 
         var bySource = rows.Where(r => !r.Excluded).GroupBy(r => r.Source).ToDictionary(g => g.Key, g => g.Count());
         limit = Math.Clamp(limit, 1, 5000);
@@ -512,7 +516,7 @@ public sealed class StationService
             Items = rows.Skip(offset).Take(limit).ToList(),
             UniqueHours = Math.Round(uniqueTicks / TimeSpan.TicksPerHour, 1),
             CycleHours = station.Mode == ScheduleMode.Pool ? Math.Round(compiled.Pool.Sum(i => (double)i.RuntimeTicks) / TimeSpan.TicksPerHour, 1) : null,
-            ExcludedCount = compiled.UserExcluded.Count + compiled.TagExcluded.Count,
+            ExcludedCount = compiled.UserExcluded.Count + compiled.TagExcluded.Count + compiled.HouseholdExcluded.Count,
             BySource = bySource
         };
     }
@@ -572,7 +576,111 @@ public sealed class StationService
     }
 
     /// <summary>Expands a station's content with its effective encoding profile and the server-wide excluded tags.</summary>
-    private CompiledStation Compile(Station station) => _compiler.Compile(station, EffectiveProfile(station), _settings.Get().ExcludedTags);
+    private CompiledStation Compile(Station station)
+    {
+        var settings = _settings.Get();
+        return _compiler.Compile(station, EffectiveProfile(station), settings.ExcludedTags, settings.HouseholdUserIds);
+    }
+
+    /// <summary>
+    /// Sets the history the schedulers continue from: a fresh snapshot of the air log when the revision was bumped,
+    /// the previous compile's otherwise; then the household's series positions are folded in (see
+    /// <see cref="HouseholdHistory.Apply"/>), so a series skips ahead to where the household is.
+    /// </summary>
+    private static void SetHistory(CompiledStation compiled, bool revisionBumped, CompiledStation? previous, Func<AirHistorySnapshot?> fresh)
+    {
+        compiled.History = HistoryFor(revisionBumped, previous, fresh);
+        compiled.History = HouseholdHistory.Apply(compiled.History, compiled.Household, compiled.ProgramItems.ToList(), DateTime.UtcNow);
+    }
+
+    /// <summary>
+    /// Recompiles every enabled station whose household history has moved since it was compiled: something newly
+    /// finished (or old enough to come back) under "skip what we finished", or a series the household has watched
+    /// further into under "follow our progress". Cheap when nothing moved: only the play state of the compiled items
+    /// is read. Returns how many stations changed; the guide is refreshed once when any did.
+    /// </summary>
+    public int RefreshHousehold()
+    {
+        if (_household is null)
+        {
+            return 0;
+        }
+
+        var users = _settings.Get().HouseholdUserIds ?? new List<Guid>();
+        var changed = 0;
+        foreach (var station in _stations.GetAll().Where(s => s.Enabled))
+        {
+            var compiled = _compiled.Get(station.Id);
+            var wanted = HouseholdHistory.Wanted(station, users);
+            if (compiled is null || (!wanted && compiled.Household is null))
+            {
+                continue;
+            }
+
+            if (wanted && !HouseholdMoved(station, compiled, users))
+            {
+                continue;
+            }
+
+            try
+            {
+                if (Recompile(station.Id, triggerGuide: false).ContentChanged)
+                {
+                    changed++;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "JellyStations: household refresh failed for {Name}", Text.ForLog(station.Name));
+            }
+        }
+
+        if (changed > 0)
+        {
+            _logger.LogInformation("JellyStations: household history moved on {Count} station(s); refreshing guide", changed);
+            _guide.Trigger();
+        }
+
+        return changed;
+    }
+
+    /// <summary>True when compiling now would leave out different items or place a series elsewhere than the compile did.</summary>
+    private bool HouseholdMoved(Station station, CompiledStation compiled, IReadOnlyList<Guid> users)
+    {
+        if (compiled.Household is null || !compiled.Household.UserIds.OrderBy(u => u).SequenceEqual(users.Distinct().OrderBy(u => u)))
+        {
+            return true;
+        }
+
+        var items = compiled.ProgramItems.Concat(compiled.HouseholdExcluded).GroupBy(i => i.ItemId).Select(g => g.First()).ToList();
+        var states = _household!.Read(items.Select(i => i.ItemId), users);
+        var now = DateTime.UtcNow;
+        var skipped = new HashSet<Guid>();
+        if (station.Household.SkipFinishedDays > 0)
+        {
+            foreach (var item in items)
+            {
+                states.TryGetValue(item.ItemId, out var st);
+                if (HouseholdHistory.RecentlyFinished(st, station.Household.SkipFinishedDays, now))
+                {
+                    skipped.Add(item.ItemId);
+                }
+            }
+        }
+
+        if (!skipped.SetEquals(compiled.HouseholdExcluded.Select(i => i.ItemId)))
+        {
+            return true;
+        }
+
+        if (!station.Household.FollowProgress)
+        {
+            return compiled.Household.Progress.Count > 0;
+        }
+
+        var progress = HouseholdHistory.Progress(items.Where(i => !skipped.Contains(i.ItemId)), states);
+        return !HouseholdHistory.SameProgress(compiled.Household, new HouseholdSnapshot { Progress = progress });
+    }
 
     private DateTime DefaultAnchor(Station station)
     {
@@ -592,6 +700,8 @@ public sealed class StationService
             s.PaddingGridMinutes = 30; // anchor alignment only; program padding comes from the length rule
         }
         s.Pool ??= new PoolConfig();
+        s.Household ??= new HouseholdConfig();
+        s.Household.Normalize();
         s.Slots ??= new SlotsConfig();
         s.Slots.Blocks ??= new List<SlotBlock>();
         s.Slots.Filler ??= new FillerConfig();

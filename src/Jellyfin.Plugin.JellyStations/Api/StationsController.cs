@@ -60,7 +60,7 @@ public sealed class StationsController : ControllerBase
                 ExcludedCount = compiled?.Excluded.Count ?? 0,
                 Revision = s.Revision,
                 HasLogo = _stations.LogoPath(s) is not null,
-                NowPlaying = resolved is null ? null : Map.Entry(resolved.Entry, resolved.Offset, _stations.History(s.Id)),
+                NowPlaying = resolved is null ? null : Map.Entry(resolved.Entry, resolved.Offset, _stations.History(s.Id), ScheduleTrace.Why(resolved.Entry, s, compiled?.Household)),
                 Streaming = _sessions.Get(s.Id) is { IsDisposed: false },
                 Seasonal = SeasonWindows.IsSeasonal(s),
                 InSeason = SeasonWindows.IsActive(s, now),
@@ -88,7 +88,8 @@ public sealed class StationsController : ControllerBase
         }
 
         var log = _stations.History(stationId);
-        return programs.Select(e => Map.Entry(e, null, log)).ToList();
+        var station = _stations.Get(stationId);
+        return station is null ? programs.Select(e => Map.Entry(e, null, log)).ToList() : Map.Entries(programs, station, log, _stations.GetCompiled(stationId)?.Household);
     }
 
     /// <summary>
@@ -336,7 +337,9 @@ public sealed class StationsController : ControllerBase
         }
 
         var log = _stations.History(id);
-        return Ok(_resolver.Enumerate(id, start, end).Select(e => Map.Entry(e, null, log)).ToList());
+        var station = _stations.Get(id);
+        var entries = _resolver.Enumerate(id, start, end).ToList();
+        return Ok(station is null ? entries.Select(e => Map.Entry(e, null, log)).ToList() : Map.Entries(entries, station, log, _stations.GetCompiled(id)?.Household));
     }
 
     /// <summary>What the station has aired, latest first, and when the snapshot its current schedule continues from was taken.</summary>
@@ -415,13 +418,14 @@ public sealed class StationsController : ControllerBase
     [HttpGet("{id}/NowPlaying")]
     public ActionResult<ScheduleEntryDto> NowPlaying([FromRoute] Guid id)
     {
-        if (_stations.Get(id) is null)
+        var station = _stations.Get(id);
+        if (station is null)
         {
             return NotFound();
         }
 
         var r = _resolver.Resolve(id, DateTime.UtcNow);
-        return r is null ? NotFound() : Ok(Map.Entry(r.Entry, r.Offset, _stations.History(id)));
+        return r is null ? NotFound() : Ok(Map.Entry(r.Entry, r.Offset, _stations.History(id), ScheduleTrace.Why(r.Entry, station, _stations.GetCompiled(id)?.Household)));
     }
 
     [HttpPost("{id}/Logo")]
@@ -536,7 +540,14 @@ public sealed class StationsController : ControllerBase
 
 internal static class Map
 {
-    public static ScheduleEntryDto Entry(ScheduleEntry e, TimeSpan? offset, AirLog? log = null)
+    /// <summary>The entries of a listing, each with its reason (marathon runs counted across the list).</summary>
+    public static List<ScheduleEntryDto> Entries(IReadOnlyList<ScheduleEntry> entries, Station station, AirLog? log, HouseholdSnapshot? household)
+    {
+        var why = ScheduleTrace.Explain(entries, station, household);
+        return entries.Select((e, i) => Entry(e, null, log, why[i])).ToList();
+    }
+
+    public static ScheduleEntryDto Entry(ScheduleEntry e, TimeSpan? offset, AirLog? log = null, string? why = null)
     {
         AirLogKey? key = null;
         AirLogItem? item = null;
@@ -565,7 +576,8 @@ internal static class Map
             SourceLabel = e.SourceLabel,
             OffsetSeconds = offset?.TotalSeconds,
             IsMovie = e.Item?.IsMovie ?? false,
-            IsSeries = e.Item?.IsSeries ?? false
+            IsSeries = e.Item?.IsSeries ?? false,
+            Why = why
         };
     }
 }

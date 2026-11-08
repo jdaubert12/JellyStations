@@ -77,7 +77,7 @@ public sealed class ScheduleController : ControllerBase
         {
             var entries = _stations.Preview(draft, start, end);
             var log = LogFor(draft);
-            return Ok(entries.Select(e => Map.Entry(e, null, log)).ToList());
+            return Ok(Map.Entries(entries, draft, log, _stations.GetCompiled(draft.Id)?.Household));
         }
         catch (Exception ex)
         {

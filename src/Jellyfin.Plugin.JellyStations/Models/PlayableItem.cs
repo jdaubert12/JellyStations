@@ -91,6 +91,9 @@ public sealed class PlayableItem : IPlayableFile
 
     public string? Overview { get; set; }
 
+    /// <summary>The content source that brought the item in, as the content view names it ("Genre \"Comedy\""); the first when several do.</summary>
+    public string? Source { get; set; }
+
     public int? ProductionYear { get; set; }
 
     public string? OfficialRating { get; set; }

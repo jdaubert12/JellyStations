@@ -173,6 +173,35 @@ ago the current schedule was dealt; **Clear** empties the log (the current sched
 next one). Schedule rows, the content table and the Now line say when a title last aired and how
 often. The log is kept in the data folder under `history/` and is not part of an export.
 
+### Our household
+
+Settings has **Our household**: the Jellyfin users whose play history a station may read. Tick nobody
+and no station reads any history, whatever its own switches say. Something counts as watched when
+everyone ticked has played it. Each station then has two switches on its content step, both off by
+default:
+
+- **Skip what we finished in the last N days** leaves out any film or episode the household finished
+  within that many days, by Jellyfin's played flag and last-played date, and lists them under the
+  station's excluded items as "Watched recently". It comes back by itself once the days have passed.
+- **Follow our progress** starts a series at the first episode nobody has watched and skips ahead as
+  the household watches, in the "episodes in order" play orders (the pool, the filler, a block). The
+  channel never goes back behind where it already is: when it has aired past the household, it carries
+  on. Watching on the channel itself does not count as played in Jellyfin, so a series the household
+  only ever watches on air plays through in order like any other.
+
+Both are read when the station is compiled, so every viewer still sees the same schedule. Every half
+hour the plugin looks at the household's history and recompiles the stations where it has moved (a
+film finished, a series watched further, a skipped film old enough to return), and the guide follows;
+Refresh content does the same at once. A fixed list is never touched.
+
+### Why this is playing
+
+Schedule rows, the Now line on a station row and the content preview carry a reason line for every
+program: the block or pool it comes from and its play order, the source that brought it in ("from
+Genre “Comedy”"), its place in a marathon ("marathon 2 of 3"), the family-hours rule in force ("family
+hours: up to PG until 20:00", or "R: outside family hours") and whether the household's progress placed
+it, beside when the title last aired.
+
 ### Tags
 
 Library **tags** work both ways. A **Tag** source plays everything carrying a tag (for example
@@ -191,6 +220,12 @@ nothing fits, that slot shows a station card. Items can only be moved within the
 whose full cycle is shorter than the restricted window will show cards rather than defer; with a few
 hours of content this is never an issue. When the pool has time blocks, an item a rule keeps off the
 air is skipped and comes up later in the pass instead. Blocks are already time-bound and are not gated.
+
+**Shape the day like a channel**, above the rules, writes them in one go: **Kids by day** (G until
+19:00, PG until 21:00), **Family evenings** (PG until 21:00, plus a Family movie night block Friday and
+Saturday at 19:00), **Grown-up nights** (PG-13 until 20:00, plus a Prime-time feature block every night
+at 20:00) or **Weekend movie marathons** (a six-hour block Saturday and Sunday from 13:00). On a shuffled
+station the block is added filled with the pool's sources, with a guide title, for you to trim.
 
 ### Seasonal stations
 
@@ -857,6 +892,7 @@ usual Jellyfin API key or session token. The ones worth calling by hand:
 | `GET /JellyStations/Stations/Export`, `POST /JellyStations/Stations/Import` | The stations plus the saved station and block templates as one document; import takes that document or a bare array of stations. |
 | `GET /JellyStations/Suggestions`, `GET .../Report`, `POST .../Create`, `POST .../Draft`, `POST .../Preview` | Stations the library could support, each with `Hours`, `NewHours` (on no enabled channel yet) and `Covered` (`refresh`; the minimums come from Settings, `minHours` replaces every hours minimum and `minEpisodes` the series one for that call); the same list with `NearMisses` (`Name`, `Have`, `Need`, `Unit`), `ClipLibraries`, the `Thresholds` in force and the number of `Channels`; create the ones with the given `Keys` (`FirstChannelNumber`, `TimeZoneId`, `TemplateId` for the look and breaks, `BumperLibraryId` for a clip library to play in the breaks, `Logo`), returning `Created`, `Errors` and `Warnings`; one suggestion (`Key`) as an unsaved station with the same options applied; the next `hours` (default 24) that suggestion would play with those options, as schedule entries, nothing saved. |
 | `GET /JellyStations/BlockTemplates`, `GET .../BuiltIn`, `POST`, `DELETE .../{id}`, `POST .../{id}/Apply` | Saved block templates; the starter blocks no saved template has replaced; save (replaces by name or id); delete a saved one; a template or starter as a block ready for a station (fresh id, sources whose ids are unknown here matched by name, the rest dropped and listed as `Resolved` / `Unmatched`). |
+| `GET /JellyStations/Household/Users` | Every Jellyfin user (id and name) for the Settings page's "Our household" list; `HouseholdUserIds` on `PUT /JellyStations/Settings` picks them, `Household` on a station carries its two switches. |
 | `GET /JellyStations/WeekLayouts`, `GET .../{id}`, `POST`, `DELETE .../{id}`, `POST .../{id}/Apply` | Saved week layouts first, then the built-in ones; one layout; save a station's blocks as a layout (`Name`, `Station`, `KeepSources`, `Fills` per block and `Filler`; replaces by name or id); delete a saved one; the layout's blocks ready for a station, matched like a block template's. |
 | `GET /JellyStations/StationTemplates`, `GET .../{id}/Draft`, `POST`, `DELETE .../{id}` | Saved station templates first, then the built-in presets; a fresh station draft from one; save (replaces by name or id); delete a saved one. |
 | `GET /JellyStations/Hardware` | Jellyfin's transcoding setting, what the default profile resolves to, the `/dev/dri` nodes and this ffmpeg build's hwaccels, encoders and filters. |

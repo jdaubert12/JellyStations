@@ -111,6 +111,7 @@ public sealed class LibraryContentResolver
                     continue;
                 }
 
+                playable.Source = SourceExpansion.Describe(source);
                 block.Add(playable);
             }
 

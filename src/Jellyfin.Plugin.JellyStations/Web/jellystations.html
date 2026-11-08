@@ -478,6 +478,17 @@
               <div class="tvs-season">
                 <div class="inputLabel">Family hours (optional)</div>
                 <div class="fieldDescription">Keep stronger ratings out of the daytime, for example nothing above PG between 06:00 and 20:00 (station time zone). Anything that would overlap the window moves to a later slot; if nothing may play, a station card shows instead. Time blocks are not affected.</div>
+                <div class="selectContainer">
+                  <label class="selectLabel" for="tvsDayShape">Shape the day like a channel</label>
+                  <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsDayShape">
+                    <option value="">Pick a shape…</option>
+                    <option value="kids">Kids by day: G until 19:00, PG until 21:00</option>
+                    <option value="family">Family evenings: PG until 21:00, a family movie night Friday and Saturday at 19:00</option>
+                    <option value="grownup">Grown-up nights: PG-13 until 20:00, a prime-time feature every night at 20:00</option>
+                    <option value="weekend">Weekend movie marathons: Saturday and Sunday from 13:00</option>
+                  </select>
+                  <div class="fieldDescription">Writes the family hours below in one go (replacing any listed) and, on a shuffled station, adds the prime-time block filled with the pool's sources for you to trim.</div>
+                </div>
                 <div id="tvsDaypartRows"></div>
                 <button is="emby-button" type="button" id="tvsBtnAddDaypart" class="raised emby-button"><span>Add family hours</span></button>
               </div>
@@ -802,6 +813,22 @@
           </div>
 
           <div class="verticalSection" data-steps="2" data-not-weather>
+            <h3 class="sectionTitle">Our household</h3>
+            <div class="fieldDescription">Uses the Jellyfin play history of the users ticked under Settings › Our household. Something counts as watched when everyone ticked has played it. Nothing here applies to a fixed list, and nothing applies until users are ticked.</div>
+            <div class="inputContainer">
+              <input is="emby-input" id="tvsHouseholdDays" label="Skip what we finished in the last (days)" type="number" min="0" max="365" step="1">
+              <div class="fieldDescription">0 = off. A film or episode everyone finished within this many days stays off the channel and comes back by itself afterwards. The station is refreshed every half hour when the history has moved.</div>
+            </div>
+            <div class="checkboxContainer checkboxContainer-withDescription">
+              <label class="emby-checkbox-label">
+                <input is="emby-checkbox" type="checkbox" id="tvsHouseholdFollow">
+                <span>Follow our progress</span>
+              </label>
+              <div class="fieldDescription checkboxFieldDescription">In the "episodes in order" play orders a series starts at the first episode nobody has watched and skips ahead as the household watches; the channel never goes back behind where it already is.</div>
+            </div>
+          </div>
+
+          <div class="verticalSection" data-steps="2" data-not-weather>
             <h3 class="sectionTitle">Excluded items</h3>
             <div id="tvsExcludedInfo" class="fieldDescription"></div>
             <div id="tvsExcludedList" class="paperList"></div>
@@ -1029,6 +1056,13 @@
                 <div class="fieldDescription">Safety cap on how far ahead schedules are enumerated for the Live TV guide. 1–30.</div>
               </div>
             </div>
+          </div>
+
+          <div class="verticalSection tvs-section">
+            <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">family_restroom</span>Our household</h3>
+            <div class="fieldDescription">The users whose Jellyfin play history a station may read when its own “Our household” switches are on (content step: skip what we finished, follow our progress). Something counts as watched when everyone ticked has played it. Nobody ticked = no station reads any history.</div>
+            <div id="tvsHouseholdEmpty" class="tvs-secondary tvs-hidden">No users found.</div>
+            <div id="tvsHouseholdUsers" class="tvs-days"></div>
           </div>
 
           <div class="verticalSection tvs-section">

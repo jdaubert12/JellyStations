@@ -80,6 +80,8 @@ public sealed class SettingsController : ControllerBase
         // Templates have their own endpoints; the settings page never edits them.
         settings.BlockTemplates = previous.BlockTemplates ?? new List<SlotBlock>();
         settings.StationTemplates = previous.StationTemplates ?? new List<StationTemplate>();
+        settings.WeekLayouts = previous.WeekLayouts ?? new List<WeekLayout>();
+        settings.HouseholdUserIds = (settings.HouseholdUserIds ?? new List<Guid>()).Where(id => id != Guid.Empty).Distinct().ToList();
         _settings.Save(settings);
         if (!JsonFileStore.SameJson(previous.DefaultEncoding, settings.DefaultEncoding))
         {
@@ -99,7 +101,8 @@ public sealed class SettingsController : ControllerBase
             }
         }
 
-        if (!previous.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).SequenceEqual(settings.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
+        var householdChanged = !(previous.HouseholdUserIds ?? new List<Guid>()).OrderBy(u => u).SequenceEqual(settings.HouseholdUserIds.OrderBy(u => u));
+        if (householdChanged || !previous.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).SequenceEqual(settings.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
         {
             _stations.RecompileAll();
         }

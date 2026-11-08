@@ -32,6 +32,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<MusicLoudnessService>();
         serviceCollection.AddSingleton<InterlaceCheckService>();
         serviceCollection.AddSingleton<MusicResolver>();
+        serviceCollection.AddSingleton<IHouseholdHistory, JellyfinHouseholdHistory>();
         serviceCollection.AddSingleton<StationCompiler>();
 
         serviceCollection.AddHttpClient();

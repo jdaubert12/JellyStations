@@ -8,16 +8,22 @@ public sealed class StationCompiler
 {
     private readonly LibraryContentResolver _resolver;
     private readonly MusicResolver? _music;
+    private readonly IHouseholdHistory? _household;
     private readonly ILogger<StationCompiler> _logger;
 
-    public StationCompiler(LibraryContentResolver resolver, ILogger<StationCompiler> logger, MusicResolver? music = null)
+    public StationCompiler(LibraryContentResolver resolver, ILogger<StationCompiler> logger, MusicResolver? music = null, IHouseholdHistory? household = null)
     {
         _resolver = resolver;
         _logger = logger;
         _music = music;
+        _household = household;
     }
 
-    public CompiledStation Compile(Station station, EncodingProfile effectiveProfile, IReadOnlyCollection<string>? globalExcludedTags = null)
+    /// <param name="station">The station to expand.</param>
+    /// <param name="effectiveProfile">The encoding profile in force (its audio language preference picks tracks).</param>
+    /// <param name="globalExcludedTags">The plugin-wide excluded tags.</param>
+    /// <param name="householdUsers">The users ticked under Settings &gt; Our household; their history is read when the station asks for it.</param>
+    public CompiledStation Compile(Station station, EncodingProfile effectiveProfile, IReadOnlyCollection<string>? globalExcludedTags = null, IReadOnlyList<Guid>? householdUsers = null)
     {
         var lang = effectiveProfile.AudioLanguagePreference ?? string.Empty;
         var tags = EffectiveExcludedTags(station, globalExcludedTags);
@@ -78,6 +84,11 @@ public sealed class StationCompiler
                 break;
         }
 
+        if (_household is not null && HouseholdHistory.Wanted(station, householdUsers))
+        {
+            ApplyHousehold(station, compiled, householdUsers!);
+        }
+
         // Only a weather channel compiles music; an ordinary station's weather block or breaks play the channel's.
         if (_music is not null && station.Mode == ScheduleMode.Weather && station.Weather.MusicEnabled)
         {
@@ -118,6 +129,35 @@ public sealed class StationCompiler
             compiled.Excluded.Count);
 
         return compiled;
+    }
+
+    /// <summary>
+    /// Reads the household's play state for every program and applies the station's switches: recently finished
+    /// items leave the pool, the blocks and the filler (never a fixed list), and each series' position is frozen
+    /// into <see cref="CompiledStation.Household"/> for the schedulers to continue from.
+    /// </summary>
+    private void ApplyHousehold(Station station, CompiledStation compiled, IReadOnlyList<Guid> users)
+    {
+        var now = DateTime.UtcNow;
+        var states = _household!.Read(compiled.ProgramItems.Select(i => i.ItemId), users);
+        var days = station.Household.SkipFinishedDays;
+        if (days > 0)
+        {
+            compiled.Pool = HouseholdHistory.SkipFinished(compiled.Pool, days, now, states, compiled);
+            compiled.Filler = HouseholdHistory.SkipFinished(compiled.Filler, days, now, states, compiled);
+            foreach (var id in compiled.Blocks.Keys.ToList())
+            {
+                compiled.Blocks[id] = HouseholdHistory.SkipFinished(compiled.Blocks[id], days, now, states, compiled);
+            }
+        }
+
+        compiled.Household = new HouseholdSnapshot
+        {
+            TakenUtc = now,
+            UserIds = users.Distinct().ToList(),
+            Progress = station.Household.FollowProgress ? HouseholdHistory.Progress(compiled.ProgramItems, states) : new Dictionary<string, HouseholdPosition>(StringComparer.Ordinal),
+            Skipped = compiled.HouseholdExcluded.Count
+        };
     }
 
     /// <summary>The clips for a pre/post-roll position: its own sources when it has any, otherwise the main bumper list.</summary>
@@ -224,6 +264,12 @@ public sealed class StationCompiler
             {
                 return false;
             }
+        }
+
+        // The household's series positions move the timeline the way content does.
+        if (!HouseholdHistory.SameProgress(a.Household, b.Household))
+        {
+            return false;
         }
 
         // Every section's ids already match, so comparing the runtimes in one sequence is aligned item by item.

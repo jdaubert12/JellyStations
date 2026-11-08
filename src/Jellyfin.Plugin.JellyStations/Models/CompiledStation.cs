@@ -46,6 +46,12 @@ public sealed class CompiledStation
     /// <summary>Snapshots of items dropped by an excluded tag, kept so the content view can show them.</summary>
     public List<PlayableItem> TagExcluded { get; set; } = new();
 
+    /// <summary>Snapshots of items left out because the household finished them recently (see <see cref="HouseholdConfig"/>).</summary>
+    public List<PlayableItem> HouseholdExcluded { get; set; } = new();
+
+    /// <summary>What the compiler read from the household's history, when the station uses it; null otherwise.</summary>
+    public HouseholdSnapshot? Household { get; set; }
+
     /// <summary>Clips available to fill gaps (empty when bumpers are off).</summary>
     public List<PlayableItem> Bumpers { get; set; } = new();
 

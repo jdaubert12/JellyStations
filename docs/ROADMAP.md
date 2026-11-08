@@ -2,7 +2,7 @@
 
 Working plan for scheduling and curation features. Phase 1 is the agreed next three steps, in order.
 Later phases are candidates, roughly ordered by payoff per effort; reorder freely.
-Phase 7 (smarter stations: embeddings, watch history, optional local model) is the current plan; step 2a, the air log with series continuity and the seam at a revision bump, was built 2026-11-02 as 1.25.0.0 from the design in `docs/HISTORY-SCHEDULING.md` (local note, not in the repo; the recency weighting it first proposed stays cut).
+Phase 7 (smarter stations: embeddings, watch history, optional local model) is the current plan; step 2a, the air log with series continuity and the seam at a revision bump, was built 2026-11-02 as 1.25.0.0 from the design in `docs/HISTORY-SCHEDULING.md` (local note, not in the repo; the recency weighting it first proposed stays cut); step 2b (skip what we finished, follow our progress; favorites parked) and step 3 (day shapes, why this is playing) were built 2026-11-08 as 1.34.0.0. Next: step 1 (embeddings) or step 4 (people and studios as sources).
 Phase 8 (weather channel) steps 1-6 shipped in 1.14.0.0 (2026-10-23); radar 1.18.0.0 and forecast radar 1.19.0.0 (2026-10-26); step 7: alerts screen (NWS), title cards, music levelling (loudnorm), weather time blocks (with block repeats) and weather in the breaks on ordinary stations built 2026-10-27 as 1.20.0.0; almanac still open.
 Phase 9 (better suggestions and channel templates, planned 2026-10-27) is done bar A6: B1 station templates built 2026-10-28 as 1.21.0.0; A1 (finish what gets created) built 2026-11-01 as 1.24.0.0; A2 (preview a day), A3 (smarter rules), A4 (coverage aware) and A5 (near misses and thresholds) built 2026-11-05 as 1.27.0.0; B2 (built-in block templates) built 2026-11-06 as 1.30.0.0; B3 (week layouts) and B4 (block templates without ids) built 2026-11-08 as 1.33.0.0. A6 waits on Phase 7, which is the plan from here (2b household history first).
 Feature survey of the other projects' trackers and communities, 2026-11-02, with a ranked list of candidates not yet planned: `docs/FEATURE-SURVEY-2026-11.md` (local note, not in the repo).
@@ -449,25 +449,34 @@ In payoff order. Steps 1-3 need no language model at all.
    never in a web request. Medium-large.
 2. **Watch-history awareness.**
    - **2a. Air log, continuity and the seam — DONE 2026-11-02 (1.25.0.0).** `AirLogRecorder` (Services) logs what every enabled station aired once a minute into `history/{id}.json` (`AirLog`, keyed like `PoolOrdering.KeyOf` and by item); `StationService` freezes an `AirHistorySnapshot` into the compile (format 4) whenever the revision is bumped and carries the previous one otherwise (`HistoryFor`); `CyclicScheduler` chains from the snapshot's cycle (seam key, cooldown ends, `EpisodeOrder.Resume` carrying each series' position through `Cycle.EpisodeOffsets`), `WeeklySlotScheduler` seeds block and filler cursors at their first pick after the snapshot (`SeedBlock`, `SeedFiller`, `Seeded` flags cloned with the week state). `POST Reshuffle`, `GET`/`DELETE History`, `LastAiredUtc`/`AirCount` on entries and content rows, History panel and Reshuffle on the station row. Designed in `docs/HISTORY-SCHEDULING.md` (local note, not in the repo) after comparing ErsatzTV, Tunarr/dizqueTV, PseudoTV Live, Channels DVR and radio schedulers; the recency weighting of the first draft stays cut and can come back on the same log (same-hour-yesterday penalty, max plays per day, bumper cooldown, locked prefix at a bump).
-   - **2b. Household history (open).** Jellyfin's per-user played state and favorites, read through
-   `IUserDataManager` for the users the admin ticks in Settings ("Our household"). Per station, all
-   off by default:
-   - "Skip what we finished in the last N days" (cooldown keyed on real playback, not airing).
-   - "Favorites play more often" (weight multiplier on favorited items).
-   - "Follow our progress": a series source plays from the first unwatched episode and advances as
-     the household watches, in `ShuffleEpisodesInOrder` and `Sequential` orders; the schedule stays
-     deterministic because progress is sampled at compile time and recorded in the compiled
-     station (recompile when it changes, like the library refresh).
-   Pure logic in `Scheduling/WatchHistory*.cs` with tests; the Jellyfin reads live in
-   `Library/`. Fingerprint: these change the timeline, so they are part of it. Medium.
-3. **Day shape preset and "why this is playing".**
-   - One control on the When step, "Shape the day like a channel": a dropdown of shapes (Kids
-     daytime, Family evening, Grown-up nights, Weekend movie marathons) that writes the daypart
-     rules and, for pools with blocks, a feature block at prime time, instead of asking for six
-     rules. Shapes are data in `jellystations.js` like `PRESETS`.
-   - The compiler already knows why every item is on the timeline (source, gate, cooldown, run);
-     keep that trace per entry and show it on the Now and next row and in the content preview:
-     "Action genre · PG-13 allowed after 20:00 · 9 days since it last aired". Small-medium.
+   - **2b. Household history — skip finished and follow progress DONE 2026-11-08 (1.34.0.0); favorites open.**
+   `GlobalSettings.HouseholdUserIds` ("Our household" in Settings, users from `GET Household/Users`),
+   `Station.Household { SkipFinishedDays, FollowProgress }`. `IHouseholdHistory` (Library) reads
+   `IUserDataManager` per item and user; `HouseholdHistory` holds the pure rules: watched = everyone
+   played it; finished date = latest last-played; `SkipFinished` moves recently finished items to
+   `ExclusionReason.HouseholdWatched` (pool, blocks, filler; never a fixed list); `Progress` = the
+   episode before the first unwatched per series key; `Apply` folds those positions into the air
+   history snapshot (a synthesized one when nothing aired yet) wherever the household is further
+   along, and drops the series' airings from `Items` so a Sequential block reads the series position,
+   so the schedulers needed no change and the station never goes back. The compiler freezes a
+   `HouseholdSnapshot` into the compiled station; `SameContent` compares the positions, so a move bumps
+   the revision like new content. `StationService.RefreshHousehold` (every 30 min from the hosted
+   service) reads the compiled items' play state and recompiles only the stations where something
+   moved. Still open: "Favorites play more often" (a weight multiplier fights the air log's fairness
+   and is hard to see on screen; waits for someone to ask). `Sequential` pools do not resume at all
+   today, so the follow applies to the episodes-in-order orders.
+3. **Day shape preset and "why this is playing" — DONE 2026-11-08 (1.34.0.0).**
+   - `DAY_SHAPES` in `jellystations.js` (Kids by day, Family evenings, Grown-up nights, Weekend movie
+     marathons) behind a dropdown above the family-hours rows: replaces the rules and, on a Pool
+     station, adds the shape's prime-time block with the pool's sources and a guide title.
+   - `ScheduleTrace` (Scheduling) builds the reason at request time from what the entry and the
+     station already know: block or pool and play order, `PlayableItem.Source` (the first content
+     source that brought the item in, recorded by the resolver), marathon place (consecutive pool
+     programs of one key, counted over the listing), the family-hours rule overlapping the entry or
+     "outside family hours" for a rating that would not pass, and the household position.
+     `ScheduleEntryDto.Why`, shown under the title in the preview and on the Now line; "last aired"
+     stays beside it from the air log. Cooldown is not named (the air log line already says when it
+     last aired).
 4. **People, studios and keywords as sources** (parked in Phase 5, unparked here because step 1's
    candidate lists need them): `SourceKind.Person` (actor or director, with the role), `Studio`,
    and `Tag` already exists. Resolver queries via `ILibraryManager` with `PersonIds` / `StudioIds`;

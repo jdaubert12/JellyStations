@@ -95,6 +95,9 @@ public sealed class Station
     /// <summary>Items shorter than this many minutes are skipped (pool, filler and blocks; not lineups or bumpers). 0 = off.</summary>
     public int MinRuntimeMinutes { get; set; }
 
+    /// <summary>What the station does with the household's play history. All off by default.</summary>
+    public HouseholdConfig Household { get; set; } = new();
+
     public BumperConfig Bumpers { get; set; } = new();
 
     /// <summary>Text on the station card shown during gaps. Null = "We'll be right back".</summary>

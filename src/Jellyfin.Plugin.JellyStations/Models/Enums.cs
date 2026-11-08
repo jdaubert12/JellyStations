@@ -103,6 +103,9 @@ public enum ExclusionReason
     /// <summary>Shorter than the station's minimum runtime.</summary>
     TooShort,
 
+    /// <summary>Everyone in the household finished it recently (see <see cref="HouseholdConfig.SkipFinishedDays"/>).</summary>
+    HouseholdWatched,
+
     /// <summary>A file in a clip folder that ffprobe could not read as a video with a length.</summary>
     Unreadable
 }

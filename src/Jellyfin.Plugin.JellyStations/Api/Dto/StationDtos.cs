@@ -275,6 +275,9 @@ public sealed class ScheduleEntryDto
 
     /// <summary>When this very item (the episode) last aired before this entry; null when it has not.</summary>
     public DateTime? ItemLastAiredUtc { get; set; }
+
+    /// <summary>Why it is on the timeline: block or pool and play order, the source, marathon place, family hours, household progress.</summary>
+    public string? Why { get; set; }
 }
 
 /// <summary>A station's air log, latest first.</summary>

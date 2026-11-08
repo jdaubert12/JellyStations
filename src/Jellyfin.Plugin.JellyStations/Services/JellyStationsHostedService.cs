@@ -25,6 +25,7 @@ public sealed class JellyStationsHostedService : IHostedService
     private readonly object _seasonLock = new();
     private HashSet<Guid>? _inSeason;
     private Timer? _seasonTimer;
+    private Timer? _householdTimer;
 
     public JellyStationsHostedService(JellyStationsPaths paths, StationService stations, StreamSessionManager sessions, GuideRefreshService guide, WeatherService weather, Weather.Radar.RadarService radar, Weather.Alerts.AlertService alerts, Library.MusicLoudnessService loudness, Music.MusicPackService packs, AirLogRecorder airLog, ILogger<JellyStationsHostedService> logger, Library.InterlaceCheckService interlace)
     {
@@ -109,6 +110,7 @@ public sealed class JellyStationsHostedService : IHostedService
             _interlace.Start();
             _airLog.Start();
             _seasonTimer = new Timer(_ => SafeCheckSeasons(), null, TimeSpan.FromMinutes(10), TimeSpan.FromMinutes(10));
+            _householdTimer = new Timer(_ => SafeRefreshHousehold(), null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(30));
             _logger.LogInformation(
                 "JellyStations started: {Count} station(s), data at {Path}",
                 _stations.GetAll().Count,
@@ -125,6 +127,7 @@ public sealed class JellyStationsHostedService : IHostedService
     public Task StopAsync(CancellationToken cancellationToken)
     {
         _seasonTimer?.Dispose();
+        _householdTimer?.Dispose();
         _weather.Dispose();
         _radar.Dispose();
         _alerts.Dispose();
@@ -145,6 +148,19 @@ public sealed class JellyStationsHostedService : IHostedService
         catch (Exception ex)
         {
             _logger.LogError(ex, "JellyStations: season check failed");
+        }
+    }
+
+    /// <summary>Every half hour: stations that follow the household's history catch up with what it has watched since.</summary>
+    private void SafeRefreshHousehold()
+    {
+        try
+        {
+            _stations.RefreshHousehold();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "JellyStations: household refresh failed");
         }
     }
 }

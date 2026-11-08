@@ -50,4 +50,10 @@ public sealed class GlobalSettings
 
     /// <summary>How much content each suggestion rule needs before it proposes a station.</summary>
     public SuggestionThresholds Suggestions { get; set; } = new();
+
+    /// <summary>
+    /// "Our household": the Jellyfin users whose play history a station may read (<see cref="HouseholdConfig"/>).
+    /// Empty = no station reads any history, whatever its own switches say.
+    /// </summary>
+    public List<Guid> HouseholdUserIds { get; set; } = new();
 }
