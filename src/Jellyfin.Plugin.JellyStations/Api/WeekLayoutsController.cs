@@ -77,7 +77,7 @@ public sealed class WeekLayoutsController : ControllerBase
             return BadRequest(ValidationErrorDto.Of("The station has no time blocks to save as a layout."));
         }
 
-        var layout = WeekLayouts.FromStation(request.Station, request.Name, request.KeepSources);
+        var layout = WeekLayouts.FromStation(request.Station, request.Name, request.KeepSources, request.Fills, request.Filler);
         var settings = _settings.Get();
         var list = Saved(settings);
         Upsert(list, layout);

@@ -98,6 +98,7 @@ public sealed class ScheduleInput
             {
                 Id = b.Id,
                 Name = string.IsNullOrWhiteSpace(b.Name) ? (b.Kind == BlockKind.Weather ? weatherTitle : "Block") : b.Name,
+                GuideTitle = Text.TrimOrNull(b.GuideTitle),
                 IsWeather = b.Kind == BlockKind.Weather,
                 RepeatEvery = TimeSpan.FromMinutes(Math.Clamp(b.RepeatEveryMinutes, 0, 24 * 60)),
                 RepeatUntil = TimeSpan.TryParseExact(b.RepeatUntilLocal ?? string.Empty, @"hh\:mm", null, out var until) ? until : null,
@@ -212,6 +213,9 @@ public sealed class SlotBlockInput
     public Guid Id { get; init; }
 
     public string Name { get; init; } = string.Empty;
+
+    /// <summary>Guide title for every program the block plays; null = each program's own title.</summary>
+    public string? GuideTitle { get; init; }
 
     public IReadOnlyList<DayOfWeek> Days { get; init; } = Array.Empty<DayOfWeek>();
 

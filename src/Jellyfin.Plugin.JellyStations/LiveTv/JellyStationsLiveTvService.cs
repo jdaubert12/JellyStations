@@ -1,3 +1,4 @@
+using Jellyfin.Plugin.JellyStations.Library;
 using Jellyfin.Plugin.JellyStations.Models;
 using Jellyfin.Plugin.JellyStations.Scheduling;
 using Jellyfin.Plugin.JellyStations.Services;
@@ -107,6 +108,7 @@ public sealed class JellyStationsLiveTvService : ILiveTvService, ISupportsDirect
         var station = _stations.Get(stationId);
         var cardText = station?.EffectiveCardText ?? Station.DefaultCardText;
         var logo = station is null ? null : _stations.LogoPath(station);
+        var log = _stations.History(stationId);
 
         foreach (var entry in entries)
         {
@@ -133,7 +135,7 @@ public sealed class JellyStationsLiveTvService : ILiveTvService, ISupportsDirect
                 continue;
             }
 
-            current = ToProgram(channelId, entry, entry.Item);
+            current = ToProgram(channelId, entry, entry.Item, log);
             programs.Add(current);
         }
 
@@ -141,21 +143,30 @@ public sealed class JellyStationsLiveTvService : ILiveTvService, ISupportsDirect
         return Task.FromResult<IEnumerable<ProgramInfo>>(programs);
     }
 
-    private static ProgramInfo ToProgram(string channelId, ScheduleEntry entry, PlayableItem item)
+    /// <summary>
+    /// The guide entry for a program. Under a time block with a guide title the block's title is the program name and
+    /// the program's own title moves to the episode line. New / Repeat come from the station's air log: an item that
+    /// has not aired on this station before this start is new. Kids marks anything rated G, TV-Y, TV-Y7 or TV-G.
+    /// </summary>
+    internal static ProgramInfo ToProgram(string channelId, ScheduleEntry entry, PlayableItem item, AirLog? log = null)
     {
+        var ownTitle = item.IsSeries && !string.IsNullOrWhiteSpace(item.EpisodeTitle) ? item.Title + " – " + item.EpisodeTitle : item.Title;
+        var isNew = PriorAirings(entry, item, log) == 0;
         var p = new ProgramInfo
         {
             Id = entry.ProgramId,
             ChannelId = channelId,
-            Name = item.Title,
-            EpisodeTitle = item.IsSeries ? item.EpisodeTitle : null,
+            Name = entry.GuideTitle ?? item.Title,
+            EpisodeTitle = entry.GuideTitle is not null ? ownTitle : (item.IsSeries ? item.EpisodeTitle : null),
             Overview = item.Overview,
             StartDate = DateTime.SpecifyKind(entry.StartUtc, DateTimeKind.Utc),
             EndDate = DateTime.SpecifyKind(entry.EndUtc, DateTimeKind.Utc),
             Genres = item.Genres.ToList(),
             IsSeries = item.IsSeries,
             IsMovie = item.IsMovie,
-            IsRepeat = true,
+            IsPremiere = isNew,
+            IsRepeat = !isNew,
+            IsKids = RatingLadder.Rank(item.OfficialRating) is <= 2,
             SeasonNumber = item.SeasonNumber,
             EpisodeNumber = item.EpisodeNumber,
             ProductionYear = item.ProductionYear,
@@ -182,6 +193,20 @@ public sealed class JellyStationsLiveTvService : ILiveTvService, ISupportsDirect
         }
 
         return p;
+    }
+
+    /// <summary>
+    /// How often <paramref name="item"/> aired on the station before <paramref name="entry"/> starts, from the air
+    /// log. The log records an airing when it starts, so one whose latest start is this entry's is not counted.
+    /// </summary>
+    internal static int PriorAirings(ScheduleEntry entry, PlayableItem item, AirLog? log)
+    {
+        if (log is null || !log.Items.TryGetValue(item.ItemId, out var aired) || aired is null)
+        {
+            return 0;
+        }
+
+        return Math.Max(0, aired.LastStartUtc >= entry.StartUtc ? aired.Count - 1 : aired.Count);
     }
 
     /// <summary>A weather program has no library item to take a poster from, so it wears the channel's logo when one is set.</summary>

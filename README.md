@@ -27,7 +27,9 @@ joining whatever is airing right now, exactly like broadcast television.
 - Stations are exposed as native Live TV channels, so the standard Jellyfin guide, channel list,
   and player are used everywhere. No extra apps or custom players.
 - Every station has one deterministic schedule. All viewers see the same program at the same
-  moment, and the guide shows up to 14 days ahead.
+  moment, and the guide shows up to 14 days ahead. A program that has not aired on the station
+  before is marked **New** in the guide (from the station's air history), everything else
+  **Repeat**; anything rated G, TV-Y, TV-Y7 or TV-G is marked **Kids**.
 - When someone tunes in, the plugin starts a single ffmpeg process for that station that plays the
   current program from the correct offset in real time and hands it to Jellyfin as a continuous
   MPEG-TS stream. Additional viewers share the same encoder. The encoder stops shortly after the
@@ -220,6 +222,11 @@ Any block can also **repeat every N minutes** (5 or more) from its start time un
 midnight, each repeat with the full duration; an earlier block in the list still wins where a repeat
 lands on another block.
 
+A block can carry a **guide title** ("Saturday Morning Cartoons", "The Late Movie"): the Jellyfin
+guide then shows it as the title of every program the block plays, with the program's own title
+(series and episode, or the film) on the episode line. Filler that takes the block's remainder keeps
+its own titles. Changing the guide title redraws the guide and does not reshuffle the station.
+
 A block's **What plays** can be **Local weather** instead of programs: the occurrence is one run of the
 [weather channel](#weather-channel)'s screens, a real guide entry titled from the block name (or the
 weather channel's guide title), with the places, look and music of the weather channel picked in the
@@ -250,9 +257,12 @@ from ten, everything rated PG or below in between). The dropdown next to "Add bl
 under "Week layouts": picking one and pressing Add block adds every block at once, without sources,
 for you to fill; the week grid shows the shape. **Save blocks as layout** (next to Add block) keeps a
 station's blocks, and in Shuffle mode its family hours, as a layout of your own, with or without the
-sources; one saved under a built-in's name takes its place, and Settings lists and deletes them. The
-built-in layouts are also what [Suggest stations](#filling-out-the-lineup) offers first, each block
-filled from the library.
+sources. The form also asks what [Suggest stations](#filling-out-the-lineup) should fill each block
+with from the library when it offers the layout (its own sources as saved, everything, kids, family,
+family movies, movies, reruns or grown-up) and what plays between the blocks; a block with sources
+defaults to them, one without to everything. One saved under a built-in's name takes its place, and
+Settings lists and deletes them. The built-in layouts are also what Suggest stations offers first,
+each block filled from the library the same way.
 
 ### Station templates
 
@@ -847,7 +857,7 @@ usual Jellyfin API key or session token. The ones worth calling by hand:
 | `GET /JellyStations/Stations/Export`, `POST /JellyStations/Stations/Import` | The stations plus the saved station and block templates as one document; import takes that document or a bare array of stations. |
 | `GET /JellyStations/Suggestions`, `GET .../Report`, `POST .../Create`, `POST .../Draft`, `POST .../Preview` | Stations the library could support, each with `Hours`, `NewHours` (on no enabled channel yet) and `Covered` (`refresh`; the minimums come from Settings, `minHours` replaces every hours minimum and `minEpisodes` the series one for that call); the same list with `NearMisses` (`Name`, `Have`, `Need`, `Unit`), `ClipLibraries`, the `Thresholds` in force and the number of `Channels`; create the ones with the given `Keys` (`FirstChannelNumber`, `TimeZoneId`, `TemplateId` for the look and breaks, `BumperLibraryId` for a clip library to play in the breaks, `Logo`), returning `Created`, `Errors` and `Warnings`; one suggestion (`Key`) as an unsaved station with the same options applied; the next `hours` (default 24) that suggestion would play with those options, as schedule entries, nothing saved. |
 | `GET /JellyStations/BlockTemplates`, `GET .../BuiltIn`, `POST`, `DELETE .../{id}`, `POST .../{id}/Apply` | Saved block templates; the starter blocks no saved template has replaced; save (replaces by name or id); delete a saved one; a template or starter as a block ready for a station (fresh id, sources whose ids are unknown here matched by name, the rest dropped and listed as `Resolved` / `Unmatched`). |
-| `GET /JellyStations/WeekLayouts`, `GET .../{id}`, `POST`, `DELETE .../{id}`, `POST .../{id}/Apply` | Saved week layouts first, then the built-in ones; one layout; save a station's blocks as a layout (`Name`, `Station`, `KeepSources`; replaces by name or id); delete a saved one; the layout's blocks ready for a station, matched like a block template's. |
+| `GET /JellyStations/WeekLayouts`, `GET .../{id}`, `POST`, `DELETE .../{id}`, `POST .../{id}/Apply` | Saved week layouts first, then the built-in ones; one layout; save a station's blocks as a layout (`Name`, `Station`, `KeepSources`, `Fills` per block and `Filler`; replaces by name or id); delete a saved one; the layout's blocks ready for a station, matched like a block template's. |
 | `GET /JellyStations/StationTemplates`, `GET .../{id}/Draft`, `POST`, `DELETE .../{id}` | Saved station templates first, then the built-in presets; a fresh station draft from one; save (replaces by name or id); delete a saved one. |
 | `GET /JellyStations/Hardware` | Jellyfin's transcoding setting, what the default profile resolves to, the `/dev/dri` nodes and this ffmpeg build's hwaccels, encoders and filters. |
 | `POST /JellyStations/Hardware/Test` | Runs a station's current program through the real chain at full speed and reports the decoder and the speed relative to real time. |

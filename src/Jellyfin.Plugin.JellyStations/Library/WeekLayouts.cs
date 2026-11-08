@@ -103,25 +103,27 @@ public static class WeekLayouts
     /// pool's family hours. The blocks' fill is <see cref="LayoutFill.None"/>, so the suggester plays the sources
     /// kept and leaves out blocks saved without any; between the blocks it plays everything.
     /// </summary>
-    public static WeekLayout FromStation(Station station, string name, bool keepSources)
+    public static WeekLayout FromStation(Station station, string name, bool keepSources, IReadOnlyList<LayoutFill?>? fills = null, LayoutFill? filler = null)
     {
         var layout = new WeekLayout
         {
             Id = Guid.NewGuid(),
             Name = (name ?? string.Empty).Trim(),
-            Filler = LayoutFill.Everything,
+            Filler = filler ?? LayoutFill.Everything,
             CreatedUtc = DateTime.UtcNow
         };
-        foreach (var block in station.Slots?.Blocks ?? new List<SlotBlock>())
+        var blocks = station.Slots?.Blocks ?? new List<SlotBlock>();
+        for (var i = 0; i < blocks.Count; i++)
         {
-            var copy = JsonFileStore.Clone(block);
+            var copy = JsonFileStore.Clone(blocks[i]);
             copy.Id = Guid.Empty;
             if (!keepSources)
             {
                 copy.Sources = new List<ContentSource>();
             }
 
-            layout.Blocks.Add(new LayoutBlock { Block = copy, Fill = LayoutFill.None });
+            var fill = copy.Kind == BlockKind.Weather ? LayoutFill.None : (fills is not null && i < fills.Count ? fills[i] ?? LayoutFill.None : LayoutFill.None);
+            layout.Blocks.Add(new LayoutBlock { Block = copy, Fill = fill });
         }
 
         if (station.Mode == ScheduleMode.Pool && station.Pool?.DaypartRules is { Count: > 0 } rules)

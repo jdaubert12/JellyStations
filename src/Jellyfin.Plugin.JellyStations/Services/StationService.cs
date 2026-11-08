@@ -208,7 +208,8 @@ public sealed class StationService
                 _sessions.StopStation(id);
             }
 
-            if (scheduleChanged || windowsChanged || existing.Enabled != draft.Enabled || existing.Name != draft.Name || existing.ChannelNumber != draft.ChannelNumber || existing.CallSign != draft.CallSign)
+            if (scheduleChanged || windowsChanged || existing.Enabled != draft.Enabled || existing.Name != draft.Name || existing.ChannelNumber != draft.ChannelNumber || existing.CallSign != draft.CallSign
+                || !GuideTitles(existing).SequenceEqual(GuideTitles(draft)))
             {
                 _guide.Trigger();
             }
@@ -651,6 +652,12 @@ public sealed class StationService
             }
 
             b.Days ??= new List<DayOfWeek>();
+            b.GuideTitle = Text.TrimOrNull(b.GuideTitle);
+            if (b.GuideTitle is { Length: > 120 })
+            {
+                b.GuideTitle = b.GuideTitle[..120];
+            }
+
             b.MaxStartDelayMinutes = Math.Clamp(b.MaxStartDelayMinutes, 0, 240);
             b.Sources = NormalizeSources(b.Sources);
             NormalizeRecurrence(b, s);
@@ -959,13 +966,33 @@ public sealed class StationService
         return errors;
     }
 
+    /// <summary>The blocks' guide titles in order; a change here redraws the guide without touching the timeline.</summary>
+    private static IEnumerable<string> GuideTitles(Station s)
+        => (s.Slots?.Blocks ?? new List<SlotBlock>()).Select(b => b.GuideTitle ?? string.Empty);
+
+    /// <summary>
+    /// What the timeline depends on. A block's guide title only renames programs in the guide, so it is left out:
+    /// changing it must not bump the revision and reshuffle the station.
+    /// </summary>
     private static string ScheduleFingerprint(Station s)
     {
+        var slots = s.Slots is null
+            ? null
+            : new SlotsConfig
+            {
+                Filler = s.Slots.Filler,
+                Blocks = s.Slots.Blocks.Select(b =>
+                {
+                    var copy = JsonFileStore.Clone(b);
+                    copy.GuideTitle = null;
+                    return copy;
+                }).ToList()
+            };
         return JsonFileStore.Serialize(new
         {
             s.Mode,
             s.Pool,
-            s.Slots,
+            Slots = slots,
             s.Lineup,
             s.AnchorUtc,
             s.PaddingGridMinutes,

@@ -340,7 +340,20 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
 
         var scope = "block:" + block.Id.ToString("N");
         var cursor = state.BlockCursor(block.Id);
+        var first = entries.Count;
         var reached = FillBlockItems(entries, block.Items, block.Order, cursor, scope, start, end, block.Overflow == SlotOverflow.TruncateLast, block.Name);
+        if (block.GuideTitle is not null)
+        {
+            // The block's own programs carry its guide title; filler that takes the remainder keeps its own titles.
+            for (var i = first; i < entries.Count; i++)
+            {
+                if (entries[i].Kind == EntryKind.Program)
+                {
+                    entries[i] = entries[i] with { GuideTitle = block.GuideTitle };
+                }
+            }
+        }
+
         if (reached < end)
         {
             return FillFiller(entries, state, reached, end, overrunLimit > end ? overrunLimit : null);

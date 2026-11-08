@@ -59,6 +59,10 @@
       #JellyStationsPage .tvs-suggest-option input[type=number] { width: 9em; }
       #JellyStationsPage .tvs-suggest-check { width: auto; padding-bottom: .6em; }
       #JellyStationsPage .tvs-inline-check { width: auto; }
+      #JellyStationsPage .tvs-fills { flex-basis: 100%; margin: .2em 0 .4em; }
+      #JellyStationsPage .tvs-fill-row { display: flex; align-items: center; gap: .8em; margin: .3em 0; }
+      #JellyStationsPage .tvs-fill-name { min-width: 14em; font-size: .95em; }
+      #JellyStationsPage .tvs-fill-select { width: auto; min-width: 18em; padding: .2em .5em; font-size: .9em; }
       #JellyStationsPage .tvs-inline-btn { margin-left: .8em; padding: .3em .9em; font-size: .85em; }
       #JellyStationsPage .tvs-override-box { margin: .4em 0 0 1.6em; padding-left: 1em; border-left: 2px solid rgba(255,255,255,.15); }
       #JellyStationsPage .tvs-override-row { margin: .4em 0 .8em; }
@@ -493,6 +497,7 @@
                 <label class="emby-checkbox-label tvs-inline-check" title="Kept sources are matched by title when the template is used on another server; without them only the days, times and order travel"><input is="emby-checkbox" type="checkbox" id="tvsLayoutKeepSources" checked><span>Keep the sources</span></label>
                 <button is="emby-button" type="button" id="tvsBtnLayoutSave" class="raised button-submit emby-button"><span>Save layout</span></button>
                 <button is="emby-button" type="button" id="tvsBtnLayoutCancel" class="raised emby-button"><span>Cancel</span></button>
+                <div id="tvsLayoutFills" class="tvs-fills tvs-hidden"></div>
               </div>
               <div class="fieldDescription" id="tvsBlocksHelp"></div>
               <div class="fieldDescription">Click or drag on the week below to add a block (drag sideways to cover several days); click a block to edit it underneath. Times are the station's local time. The dropdown also offers week layouts: a whole broadcast week of blocks (cartoons in the morning, reruns by day, a movie at eight, grown-up shows late) added at once, for you to fill.</div>
@@ -989,7 +994,7 @@
 
           <div class="verticalSection tvs-section">
             <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">view_week</span>Week layouts</h3>
-            <div class="fieldDescription">Whole broadcast weeks saved from a station editor with “Save blocks as layout”: every time block, with or without its sources, and the family hours. Pick one from the dropdown next to “Add block” to paint it onto any station; one saved with its sources is also offered under Suggest stations. Three built-in layouts (Classic broadcast week, Movies all day, Kids by day, grown-ups by night) are always there, filled from the library on the suggestions page; a layout saved under a built-in's name takes its place. Layouts travel with Export and Import.</div>
+            <div class="fieldDescription">Whole broadcast weeks saved from a station editor with “Save blocks as layout”: every time block, with or without its sources, what Suggest stations fills each block with from the library, and the family hours. Pick one from the dropdown next to “Add block” to paint it onto any station; one whose blocks have sources or a library fill is also offered under Suggest stations. Three built-in layouts (Classic broadcast week, Movies all day, Kids by day, grown-ups by night) are always there, filled from the library on the suggestions page; a layout saved under a built-in's name takes its place. Layouts travel with Export and Import.</div>
             <div id="tvsLayoutEmpty" class="tvs-secondary">No week layouts saved yet.</div>
             <div id="tvsLayoutList" class="paperList"></div>
           </div>

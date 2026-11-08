@@ -238,6 +238,14 @@ public class WeekLayoutsTests
         // Slots mode has no family hours to carry.
         station.Mode = ScheduleMode.Slots;
         Assert.Empty(WeekLayouts.FromStation(station, "Slots", true).DaypartRules);
+
+        // Fills chosen on the form ride along per block; a weather block takes none; a missing entry means None.
+        var filled = WeekLayouts.FromStation(station, "Filled", keepSources: false, fills: new LayoutFill?[] { LayoutFill.Kids, LayoutFill.Movies }, filler: LayoutFill.Family);
+        Assert.Equal(LayoutFill.Family, filled.Filler);
+        Assert.Equal(LayoutFill.Kids, filled.Blocks[0].Fill);
+        Assert.Equal(LayoutFill.None, filled.Blocks[1].Fill);
+        Assert.Equal(LayoutFill.None, WeekLayouts.FromStation(station, "Short", true, fills: new LayoutFill?[] { null }).Blocks[0].Fill);
+        Assert.Equal(LayoutFill.None, WeekLayouts.FromStation(station, "Empty", true, fills: Array.Empty<LayoutFill?>()).Blocks[0].Fill);
     }
 
     [Fact]

@@ -3,7 +3,11 @@ using Jellyfin.Plugin.JellyStations.Models;
 namespace Jellyfin.Plugin.JellyStations.Scheduling;
 
 /// <summary>One occurrence on a station's timeline: a program, a slate (dead air with a card), a bumper clip or a run of weather screens.</summary>
-/// <remarks><paramref name="InBreak"/> marks weather placed in a break between programs: it plays like a bumper and, like one, is not a guide entry.</remarks>
+/// <remarks>
+/// <paramref name="InBreak"/> marks weather placed in a break between programs: it plays like a bumper and, like one,
+/// is not a guide entry. <paramref name="GuideTitle"/> is the time block's title for the guide ("Saturday Morning
+/// Cartoons") when the block has one; the program's own title then goes on the episode line.
+/// </remarks>
 public sealed record ScheduleEntry(
     Guid StationId,
     int Revision,
@@ -13,7 +17,8 @@ public sealed record ScheduleEntry(
     DateTime EndUtc,
     bool IsTruncated,
     string? SourceLabel,
-    bool InBreak = false)
+    bool InBreak = false,
+    string? GuideTitle = null)
 {
     public TimeSpan Duration => EndUtc - StartUtc;
 

@@ -246,6 +246,9 @@ public sealed class ScheduleEntryDto
 
     public string Title { get; set; } = string.Empty;
 
+    /// <summary>The time block's guide title when it has one: the guide shows it in place of <see cref="Title"/>.</summary>
+    public string? GuideTitle { get; set; }
+
     public string? EpisodeTitle { get; set; }
 
     public int? SeasonNumber { get; set; }

@@ -1496,6 +1496,7 @@
   /** Fills in and clamps a block loaded from the server or built from a template, and gives it a client key. */
   function normalizeBlock(b) {
     b.Days = b.Days || [];
+    b.GuideTitle = (b.GuideTitle || '').trim();
     b.Sources = b.Sources || [];
     b.Sources.forEach(normalizeSource);
     b.Order = b.Order || 'Sequential';
@@ -2872,9 +2873,15 @@
       if (markNow && start.getTime() <= now && now < end.getTime()) {
         classes.push('now');
       }
-      const programCell = el('td', null, el('span', { text: entryTitle(e) }));
+      const programCell = el('td', null, el('span', { text: e.GuideTitle || entryTitle(e) }));
       if (e.IsTruncated) {
         programCell.appendChild(badge('cut off', 'warn'));
+      }
+      if (e.Kind === 'Program' && !e.AirCount) {
+        programCell.appendChild(badge('New', 'on', 'Has not aired on this station yet: the guide marks it new rather than a repeat'));
+      }
+      if (e.GuideTitle) {
+        programCell.appendChild(el('div', { className: 'tvs-secondary', text: entryTitle(e) }));
       }
       const aired = airedText(e);
       if (aired) {
@@ -3375,6 +3382,9 @@
         selectHtml(p + 'order', 'Play order', [['Sequential', 'Sequential – continue where the last occurrence left off'], ['Shuffle', 'Shuffle – re-rolled every occurrence'], ['ShuffleEpisodesInOrder', 'Shuffle shows, episodes in order – re-rolled every occurrence']]) +
         selectHtml(p + 'overflow', 'When the next item does not fit', [['FillerRemainder', 'Hand the remainder to ' + betweenBlocksName()], ['TruncateLast', 'Play it anyway and cut it off at the block end']]) +
       '</div>' +
+      '<div class="tvs-grid2" data-kind="Content">' +
+        inputHtml(p + 'guide', 'Guide title (optional)', 'text', { maxlength: 120 }, 'Shown in the Jellyfin guide as the title of every program in the block, e.g. "Saturday Morning Cartoons"; the program\'s own title moves to the episode line. Empty = each program under its own title. Changing it redraws the guide without reshuffling the station.') +
+      '</div>' +
       '<label class="emby-checkbox-label tvs-block-overrun" data-kind="Content"><input type="checkbox" id="' + p + 'overrun"><span>When ' + betweenBlocksName() + ' takes the remainder, let its last program finish past the block end instead of cutting it (unless another block starts right then)</span></label>' +
       '<div class="tvs-grid2">' +
         selectHtml(p + 'rec', 'Repeats', [['Weekly', 'Every week'], ['EveryNWeeks', 'Every N weeks'], ['WeeksOfMonth', 'Certain weeks of the month'], ['Dates', 'Only on specific dates']], 'Weeks run Monday to Sunday, so a Saturday-Sunday weekend stays together. An earlier block in the list wins when two blocks coincide.') +
@@ -3431,6 +3441,8 @@
     q('every').addEventListener('input', () => { b.RepeatEveryMinutes = clampTo(q('every').value, LIMITS.blockRepeatEveryMinutes); refreshHead(); });
     q('until').addEventListener('change', () => { b.RepeatUntilLocal = parseHm(q('until').value) === null ? '' : q('until').value; refreshHead(); });
     q('name').addEventListener('input', () => { b.Name = q('name').value; refreshHead(); });
+    q('guide').value = b.GuideTitle || '';
+    q('guide').addEventListener('input', () => { b.GuideTitle = q('guide').value; });
     q('start').addEventListener('change', () => { b.StartLocal = q('start').value; refreshHead(); });
     q('dur').addEventListener('input', () => { b.DurationMinutes = parseInt(q('dur').value, 10) || 0; refreshHead(); });
     q('order').addEventListener('change', () => { b.Order = q('order').value; });
@@ -3676,6 +3688,9 @@
     const parts = [plural(blocks.length, 'block') + (names.length ? ': ' + names.slice(0, 4).join(', ') + (names.length > 4 ? ' and ' + (names.length - 4) + ' more' : '') : '')];
     if (!l.BuiltIn) {
       parts.push(blocks.some(b => b.Block && (b.Block.Sources || []).length) ? 'with sources' : 'shape only');
+      if (blocks.some(b => b.Fill && b.Fill !== 'None')) {
+        parts.push('filled from the library');
+      }
     }
     if ((l.DaypartRules || []).length) {
       parts.push('family hours');
@@ -3686,6 +3701,7 @@
   function blockFromTemplate(t) {
     return normalizeBlock({
       Name: t.Name || '',
+      GuideTitle: t.GuideTitle || '',
       Days: (t.Days || []).slice(),
       StartLocal: t.StartLocal,
       DurationMinutes: parseInt(t.DurationMinutes, 10) || 60,
@@ -3720,7 +3736,62 @@
     name.placeholder = block ? 'Template name' : 'Layout name';
     name.value = block ? (block.Name || '').trim() : ((val('#tvsName') || '').trim() ? (val('#tvsName') || '').trim() + ' week' : '');
     $('#tvsBtnLayoutSave').querySelector('span').textContent = block ? 'Save template' : 'Save layout';
+    renderLayoutFills(block ? null : state.draft.Slots.Blocks);
     name.focus();
+  }
+
+  /** What Suggest stations fills a saved layout's blocks with; None = the block's own sources. */
+  const LAYOUT_FILLS = [
+    ['None', 'Its own sources (as saved)'],
+    ['Everything', 'Everything in the library'],
+    ['Kids', 'Kids: everything rated G or below'],
+    ['Family', 'Family: everything rated PG or below'],
+    ['FamilyMovies', 'Family movies (rated PG or below)'],
+    ['Movies', 'Movies'],
+    ['Reruns', 'Reruns: half-hour comedies, or every show'],
+    ['Grownup', 'Grown-up: PG-13 and up']
+  ];
+
+  /**
+   * The per-block fill pickers on the save-layout form: what Suggest stations puts in each block from the library
+   * when the layout is offered there, and what plays between the blocks. A block with sources defaults to its own
+   * sources, one without to everything; weather blocks need nothing. Hidden when a single block is saved as a template.
+   */
+  function renderLayoutFills(blocks) {
+    const box = clear($('#tvsLayoutFills'));
+    show(box, !!blocks);
+    if (!blocks) {
+      return;
+    }
+    const fillSelect = (value, skipNone) => el('select', { className: 'emby-select tvs-fill-select' },
+      LAYOUT_FILLS.filter(f => !skipNone || f[0] !== 'None').map(f => el('option', { value: f[0], text: f[1] })));
+    box.appendChild(el('div', { className: 'fieldDescription', text: 'Under Suggest stations, fill each block from the library with:' }));
+    blocks.forEach((b, i) => {
+      const row = el('div', { className: 'tvs-fill-row' }, el('span', { className: 'tvs-fill-name', text: b.Name || 'Block ' + (i + 1) }));
+      if (b.Kind === 'Weather') {
+        row.appendChild(el('span', { className: 'tvs-secondary', text: 'Local weather' }));
+      } else {
+        const sel = fillSelect(null, false);
+        sel.setAttribute('data-fill-index', String(i));
+        sel.value = (b.Sources || []).length ? 'None' : 'Everything';
+        row.appendChild(sel);
+      }
+      box.appendChild(row);
+    });
+    const filler = fillSelect(null, true);
+    filler.id = 'tvsLayoutFiller';
+    filler.value = 'Everything';
+    box.appendChild(el('div', { className: 'tvs-fill-row' }, [el('span', { className: 'tvs-fill-name', text: 'Between the blocks' }), filler]));
+  }
+
+  /** The fills chosen on the save-layout form, one per block (null for a weather block), and the filler. */
+  function readLayoutFills(blocks) {
+    const fills = blocks.map(() => null);
+    $all('#tvsLayoutFills [data-fill-index]').forEach(sel => {
+      fills[parseInt(sel.getAttribute('data-fill-index'), 10)] = sel.value;
+    });
+    const filler = $('#tvsLayoutFiller');
+    return { fills: fills, filler: filler ? filler.value : 'Everything' };
   }
 
   function closeBlockSaveForm() {
@@ -3762,13 +3833,14 @@
       toast('Add a block first.');
       return;
     }
-    const payload = { Name: name, Station: readDraft(), KeepSources: keepSources };
+    const chosen = readLayoutFills(state.draft.Slots.Blocks);
+    const payload = { Name: name, Station: readDraft(), KeepSources: keepSources, Fills: chosen.fills, Filler: chosen.filler };
     const shadowed = state.weekLayouts.some(l => l.BuiltIn && l.Name.toLowerCase() === name.toLowerCase());
     withBusy('Could not save the layout', () => api('POST', 'WeekLayouts', payload).then(list => {
       state.weekLayouts = Array.isArray(list) ? list : [];
       renderBlockTemplateSelect();
       closeBlockSaveForm();
-      const suggested = keepSources && state.draft.Slots.Blocks.filter(b => b.Kind === 'Weather' || (b.Sources || []).length).length >= 2;
+      const suggested = state.draft.Slots.Blocks.filter((b, i) => b.Kind === 'Weather' || (chosen.fills[i] && chosen.fills[i] !== 'None') || (keepSources && (b.Sources || []).length)).length >= 2;
       toast('Layout “' + name + '” saved' + (shadowed ? ' in place of the built-in one' : '') + '. Find it next to Add block on any station' + (suggested ? ', and under Suggest stations' : '') + '.');
     }));
   }

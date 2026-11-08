@@ -54,6 +54,12 @@ public sealed class SlotBlock
 
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Shown in the guide as the title of every program the block plays ("Saturday Morning Cartoons"); the program's
+    /// own title moves to the episode line. Null = each program under its own title. Trimmed, at most 120 characters.
+    /// </summary>
+    public string? GuideTitle { get; set; }
+
     /// <summary>Days of week (in the station's time zone) the block occurs on.</summary>
     public List<DayOfWeek> Days { get; set; } = new();
 

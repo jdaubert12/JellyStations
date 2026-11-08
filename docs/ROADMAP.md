@@ -199,7 +199,10 @@ analyzer, then suggestion rules and the dashboard view on top of it.
   weeks from a start date, chosen weeks of the month (Monday-based weeks, 5 = last), or listed
   dates. `RecurrenceRule` decides per local date; the weekly scheduler asks it when listing a
   week's occurrences, so cursors still carry across sparse occurrences. Built for "a Harry
-  Potter weekend on some weekends". Still open: a custom guide title per block.
+  Potter weekend on some weekends". Custom guide title per block DONE 2026-11-08 (1.33.0.0):
+  `SlotBlock.GuideTitle` rides on the block's program entries (`ScheduleEntry.GuideTitle`), the
+  Live TV service shows it as the program name with the item's own title on the episode line, and
+  it is left out of the schedule fingerprint so a change redraws the guide without a revision bump.
 - **Block templates — DONE 2026-10-15.** Bookmark button on a block saves it under its name
   (`/JellyStations/BlockTemplates`, stored in settings); the dropdown next to "Add block" starts a new
   block from a template; Settings lists and deletes them.
@@ -245,7 +248,9 @@ analyzer, then suggestion rules and the dashboard view on top of it.
 - **Richer guide entries.** Thumbnails, season/episode numbers, year and rating confirmed flowing
   into the guide on the dev server 2026-10-16 (movie poster, episode thumb, series-poster fallback
   all served; channel logo too). Image paths are captured at compile time, so artwork added later
-  shows after the nightly recompile. Still open: a "New" tag for recently added items. Small.
+  shows after the nightly recompile. New / Repeat / Kids DONE 2026-11-08 (1.33.0.0): `IsPremiere`
+  when the station's air log has no earlier airing of the item, `IsRepeat` otherwise, `IsKids` for
+  G, TV-Y, TV-Y7 and TV-G; the dashboard preview shows a "New" badge from the same log.
 - **Filler gate and block-level dayparting.** Extend Step 2 to slots mode if needed.
 - **Deinterlacing — DONE 2026-11-02.** The compiler records Jellyfin's interlaced flag per file
   (compiled format 3), and `FfmpegArgsBuilder.VideoFilter` puts `bwdif` ahead of the scaler when
@@ -351,7 +356,7 @@ order; together they turn a station into a broadcast.
    every station's own. The editor's Logo step has "Set ... for this station" with the default described.
 
 Considered and parked: off-air hours (a daypart rule approximates it),
-custom guide titles per block, studio and people sources, smart (search) collections, multi-part
+studio and people sources, smart (search) collections, multi-part
 episode grouping, rerun blocks, channel redirects, on-demand channels (contradicts the always-on
 clock), DVR (files are already in the library), music videos, AI lineup builder (the rule-based
 suggester covers it; see Phase 7 for what a model is and is not allowed to do). Revisit when someone asks.

@@ -37,4 +37,13 @@ public sealed class SaveWeekLayoutDto
 
     /// <summary>Keep each block's sources (their ids are matched by name on another server) or save the shape alone.</summary>
     public bool KeepSources { get; set; } = true;
+
+    /// <summary>
+    /// Per block, in the station's block order, what Suggest stations fills it with from the library; null or missing
+    /// = <see cref="LayoutFill.None"/> (the block's own sources, if kept). Weather blocks ignore it.
+    /// </summary>
+    public List<LayoutFill?>? Fills { get; set; }
+
+    /// <summary>What plays between the blocks when the layout is suggested; null = everything in the library.</summary>
+    public LayoutFill? Filler { get; set; }
 }

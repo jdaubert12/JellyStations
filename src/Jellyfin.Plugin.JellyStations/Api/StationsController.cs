@@ -556,6 +556,7 @@ internal static class Map
             EndUtc = DateTime.SpecifyKind(e.EndUtc, DateTimeKind.Utc),
             Kind = e.Kind,
             Title = e.Title,
+            GuideTitle = e.GuideTitle,
             EpisodeTitle = e.Item?.IsSeries == true ? e.Item.EpisodeTitle : null,
             SeasonNumber = e.Item?.SeasonNumber,
             EpisodeNumber = e.Item?.EpisodeNumber,
