@@ -9,6 +9,14 @@
         "imageUrl":  "",
         "versions":  [
                          {
+                             "version":  "1.35.1.0",
+                             "changelog":  "Refresh content says what it found. The result of Refresh content on the dashboard lists every channel on its own line with what the scan added to it and removed from it, counted in distinct movies and episodes against the scan before; bumper clips and a weather channel\u0027s music tracks are counted on their own. A channel whose content changed some other way (a new order, a changed runtime, the household\u0027s progress) says so, and a channel that failed shows its error on its line. Refresh content in a station\u0027s editor and on the Status page name the same counts. Fix: several messages in one error dialog ran together on one line; each now has its own.",
+                             "targetAbi":  "12.0.0.0",
+                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.35.1.0/JellyStations_1.35.1.0.zip",
+                             "checksum":  "5eba023bcb8a2e1cc20ae00e91772b6b",
+                             "timestamp":  "2026-11-09T02:51:00Z"
+                         },
+                         {
                              "version":  "1.35.0.0",
                              "changelog":  "A new schedule starts at a program boundary. Until now an edit, a content refresh or Reshuffle now dealt the new schedule from the station\u0027s anchor and switched to it at once, usually in the middle of a program, so the stream jumped and the schedule had to patch over the seam. Now the program on the air finishes and its break plays out; the new schedule begins at the next program start on the padding grid (dead air hands over at once). The guide, the Now line and the editor\u0027s preview show the finishing program first, marked as the previous schedule. Series still continue from their next episode and what just aired still rests. Lineup and weather channels are unchanged. The handover is kept with the compiled station, so a server restart in between serves the same programs.",
                              "targetAbi":  "12.0.0.0",
