@@ -155,7 +155,7 @@ public sealed class StationService
             }
 
             var compiled = Compile(draft);
-            SetHistory(compiled, true, null, () => _airLog.Snapshot(draft.Id, DateTime.UtcNow, compiled));
+            SetContinuity(compiled, true, null, () => _airLog.Snapshot(draft.Id, DateTime.UtcNow, compiled), () => null);
             _compiled.Save(compiled);
             _stations.Save(draft);
             _resolver.Invalidate(draft.Id);
@@ -197,7 +197,7 @@ public sealed class StationService
             }
 
             compiled.Revision = draft.Revision;
-            SetHistory(compiled, scheduleChanged, previous, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled));
+            SetContinuity(compiled, scheduleChanged, previous, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled), () => PlanHandover(id, existing));
             _compiled.Save(compiled);
             _stations.Save(draft);
             _resolver.Invalidate(id);
@@ -261,14 +261,16 @@ public sealed class StationService
             var previous = _compiled.Get(id);
             var compiled = Compile(station);
             var changed = previous is null || !StationCompiler.SameContent(previous, compiled);
-            if (changed && previous is not null)
+            var bumped = changed && previous is not null;
+            // The handover reads the schedule on the air, so it is planned before the revision moves.
+            SetContinuity(compiled, bumped, previous, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled), () => PlanHandover(id, station));
+            if (bumped)
             {
                 station.Revision++;
                 compiled.Revision = station.Revision;
                 _stations.Save(station);
             }
 
-            SetHistory(compiled, changed && previous is not null, previous, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled));
             _compiled.Save(compiled);
             _resolver.Invalidate(id);
             if (changed && triggerGuide)
@@ -359,10 +361,11 @@ public sealed class StationService
         lock (_writeLock)
         {
             var station = _stations.Get(id) ?? throw new KeyNotFoundException("Station not found.");
+            var handover = PlanHandover(id, station);
             station.Revision++;
             var compiled = Compile(station);
             compiled.Revision = station.Revision;
-            SetHistory(compiled, true, null, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled));
+            SetContinuity(compiled, true, null, () => _airLog.Snapshot(id, DateTime.UtcNow, compiled), () => handover);
             _compiled.Save(compiled);
             _stations.Save(station);
             _resolver.Invalidate(id);
@@ -392,7 +395,7 @@ public sealed class StationService
         var savedCompiled = saved is null ? null : _compiled.Get(draft.Id);
         // A draft a save would not bump reuses the saved snapshot; otherwise it takes a fresh one, as the save would.
         var bumped = saved is null || savedCompiled is null || ScheduleFingerprint(saved) != ScheduleFingerprint(draft) || !StationCompiler.SameContent(savedCompiled, compiled);
-        SetHistory(compiled, bumped, savedCompiled, () => _airLog.Snapshot(draft.Id, DateTime.UtcNow, compiled));
+        SetContinuity(compiled, bumped, savedCompiled, () => _airLog.Snapshot(draft.Id, DateTime.UtcNow, compiled), () => saved is null ? null : PlanHandover(draft.Id, saved));
         return ScheduleResolver.EnumerateInput(ScheduleInput.From(draft, compiled, WeatherSources.ConfigFor(draft, _stations.GetAll())), fromUtc, toUtc);
     }
 
@@ -583,14 +586,34 @@ public sealed class StationService
     }
 
     /// <summary>
-    /// Sets the history the schedulers continue from: a fresh snapshot of the air log when the revision was bumped,
-    /// the previous compile's otherwise; then the household's series positions are folded in (see
-    /// <see cref="HouseholdHistory.Apply"/>), so a series skips ahead to where the household is.
+    /// Sets what the new compile continues from. The history: a fresh snapshot of the air log when the revision was
+    /// bumped, the previous compile's otherwise, with the household's series positions folded in (see
+    /// <see cref="HouseholdHistory.Apply"/>) so a series skips ahead to where the household is. The handover: when
+    /// the revision was bumped, the previous schedule's last stretch from <paramref name="handover"/> (see
+    /// <see cref="Scheduling.Handovers.Plan"/>), so the program on the air finishes before the new timeline begins;
+    /// otherwise the previous compile's, so the timeline holds.
     /// </summary>
-    private static void SetHistory(CompiledStation compiled, bool revisionBumped, CompiledStation? previous, Func<AirHistorySnapshot?> fresh)
+    private static void SetContinuity(CompiledStation compiled, bool revisionBumped, CompiledStation? previous, Func<AirHistorySnapshot?> fresh, Func<Handover?> handover)
     {
         compiled.History = HistoryFor(revisionBumped, previous, fresh);
         compiled.History = HouseholdHistory.Apply(compiled.History, compiled.Household, compiled.ProgramItems.ToList(), DateTime.UtcNow);
+        compiled.Handover = revisionBumped ? handover() : previous?.Handover;
+    }
+
+    /// <summary>
+    /// The handover from what the station has on the air right now, read from the live resolver: call it before
+    /// anything about the station is saved, while the resolver still serves the schedule being replaced.
+    /// </summary>
+    private Handover? PlanHandover(Guid id, Station station)
+    {
+        if (station.Mode is not (ScheduleMode.Pool or ScheduleMode.Slots))
+        {
+            return null;
+        }
+
+        var now = DateTime.UtcNow;
+        var onAir = _resolver.Enumerate(id, now, now + Scheduling.Handovers.Lookahead);
+        return Scheduling.Handovers.Plan(onAir, now, TimeSpan.FromMinutes(Math.Max(0, station.PaddingGridMinutes)), station.PaddingByLength);
     }
 
     /// <summary>

@@ -68,14 +68,12 @@ public sealed class ScheduleResolver : IScheduleResolver
 
     private static IStationScheduler Create(ScheduleInput input)
     {
-        if (input.Mode == ScheduleMode.Weather)
-        {
-            return new WeatherScheduler(input);
-        }
-
-        return input.HasBlocks
-            ? new WeeklySlotScheduler(input)
-            : new CyclicScheduler(input);
+        IStationScheduler inner = input.Mode == ScheduleMode.Weather
+            ? new WeatherScheduler(input)
+            : input.HasBlocks
+                ? new WeeklySlotScheduler(input)
+                : new CyclicScheduler(input);
+        return input.Handover is { } handover ? new HandoverScheduler(input, handover, inner) : inner;
     }
 
     private static DateTime EnsureUtc(DateTime dt) => dt.Kind == DateTimeKind.Utc ? dt : DateTime.SpecifyKind(dt.ToUniversalTime(), DateTimeKind.Utc);

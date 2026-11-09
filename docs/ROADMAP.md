@@ -2,7 +2,7 @@
 
 Working plan for scheduling and curation features. Phase 1 is the agreed next three steps, in order.
 Later phases are candidates, roughly ordered by payoff per effort; reorder freely.
-Phase 7 (smarter stations: embeddings, watch history, optional local model) is the current plan; step 2a, the air log with series continuity and the seam at a revision bump, was built 2026-11-02 as 1.25.0.0 from the design in `docs/HISTORY-SCHEDULING.md` (local note, not in the repo; the recency weighting it first proposed stays cut); step 2b (skip what we finished, follow our progress; favorites parked) and step 3 (day shapes, why this is playing) were built 2026-11-08 as 1.34.0.0. Next: step 1 (embeddings) or step 4 (people and studios as sources).
+Phase 7 (smarter stations: embeddings, watch history, optional local model) is the current plan; step 2a, the air log with series continuity and the seam at a revision bump, was built 2026-11-02 as 1.25.0.0 from the design in `docs/HISTORY-SCHEDULING.md` (local note, not in the repo; the recency weighting it first proposed stays cut); step 2b (skip what we finished, follow our progress; favorites parked) and step 3 (day shapes, why this is playing) were built 2026-11-08 as 1.34.0.0; step 2c (a new schedule starts at a program boundary) 2026-11-08 as 1.35.0.0. Next: step 1 (embeddings) or step 4 (people and studios as sources).
 Phase 8 (weather channel) steps 1-6 shipped in 1.14.0.0 (2026-10-23); radar 1.18.0.0 and forecast radar 1.19.0.0 (2026-10-26); step 7: alerts screen (NWS), title cards, music levelling (loudnorm), weather time blocks (with block repeats) and weather in the breaks on ordinary stations built 2026-10-27 as 1.20.0.0; almanac still open.
 Phase 9 (better suggestions and channel templates, planned 2026-10-27) is done bar A6: B1 station templates built 2026-10-28 as 1.21.0.0; A1 (finish what gets created) built 2026-11-01 as 1.24.0.0; A2 (preview a day), A3 (smarter rules), A4 (coverage aware) and A5 (near misses and thresholds) built 2026-11-05 as 1.27.0.0; B2 (built-in block templates) built 2026-11-06 as 1.30.0.0; B3 (week layouts) and B4 (block templates without ids) built 2026-11-08 as 1.33.0.0. A6 waits on Phase 7, which is the plan from here (2b household history first).
 Feature survey of the other projects' trackers and communities, 2026-11-02, with a ranked list of candidates not yet planned: `docs/FEATURE-SURVEY-2026-11.md` (local note, not in the repo).
@@ -465,6 +465,19 @@ In payoff order. Steps 1-3 need no language model at all.
    moved. Still open: "Favorites play more often" (a weight multiplier fights the air log's fairness
    and is hard to see on screen; waits for someone to ask). `Sequential` pools do not resume at all
    today, so the follow applies to the episodes-in-order orders.
+   - **2c. Boundary takeover — DONE 2026-11-08 (1.35.0.0).** A new revision no longer lays its timeline
+   out from the anchor and takes over mid-program. `StationService` plans a `Handover` before anything
+   is saved (`Handovers.Plan` over the live resolver's next 25 h): the program on the air and the clips
+   of its break play out and the new timeline begins where the old one's next program or weather block
+   would have started (its own slot boundary, so the grid phase holds); a long card hands over within
+   the grid, on the old phase. The handover (the old entries for that stretch)
+   is frozen into the `CompiledStation` (format 6) and served by `HandoverScheduler`, which wraps the
+   cyclic or weekly scheduler; `ScheduleInput.StartUtc` makes the pool's first cycle and the week's
+   layout begin at the boundary (a running block is joined there, without the late-start extension), so
+   there are no fictional picks before the snapshot any more and the seam patches of 1.25 and 1.34.1
+   only matter for inputs without a handover. Lineup and Weather modes untouched. Entries of the stretch
+   carry `ScheduleEntry.FromPrevious`; the trace says "Previous schedule, finishing before the new one
+   starts".
 3. **Day shape preset and "why this is playing" — DONE 2026-11-08 (1.34.0.0).**
    - `DAY_SHAPES` in `jellystations.js` (Kids by day, Family evenings, Grown-up nights, Weekend movie
      marathons) behind a dropdown above the family-hours rows: replaces the rules and, on a Pool

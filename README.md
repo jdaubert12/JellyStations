@@ -156,15 +156,17 @@ enabled station's timeline (a slot that aired counts, whether or not anyone watc
 with the server off is not back-filled). The log is never read while a schedule plays. It matters at
 the moment a station gets a new schedule, which happens when an edit changes the timeline, when a
 refresh finds new or removed content, or when you press **Reshuffle now** on the station row. The
-log is frozen into that new schedule, which then continues from it:
+program on the air finishes first, bumpers and all, and the new schedule begins where the old one's
+next program would have started, so nothing jumps mid-program and the slots stay where they were (a
+station showing its card for long switches within the grid). The guide and the preview show that
+program marked as the previous schedule. The log is frozen into the new schedule,
+which then continues from it:
 
 - With *episodes in order*, every series carries on from the episode after the one that aired last,
   in the pool and in time blocks, instead of going back to its first episode. If that episode has
   since vanished from the library, the next one by number is used.
 - A Sequential or episodes-in-order block resumes after the item it aired last; the stream between
-  blocks skips what it had already played in the current pass (the next pass is full again). The new
-  schedule takes over mid-program: whatever it shows on the air at that moment plays out and counts
-  as played, so the stream carries on after it rather than repeating it.
+  blocks skips what it had already played in the current pass (the next pass is full again).
 - The series or film that was airing when the schedule changed never leads the new one, and the
   rest rule counts what the old schedule just aired.
 

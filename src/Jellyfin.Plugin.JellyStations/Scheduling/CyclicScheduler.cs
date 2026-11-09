@@ -4,8 +4,9 @@ using Jellyfin.Plugin.JellyStations.Models;
 namespace Jellyfin.Plugin.JellyStations.Scheduling;
 
 /// <summary>
-/// Pool (without blocks) and Lineup modes: the item list repeats in cycles from the anchor. Every cycle has the same
-/// duration, so the cycle containing an instant is a division and the item inside it a binary search.
+/// Pool (without blocks) and Lineup modes: the item list repeats in cycles from the origin (a pool's handover from
+/// the previous schedule, else the anchor). Every cycle has the same duration, so the cycle containing an instant
+/// is a division and the item inside it a binary search.
 /// </summary>
 internal sealed class CyclicScheduler : IStationScheduler
 {
@@ -26,6 +27,7 @@ internal sealed class CyclicScheduler : IStationScheduler
     private readonly AirHistorySnapshot? _snapshot;
     private readonly long _takenTicks;
     private readonly long _chainStart;
+    private readonly long _origin;
     private readonly bool _chains;
     private readonly ConcurrentDictionary<long, Cycle> _cycles = new();
 
@@ -55,14 +57,19 @@ internal sealed class CyclicScheduler : IStationScheduler
         _tz = TimeZones.Resolve(input.TimeZoneId);
         _rules = input.DaypartRules;
 
+        // A pool that took over from the previous schedule starts its first cycle there; a lineup and a pool that
+        // never had one count from the anchor.
+        _origin = (input.Mode == ScheduleMode.Pool && input.StartUtc is { } start ? start : input.AnchorUtc).Ticks;
+
         // With a snapshot the cycle containing the moment it was taken is the first that airs under this revision:
         // it continues from the snapshot, and the cycles after it chain from it when they carry anything forward
         // (a cooldown rests what aired; episodes in order carry each series' position). Cycles before it never air
-        // under this revision and are built standalone, exactly as without a snapshot.
+        // under this revision and are built standalone, exactly as without a snapshot. A snapshot taken before the
+        // origin (the handover is planned at the same instant) reads as taken at the origin: cycle 0 is the first.
         if (_snapshot is not null && _cycleTicks > 0)
         {
-            _takenTicks = DateTime.SpecifyKind(_snapshot.TakenUtc, DateTimeKind.Utc).Ticks;
-            _chainStart = Padding.FloorDiv(_takenTicks - _input.AnchorUtc.Ticks, _cycleTicks);
+            _takenTicks = Math.Max(DateTime.SpecifyKind(_snapshot.TakenUtc, DateTimeKind.Utc).Ticks, _origin);
+            _chainStart = Padding.FloorDiv(_takenTicks - _origin, _cycleTicks);
         }
 
         _chains = _input.Mode == ScheduleMode.Pool && (_cooldownTicks > 0 || (_snapshot is not null && _order == PlayOrder.ShuffleEpisodesInOrder));
@@ -78,7 +85,7 @@ internal sealed class CyclicScheduler : IStationScheduler
             return new ResolvedProgram(slate, utc - slate.StartUtc);
         }
 
-        var elapsed = utc.Ticks - _input.AnchorUtc.Ticks;
+        var elapsed = utc.Ticks - _origin;
         var k = Padding.FloorDiv(elapsed, _cycleTicks);
         var inCycle = elapsed - (k * _cycleTicks);
         var cycle = GetCycle(k);
@@ -131,7 +138,7 @@ internal sealed class CyclicScheduler : IStationScheduler
 
     private ScheduleEntry MakeEntry(Cycle cycle, long k, int i, long inCycle)
     {
-        var cycleStart = _input.AnchorUtc.Ticks + (k * _cycleTicks);
+        var cycleStart = _origin + (k * _cycleTicks);
         var item = _items[cycle.Order[i]];
         var itemStart = cycleStart + cycle.Starts[i];
         var itemEnd = itemStart + item.RuntimeTicks;
@@ -237,7 +244,7 @@ internal sealed class CyclicScheduler : IStationScheduler
     /// </summary>
     private Cycle BuildCycle(long k, Cycle? previous)
     {
-        var cycleStart = _input.AnchorUtc.Ticks + (k * _cycleTicks);
+        var cycleStart = _origin + (k * _cycleTicks);
         var runs = GatedRuns(k, cycleStart);
         var fromSnapshot = UsesSnapshot(k, previous);
 

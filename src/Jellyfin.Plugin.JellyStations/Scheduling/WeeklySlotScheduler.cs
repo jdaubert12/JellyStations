@@ -26,6 +26,8 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
     private readonly Dictionary<long, int[]> _fillerOrders = new();
     private readonly AirHistorySnapshot? _snapshot;
     private readonly DateTime _takenUtc;
+    private readonly DateTime? _startUtc;
+    private readonly long _startWeek;
 
     public WeeklySlotScheduler(ScheduleInput input)
     {
@@ -34,6 +36,11 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         var anchorLocal = TimeZoneInfo.ConvertTimeFromUtc(input.AnchorUtc, _tz).Date;
         var daysSinceMonday = ((int)anchorLocal.DayOfWeek + 6) % 7;
         _anchorMondayLocal = anchorLocal.AddDays(-daysSinceMonday);
+
+        // A schedule that took over from the previous one begins at the handover: its week is laid out from that
+        // instant (a block already running is joined there) and the weeks before it hold nothing.
+        _startUtc = input.StartUtc;
+        _startWeek = _startUtc is { } start ? WeekIndexOf(start) : 0;
         // Slots-mode filler keeps its original behaviour (plain pass order, cut at the gap end) so existing stations keep their timeline.
         _filler = input.Mode == ScheduleMode.Pool
             ? new FillerStream(input.Pool, input.PoolOrder, input.AvoidSameSeriesBackToBack, input.MarathonMin, input.MarathonMax, input.DaypartRules, input.PoolOrder != PlayOrder.Sequential, "Pool")
@@ -198,6 +205,11 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
     {
         lock (_lock)
         {
+            if (_startUtc is not null && w < _startWeek)
+            {
+                return new List<ScheduleEntry>();
+            }
+
             if (_entries.TryGetValue(w, out var cached))
             {
                 return cached;
@@ -217,9 +229,9 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
 
     private WeekState StateIn(long w)
     {
-        if (w <= 0)
+        if (w <= _startWeek)
         {
-            return WeekState.Initial(WeekStartUtc(w));
+            return WeekState.Initial(w == _startWeek && _startUtc is { } start ? start : WeekStartUtc(w));
         }
 
         if (_stateOut.TryGetValue(w - 1, out var s))
@@ -228,18 +240,18 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         }
 
         // Find the latest computed week below w and roll forward.
-        long start = 0;
-        for (var k = w - 1; k >= 0; k--)
+        var from = _startWeek;
+        for (var k = w - 1; k >= _startWeek; k--)
         {
             if (_stateOut.ContainsKey(k))
             {
-                start = k + 1;
+                from = k + 1;
                 break;
             }
         }
 
-        var state = start == 0 ? WeekState.Initial(WeekStartUtc(0)) : _stateOut[start - 1];
-        for (var k = start; k < w; k++)
+        var state = from == _startWeek ? StateIn(_startWeek) : _stateOut[from - 1];
+        for (var k = from; k < w; k++)
         {
             BuildWeek(k, state);
             state = _stateOut[k];
@@ -258,6 +270,12 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         {
             var occ = occurrences[i];
             var block = _input.Blocks[occ.BlockIndex];
+            var carryBefore = state.CarryEnd;
+            if (occ.EndUtc <= carryBefore)
+            {
+                // Over before this schedule began (the handover fell after it).
+                continue;
+            }
 
             // Whatever comes after this block: the next block of the week, or the first block of the next week
             // (the same instant the end-of-week filler targets). Overruns and late starts never cross it.
@@ -277,9 +295,10 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
 
             var blockStart = occ.StartUtc > state.CarryEnd ? occ.StartUtc : state.CarryEnd;
             var blockEnd = occ.EndUtc;
-            if (blockStart > occ.StartUtc && block.MaxStartDelay > TimeSpan.Zero)
+            if (blockStart > occ.StartUtc && block.MaxStartDelay > TimeSpan.Zero && carryBefore <= occ.StartUtc)
             {
-                // Started late to let a program finish: keep the full duration, up to whatever comes next.
+                // Started late to let a program finish: keep the full duration, up to whatever comes next. A block
+                // joined at the handover is not late; it ends on time.
                 blockEnd = Min(blockStart + (occ.EndUtc - occ.StartUtc), next);
             }
 

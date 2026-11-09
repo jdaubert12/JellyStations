@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.34.1.0"
+$version = "1.35.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Fix: the stream between a station's time blocks could play the same episode twice in a row when the schedule was dealt afresh (an edit, new content, Reshuffle now, or the editor's preview): the program on the air at that moment now counts as played, so the new schedule carries on after it instead of repeating it. Most visible on a Sequential pool under a family-hours rule, where it previewed S01E01 twice at the first slot."
+    changelog = "A new schedule starts at a program boundary. Until now an edit, a content refresh or Reshuffle now dealt the new schedule from the station's anchor and switched to it at once, usually in the middle of a program, so the stream jumped and the schedule had to patch over the seam. Now the program on the air finishes and its break plays out; the new schedule begins at the next program start on the padding grid (dead air hands over at once). The guide, the Now line and the editor's preview show the finishing program first, marked as the previous schedule. Series still continue from their next episode and what just aired still rests. Lineup and weather channels are unchanged. The handover is kept with the compiled station, so a server restart in between serves the same programs."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

@@ -9,9 +9,9 @@ public sealed class CompiledStation
     /// Bump when a compile starts recording something the restreamer depends on (snapshots saved by an older
     /// plugin are recompiled at startup). 1: items carry <see cref="PlayableItem.IsHdr"/>. 2: codec, profile, bit
     /// depth and pixel format. 3: <see cref="PlayableItem.IsInterlaced"/>. 4: <see cref="History"/>.
-    /// 5: picture height and frame rate.
+    /// 5: picture height and frame rate. 6: <see cref="Handover"/>.
     /// </summary>
-    public const int CurrentFormat = 5;
+    public const int CurrentFormat = 6;
 
     public Guid StationId { get; set; }
 
@@ -28,6 +28,13 @@ public sealed class CompiledStation
     /// holds. Not part of <c>StationCompiler.SameContent</c>.
     /// </summary>
     public AirHistorySnapshot? History { get; set; }
+
+    /// <summary>
+    /// What the previous schedule still plays before this revision's timeline begins (see <see cref="Models.Handover"/>);
+    /// null when the timeline starts from the anchor. Carried over unchanged by recompiles that do not bump the
+    /// revision, like <see cref="History"/>.
+    /// </summary>
+    public Handover? Handover { get; set; }
 
     public List<PlayableItem> Pool { get; set; } = new();
 

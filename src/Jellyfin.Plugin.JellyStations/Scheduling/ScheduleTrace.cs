@@ -29,6 +29,11 @@ public static class ScheduleTrace
 
     public static string? Why(ScheduleEntry entry, Station station, HouseholdSnapshot? household, int runIndex, int runLength)
     {
+        if (entry.FromPrevious && Handovers.IsContent(entry))
+        {
+            return "Previous schedule, finishing before the new one starts";
+        }
+
         switch (entry.Kind)
         {
             case EntryKind.Slate:

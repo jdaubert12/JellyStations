@@ -84,6 +84,16 @@ public sealed class ScheduleInput
     public AirHistorySnapshot? History { get; init; }
 
     /// <summary>
+    /// The previous schedule's last stretch, served before this revision's own timeline begins (see
+    /// <see cref="Handovers.Plan"/>); null when the timeline starts from the anchor (a new station, a station
+    /// compiled before 1.35, Lineup and Weather modes).
+    /// </summary>
+    public Handover? Handover { get; init; }
+
+    /// <summary>The instant this revision's timeline begins: the handover's end, or null for the anchor.</summary>
+    public DateTime? StartUtc => Handover is null ? null : DateTime.SpecifyKind(Handover.UntilUtc, DateTimeKind.Utc);
+
+    /// <summary>
     /// Builds the scheduler's input. <paramref name="weather"/> is the weather the station airs (its own on a
     /// weather channel, the chosen weather channel's on an ordinary station, see <c>WeatherSources.ConfigFor</c>);
     /// null means a weather channel's own settings, or no weather at all on an ordinary station.
@@ -150,6 +160,7 @@ public sealed class ScheduleInput
             Weather = station.UsesWeather ? config : null,
             Music = station.Mode == ScheduleMode.Weather ? compiled.Music : Array.Empty<MusicTrack>(),
             History = station.Mode is ScheduleMode.Pool or ScheduleMode.Slots ? compiled.History : null,
+            Handover = station.Mode is ScheduleMode.Pool or ScheduleMode.Slots ? compiled.Handover : null,
             WeatherBreak = usesWeather && station.HasWeatherBreaks ? TimeSpan.FromMinutes(Math.Clamp(station.Bumpers!.Weather.Minutes, 1, 10)) : TimeSpan.Zero,
             WeatherBreakFirst = station.Bumpers?.Weather?.Position == BreakPosition.AfterProgram,
             WeatherLabel = weatherTitle,
