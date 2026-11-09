@@ -162,6 +162,49 @@ public class WeeklyContinuityTests
     }
 
     [Fact]
+    public void PoolWithBlocks_TheItemOnTheAirAcrossTheSnapshot_DoesNotLeadTheSeededPass()
+    {
+        // By day a family-hours rule leaves one series on the air. The new timeline's pick that is on the air when the
+        // snapshot is taken plays out, so the seeded pass that follows must not open with that same item (seen
+        // 2026-11-08: a Sequential pool previewed S01E01 twice in a row at the first slot).
+        var pool = Items.SeriesRun("Test Show", 4, 22);
+        pool.ForEach(e => e.OfficialRating = "PG");
+        var late = new List<PlayableItem> { Items.Movie("Alpha", 22) };
+        late.AddRange(Items.SeriesRun("Other", 2, 22));
+        late.ForEach(i => i.OfficialRating = "R");
+        pool.AddRange(late);
+        var block = WeekdayBlock(PlayOrder.Sequential);
+        var blockItems = new Dictionary<Guid, List<PlayableItem>> { [BlockId] = Items.SeriesRun("Seinfeld", 10, 22) };
+        var rev1 = Items.PoolWithBlocksInput(pool, new List<SlotBlock> { block }, blockItems, PlayOrder.Sequential);
+        var compiled = new CompiledStation { Pool = pool, Blocks = blockItems };
+
+        var straddled = 0;
+        for (var minute = 0; minute < 12 * 60; minute += 7)
+        {
+            var taken = Local(12, 8).AddMinutes(minute);
+            var (_, snapshot) = Aired(rev1, compiled, taken);
+            var station = Items.PoolStation(pool, PlayOrder.Sequential, 0, 2, true);
+            station.Pool.DaypartRules = new List<DaypartRule> { new() { StartLocal = "06:00", EndLocal = "21:00", MaxRating = "PG" } };
+            station.Slots = new SlotsConfig { Blocks = new List<SlotBlock> { block } };
+            var rev2 = ScheduleInput.From(station, new CompiledStation { StationId = station.Id, Revision = 2, Pool = pool, Blocks = blockItems, History = snapshot });
+            // What the new timeline shows from the snapshot on: the program on the air across it, then the seeded picks.
+            var programs = Programs(rev2, taken.AddHours(-1), taken.AddHours(3), "Pool").Where(e => e.EndUtc > taken).ToList();
+            var listing = string.Join(", ", programs.Select(e => e.Item!.Title + " E" + e.Item.EpisodeNumber + " " + e.StartUtc.ToString("HH:mm")));
+            if (programs[0].StartUtc < taken)
+            {
+                straddled++;
+            }
+
+            for (var i = 1; i < programs.Count; i++)
+            {
+                Assert.True(programs[i - 1].Item!.ItemId != programs[i].Item!.ItemId, $"minute {minute} (snapshot {taken:HH:mm}): {listing}");
+            }
+        }
+
+        Assert.True(straddled > 10, "the sweep never caught a program on the air across the snapshot");
+    }
+
+    [Fact]
     public void PoolWithBlocks_FirstPickAfterTheSnapshot_AvoidsTheLastKey_AndResolveMatchesEnumerate()
     {
         var films = Enumerable.Range(1, 6).Select(i => Items.Movie("Film " + i, 60)).ToList();

@@ -210,11 +210,13 @@ public class HouseholdHistoryTests
         compiled.History = HouseholdHistory.Apply(null, household, bluey, taken);
         var input = ScheduleInput.From(station, compiled);
 
+        // The new timeline takes over mid-slot: the episode on the air across the snapshot plays out, then the next.
         var episodes = ScheduleResolver.EnumerateInput(input, taken, taken.AddHours(6))
-            .Where(e => e.Kind == EntryKind.Program && e.StartUtc >= taken)
+            .Where(e => e.Kind == EntryKind.Program && e.EndUtc > taken)
             .Select(e => e.Item!.EpisodeNumber!.Value)
             .ToList();
         Assert.Equal(4, episodes[0]);
         Assert.Equal(5, episodes[1]);
+        Assert.Equal(6, episodes[2]);
     }
 }

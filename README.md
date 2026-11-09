@@ -162,7 +162,9 @@ log is frozen into that new schedule, which then continues from it:
   in the pool and in time blocks, instead of going back to its first episode. If that episode has
   since vanished from the library, the next one by number is used.
 - A Sequential or episodes-in-order block resumes after the item it aired last; the stream between
-  blocks skips what it had already played in the current pass (the next pass is full again).
+  blocks skips what it had already played in the current pass (the next pass is full again). The new
+  schedule takes over mid-program: whatever it shows on the air at that moment plays out and counts
+  as played, so the stream carries on after it rather than repeating it.
 - The series or film that was airing when the schedule changed never leads the new one, and the
   rest rule counts what the old schedule just aired.
 

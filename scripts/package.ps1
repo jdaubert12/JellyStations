@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.34.0.0"
+$version = "1.34.1.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Our household, and why this is playing. Settings gains Our household: the Jellyfin users whose play history a station may read. Each station then has two switches on its content step, both off by default. Skip what we finished in the last N days leaves out any film or episode everyone in the household has played within that many days (by Jellyfin's played flag and last-played date); it comes back by itself once the days have passed. Follow our progress starts a series at the first episode nobody has watched and skips ahead as the household watches, in the episodes-in-order play orders, and never goes back behind where the channel already is. Something counts as watched when everyone ticked has played it. Both are read when the station is compiled, so the schedule stays the same for every viewer; every half hour the plugin looks at the household's history and recompiles the stations where it has moved, and the guide follows. The schedule preview, the Now line and the content view now say why each program is there: the block or pool and its play order, the source that brought it in, its place in a marathon, the family-hours rule in force and whether the household's progress placed it. The When step gets Shape the day like a channel: Kids by day, Family evenings, Grown-up nights or Weekend movie marathons write the family hours in one go and, on a shuffled station, add a prime-time block filled with the pool's sources. Fix: saving the Settings page deleted every saved week layout (1.33.0.0). API: HouseholdUserIds in Settings, GET Household/Users, Household on a station, Why on schedule entries, Source on playable items."
+    changelog = "Fix: the stream between a station's time blocks could play the same episode twice in a row when the schedule was dealt afresh (an edit, new content, Reshuffle now, or the editor's preview): the program on the air at that moment now counts as played, so the new schedule carries on after it instead of repeating it. Most visible on a Sequential pool under a family-hours rule, where it previewed S01E01 twice at the first slot."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

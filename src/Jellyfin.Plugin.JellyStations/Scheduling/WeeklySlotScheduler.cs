@@ -431,22 +431,50 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         {
             BeginPass(cursor);
             var remaining = end - t;
-            string? avoid = null;
+            HashSet<string>? avoid = null;
+            var avoidItem = -1;
             if (_snapshot is not null && !cursor.Seeded && t >= _takenUtc)
             {
                 // The first pick this revision really makes: skip what the stream had already played this pass, and
-                // do not lead with the series or film that was airing when the revision changed.
+                // do not lead with the series or film that was airing when the revision changed. When the pick before
+                // this one is still on the air across the snapshot, the new timeline plays it out: it counts as played
+                // this pass (a series carries on after it), its series or film is not led with either, and the very
+                // same item never follows itself (a seeded pass that starts over would begin with it).
                 SeedFiller(cursor);
-                avoid = _filler.AvoidRepeats ? _snapshot.LastKey : null;
+                var straddles = cursor.LastItem >= 0 && cursor.LastEndUtc > _takenUtc;
+                avoidItem = straddles ? cursor.LastItem : -1;
+                if (straddles && Array.IndexOf(FillerOrder(cursor.Round), cursor.LastItem) is var played && played >= 0)
+                {
+                    cursor.Mark(played);
+                }
+                if (_filler.AvoidRepeats)
+                {
+                    avoid = new HashSet<string>(StringComparer.Ordinal);
+                    if (_snapshot.LastKey is not null)
+                    {
+                        avoid.Add(_snapshot.LastKey);
+                    }
+
+                    if (straddles)
+                    {
+                        avoid.Add(PoolOrdering.KeyOf(items[cursor.LastItem]));
+                    }
+                }
             }
 
-            var p = PickFiller(cursor, t, remaining, avoid);
-            if (p < 0 && cursor.UsedCount > 0 && PickFiller(PeekNextPass(cursor), t, remaining, avoid) >= 0)
+            var p = PickFiller(cursor, t, remaining, avoid, avoidItem);
+            if (p < 0 && cursor.UsedCount > 0 && PickFiller(PeekNextPass(cursor), t, remaining, avoid, avoidItem) >= 0)
             {
                 // Whatever is left of this pass may not air now, but a fresh pass has something that may: start it.
                 cursor.NextPass();
                 BeginPass(cursor);
-                p = PickFiller(cursor, t, remaining, avoid);
+                p = PickFiller(cursor, t, remaining, avoid, avoidItem);
+            }
+
+            if (p < 0 && avoidItem >= 0)
+            {
+                // Nothing but the item on the air may play now, this pass or the next: so be it.
+                p = PickFillerCore(cursor, t, remaining, null, -1);
             }
 
             if (p < 0)
@@ -457,9 +485,11 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
                 continue;
             }
 
-            var item = items[FillerOrder(cursor.Round)[p]];
+            var index = FillerOrder(cursor.Round)[p];
+            var item = items[index];
             if (item.Runtime <= remaining)
             {
+                cursor.Placed(index, t + item.Runtime);
                 t = Place(entries, item, t, end, label);
                 cursor.Mark(p);
                 continue;
@@ -470,6 +500,7 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
             if (overrunLimit.HasValue && t + item.Runtime <= overrunLimit.Value)
             {
                 cursor.Mark(p);
+                cursor.Placed(index, t + item.Runtime);
                 return Place(entries, item, t, overrunLimit.Value, label);
             }
 
@@ -478,6 +509,7 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
             {
                 entries.Add(Program(item, t, end, true, label));
                 cursor.Mark(p);
+                cursor.Placed(index, end);
             }
             else
             {
@@ -519,15 +551,17 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
     /// <summary>
     /// Position (in the pass order) of the item to play at <paramref name="t"/>, or -1 when no unplayed item may air
     /// then. With episodes in order, a series' later episodes wait for its earlier ones. A candidate whose series or
-    /// film is <paramref name="avoidKey"/> is passed over when any other fits.
+    /// film is in <paramref name="avoidKeys"/> is passed over when any other fits; the item at index
+    /// <paramref name="avoidItem"/> (the one on the air across the snapshot) is never picked here, so that the caller
+    /// can start a fresh pass before falling back to it.
     /// </summary>
-    private int PickFiller(FillerCursor cursor, DateTime t, TimeSpan remaining, string? avoidKey = null)
+    private int PickFiller(FillerCursor cursor, DateTime t, TimeSpan remaining, HashSet<string>? avoidKeys = null, int avoidItem = -1)
     {
-        var p = PickFillerCore(cursor, t, remaining, avoidKey);
-        return p < 0 && avoidKey is not null ? PickFillerCore(cursor, t, remaining, null) : p;
+        var p = PickFillerCore(cursor, t, remaining, avoidKeys, avoidItem);
+        return p < 0 && avoidKeys is not null ? PickFillerCore(cursor, t, remaining, null, avoidItem) : p;
     }
 
-    private int PickFillerCore(FillerCursor cursor, DateTime t, TimeSpan remaining, string? avoidKey)
+    private int PickFillerCore(FillerCursor cursor, DateTime t, TimeSpan remaining, HashSet<string>? avoidKeys, int avoidItem)
     {
         var items = _filler.Items;
         var order = FillerOrder(cursor.Round);
@@ -553,7 +587,7 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
                 continue;
             }
 
-            if (avoidKey is not null && PoolOrdering.KeyOf(item) == avoidKey)
+            if (order[p] == avoidItem || (avoidKeys is not null && avoidKeys.Contains(PoolOrdering.KeyOf(item))))
             {
                 continue;
             }
@@ -847,6 +881,17 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
         /// <summary>True once the stream has made its first pick at or after the snapshot (see SeedFiller).</summary>
         public bool Seeded { get; set; }
 
+        /// <summary>Index (into the filler items) of the program the stream placed last, or -1, and when it ends: the seeded pick must not repeat what is still on the air.</summary>
+        public int LastItem { get; set; } = -1;
+
+        public DateTime LastEndUtc { get; set; }
+
+        public void Placed(int item, DateTime endUtc)
+        {
+            LastItem = item;
+            LastEndUtc = endUtc;
+        }
+
         public void Mark(int p)
         {
             if (!Used[p])
@@ -872,7 +917,7 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
             UsedCount = 0;
         }
 
-        public FillerCursor Clone() => new() { Round = Round, Used = (bool[])Used.Clone(), UsedCount = UsedCount, Seeded = Seeded };
+        public FillerCursor Clone() => new() { Round = Round, Used = (bool[])Used.Clone(), UsedCount = UsedCount, Seeded = Seeded, LastItem = LastItem, LastEndUtc = LastEndUtc };
     }
 
     private sealed class WeekState
