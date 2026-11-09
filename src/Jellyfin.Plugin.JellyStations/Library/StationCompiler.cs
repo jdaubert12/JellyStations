@@ -1,3 +1,4 @@
+using Jellyfin.Plugin.JellyStations.Api.Dto;
 using Jellyfin.Plugin.JellyStations.Models;
 using Microsoft.Extensions.Logging;
 
@@ -236,6 +237,32 @@ public sealed class StationCompiler
         }
 
         return kept;
+    }
+
+    /// <summary>
+    /// What <paramref name="current"/> plays that <paramref name="previous"/> did not, and the reverse, in distinct
+    /// items: programs (pool, lineup, blocks, filler), clips (bumpers, pre-roll, post-roll) and music tracks. An
+    /// item listed in several sections counts once; with no previous scan everything counts as added.
+    /// </summary>
+    public static ContentChangesDto Changes(CompiledStation? previous, CompiledStation current)
+    {
+        static HashSet<Guid> Programs(CompiledStation? c) => c is null ? new() : c.ProgramItems.Select(i => i.ItemId).ToHashSet();
+        static HashSet<Guid> Clips(CompiledStation? c) => c is null ? new() : c.Bumpers.Concat(c.PreRoll).Concat(c.PostRoll).Select(i => i.ItemId).ToHashSet();
+        static HashSet<Guid> Tracks(CompiledStation? c) => c is null ? new() : c.Music.Select(t => t.Id).ToHashSet();
+        static int Extra(HashSet<Guid> of, HashSet<Guid> over) => of.Count(id => !over.Contains(id));
+
+        var (oldPrograms, newPrograms) = (Programs(previous), Programs(current));
+        var (oldClips, newClips) = (Clips(previous), Clips(current));
+        var (oldTracks, newTracks) = (Tracks(previous), Tracks(current));
+        return new ContentChangesDto
+        {
+            Added = Extra(newPrograms, oldPrograms),
+            Removed = Extra(oldPrograms, newPrograms),
+            ClipsAdded = Extra(newClips, oldClips),
+            ClipsRemoved = Extra(oldClips, newClips),
+            TracksAdded = Extra(newTracks, oldTracks),
+            TracksRemoved = Extra(oldTracks, newTracks)
+        };
     }
 
     /// <summary>True if two snapshots reference the same items in the same structure.</summary>

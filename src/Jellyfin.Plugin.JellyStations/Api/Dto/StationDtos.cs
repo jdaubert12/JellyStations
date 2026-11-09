@@ -324,6 +324,31 @@ public sealed class CompileResultDto
     public DateTime CompiledUtc { get; set; }
 
     public bool ContentChanged { get; set; }
+
+    /// <summary>What this scan added and removed against the one before; all zero when the result is not from a scan.</summary>
+    public ContentChangesDto Changes { get; set; } = new();
+}
+
+/// <summary>
+/// What a re-scan added to and removed from a station, in distinct items against the previous scan. Content can
+/// change with every count at zero: a new play order, a changed runtime, the household's progress.
+/// </summary>
+public sealed class ContentChangesDto
+{
+    /// <summary>Movies and episodes new to the pool, lineup, blocks or filler.</summary>
+    public int Added { get; set; }
+
+    public int Removed { get; set; }
+
+    /// <summary>Bumper, pre-roll and post-roll clips.</summary>
+    public int ClipsAdded { get; set; }
+
+    public int ClipsRemoved { get; set; }
+
+    /// <summary>Music tracks of a weather channel.</summary>
+    public int TracksAdded { get; set; }
+
+    public int TracksRemoved { get; set; }
 }
 
 /// <summary>How many stations dropped their own logo bug or "Up next" card for the plugin-wide default.</summary>
@@ -355,6 +380,8 @@ public sealed class StationCompileResultDto
     public int ExcludedCount { get; set; }
 
     public bool ContentChanged { get; set; }
+
+    public ContentChangesDto Changes { get; set; } = new();
 
     /// <summary>Set when this station failed to compile; the others were still processed.</summary>
     public string? Error { get; set; }

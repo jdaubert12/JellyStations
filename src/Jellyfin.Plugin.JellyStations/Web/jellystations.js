@@ -849,7 +849,7 @@
       try {
         // The dashboard's alert dialog treats the message as (sanitised) HTML, unlike the plain toast, so names that
         // came back inside a server message (an imported station called "<b>x</b>") are escaped before they get there.
-        Dashboard.alert({ title: title || 'Error', message: messages.map(esc).join('\n') });
+        Dashboard.alert({ title: title || 'Error', message: messages.map(esc).join('<br>') });
       } catch (e) {
         /* ignore */
       }
@@ -1384,21 +1384,51 @@
       .then(() => toast('Live TV guide refresh requested.')));
   }
 
+  /**
+   * "3 added, 1 removed" for what a re-scan added to and took from a station (a compile result's Changes): programs
+   * first, then bumper clips and music tracks by name. Empty when it added and removed nothing.
+   */
+  function describeChanges(c) {
+    const parts = [];
+    const count = (added, removed, noun) => {
+      if (added) {
+        parts.push((noun ? plural(added, noun) : added) + ' added');
+      }
+      if (removed) {
+        parts.push((noun ? plural(removed, noun) : removed) + ' removed');
+      }
+    };
+    if (c) {
+      count(c.Added, c.Removed, '');
+      count(c.ClipsAdded, c.ClipsRemoved, 'clip');
+      count(c.TracksAdded, c.TracksRemoved, 'music track');
+    }
+    return parts.join(', ');
+  }
+
+  /** What a re-scan did to one station: its additions and removals, or that its content changed some other way, or not at all. */
+  function describeScan(result) {
+    return describeChanges(result && result.Changes) ||
+      (result && result.ContentChanged ? 'updated, nothing added or removed' : 'no change');
+  }
+
   function recompileAll() {
     withBusy('Refresh content failed', () => api('POST', 'Stations/RecompileAll').then(result => {
       const rows = result && Array.isArray(result.Stations) ? result.Stations : [];
-      const changed = rows.filter(r => r.ContentChanged && !r.Error);
-      const failed = rows.filter(r => r.Error);
-      const lines = ['Refreshed ' + plural(rows.length, 'station') + '.'];
-      if (changed.length) {
-        lines.push(changed.length + ' changed content and the guide is refreshing: ' + changed.map(r => channelLabel(r)).join(', ') + '.');
-      } else {
-        lines.push('No station changed content.');
-      }
-      if (failed.length) {
-        lines.push(failed.length + ' failed: ' + failed.map(r => channelLabel(r) + ' (' + r.Error + ')').join('; ') + '.');
-      }
-      toast({ title: 'Refresh content', message: lines.join('\n') });
+      const changed = rows.filter(r => r.ContentChanged && !r.Error).length;
+      const failed = rows.filter(r => r.Error).length;
+      const head = 'Refreshed ' + plural(rows.length, 'station') + '. ' +
+        (changed ? changed + ' changed, and the guide is refreshing.' : 'Nothing changed.') +
+        (failed ? ' ' + failed + ' failed.' : '');
+      // One row per channel: its name on the left, what the scan did on the right. The dialog takes HTML, collapses
+      // line breaks and is narrow, so each row is its own block and a result that does not fit drops under the name.
+      const lines = rows.map(r => '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;column-gap:1em;margin-bottom:.4em">' +
+        '<strong>' + esc(channelLabel(r)) + '</strong>' +
+        (r.Error
+          ? '<span>' + esc('failed: ' + r.Error) + '</span>'
+          : '<span style="opacity:.8">' + esc(describeScan(r) + (r.ItemCount ? ' · ' + plural(r.ItemCount, 'item') : '')) + '</span>') +
+        '</div>');
+      toast({ title: 'Refresh content', message: esc(head) + '<div style="text-align:left;margin-top:1em">' + lines.join('') + '</div>' });
       return loadStations();
     }));
   }
@@ -2764,7 +2794,8 @@
       }
       renderExcluded();
       const excluded = result && result.Excluded ? result.Excluded.length : 0;
-      toast('Refreshed: ' + (result ? result.ItemCount : 0) + ' items, ' + excluded + ' excluded.' +
+      const changes = describeChanges(result && result.Changes);
+      toast('Refreshed: ' + (result ? result.ItemCount : 0) + ' items' + (changes ? ' (' + changes + ')' : '') + ', ' + excluded + ' excluded.' +
         (result && result.ContentChanged ? ' Content changed – revision ' + result.Revision + '.' : ' Content unchanged.'));
     }));
   }
@@ -5778,7 +5809,8 @@
   /** Re-scans one station from the Health section and reloads the view. */
   function refreshStationContent(stationId, name) {
     withBusy('Refresh content failed', () => api('POST', 'Stations/' + stationId + '/Recompile').then(result => {
-      toast((name || 'Station') + ': ' + (result ? result.ItemCount : 0) + ' items after the scan.');
+      const changes = describeChanges(result && result.Changes);
+      toast((name || 'Station') + ': ' + (result ? result.ItemCount : 0) + ' items after the scan' + (changes ? ' (' + changes + ')' : '') + '.');
       return loadStatus(false);
     }));
   }

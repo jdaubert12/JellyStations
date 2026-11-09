@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.35.0.0"
+$version = "1.35.1.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "A new schedule starts at a program boundary. Until now an edit, a content refresh or Reshuffle now dealt the new schedule from the station's anchor and switched to it at once, usually in the middle of a program, so the stream jumped and the schedule had to patch over the seam. Now the program on the air finishes and its break plays out; the new schedule begins at the next program start on the padding grid (dead air hands over at once). The guide, the Now line and the editor's preview show the finishing program first, marked as the previous schedule. Series still continue from their next episode and what just aired still rests. Lineup and weather channels are unchanged. The handover is kept with the compiled station, so a server restart in between serves the same programs."
+    changelog = "Refresh content says what it found. The result of Refresh content on the dashboard lists every channel on its own line with what the scan added to it and removed from it, counted in distinct movies and episodes against the scan before; bumper clips and a weather channel's music tracks are counted on their own. A channel whose content changed some other way (a new order, a changed runtime, the household's progress) says so, and a channel that failed shows its error on its line. Refresh content in a station's editor and on the Status page name the same counts. Fix: several messages in one error dialog ran together on one line; each now has its own."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

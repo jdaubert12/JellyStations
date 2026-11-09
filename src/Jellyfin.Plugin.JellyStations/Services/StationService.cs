@@ -278,7 +278,7 @@ public sealed class StationService
                 _guide.Trigger();
             }
 
-            return ToCompileResult(compiled, changed);
+            return ToCompileResult(compiled, changed, StationCompiler.Changes(previous, compiled));
         }
     }
 
@@ -299,6 +299,7 @@ public sealed class StationService
                 row.ItemCount = compiled.ItemCount;
                 row.ExcludedCount = compiled.Excluded.Count;
                 row.ContentChanged = compiled.ContentChanged;
+                row.Changes = compiled.Changes;
                 if (compiled.ContentChanged)
                 {
                     result.ChangedCount++;
@@ -566,7 +567,7 @@ public sealed class StationService
         return path is not null && File.Exists(path) ? path : null;
     }
 
-    public static CompileResultDto ToCompileResult(CompiledStation compiled, bool changed)
+    public static CompileResultDto ToCompileResult(CompiledStation compiled, bool changed, ContentChangesDto? changes = null)
     {
         return new CompileResultDto
         {
@@ -574,7 +575,8 @@ public sealed class StationService
             ItemCount = compiled.TotalItemCount,
             Excluded = compiled.Excluded,
             CompiledUtc = compiled.CompiledUtc,
-            ContentChanged = changed
+            ContentChanged = changed,
+            Changes = changes ?? new ContentChangesDto()
         };
     }
 
