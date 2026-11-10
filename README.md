@@ -603,8 +603,9 @@ edits (name, number, logo) do not. A nightly task re-scans the library for stati
 *nightly refresh* enabled so new episodes join the rotation. Added a batch of films and don't want to
 wait for the night? **Refresh content** on the dashboard re-scans every station at once and refreshes
 the guide if anything changed; **Refresh content** in a station's editor does the same for one. The
-dashboard's result lists every channel on its own line with what the scan added to and removed from
-it (bumper clips and a weather channel's music tracks are counted apart from programs).
+dashboard's result lists every channel that changed on its own line with what the scan added to and
+removed from it (bumper clips and a weather channel's music tracks are counted apart from programs);
+channels with no change are left out.
 
 ### Station rows and health
 

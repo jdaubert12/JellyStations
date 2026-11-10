@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.35.1.0"
+$version = "1.36.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Refresh content says what it found. The result of Refresh content on the dashboard lists every channel on its own line with what the scan added to it and removed from it, counted in distinct movies and episodes against the scan before; bumper clips and a weather channel's music tracks are counted on their own. A channel whose content changed some other way (a new order, a changed runtime, the household's progress) says so, and a channel that failed shows its error on its line. Refresh content in a station's editor and on the Status page name the same counts. Fix: several messages in one error dialog ran together on one line; each now has its own."
+    changelog = "More varied station logos. A generated logo is now drawn from ten background patterns instead of six: bubbles of mixed sizes, scattered strokes, confetti dots and a sunburst are new, rings start from any point with thin or heavy lines, and the dot grid can be staggered or tilted. Every card also gets two to four soft discs and rings, each its own size and placed anywhere, instead of one disc in one of four spots. Logos already saved stay as they are; Another look and newly generated logos use the new patterns. Refresh content on the dashboard now lists only the channels that changed or failed; the rest are counted in the summary line."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true

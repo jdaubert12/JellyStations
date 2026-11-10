@@ -8,7 +8,7 @@ namespace Jellyfin.Plugin.JellyStations.Library;
 /// <summary>
 /// The generated station logo, drawn server side: an 800 x 450 card with the name (up to two lines) and the
 /// channel number on a patterned background seeded from the station. The same hash, random source, colors and
-/// six patterns as the editor's canvas (jellystations.js), so a card drawn here and one drawn in the browser
+/// ten patterns as the editor's canvas (jellystations.js), so a card drawn here and one drawn in the browser
 /// match for the same seed apart from the font. Suggested stations get theirs from here.
 /// </summary>
 public static class StationLogo
@@ -138,7 +138,7 @@ public static class StationLogo
     }
 
     /// <summary>
-    /// One of six patterns in the base color and a neighbouring hue, then the soft disc every card has. Each draw
+    /// One of ten patterns in the base color and a neighbouring hue, then the soft discs and rings every card has. Each draw
     /// consumes the random source in the same order as the canvas version.
     /// </summary>
     private static void Background(SKCanvas canvas, string color, string fg, Mulberry32 rnd)
@@ -156,12 +156,17 @@ public static class StationLogo
             new[] { SKColor.Parse(from), SKColor.Parse(to) },
             SKShaderTileMode.Clamp);
 
-        var style = (int)Math.Floor(rnd.Next() * 6);
+        var style = (int)Math.Floor(rnd.Next() * 10);
+        var wash = rnd.Next();
         using (var fill = new SKPaint { IsAntialias = true })
         {
             if (style == 0)
             {
                 fill.Shader = Gradient(color, partner);
+            }
+            else if (style == 5 || wash < 0.4)
+            {
+                fill.Shader = Gradient(color, deep);
             }
             else
             {
@@ -171,15 +176,25 @@ public static class StationLogo
             canvas.DrawRect(0, 0, Width, Height, fill);
         }
 
+        using var paint = new SKPaint { IsAntialias = true, StrokeCap = SKStrokeCap.Round };
+        void Ink(string hex, double alpha) => paint.Color = SKColor.Parse(hex).WithAlpha(Alpha(alpha));
+
+        // A filled circle, or an outlined one when given a line width.
+        void Circle(double x, double y, double r, double lineWidth)
+        {
+            paint.Style = lineWidth > 0 ? SKPaintStyle.Stroke : SKPaintStyle.Fill;
+            paint.StrokeWidth = (float)lineWidth;
+            canvas.DrawCircle((float)x, (float)y, (float)r, paint);
+        }
+
         canvas.Save();
-        using var paint = new SKPaint { IsAntialias = true };
         if (style == 1)
         {
             // Diagonal stripes.
             var width = (float)(30 + rnd.Next() * 60);
             canvas.Translate(400, 225);
             canvas.RotateRadians((float)angle);
-            paint.Color = SKColor.Parse(partner).WithAlpha(Alpha(0.22));
+            Ink(partner, 0.22);
             for (var x = -700f; x < 700; x += width * 2)
             {
                 canvas.DrawRect(x, -700, width, 1400, paint);
@@ -187,39 +202,45 @@ public static class StationLogo
         }
         else if (style == 2)
         {
-            // A grid of dots.
-            var gap = (float)(36 + rnd.Next() * 44);
-            var radius = (float)(gap * (0.12 + rnd.Next() * 0.16));
-            var offsetX = (float)(rnd.Next() * gap);
-            var offsetY = (float)(rnd.Next() * gap);
-            paint.Color = SKColor.Parse(fg).WithAlpha(Alpha(0.12));
-            for (var y = offsetY - gap; y < Height + gap; y += gap)
+            // A grid of dots: square or staggered, upright or tilted.
+            var gap = 36 + rnd.Next() * 44;
+            var radius = gap * (0.12 + rnd.Next() * 0.16);
+            var offsetX = rnd.Next() * gap;
+            var offsetY = rnd.Next() * gap;
+            var stagger = rnd.Next() < 0.5;
+            var tilt = rnd.Next() < 0.5 ? 0 : angle;
+            canvas.Translate(400, 225);
+            canvas.RotateRadians((float)tilt);
+            Ink(fg, 0.12);
+            var row = 0;
+            for (var y = offsetY - 520; y < 520; y += gap)
             {
-                for (var x = offsetX - gap; x < Width + gap; x += gap)
+                for (var x = offsetX - 520 - (stagger && row % 2 == 1 ? gap / 2 : 0); x < 520; x += gap)
                 {
-                    canvas.DrawCircle(x, y, radius, paint);
+                    Circle(x, y, radius, 0);
                 }
+
+                row++;
             }
         }
         else if (style == 3)
         {
-            // Rings spreading from one corner.
-            var cx = rnd.Next() < 0.5 ? -40f : 840f;
-            var cy = rnd.Next() < 0.5 ? -40f : 490f;
-            var gap = (float)(40 + rnd.Next() * 50);
-            paint.Style = SKPaintStyle.Stroke;
-            paint.StrokeWidth = gap * 0.45f;
-            paint.Color = SKColor.Parse(partner).WithAlpha(Alpha(0.2));
-            for (var r = gap; r < 1100; r += gap)
+            // Rings spreading from a point anywhere on or just off the card, thin or heavy.
+            var cx = -80 + rnd.Next() * 960;
+            var cy = -80 + rnd.Next() * 610;
+            var gap = 40 + rnd.Next() * 50;
+            var weight = gap * (0.15 + rnd.Next() * 0.4);
+            Ink(partner, 0.2);
+            for (var r = gap; r < 1400; r += gap)
             {
-                canvas.DrawCircle(cx, cy, r, paint);
+                Circle(cx, cy, r, weight);
             }
         }
         else if (style == 4)
         {
             // Two or three big tilted slabs.
             var count = 2 + (int)Math.Floor(rnd.Next() * 2);
-            paint.Color = SKColor.Parse(partner).WithAlpha(Alpha(0.28));
+            Ink(partner, 0.28);
             for (var i = 0; i < count; i++)
             {
                 canvas.Save();
@@ -234,30 +255,107 @@ public static class StationLogo
         else if (style == 5)
         {
             // Color bars along the bottom, like a test card.
-            using (var fill = new SKPaint { Shader = Gradient(color, deep) })
-            {
-                canvas.DrawRect(0, 0, Width, Height, fill);
-            }
-
             var bars = 6 + (int)Math.Floor(rnd.Next() * 3);
             var height = (float)(22 + rnd.Next() * 10); // stays under the channel number
             var width = (float)Width / bars;
             for (var i = 0; i < bars; i++)
             {
-                paint.Color = SKColor.Parse(HslToHex((bh + i * (360.0 / bars)) % 360, 60, 48)).WithAlpha(Alpha(0.55));
+                Ink(HslToHex((bh + i * (360.0 / bars)) % 360, 60, 48), 0.55);
                 canvas.DrawRect(i * width, Height - height, width + 1, height, paint);
+            }
+        }
+        else if (style == 6)
+        {
+            // Bubbles: scattered circles from small to large, some filled and some outlined.
+            var count = 8 + (int)Math.Floor(rnd.Next() * 11);
+            for (var i = 0; i < count; i++)
+            {
+                var x = rnd.Next() * 800;
+                var y = rnd.Next() * 450;
+                var size = rnd.Next();
+                var r = 14 + size * size * 150;
+                var usePartner = rnd.Next() < 0.6;
+                var outline = rnd.Next() < 0.4;
+                var strength = rnd.Next();
+                Ink(usePartner ? partner : fg, usePartner ? 0.16 + strength * 0.14 : 0.05 + strength * 0.08);
+                Circle(x, y, r, outline ? 3 + r * 0.12 : 0);
+            }
+        }
+        else if (style == 7)
+        {
+            // Scattered strokes, parallel or loosely fanned, from hairline to heavy.
+            var count = 6 + (int)Math.Floor(rnd.Next() * 9);
+            var spread = rnd.Next() < 0.5 ? 0 : 0.5;
+            paint.Style = SKPaintStyle.Stroke;
+            for (var i = 0; i < count; i++)
+            {
+                var x = rnd.Next() * 800;
+                var y = rnd.Next() * 450;
+                var tilt = angle + (rnd.Next() - 0.5) * spread;
+                var half = (120 + rnd.Next() * 520) / 2;
+                var thick = rnd.Next();
+                var usePartner = rnd.Next() < 0.6;
+                Ink(usePartner ? partner : fg, usePartner ? 0.24 : 0.1);
+                paint.StrokeWidth = (float)(3 + thick * thick * 40);
+                canvas.DrawLine(
+                    (float)(x - Math.Cos(tilt) * half),
+                    (float)(y - Math.Sin(tilt) * half),
+                    (float)(x + Math.Cos(tilt) * half),
+                    (float)(y + Math.Sin(tilt) * half),
+                    paint);
+            }
+        }
+        else if (style == 8)
+        {
+            // Confetti: many small dots of mixed sizes.
+            var count = 40 + (int)Math.Floor(rnd.Next() * 60);
+            for (var i = 0; i < count; i++)
+            {
+                var x = rnd.Next() * 800;
+                var y = rnd.Next() * 450;
+                var size = rnd.Next();
+                var usePartner = rnd.Next() < 0.5;
+                Ink(usePartner ? partner : fg, usePartner ? 0.3 : 0.14);
+                Circle(x, y, 3 + size * size * 18, 0);
+            }
+        }
+        else if (style == 9)
+        {
+            // A sunburst: rays fanning from a point anywhere on or just off the card.
+            var cx = -80 + rnd.Next() * 960;
+            var cy = -80 + rnd.Next() * 610;
+            var rays = 10 + (int)Math.Floor(rnd.Next() * 15);
+            var start = rnd.Next() * Math.PI * 2;
+            var step = Math.PI * 2 / rays;
+            var sweep = step * (0.3 + rnd.Next() * 0.3);
+            paint.Style = SKPaintStyle.Fill;
+            Ink(partner, 0.18);
+            for (var i = 0; i < rays; i++)
+            {
+                var a = start + i * step;
+                using var ray = new SKPath();
+                ray.MoveTo((float)cx, (float)cy);
+                ray.LineTo((float)(cx + Math.Cos(a) * 1500), (float)(cy + Math.Sin(a) * 1500));
+                ray.LineTo((float)(cx + Math.Cos(a + sweep) * 1500), (float)(cy + Math.Sin(a + sweep) * 1500));
+                ray.Close();
+                canvas.DrawPath(ray, paint);
             }
         }
 
         canvas.Restore();
 
-        // The soft disc every card has, placed by the seed.
-        paint.Style = SKPaintStyle.Fill;
-        paint.StrokeWidth = 0;
-        paint.Color = SKColor.Parse(fg).WithAlpha(Alpha(0.08));
-        var dx = (float)(rnd.Next() < 0.5 ? 120 + rnd.Next() * 80 : 600 + rnd.Next() * 80);
-        var dy = (float)(rnd.Next() < 0.5 ? 60 + rnd.Next() * 60 : 340 + rnd.Next() * 60);
-        canvas.DrawCircle(dx, dy, (float)(200 + rnd.Next() * 120), paint);
+        // Every card also gets two to four soft discs and rings, each its own size, anywhere on the card.
+        var accents = 2 + (int)Math.Floor(rnd.Next() * 3);
+        for (var i = 0; i < accents; i++)
+        {
+            var x = rnd.Next() * 800;
+            var y = rnd.Next() * 450;
+            var size = rnd.Next();
+            var ring = rnd.Next() < 0.4;
+            var strength = rnd.Next();
+            Ink(fg, ring ? 0.08 + strength * 0.08 : 0.04 + strength * 0.06);
+            Circle(x, y, 40 + size * size * 280, ring ? 4 + strength * 18 : 0);
+        }
     }
 
     private static byte Alpha(double a) => (byte)Math.Round(a * 255);

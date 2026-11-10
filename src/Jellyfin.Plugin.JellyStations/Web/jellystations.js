@@ -1420,15 +1420,16 @@
       const head = 'Refreshed ' + plural(rows.length, 'station') + '. ' +
         (changed ? changed + ' changed, and the guide is refreshing.' : 'Nothing changed.') +
         (failed ? ' ' + failed + ' failed.' : '');
-      // One row per channel: its name on the left, what the scan did on the right. The dialog takes HTML, collapses
-      // line breaks and is narrow, so each row is its own block and a result that does not fit drops under the name.
-      const lines = rows.map(r => '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;column-gap:1em;margin-bottom:.4em">' +
+      // One row per channel that changed or failed (the rest are only counted above): its name on the left, what the
+      // scan did on the right. The dialog takes HTML, collapses line breaks and is narrow, so each row is its own
+      // block and a result that does not fit drops under the name.
+      const lines = rows.filter(r => r.Error || r.ContentChanged).map(r => '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;column-gap:1em;margin-bottom:.4em">' +
         '<strong>' + esc(channelLabel(r)) + '</strong>' +
         (r.Error
           ? '<span>' + esc('failed: ' + r.Error) + '</span>'
           : '<span style="opacity:.8">' + esc(describeScan(r) + (r.ItemCount ? ' · ' + plural(r.ItemCount, 'item') : '')) + '</span>') +
         '</div>');
-      toast({ title: 'Refresh content', message: esc(head) + '<div style="text-align:left;margin-top:1em">' + lines.join('') + '</div>' });
+      toast({ title: 'Refresh content', message: esc(head) + (lines.length ? '<div style="text-align:left;margin-top:1em">' + lines.join('') + '</div>' : '') });
       return loadStations();
     }));
   }
@@ -2419,53 +2420,64 @@
       g.addColorStop(1, to);
       return g;
     };
-    const style = Math.floor(rnd() * 6);
-    ctx.fillStyle = style === 0 ? gradient(color, partner) : color;
+    const style = Math.floor(rnd() * 10);
+    const wash = rnd();
+    ctx.fillStyle = style === 0 ? gradient(color, partner) : (style === 5 || wash < 0.4 ? gradient(color, deep) : color);
     ctx.fillRect(0, 0, 800, 450);
+    const ink = (c, alpha) => { ctx.fillStyle = c; ctx.strokeStyle = c; ctx.globalAlpha = alpha; };
+    // A filled circle, or an outlined one when given a line width.
+    const circle = (x, y, r, lineWidth) => {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      if (lineWidth > 0) {
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+      } else {
+        ctx.fill();
+      }
+    };
     ctx.save();
     if (style === 1) {
       // Diagonal stripes.
       const width = 30 + rnd() * 60;
       ctx.translate(400, 225);
       ctx.rotate(angle);
-      ctx.fillStyle = partner;
-      ctx.globalAlpha = 0.22;
+      ink(partner, 0.22);
       for (let x = -700; x < 700; x += width * 2) {
         ctx.fillRect(x, -700, width, 1400);
       }
     } else if (style === 2) {
-      // A grid of dots.
+      // A grid of dots: square or staggered, upright or tilted.
       const gap = 36 + rnd() * 44;
       const radius = gap * (0.12 + rnd() * 0.16);
       const offsetX = rnd() * gap;
       const offsetY = rnd() * gap;
-      ctx.fillStyle = fg;
-      ctx.globalAlpha = 0.12;
-      for (let y = offsetY - gap; y < 450 + gap; y += gap) {
-        for (let x = offsetX - gap; x < 800 + gap; x += gap) {
-          ctx.beginPath();
-          ctx.arc(x, y, radius, 0, Math.PI * 2);
-          ctx.fill();
+      const stagger = rnd() < 0.5;
+      const tilt = rnd() < 0.5 ? 0 : angle;
+      ctx.translate(400, 225);
+      ctx.rotate(tilt);
+      ink(fg, 0.12);
+      let row = 0;
+      for (let y = offsetY - 520; y < 520; y += gap) {
+        for (let x = offsetX - 520 - (stagger && row % 2 ? gap / 2 : 0); x < 520; x += gap) {
+          circle(x, y, radius, 0);
         }
+        row++;
       }
     } else if (style === 3) {
-      // Rings spreading from one corner.
-      const cx = rnd() < 0.5 ? -40 : 840;
-      const cy = rnd() < 0.5 ? -40 : 490;
+      // Rings spreading from a point anywhere on or just off the card, thin or heavy.
+      const cx = -80 + rnd() * 960;
+      const cy = -80 + rnd() * 610;
       const gap = 40 + rnd() * 50;
-      ctx.strokeStyle = partner;
-      ctx.lineWidth = gap * 0.45;
-      ctx.globalAlpha = 0.2;
-      for (let r = gap; r < 1100; r += gap) {
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.stroke();
+      const weight = gap * (0.15 + rnd() * 0.4);
+      ink(partner, 0.2);
+      for (let r = gap; r < 1400; r += gap) {
+        circle(cx, cy, r, weight);
       }
     } else if (style === 4) {
       // Two or three big tilted slabs.
       const count = 2 + Math.floor(rnd() * 2);
-      ctx.fillStyle = partner;
-      ctx.globalAlpha = 0.28;
+      ink(partner, 0.28);
       for (let i = 0; i < count; i++) {
         ctx.save();
         ctx.translate(rnd() * 800, rnd() * 450);
@@ -2475,24 +2487,88 @@
       }
     } else if (style === 5) {
       // Color bars along the bottom, like a test card.
-      ctx.fillStyle = gradient(color, deep);
-      ctx.fillRect(0, 0, 800, 450);
       const bars = 6 + Math.floor(rnd() * 3);
       const height = 22 + rnd() * 10; // stays under the channel number
       const width = 800 / bars;
-      ctx.globalAlpha = 0.55;
       for (let i = 0; i < bars; i++) {
-        ctx.fillStyle = hslToHex((base.h + i * (360 / bars)) % 360, 60, 48);
+        ink(hslToHex((base.h + i * (360 / bars)) % 360, 60, 48), 0.55);
         ctx.fillRect(i * width, 450 - height, width + 1, height);
+      }
+    } else if (style === 6) {
+      // Bubbles: scattered circles from small to large, some filled and some outlined.
+      const count = 8 + Math.floor(rnd() * 11);
+      for (let i = 0; i < count; i++) {
+        const x = rnd() * 800;
+        const y = rnd() * 450;
+        const size = rnd();
+        const r = 14 + size * size * 150;
+        const usePartner = rnd() < 0.6;
+        const outline = rnd() < 0.4;
+        const strength = rnd();
+        ink(usePartner ? partner : fg, usePartner ? 0.16 + strength * 0.14 : 0.05 + strength * 0.08);
+        circle(x, y, r, outline ? 3 + r * 0.12 : 0);
+      }
+    } else if (style === 7) {
+      // Scattered strokes, parallel or loosely fanned, from hairline to heavy.
+      const count = 6 + Math.floor(rnd() * 9);
+      const spread = rnd() < 0.5 ? 0 : 0.5;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < count; i++) {
+        const x = rnd() * 800;
+        const y = rnd() * 450;
+        const tilt = angle + (rnd() - 0.5) * spread;
+        const half = (120 + rnd() * 520) / 2;
+        const thick = rnd();
+        const usePartner = rnd() < 0.6;
+        ink(usePartner ? partner : fg, usePartner ? 0.24 : 0.1);
+        ctx.lineWidth = 3 + thick * thick * 40;
+        ctx.beginPath();
+        ctx.moveTo(x - Math.cos(tilt) * half, y - Math.sin(tilt) * half);
+        ctx.lineTo(x + Math.cos(tilt) * half, y + Math.sin(tilt) * half);
+        ctx.stroke();
+      }
+    } else if (style === 8) {
+      // Confetti: many small dots of mixed sizes.
+      const count = 40 + Math.floor(rnd() * 60);
+      for (let i = 0; i < count; i++) {
+        const x = rnd() * 800;
+        const y = rnd() * 450;
+        const size = rnd();
+        const usePartner = rnd() < 0.5;
+        ink(usePartner ? partner : fg, usePartner ? 0.3 : 0.14);
+        circle(x, y, 3 + size * size * 18, 0);
+      }
+    } else if (style === 9) {
+      // A sunburst: rays fanning from a point anywhere on or just off the card.
+      const cx = -80 + rnd() * 960;
+      const cy = -80 + rnd() * 610;
+      const rays = 10 + Math.floor(rnd() * 15);
+      const start = rnd() * Math.PI * 2;
+      const step = Math.PI * 2 / rays;
+      const sweep = step * (0.3 + rnd() * 0.3);
+      ink(partner, 0.18);
+      for (let i = 0; i < rays; i++) {
+        const a = start + i * step;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(a) * 1500, cy + Math.sin(a) * 1500);
+        ctx.lineTo(cx + Math.cos(a + sweep) * 1500, cy + Math.sin(a + sweep) * 1500);
+        ctx.closePath();
+        ctx.fill();
       }
     }
     ctx.restore();
-    // The soft disc every card has, placed by the seed.
-    ctx.fillStyle = fg;
-    ctx.globalAlpha = 0.08;
-    ctx.beginPath();
-    ctx.arc(rnd() < 0.5 ? 120 + rnd() * 80 : 600 + rnd() * 80, rnd() < 0.5 ? 60 + rnd() * 60 : 340 + rnd() * 60, 200 + rnd() * 120, 0, Math.PI * 2);
-    ctx.fill();
+    // Every card also gets two to four soft discs and rings, each its own size, anywhere on the card.
+    const accents = 2 + Math.floor(rnd() * 3);
+    for (let i = 0; i < accents; i++) {
+      const x = rnd() * 800;
+      const y = rnd() * 450;
+      const size = rnd();
+      const ring = rnd() < 0.4;
+      const strength = rnd();
+      ink(fg, ring ? 0.08 + strength * 0.08 : 0.04 + strength * 0.06);
+      circle(x, y, 40 + size * size * 280, ring ? 4 + strength * 18 : 0);
+    }
     ctx.globalAlpha = 1;
   }
 

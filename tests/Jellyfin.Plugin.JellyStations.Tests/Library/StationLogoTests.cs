@@ -91,11 +91,15 @@ public class StationLogoTests
     [Fact]
     public void Every_pattern_and_a_long_name_draw_without_error()
     {
-        // The six styles come from the seed; a spread of seeds covers them all many times over.
-        for (var i = 0; i < 24; i++)
+        var dir = Path.Combine(Path.GetTempPath(), "JellyStationsTests", "logos");
+        Directory.CreateDirectory(dir);
+
+        // The ten styles come from the seed; a spread of seeds covers them all several times over.
+        for (var i = 0; i < 80; i++)
         {
             var png = StationLogo.Png("The Very Long Running Comedy Channel Of Laughs", i % 2 == 0 ? "101" : null, i % 3 == 0 ? "#f0f0f0" : "#2c7396", "seed" + i, Assets.Typeface(FontWeight.Bold), Assets.Typeface(FontWeight.SemiBold));
             Assert.True(png.Length > 1000);
+            File.WriteAllBytes(Path.Combine(dir, "pattern-" + i + ".png"), png);
         }
 
         var blank = StationLogo.Png(string.Empty, string.Empty, "nonsense", string.Empty, Assets.Typeface(FontWeight.Bold), Assets.Typeface(FontWeight.SemiBold));
