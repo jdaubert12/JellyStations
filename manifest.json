@@ -9,6 +9,14 @@
         "imageUrl":  "",
         "versions":  [
                          {
+                             "version":  "1.36.0.0",
+                             "changelog":  "More varied station logos. A generated logo is now drawn from ten background patterns instead of six: bubbles of mixed sizes, scattered strokes, confetti dots and a sunburst are new, rings start from any point with thin or heavy lines, and the dot grid can be staggered or tilted. Every card also gets two to four soft discs and rings, each its own size and placed anywhere, instead of one disc in one of four spots. Logos already saved stay as they are; Another look and newly generated logos use the new patterns. Refresh content on the dashboard now lists only the channels that changed or failed; the rest are counted in the summary line.",
+                             "targetAbi":  "12.0.0.0",
+                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.36.0.0/JellyStations_1.36.0.0.zip",
+                             "checksum":  "147c883155bdef3753bb1834bdbaed0d",
+                             "timestamp":  "2026-11-10T18:45:57Z"
+                         },
+                         {
                              "version":  "1.35.1.0",
                              "changelog":  "Refresh content says what it found. The result of Refresh content on the dashboard lists every channel on its own line with what the scan added to it and removed from it, counted in distinct movies and episodes against the scan before; bumper clips and a weather channel\u0027s music tracks are counted on their own. A channel whose content changed some other way (a new order, a changed runtime, the household\u0027s progress) says so, and a channel that failed shows its error on its line. Refresh content in a station\u0027s editor and on the Status page name the same counts. Fix: several messages in one error dialog ran together on one line; each now has its own.",
                              "targetAbi":  "12.0.0.0",
