@@ -24,6 +24,9 @@ public sealed class LibraryAnalysisDto
 
     public List<FranchiseStatDto> Franchises { get; set; } = new();
 
+    /// <summary>Shows and the movies that share their name ("Star Trek": three series and the films).</summary>
+    public List<UniverseStatDto> Universes { get; set; } = new();
+
     public List<DecadeStatDto> Decades { get; set; } = new();
 
     public List<RatingStatDto> Ratings { get; set; } = new();
@@ -106,6 +109,23 @@ public sealed class FranchiseStatDto
     public List<Guid> ItemIds { get; set; } = new();
 
     public List<string> Titles { get; set; } = new();
+
+    public double Hours { get; set; }
+}
+
+/// <summary>One name across shows and movies: the series that carry it and the movies titled after it.</summary>
+public sealed class UniverseStatDto
+{
+    public string Name { get; set; } = string.Empty;
+
+    public List<Guid> SeriesIds { get; set; } = new();
+
+    public List<string> SeriesNames { get; set; } = new();
+
+    /// <summary>The movies, in release order.</summary>
+    public List<Guid> MovieIds { get; set; } = new();
+
+    public List<string> MovieTitles { get; set; } = new();
 
     public double Hours { get; set; }
 }

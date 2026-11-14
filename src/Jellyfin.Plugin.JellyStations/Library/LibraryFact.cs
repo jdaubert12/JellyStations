@@ -35,6 +35,9 @@ public sealed class LibraryFact
     /// <summary>Own genres, or the series genres for an episode without any.</summary>
     public List<string> Genres { get; set; } = new();
 
+    /// <summary>True for an episode with no genres of its own: <see cref="Genres"/> are the series'.</summary>
+    public bool GenresFromSeries { get; set; }
+
     /// <summary>Own tags, or the series tags for an episode without any.</summary>
     public List<string> Tags { get; set; } = new();
 

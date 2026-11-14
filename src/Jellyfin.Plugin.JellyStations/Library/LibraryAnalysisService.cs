@@ -180,9 +180,13 @@ public sealed class LibraryAnalysisService
                         fact.Rating = series?.OfficialRating;
                     }
 
-                    if (fact.Genres.Count == 0 && series?.Genres is { Length: > 0 } g)
+                    if (fact.Genres.Count == 0)
                     {
-                        fact.Genres = g.ToList();
+                        fact.GenresFromSeries = true;
+                        if (series?.Genres is { Length: > 0 } g)
+                        {
+                            fact.Genres = g.ToList();
+                        }
                     }
 
                     if (fact.Tags.Count == 0 && series?.Tags is { Length: > 0 } t)

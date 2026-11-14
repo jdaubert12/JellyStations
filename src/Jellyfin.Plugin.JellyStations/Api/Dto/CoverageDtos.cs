@@ -75,4 +75,10 @@ public sealed class UncoveredSeriesDto
     public double Hours { get; set; }
 
     public string? LibraryName { get; set; }
+
+    /// <summary>
+    /// For a show that is partly on a channel: what sets the episodes left out apart from the ones that are on
+    /// (no genres of their own, not under the genre the rest share, no rating, specials). Null when nothing does.
+    /// </summary>
+    public string? Why { get; set; }
 }

@@ -116,4 +116,95 @@ public class FranchiseDetectorTests
         var franchises = FranchiseDetector.Detect(small.Concat(big));
         Assert.Equal(new[] { "Alpha", "Beta" }, franchises.Select(f => f.Name));
     }
+
+    [Fact]
+    public void Detect_WordsAnyTitleOpensWith_AreNotAFranchise()
+    {
+        var movies = new[]
+        {
+            M("Captain Blood", 1935), M("Captain America", 2011), M("Captain Marvel", 2019),
+            M("High Society", 1956), M("High Anxiety", 1977), M("High Spirits", 1988),
+            M("Pride & Prejudice", 2005), M("Pride and Glory", 2008),
+            M("The Adventures of Robin Hood", 1938), M("Adventures of Don Juan", 1948), M("The Adventures of Ichabod and Mr. Toad", 1949)
+        };
+
+        Assert.Empty(FranchiseDetector.Detect(movies));
+
+        // A movie called just the word makes it a name again.
+        var legend = Assert.Single(FranchiseDetector.Detect(new[] { M("Legend", 1985), M("Legend of the Lake", 1990), M("Legend Returns", 1995) }));
+        Assert.Equal("Legend", legend.Name);
+    }
+
+    [Fact]
+    public void Detect_PrefixRunsToTheSecondMeaningfulWord()
+    {
+        var franchises = FranchiseDetector.Detect(new[]
+        {
+            M("Men in Black", 1997), M("Men in Black II", 2002), M("Men in Tights", 1993),
+            M("A Charlie Brown Christmas", 1965), M("A Charlie Brown Thanksgiving", 1973),
+            M("Anne of Green Gables", 1985), M("Anne of Green Gables: The Sequel", 1987)
+        });
+
+        Assert.Equal(new[] { "A Charlie Brown", "Anne of Green Gables", "Men in Black" }, franchises.Select(f => f.Name).OrderBy(n => n, StringComparer.Ordinal));
+        Assert.All(franchises, f => Assert.Equal(2, f.Members.Count));
+    }
+
+    [Fact]
+    public void Detect_ATitleJoinsTheGroupMostTitlesShare()
+    {
+        var franchises = FranchiseDetector.Detect(new[]
+        {
+            M("Harry Potter and the Philosopher's Stone", 2001), M("Harry Potter and the Chamber of Secrets", 2002),
+            M("Harry Potter and the Deathly Hallows: Part 1", 2010), M("Harry Potter and the Deathly Hallows: Part 2", 2011),
+            M("Futurama: Bender's Big Score", 2007), M("Futurama: Bender's Game", 2008), M("Futurama: Into the Wild Green Yonder", 2009)
+        });
+
+        Assert.Equal(new[] { "Harry Potter", "Futurama" }, franchises.Select(f => f.Name));
+        Assert.Equal(new[] { 4, 3 }, franchises.Select(f => f.Members.Count));
+    }
+
+    [Fact]
+    public void Detect_TheSameMovieFiledTwice_CountsOnce()
+    {
+        var franchises = FranchiseDetector.Detect(new[]
+        {
+            M("Toy Story", 1995) with { Collection = "Toy Story Collection" }, M("Toy Story", 1995) with { Collection = "Toy Story Collection" },
+            M("Toy Story 2", 1999) with { Collection = "Toy Story Collection" },
+            M("Cinderella", 1950), M("Cinderella", 2015)
+        });
+
+        var toys = Assert.Single(franchises);
+        Assert.Equal(new[] { "Toy Story", "Toy Story 2" }, toys.Members.Select(m => m.Title));
+    }
+
+    [Fact]
+    public void Universes_GatherAShowItsSisterShowsAndTheMoviesNamedAfterThem()
+    {
+        static UniverseSeries S(string name, double hours) => new(Guid.NewGuid(), name, hours);
+        var series = new[]
+        {
+            S("Star Trek", 60), S("Star Trek: The Next Generation", 130), S("Star Trek: The Animated Series", 9),
+            S("Futurama", 45), S("Avatar: The Last Airbender", 24), S("Sherlock", 18), S("Cowboy Bebop", 10), S("The Pacific", 9)
+        };
+        var movies = new[]
+        {
+            M("Star Trek II: The Wrath of Khan", 1982), M("Star Trek: The Motion Picture", 1979), M("Star Trek Into Darkness", 2013),
+            M("Futurama: Bender's Big Score", 2007), M("Futurama: Bender's Game", 2008), M("Futurama: Bender's Game", 2008),
+            M("Avatar", 2009), M("Avatar: The Way of Water", 2022),
+            M("Sherlock Holmes", 2009), M("Sherlock Holmes: A Game of Shadows", 2011),
+            M("Cowboy Bebop: The Movie", 2001), M("Pacific Rim", 2013), M("Pacific Heights", 1990)
+        };
+
+        var universes = FranchiseDetector.Universes(series, movies);
+
+        Assert.Equal(new[] { "Star Trek", "Futurama" }, universes.Select(u => u.Name));
+        var trek = universes[0];
+        Assert.Equal(new[] { "Star Trek: The Next Generation", "Star Trek", "Star Trek: The Animated Series" }, trek.Series.Select(s => s.Name)); // most hours first
+        Assert.Equal(new[] { "Star Trek: The Motion Picture", "Star Trek II: The Wrath of Khan", "Star Trek Into Darkness" }, trek.Movies.Select(m => m.Title));
+        Assert.Equal(2, universes[1].Movies.Count); // the movie filed twice counts once
+
+        // One show and one movie is the show's own channel; two shows are a universe without any movie.
+        Assert.Empty(FranchiseDetector.Universes(new[] { S("Cowboy Bebop", 10) }, new[] { M("Cowboy Bebop: The Movie", 2001) }));
+        Assert.Single(FranchiseDetector.Universes(new[] { S("Avatar: The Last Airbender", 24), S("Avatar: The Legend of Korra", 20) }, Array.Empty<FranchiseCandidate>()));
+    }
 }

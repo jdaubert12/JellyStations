@@ -4421,7 +4421,9 @@
         : [el('span', { text: r.Minutes + ' min' })];
       tbody.appendChild(el('tr', null, [
         el('td', { className: 'pick' }, el('label', null, cb)),
-        el('td', { text: name }),
+        isSeries && r.Why
+          ? el('td', null, [el('div', { text: name }), el('div', { className: 'fieldDescription', text: r.Why })])
+          : el('td', { text: name }),
         el('td', { className: 'nowrap', text: r.Year || '' }),
         el('td', { className: 'nowrap', text: r.Rating || '' }),
         el('td', { className: 'nowrap' }, amount),

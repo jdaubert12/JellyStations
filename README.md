@@ -690,7 +690,9 @@ and series with enough hours, a kids channel and family movies by rating, franch
 "Franchise Nights" slots station, collections, decades, a "Classic Movies" channel for everything made
 before 1970, and seasonal channels from holiday tags. A franchise is any group of movies the metadata
 provider puts in one collection (TMDB's "James Bond Collection", whether or not you let Jellyfin build
-the box set), or failing that any set of titles that share a prefix. Tick the ones you want and press
+the box set), or failing that any set of titles that share a prefix; a word any title may open with
+("Captain", "Princess") does not make one, and the same movie filed twice counts once. **Kitchen
+Sink**, offered first after the broadcast weeks, is the whole library on one channel. Tick the ones you want and press
 **Create selected**: each arrives with a drawn logo (the same generated card the editor makes), in the
 time zone and from the first channel number set above the list (numbers already in use are skipped),
 and with the breaks and look of the station template picked under **Look and breaks from**, if any:
@@ -703,16 +705,30 @@ station with those options applied, to change before it is created. Everything i
 like any other station.
 
 More rules look past the plain genre and series channels. A genre with enough hours in movies and
-again in episodes becomes two channels ("Comedy Movies" and "Comedy TV") instead of one. **Anime** and
-**Documentaries** each gather every genre and tag that spell the same thing. **Comfort Reruns** puts
+again in episodes becomes two channels ("Comedy Movies" and "Comedy TV") instead of one. The names
+different metadata providers give one genre ("Science Fiction", "Sci-Fi", "Sci-Fi & Fantasy"; "War"
+and "War & Politics"; "Action" and "Action & Adventure") count as one genre when a library has more
+than one of them. A genre that turns out to be a single show's episodes is left to that show's own
+channel, and "TV Movie" and "Short" are not genres worth a channel. **Anime** and
+**Documentaries** each gather every genre and tag that spell the same thing, and the **Theme**
+channels do the same from the keywords the metadata provider attaches, with no tagging by hand:
+Musicals, Superheroes, Spies & Secret Agents, Martial Arts, World War II, Westerns, Outer Space, Time
+Travel, Creature Features, True Stories, Romantic Comedies, Fairy Tales, Spoofs & Parodies and Black &
+White. **Comfort Reruns** puts
 the half-hour comedies together (three or more shows, six hours), whether or not any of them could
-carry a channel alone. Shows get decade channels too ("1990s TV"), from the year each began.
+carry a channel alone. Shows get decade channels too ("1990s TV"), from the year each began. A show
+with sister shows, or with two or more movies named after it, is offered whole as **Everything Star
+Trek**: the series and the films on one channel. The Holiday channel goes by the Christmas tags; the
+looser "holiday" tag, which providers also put on Thanksgiving and Halloween specials, is used only
+when a library has no Christmas tag. Two suggestions never share a name.
 
 Suggestions know what is already on the air. Each one shows how many of its hours no enabled channel
 plays ("12 h new"), the list leads with the most new hours in each group, and a suggestion whose
 content is all on a channel already is hidden behind a **Show them** link rather than offered again.
 When channels exist and enough is left over, **Everything Else** offers one station of every movie
-and show no channel plays.
+and show no channel plays. A channel that plays whole libraries unfiltered, such as Kitchen Sink, is
+not counted here or on **Not on a channel**: it plays everything, so it says nothing about what has a
+channel of its own.
 
 Under the list, **Almost there** names what came close: "Horror: 6.5 h, needs 8". The amounts a
 suggestion needs are in **Settings**, under **Station suggestions** (hours for a genre, a kids
@@ -734,7 +750,9 @@ station template whose bumpers name that folder, picked under **Look and breaks 
 content of every enabled station (clips used as bumpers or idents count as on it). Tick titles and
 either start a new channel with them or add them to a channel you already have: its pool, its filler
 for a weekly schedule, or its list for a fixed list. A show with only some episodes on a channel is
-listed with a badge; adding it again gives the channel every episode. A filter box narrows the list
+listed with a badge and, when something sets the episodes left out apart (no genres of their own,
+not under the genre the rest share, no rating, specials), a line saying so; adding it again gives
+the channel every episode. A filter box narrows the list
 by title, genre, rating or library.
 
 ## Settings

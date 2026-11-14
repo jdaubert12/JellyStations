@@ -9,13 +9,22 @@ public sealed record FranchiseCandidate(Guid Id, string Title, int? Year, long R
 /// <summary>A detected group of movies sharing a collection or a title prefix.</summary>
 public sealed record Franchise(string Name, IReadOnlyList<FranchiseCandidate> Members);
 
+/// <summary>A series offered to <see cref="FranchiseDetector.Universes"/>: its name and how much of it there is.</summary>
+public sealed record UniverseSeries(Guid Id, string Name, double Hours);
+
+/// <summary>Shows and the movies that share their name.</summary>
+public sealed record Universe(string Name, IReadOnlyList<UniverseSeries> Series, IReadOnlyList<FranchiseCandidate> Movies);
+
 /// <summary>
 /// Finds franchises. Movies that name the same collection (TMDB's "James Bond Collection", stamped on every member
 /// whether or not a box set exists) group first, two titles being enough, so series whose titles share nothing
 /// ("Dr. No", "Goldfinger", "Skyfall") are found. The rest group by title prefix: "Harry Potter and the …" ×8,
 /// "The Lord of the Rings: …" ×3, "The Bourne …" ×5, "Iron Man" / "Iron Man 2". A prefix before a colon or dash, or
-/// of two leading words, needs two titles; a single leading word needs three so "Black Swan" and "Black Panther"
-/// stay apart. Each title joins its most specific qualifying group only.
+/// the leading words up to the second one that carries meaning ("Men in Black", never "Pride and" or "Adventures
+/// of"), needs two titles; a single leading word needs three so "Black Swan" and "Black Panther" stay apart, and
+/// a word any title may open with ("Captain", "Princess", "High") names a franchise only when one of the movies
+/// is called just that. Each title joins one group only: the one most titles share. The same movie filed twice
+/// (same title and year) counts once.
 /// </summary>
 public static partial class FranchiseDetector
 {
@@ -27,6 +36,23 @@ public static partial class FranchiseDetector
         "a", "an", "the", "of", "in", "on", "at", "to", "and", "or", "for", "from", "with", "my", "our", "your", "his", "her", "its", "no", "not"
     };
 
+    /// <summary>
+    /// Words many unrelated titles open with. Three movies sharing one of these are not a franchise unless one of
+    /// them has the word as its whole title ("Twilight", "Taken").
+    /// </summary>
+    private static readonly HashSet<string> GenericLeadWords = new(StringComparer.Ordinal)
+    {
+        "about", "adventure", "adventures", "american", "back", "beyond", "black", "blue", "born", "captain", "christmas", "city",
+        "dark", "dead", "death", "doctor", "down", "final", "first", "ghost", "girl", "girls", "good", "grand", "great", "green",
+        "high", "home", "house", "into", "just", "king", "lady", "last", "legend", "life", "little", "lord", "lost", "love",
+        "miss", "mister", "monster", "monsters", "night", "over", "perfect", "pride", "prince", "princess", "queen", "return",
+        "saint", "secret", "space", "star", "super", "that", "there", "this", "three", "time", "total", "true", "under",
+        "what", "when", "where", "white", "wild", "world", "young"
+    };
+
+    /// <summary>The most leading words a multi-word prefix key takes.</summary>
+    private const int MaxPrefixWords = 5;
+
     [GeneratedRegex(@"\s*\((19|20)\d{2}\)\s*$")]
     private static partial Regex YearSuffix();
 
@@ -35,7 +61,12 @@ public static partial class FranchiseDetector
 
     public static IReadOnlyList<Franchise> Detect(IEnumerable<FranchiseCandidate> candidates)
     {
-        var all = candidates.Where(c => !string.IsNullOrWhiteSpace(c.Title)).ToList();
+        // The same movie filed twice (two files, two versions) is one title of the franchise.
+        var all = candidates
+            .Where(c => !string.IsNullOrWhiteSpace(c.Title))
+            .GroupBy(c => (Title: c.Title.Trim().ToLowerInvariant(), c.Year))
+            .Select(g => g.First())
+            .ToList();
 
         // Collections first: exact membership from the metadata provider beats any guess from the titles.
         var byCollection = all
@@ -75,13 +106,32 @@ public static partial class FranchiseDetector
             }
         }
 
-        bool Qualifies(string key) => members[key].Count >= (strongKeys.Contains(key) || key.Contains(' ') ? 2 : 3);
+        // A strong or multi-word key needs two titles. A single word needs three, and one any title may open with
+        // needs a movie called just that.
+        bool Enough(string key, List<FranchiseCandidate> group)
+        {
+            if (strongKeys.Contains(key) || key.Contains(' '))
+            {
+                return group.Count >= 2;
+            }
 
-        // Assign each title to its longest qualifying key, then re-check sizes after the assignment.
+            return group.Count >= 3 && (!GenericLeadWords.Contains(key) || group.Any(m => Normalize(YearSuffix().Replace(m.Title.Trim(), string.Empty)) == key));
+        }
+
+        bool Qualifies(string key) => Enough(key, members[key]);
+
+        // Assign each title to one qualifying key, then re-check sizes after the assignment. Of the strong and
+        // multi-word keys the one most titles share wins ("harry potter" ×8 over "harry potter and the deathly
+        // hallows" ×2), the longer on a tie; a plain single word is the last resort.
         var assigned = new Dictionary<string, List<FranchiseCandidate>>(StringComparer.Ordinal);
         foreach (var item in items)
         {
-            var best = keysOf[item.Id].Where(k => Qualifies(k.Key)).Select(k => k.Key).OrderByDescending(k => k.Length).FirstOrDefault();
+            var qualifying = keysOf[item.Id].Where(k => Qualifies(k.Key)).Select(k => k.Key).ToList();
+            var best = qualifying
+                .Where(k => k.Contains(' ') || strongKeys.Contains(k))
+                .OrderByDescending(k => members[k].Count)
+                .ThenByDescending(k => k.Length)
+                .FirstOrDefault() ?? qualifying.OrderByDescending(k => k.Length).FirstOrDefault();
             if (best is null)
             {
                 continue;
@@ -98,11 +148,94 @@ public static partial class FranchiseDetector
 
         return byCollection
             .Concat(assigned
-                .Where(kv => kv.Value.Count >= (strongKeys.Contains(kv.Key) || kv.Key.Contains(' ') ? 2 : 3))
+                .Where(kv => Enough(kv.Key, kv.Value))
                 .Select(kv => new Franchise(DisplayName(kv.Key), Ordered(kv.Value))))
             .OrderByDescending(f => f.Members.Sum(m => m.RuntimeTicks))
             .ThenBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    /// <summary>
+    /// Shows and the movies named after them: "Star Trek" (the series, its sister series and the films),
+    /// "Futurama" and its four movies. A show answers to its whole name and to the part before a colon or dash;
+    /// that part counts when it is more than one word, or when another show shares it or is called just that
+    /// ("Avatar: The Last Airbender" alone does not claim the movie "Avatar"). A movie belongs when its title, or
+    /// the part before its colon or dash, is the name, or when its title goes on from a name of two words or more
+    /// ("Star Trek Into Darkness"). A universe is two shows or more, or one show and at least two movies; anything
+    /// less is the show's own channel. Largest first.
+    /// </summary>
+    public static IReadOnlyList<Universe> Universes(IEnumerable<UniverseSeries> series, IEnumerable<FranchiseCandidate> movies)
+    {
+        var shows = series.Where(s => !string.IsNullOrWhiteSpace(s.Name)).ToList();
+        var films = movies
+            .Where(m => !string.IsNullOrWhiteSpace(m.Title))
+            .GroupBy(m => (Title: m.Title.Trim().ToLowerInvariant(), m.Year))
+            .Select(g => g.First())
+            .Select(m =>
+            {
+                var text = YearSuffix().Replace(m.Title.Trim(), string.Empty);
+                return (Movie: m, Whole: Normalize(text), Lead: Normalize(LeadPart(text)));
+            })
+            .ToList();
+
+        var named = shows.Select(s =>
+        {
+            var text = YearSuffix().Replace(s.Name.Trim(), string.Empty);
+            var lead = LeadPart(text);
+            return (Show: s, Whole: Normalize(text), Lead: Normalize(lead), WholeText: text, LeadText: lead?.Trim() ?? string.Empty);
+        }).ToList();
+
+        // Every name a universe could go by, with the spelling to show for it.
+        var roots = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var n in named.Where(n => n.Whole.Length >= 3))
+        {
+            roots.TryAdd(n.Whole, n.WholeText);
+        }
+
+        foreach (var n in named.Where(n => n.Lead.Length >= 3 && n.Lead != n.Whole))
+        {
+            var shared = named.Count(o => o.Lead == n.Lead || o.Whole == n.Lead) >= 2;
+            if (n.Lead.Contains(' ') || shared)
+            {
+                roots.TryAdd(n.Lead, n.LeadText);
+            }
+        }
+
+        var result = new List<Universe>();
+        foreach (var (root, display) in roots)
+        {
+            var members = named.Where(n => n.Whole == root || n.Lead == root).Select(n => n.Show).ToList();
+            var multiWord = root.Contains(' ');
+            var matched = films
+                .Where(f => f.Whole == root || f.Lead == root || (multiWord && f.Whole.StartsWith(root + " ", StringComparison.Ordinal)))
+                .Select(f => f.Movie)
+                .ToList();
+            if (members.Count >= 2 || (members.Count == 1 && matched.Count >= 2))
+            {
+                result.Add(new Universe(display, members.OrderByDescending(s => s.Hours).ThenBy(s => s.Name, StringComparer.OrdinalIgnoreCase).ToList(), Ordered(matched)));
+            }
+        }
+
+        return result
+            .OrderByDescending(u => u.Series.Sum(s => s.Hours) + u.Movies.Sum(m => m.RuntimeTicks / (double)TimeSpan.TicksPerHour))
+            .ThenBy(u => u.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>The part of a title before its first colon or spaced dash; null when it has neither.</summary>
+    private static string? LeadPart(string text)
+    {
+        var cut = text.IndexOf(':');
+        foreach (var dash in new[] { " - ", " – ", " — " })
+        {
+            var at = text.IndexOf(dash, StringComparison.Ordinal);
+            if (at > 0 && (cut <= 0 || at < cut))
+            {
+                cut = at;
+            }
+        }
+
+        return cut > 0 ? text[..cut] : null;
     }
 
     /// <summary>Release order: by year, then title.</summary>
@@ -162,10 +295,23 @@ public static partial class FranchiseDetector
             }
         }
 
+        // The leading words up to the second one that is not a stop word: "harry potter", "men in black",
+        // "a charlie brown". Two words ending on "and" or "of" say nothing about what follows.
         var words = Words(Normalize(text));
+        var meaningful = 0;
+        for (var i = 0; i < words.Count && i < MaxPrefixWords; i++)
+        {
+            if (!StopWords.Contains(words[i]) && ++meaningful == 2)
+            {
+                Add(string.Join(' ', words.Take(i + 1)), false);
+                break;
+            }
+        }
+
+        // The whole title, so "Anne of Green Gables" meets "Anne of Green Gables: The Sequel".
         if (words.Count >= 2)
         {
-            Add(words[0] + " " + words[1], false);
+            Add(string.Join(' ', words), false);
         }
 
         if (words.Count >= 1 && words[0].Length >= 4 && !StopWords.Contains(words[0]))

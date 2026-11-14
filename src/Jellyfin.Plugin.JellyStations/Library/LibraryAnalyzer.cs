@@ -85,6 +85,20 @@ public static class LibraryAnalyzer
                 Hours = Math.Round(fr.Members.Sum(m => HoursOf(m.RuntimeTicks)), 1)
             })
             .ToList();
+        result.Universes = FranchiseDetector
+            .Universes(
+                result.Series.Select(s => new UniverseSeries(s.Id, s.Name, s.Hours)),
+                movies.Select(m => new FranchiseCandidate(m.Id, m.Title, m.Year, m.RuntimeTicks, m.CollectionName)))
+            .Select(u => new UniverseStatDto
+            {
+                Name = u.Name,
+                SeriesIds = u.Series.Select(s => s.Id).ToList(),
+                SeriesNames = u.Series.Select(s => s.Name).ToList(),
+                MovieIds = u.Movies.Select(m => m.Id).ToList(),
+                MovieTitles = u.Movies.Select(m => m.Title).ToList(),
+                Hours = Math.Round(u.Series.Sum(s => s.Hours) + u.Movies.Sum(m => HoursOf(m.RuntimeTicks)), 1)
+            })
+            .ToList();
         result.Decades = movies
             .Where(m => m.Year.HasValue)
             .GroupBy(m => m.Year!.Value / 10 * 10)

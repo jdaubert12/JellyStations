@@ -60,13 +60,15 @@ public sealed class StationService
 
     /// <summary>
     /// The movies, episodes and clips some station plays, from the compiled content of every enabled station (every
-    /// station with <paramref name="includeDisabled"/>), and how many stations were counted.
+    /// station with <paramref name="includeDisabled"/>), and how many stations were counted. A station that plays
+    /// whole libraries unfiltered (see <see cref="StationSuggester.PlaysEverything"/>) is left out: it would put
+    /// every title "on a channel" and hide what no channel was built around.
     /// </summary>
     public (HashSet<Guid> Items, int Channels) ItemsOnChannels(bool includeDisabled = false)
     {
         var items = new HashSet<Guid>();
         var channels = 0;
-        foreach (var station in _stations.GetAll().Where(s => includeDisabled || s.Enabled))
+        foreach (var station in _stations.GetAll().Where(s => (includeDisabled || s.Enabled) && !StationSuggester.PlaysEverything(s)))
         {
             if (_compiled.Get(station.Id) is not { } compiled)
             {

@@ -70,7 +70,8 @@ public static class LibraryCoverage
                 Episodes = episodes.Count,
                 EpisodesOnChannels = episodes.Count - missing.Count,
                 Hours = Math.Round(hours, 1),
-                LibraryName = summary.LibraryName
+                LibraryName = summary.LibraryName,
+                Why = WhyLeftOut(episodes.Where(e => onChannels.Contains(e.Id)).ToList(), missing)
             });
         }
 
@@ -84,5 +85,54 @@ public static class LibraryCoverage
             .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
         return result;
+    }
+
+    /// <summary>
+    /// What sets the episodes no channel plays apart from the ones of the same show that are on one, as a sentence
+    /// for the page; null when the show is on no channel at all or nothing tells the two apart. The first that
+    /// holds: the ones left have no genres of their own (they go by the show's, which a genre channel built on the
+    /// episodes' genres does not match); they lack a genre every episode on a channel has; they have no rating
+    /// while the others do; they are the specials.
+    /// </summary>
+    public static string? WhyLeftOut(IReadOnlyList<LibraryFact> onChannels, IReadOnlyList<LibraryFact> leftOut)
+    {
+        if (onChannels.Count == 0 || leftOut.Count == 0)
+        {
+            return null;
+        }
+
+        var one = leftOut.Count == 1;
+        var subject = one ? "The episode left" : "The " + leftOut.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) + " episodes left";
+
+        if (leftOut.All(e => e.GenresFromSeries) && onChannels.Any(e => !e.GenresFromSeries))
+        {
+            var shows = leftOut.SelectMany(e => e.Genres).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(g => g, StringComparer.OrdinalIgnoreCase).ToList();
+            return subject + (one ? " has" : " have") + " no genres of " + (one ? "its" : "their") + " own"
+                + (shows.Count > 0 ? " and " + (one ? "goes" : "go") + " by the show's (" + string.Join(", ", shows) + ")" : string.Empty)
+                + ". Identify " + (one ? "it" : "them") + " in Jellyfin, or add the show itself to a channel.";
+        }
+
+        var shared = onChannels
+            .Select(e => e.Genres.AsEnumerable())
+            .Aggregate((a, b) => a.Intersect(b, StringComparer.OrdinalIgnoreCase))
+            .Where(g => leftOut.All(e => !e.Genres.Contains(g, StringComparer.OrdinalIgnoreCase)))
+            .OrderBy(g => g, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (shared.Count > 0)
+        {
+            return subject + (one ? " is" : " are") + " not under " + string.Join(" or ", shared.Select(g => "\"" + g + "\"")) + " like the episodes on a channel.";
+        }
+
+        if (leftOut.All(e => RatingLadder.Rank(e.Rating) is null) && onChannels.All(e => RatingLadder.Rank(e.Rating) is not null))
+        {
+            return subject + (one ? " has" : " have") + " no rating, and the channel playing the rest asks for one.";
+        }
+
+        if (leftOut.All(e => e.SeasonNumber == 0) && onChannels.All(e => e.SeasonNumber != 0))
+        {
+            return subject + (one ? " is a special" : " are specials") + ", which the channel playing the rest leaves out.";
+        }
+
+        return null;
     }
 }

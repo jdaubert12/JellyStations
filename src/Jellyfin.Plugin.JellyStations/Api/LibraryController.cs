@@ -89,8 +89,8 @@ public sealed class LibraryController : ControllerBase
 
     /// <summary>
     /// Movies and series no channel plays, from the compiled content of every enabled station (every station with
-    /// includeDisabled=true). Clips a station uses as bumpers or idents count as on that channel. refresh=true
-    /// re-reads the library.
+    /// includeDisabled=true). Clips a station uses as bumpers or idents count as on that channel; a station that
+    /// plays whole libraries unfiltered ("Kitchen Sink") is not counted. refresh=true re-reads the library.
     /// </summary>
     [HttpGet("Coverage")]
     public ActionResult<CoverageDto> Coverage([FromQuery] bool includeDisabled = false, [FromQuery] bool refresh = false)

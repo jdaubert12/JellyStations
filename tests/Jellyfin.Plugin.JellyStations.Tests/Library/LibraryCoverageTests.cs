@@ -120,4 +120,36 @@ public class LibraryCoverageTests
         Assert.Empty(c.Series);
         Assert.Equal(0, c.Totals.Series);
     }
+
+    [Fact]
+    public void A_partly_played_show_says_what_sets_the_left_out_episodes_apart()
+    {
+        static LibraryFact Ep(string rating, int? season, bool fromSeries, params string[] genres)
+        {
+            var e = Episode(Frasier, "Frasier", 22, rating);
+            e.SeasonNumber = season;
+            e.GenresFromSeries = fromSeries;
+            e.Genres = genres.ToList();
+            return e;
+        }
+
+        // No genres of their own: they go by the show's.
+        var on = new[] { Ep("TV-PG", 1, false, "Adventure", "Comedy"), Ep("TV-PG", 1, false, "Adventure", "Sport") };
+        var bare = new[] { Ep("TV-PG", 2, true, "Reality", "Talk"), Ep("TV-PG", 2, true, "Reality", "Talk") };
+        var facts = on.Concat(bare).ToList();
+        var show = Assert.Single(LibraryCoverage.Build(facts, on.Select(e => e.Id).ToHashSet(), 1, Now).Series);
+        Assert.Equal("The 2 episodes left have no genres of their own and go by the show's (Reality, Talk). Identify them in Jellyfin, or add the show itself to a channel.", show.Why);
+        Assert.StartsWith("The episode left has no genres of its own and goes by the show's", LibraryCoverage.WhyLeftOut(on, bare.Take(1).ToList()), StringComparison.Ordinal);
+
+        // A genre every episode on a channel has, and these do not.
+        Assert.Equal("The episode left is not under \"Adventure\" like the episodes on a channel.", LibraryCoverage.WhyLeftOut(on, new[] { Ep("TV-PG", 1, false, "Comedy") }));
+
+        // No rating; specials; nothing to tell apart; a show on no channel at all.
+        var same = new[] { "Comedy" };
+        var rated = new[] { Ep("TV-PG", 1, false, same), Ep("TV-14", 2, false, same) };
+        Assert.StartsWith("The 2 episodes left have no rating", LibraryCoverage.WhyLeftOut(rated, new[] { Ep(null!, 1, false, same), Ep("NR", 1, false, same) }), StringComparison.Ordinal);
+        Assert.StartsWith("The episode left is a special", LibraryCoverage.WhyLeftOut(rated, new[] { Ep("TV-PG", 0, false, same) }), StringComparison.Ordinal);
+        Assert.Null(LibraryCoverage.WhyLeftOut(rated, new[] { Ep("TV-PG", 3, false, same) }));
+        Assert.Null(Assert.Single(LibraryCoverage.Build(facts, new HashSet<Guid>(), 1, Now).Series).Why);
+    }
 }
