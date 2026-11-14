@@ -9,6 +9,14 @@
         "imageUrl":  "",
         "versions":  [
                          {
+                             "version":  "1.37.1.0",
+                             "changelog":  "Not on a channel names the episodes of a partly played show that no channel plays: season and episode number, title, and the file name when the title does not already give it, up to twelve with a count of the rest. 1.37.0.0 said why such episodes were left out but not which they were.",
+                             "targetAbi":  "12.0.0.0",
+                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.37.1.0/JellyStations_1.37.1.0.zip",
+                             "checksum":  "96bd2c9d9027c42801bf608c78e28ae0",
+                             "timestamp":  "2026-11-14T18:39:24Z"
+                         },
+                         {
                              "version":  "1.37.0.0",
                              "changelog":  "Better station suggestions, worked out against a large real library. New: a Kitchen Sink channel (the whole library on one channel), theme channels from the keywords the metadata provider attaches (Musicals, Superheroes, Spies \u0026 Secret Agents, Martial Arts, World War II, Westerns, Outer Space, Time Travel, Creature Features, True Stories, Romantic Comedies, Fairy Tales, Spoofs \u0026 Parodies, Black \u0026 White), and an Everything channel for a show with its sister shows and the movies named after it (Everything Star Trek). Fixed: the spellings different providers give one genre (Science Fiction, Sci-Fi, Sci-Fi \u0026 Fantasy; War and War \u0026 Politics; Action and Action \u0026 Adventure) now count as one genre; a genre that is a single show\u0027s episodes is left to that show; TV Movie and Short are no longer offered as genres; unrelated movies that merely open with the same common word (Captain, Princess, High) are no longer a franchise; a movie filed twice counts once in a marathon; the Holiday channel goes by the Christmas tags and uses the looser holiday tag only when there is no Christmas tag; two suggestions never share a name; two-title franchises no longer crowd the Almost there list. A channel that plays whole libraries unfiltered is not counted as coverage, so creating Kitchen Sink does not hide the other suggestions. Not on a channel now says why a show is only partly played (for example episodes with no genres of their own).",
                              "targetAbi":  "12.0.0.0",
