@@ -16,6 +16,12 @@ public sealed class LibraryFact
 
     public int? SeasonNumber { get; set; }
 
+    /// <summary>An episode's number within its season, when Jellyfin knows it.</summary>
+    public int? EpisodeNumber { get; set; }
+
+    /// <summary>The file's name without its folder, to point at an episode the metadata provider did not identify.</summary>
+    public string? FileName { get; set; }
+
     /// <summary>Own rating, or the series rating for an episode without one.</summary>
     public string? Rating { get; set; }
 

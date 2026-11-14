@@ -175,6 +175,8 @@ public sealed class LibraryAnalysisService
                     fact.SeriesId = episode.SeriesId == Guid.Empty ? null : episode.SeriesId;
                     fact.SeriesName = episode.SeriesName ?? series?.Name;
                     fact.SeasonNumber = episode.ParentIndexNumber;
+                    fact.EpisodeNumber = episode.IndexNumber;
+                    fact.FileName = string.IsNullOrWhiteSpace(episode.Path) ? null : System.IO.Path.GetFileName(episode.Path);
                     if (string.IsNullOrWhiteSpace(fact.Rating))
                     {
                         fact.Rating = series?.OfficialRating;

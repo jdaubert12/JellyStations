@@ -152,4 +152,34 @@ public class LibraryCoverageTests
         Assert.Null(LibraryCoverage.WhyLeftOut(rated, new[] { Ep("TV-PG", 3, false, same) }));
         Assert.Null(Assert.Single(LibraryCoverage.Build(facts, new HashSet<Guid>(), 1, Now).Series).Why);
     }
+
+    [Fact]
+    public void A_partly_played_show_names_the_episodes_left_out()
+    {
+        LibraryFact Ep(int season, int number, string title)
+        {
+            var e = Episode(Frasier, "Frasier", 22);
+            e.SeasonNumber = season;
+            e.EpisodeNumber = number;
+            e.Title = title;
+            e.FileName = title + ".mkv";
+            return e;
+        }
+
+        var on = Ep(1, 1, "Pilot");
+        var late = Ep(2, 3, "Late");
+        var early = Ep(1, 2, "Early");
+        var facts = new List<LibraryFact> { on, late, early };
+
+        var show = Assert.Single(LibraryCoverage.Build(facts, new HashSet<Guid> { on.Id }, 1, Now).Series);
+        Assert.Equal(new[] { (1, 2, "Early", "Early.mkv"), (2, 3, "Late", "Late.mkv") }, show.LeftOut.Select(e => (e.Season!.Value, e.Episode!.Value, e.Title, e.FileName!)));
+        Assert.Equal(early.Id, show.LeftOut[0].Id);
+
+        // A show on no channel at all is listed whole, with no episodes named; a long list stops at the cap.
+        Assert.Empty(Assert.Single(LibraryCoverage.Build(facts, new HashSet<Guid>(), 1, Now).Series).LeftOut);
+        facts.AddRange(Enumerable.Range(1, 30).Select(i => Ep(3, i, "More " + i)));
+        var many = Assert.Single(LibraryCoverage.Build(facts, new HashSet<Guid> { on.Id }, 1, Now).Series);
+        Assert.Equal(LibraryCoverage.MaxLeftOutListed, many.LeftOut.Count);
+        Assert.Equal(32, many.Episodes - many.EpisodesOnChannels);
+    }
 }

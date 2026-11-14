@@ -4193,6 +4193,23 @@
     return station.Mode === 'Pool' && blocks.length ? label + ' + ' + plural(blocks.length, 'time block') : label;
   }
 
+  /**
+   * The episodes of a partly played show that no channel plays: "Not on a channel: S21E08 Patagonia Special
+   * (file.mkv); S22E00 ... and 3 more". The file name is added when the title does not already say it.
+   */
+  function leftOutText(r) {
+    const pad = n => (n < 10 ? '0' : '') + n;
+    const items = (r.LeftOut || []).map(e => {
+      const number = e.Season != null && e.Episode != null ? 'S' + pad(e.Season) + 'E' + pad(e.Episode) : (e.Season != null ? 'Season ' + e.Season : '');
+      const title = e.Title || '';
+      const stem = (e.FileName || '').replace(/\.[^.]+$/, '');
+      const file = e.FileName && title.toLowerCase().indexOf(stem.toLowerCase()) < 0 && stem.toLowerCase().indexOf(title.toLowerCase()) !== 0 ? ' (' + e.FileName + ')' : '';
+      return [number, title].filter(Boolean).join(' ') + file;
+    });
+    const more = (r.Episodes - (r.EpisodesOnChannels || 0)) - items.length;
+    return 'Not on a channel: ' + items.join('; ') + (more > 0 ? ' and ' + more + ' more' : '');
+  }
+
   /** How much of a suggestion no channel plays yet, said only when some of it already is on one. */
   function newHoursBadge(s, channels) {
     if (!channels || s.Exists) {
@@ -4421,8 +4438,12 @@
         : [el('span', { text: r.Minutes + ' min' })];
       tbody.appendChild(el('tr', null, [
         el('td', { className: 'pick' }, el('label', null, cb)),
-        isSeries && r.Why
-          ? el('td', null, [el('div', { text: name }), el('div', { className: 'fieldDescription', text: r.Why })])
+        isSeries && (r.Why || (r.LeftOut || []).length)
+          ? el('td', null, [
+            el('div', { text: name }),
+            r.Why ? el('div', { className: 'fieldDescription', text: r.Why }) : null,
+            (r.LeftOut || []).length ? el('div', { className: 'fieldDescription', text: leftOutText(r) }) : null
+          ])
           : el('td', { text: name }),
         el('td', { className: 'nowrap', text: r.Year || '' }),
         el('td', { className: 'nowrap', text: r.Rating || '' }),

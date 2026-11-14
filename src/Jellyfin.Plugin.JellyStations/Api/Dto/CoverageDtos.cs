@@ -81,4 +81,25 @@ public sealed class UncoveredSeriesDto
     /// (no genres of their own, not under the genre the rest share, no rating, specials). Null when nothing does.
     /// </summary>
     public string? Why { get; set; }
+
+    /// <summary>
+    /// For a show that is partly on a channel: the episodes no channel plays, in season and episode order, at most
+    /// <see cref="Library.LibraryCoverage.MaxLeftOutListed"/> of them (<see cref="Episodes"/> less
+    /// <see cref="EpisodesOnChannels"/> says how many there are). Empty for a show on no channel at all.
+    /// </summary>
+    public List<UncoveredEpisodeDto> LeftOut { get; set; } = new();
+}
+
+/// <summary>One episode no channel plays, named so it can be found in the library and on disk.</summary>
+public sealed class UncoveredEpisodeDto
+{
+    public Guid Id { get; set; }
+
+    public int? Season { get; set; }
+
+    public int? Episode { get; set; }
+
+    public string Title { get; set; } = string.Empty;
+
+    public string? FileName { get; set; }
 }

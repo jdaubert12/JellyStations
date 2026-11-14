@@ -751,7 +751,8 @@ content of every enabled station (clips used as bumpers or idents count as on it
 either start a new channel with them or add them to a channel you already have: its pool, its filler
 for a weekly schedule, or its list for a fixed list. A show with only some episodes on a channel is
 listed with a badge and, when something sets the episodes left out apart (no genres of their own,
-not under the genre the rest share, no rating, specials), a line saying so; adding it again gives
+not under the genre the rest share, no rating, specials), a line saying so, then the episodes left
+out by number, title and file name (the first twelve); adding it again gives
 the channel every episode. A filter box narrows the list
 by title, genre, rating or library.
 

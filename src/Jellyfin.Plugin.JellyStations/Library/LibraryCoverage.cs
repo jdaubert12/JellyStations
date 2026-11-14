@@ -6,6 +6,9 @@ namespace Jellyfin.Plugin.JellyStations.Library;
 /// <summary>Pure comparison of the library against what the channels play: which movies and series are left out.</summary>
 public static class LibraryCoverage
 {
+    /// <summary>The most left-out episodes named for a partly played show.</summary>
+    public const int MaxLeftOutListed = 12;
+
     /// <param name="facts">Every movie and episode in the library.</param>
     /// <param name="onChannels">Ids of the movies and episodes some counted station plays.</param>
     /// <param name="channels">How many stations were counted (reported back for the page).</param>
@@ -71,7 +74,16 @@ public static class LibraryCoverage
                 EpisodesOnChannels = episodes.Count - missing.Count,
                 Hours = Math.Round(hours, 1),
                 LibraryName = summary.LibraryName,
-                Why = WhyLeftOut(episodes.Where(e => onChannels.Contains(e.Id)).ToList(), missing)
+                Why = WhyLeftOut(episodes.Where(e => onChannels.Contains(e.Id)).ToList(), missing),
+                LeftOut = missing.Count == episodes.Count
+                    ? new List<UncoveredEpisodeDto>()
+                    : missing
+                        .OrderBy(e => e.SeasonNumber ?? int.MaxValue)
+                        .ThenBy(e => e.EpisodeNumber ?? int.MaxValue)
+                        .ThenBy(e => e.Title, StringComparer.OrdinalIgnoreCase)
+                        .Take(MaxLeftOutListed)
+                        .Select(e => new UncoveredEpisodeDto { Id = e.Id, Season = e.SeasonNumber, Episode = e.EpisodeNumber, Title = e.Title, FileName = e.FileName })
+                        .ToList()
             });
         }
 

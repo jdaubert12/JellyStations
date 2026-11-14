@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.37.0.0"
+$version = "1.37.1.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Better station suggestions, worked out against a large real library. New: a Kitchen Sink channel (the whole library on one channel), theme channels from the keywords the metadata provider attaches (Musicals, Superheroes, Spies & Secret Agents, Martial Arts, World War II, Westerns, Outer Space, Time Travel, Creature Features, True Stories, Romantic Comedies, Fairy Tales, Spoofs & Parodies, Black & White), and an Everything channel for a show with its sister shows and the movies named after it (Everything Star Trek). Fixed: the spellings different providers give one genre (Science Fiction, Sci-Fi, Sci-Fi & Fantasy; War and War & Politics; Action and Action & Adventure) now count as one genre; a genre that is a single show's episodes is left to that show; TV Movie and Short are no longer offered as genres; unrelated movies that merely open with the same common word (Captain, Princess, High) are no longer a franchise; a movie filed twice counts once in a marathon; the Holiday channel goes by the Christmas tags and uses the looser holiday tag only when there is no Christmas tag; two suggestions never share a name; two-title franchises no longer crowd the Almost there list. A channel that plays whole libraries unfiltered is not counted as coverage, so creating Kitchen Sink does not hide the other suggestions. Not on a channel now says why a show is only partly played (for example episodes with no genres of their own)."
+    changelog = "Not on a channel names the episodes of a partly played show that no channel plays: season and episode number, title, and the file name when the title does not already give it, up to twelve with a count of the rest. 1.37.0.0 said why such episodes were left out but not which they were."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true
