@@ -9,6 +9,14 @@
         "imageUrl":  "",
         "versions":  [
                          {
+                             "version":  "1.37.0.0",
+                             "changelog":  "Better station suggestions, worked out against a large real library. New: a Kitchen Sink channel (the whole library on one channel), theme channels from the keywords the metadata provider attaches (Musicals, Superheroes, Spies \u0026 Secret Agents, Martial Arts, World War II, Westerns, Outer Space, Time Travel, Creature Features, True Stories, Romantic Comedies, Fairy Tales, Spoofs \u0026 Parodies, Black \u0026 White), and an Everything channel for a show with its sister shows and the movies named after it (Everything Star Trek). Fixed: the spellings different providers give one genre (Science Fiction, Sci-Fi, Sci-Fi \u0026 Fantasy; War and War \u0026 Politics; Action and Action \u0026 Adventure) now count as one genre; a genre that is a single show\u0027s episodes is left to that show; TV Movie and Short are no longer offered as genres; unrelated movies that merely open with the same common word (Captain, Princess, High) are no longer a franchise; a movie filed twice counts once in a marathon; the Holiday channel goes by the Christmas tags and uses the looser holiday tag only when there is no Christmas tag; two suggestions never share a name; two-title franchises no longer crowd the Almost there list. A channel that plays whole libraries unfiltered is not counted as coverage, so creating Kitchen Sink does not hide the other suggestions. Not on a channel now says why a show is only partly played (for example episodes with no genres of their own).",
+                             "targetAbi":  "12.0.0.0",
+                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.37.0.0/JellyStations_1.37.0.0.zip",
+                             "checksum":  "1f87fcc0c53fff0b46ba7be103fdfb46",
+                             "timestamp":  "2026-11-14T18:03:04Z"
+                         },
+                         {
                              "version":  "1.36.0.0",
                              "changelog":  "More varied station logos. A generated logo is now drawn from ten background patterns instead of six: bubbles of mixed sizes, scattered strokes, confetti dots and a sunburst are new, rings start from any point with thin or heavy lines, and the dot grid can be staggered or tilted. Every card also gets two to four soft discs and rings, each its own size and placed anywhere, instead of one disc in one of four spots. Logos already saved stay as they are; Another look and newly generated logos use the new patterns. Refresh content on the dashboard now lists only the channels that changed or failed; the rest are counted in the summary line.",
                              "targetAbi":  "12.0.0.0",
