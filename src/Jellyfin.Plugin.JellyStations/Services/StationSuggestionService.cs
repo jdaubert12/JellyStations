@@ -108,7 +108,7 @@ public sealed class StationSuggestionService
 
         var existing = _stations.GetAll();
         var used = UsedNumbers(existing);
-        var draft = Prepare(suggestion.Station, NextFree(request.FirstChannelNumber ?? NextChannelNumber(existing), used), TimeZone(request.TimeZoneId, existing), Template(request.TemplateId), BumperSource(request.BumperLibraryId));
+        var draft = Prepare(suggestion.Station, NextFree(request.FirstChannelNumber ?? NextChannelNumber(existing), used), TimeZone(request.TimeZoneId, existing), Template(request.TemplateId), BumperSource(request.BumperLibraryId), _settings.Get().NewStationPadding);
         return draft;
     }
 
@@ -142,6 +142,7 @@ public sealed class StationSuggestionService
             result.Errors.Add("No station template has the id " + id.ToString("N") + "; the stations were created plain.");
         }
 
+        var padding = _settings.Get().NewStationPadding;
         var bumpers = BumperSource(request.BumperLibraryId);
         if (request.BumperLibraryId is { } lib && lib != Guid.Empty && bumpers is null)
         {
@@ -163,7 +164,7 @@ public sealed class StationSuggestionService
             }
 
             next = NextFree(next, used);
-            var draft = Prepare(suggestion.Station, next, tz, template, bumpers);
+            var draft = Prepare(suggestion.Station, next, tz, template, bumpers, padding);
             Station created;
             try
             {
@@ -191,7 +192,7 @@ public sealed class StationSuggestionService
     /// The suggester's station with its identity filled in, with a template that template's look, and with a
     /// bumper library its clips in the breaks (see <see cref="UseBumpers"/>).
     /// </summary>
-    private static Station Prepare(Station suggested, int number, string timeZoneId, StationTemplate? template, ContentSource? bumpers)
+    internal static Station Prepare(Station suggested, int number, string timeZoneId, StationTemplate? template, ContentSource? bumpers, PaddingDefault? padding = null)
     {
         var draft = JsonFileStore.Clone(suggested);
         draft.Id = Guid.Empty;
@@ -201,6 +202,13 @@ public sealed class StationSuggestionService
         if (template is not null)
         {
             StationTemplates.ApplyLook(template, draft);
+        }
+
+        // The plugin-wide padding for new stations wins over the suggester's and a built-in preset's choice; a saved
+        // template's padding is the user's own and stays. Before the bumpers, which look at the gap padding leaves.
+        if (template is null || template.BuiltIn)
+        {
+            padding?.ApplyTo(draft);
         }
 
         if (bumpers is not null)

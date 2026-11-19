@@ -1015,6 +1015,26 @@
           <div class="verticalSection tvs-section">
             <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">bookmark</span>Block templates</h3>
             <div class="fieldDescription">Time blocks saved from a station editor with the bookmark button, with or without their sources. Pick one from the dropdown next to “Add block” to reuse it on any station; sources whose ids this server does not know (a template imported from elsewhere, or a library that was removed and added again) are matched by title as it is added. The same dropdown offers four starter blocks (Saturday morning cartoons, Prime-time movie, Late night, Weather on the hour) that come without sources; a template saved under a starter's name takes its place.</div>
+          <div class="verticalSection tvs-section">
+            <h3 class="sectionTitle"><span class="material-icons" aria-hidden="true">grid_on</span>New stations</h3>
+            <div class="tvs-grid2">
+              <div class="selectContainer">
+                <label class="selectLabel" for="tvsNewPadding">Padding grid for new stations</label>
+                <select is="emby-select" class="emby-select-withcolor emby-select" id="tvsNewPadding">
+                  <option value="">Each preset's own</option>
+                  <option value="0">None – programs play back to back</option>
+                  <option value="5">5 minutes</option>
+                  <option value="10">10 minutes</option>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">60 minutes</option>
+                  <option value="length">By length – half hours up to 60 min, whole hours beyond</option>
+                </select>
+                <div class="fieldDescription">What the padding grid starts on when you make a station: a blank one, one from a built-in preset, one from “Not on a channel”, and the ones Suggest stations creates. It is only the starting value; change it per station under Advanced. Stations you already have are not touched, and a template you saved keeps the padding it was saved with.</div>
+              </div>
+            </div>
+          </div>
+
             <div id="tvsTemplateEmpty" class="tvs-secondary">No templates saved yet.</div>
             <div id="tvsTemplateList" class="paperList"></div>
           </div>

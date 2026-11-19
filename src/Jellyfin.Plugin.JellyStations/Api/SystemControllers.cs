@@ -46,6 +46,7 @@ public sealed class SettingsController : ControllerBase
         settings.Suggestions.Normalize();
         var errors = StationService.ValidateEncoding(settings.DefaultEncoding);
         if (settings.LingerSeconds < 0 || settings.LingerSeconds > 600)
+        settings.NewStationPadding?.Normalize();
         {
             errors.Add("Linger must be between 0 and 600 seconds.");
         }

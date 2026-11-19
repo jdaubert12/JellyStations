@@ -10,6 +10,13 @@ public sealed class GlobalSettings
     /// <summary>The "Up next" card every station shows unless it sets its own (<see cref="Station.UpNextCard"/>). Off by default.</summary>
     public UpNextCardConfig UpNextCard { get; set; } = new();
 
+    /// <summary>
+    /// The padding a new station starts with: a blank one, one from a built-in preset, one made from "Not on a
+    /// channel", and a suggested one created plain or with a built-in preset's look. Null = each of those keeps
+    /// its own choice. A saved template always keeps the padding it was saved with.
+    /// </summary>
+    public PaddingDefault? NewStationPadding { get; set; }
+
     /// <summary>Seconds a station stream keeps running after the last viewer leaves.</summary>
     public int LingerSeconds { get; set; } = 30;
 

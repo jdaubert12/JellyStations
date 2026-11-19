@@ -262,6 +262,42 @@ public class SuggestionRulesTests
     }
 
     [Fact]
+    public void New_station_padding_from_settings_replaces_the_suggesters_and_a_presets_but_not_a_saved_templates()
+    {
+        var suggested = new Station { Name = "Action Movies", PaddingByLength = true };
+        var quarter = new PaddingDefault { GridMinutes = 15 };
+        var builtIn = StationTemplates.BuiltIn.Single(p => p.Name == "Movie night");
+        var saved = StationTemplates.Merge(new[] { StationTemplates.FromStation(new Station { Name = "x", PaddingGridMinutes = 60 }, "Mine") }).First();
+        Assert.False(saved.BuiltIn);
+
+        (bool ByLength, int Grid) Made(StationTemplate? template, PaddingDefault? padding)
+        {
+            var s = StationSuggestionService.Prepare(suggested, 5, "UTC", template, null, padding);
+            return (s.PaddingByLength, s.PaddingGridMinutes);
+        }
+
+        // Nothing set: the suggester's choice, or the look's, as before.
+        Assert.Equal((true, 0), Made(null, null));
+        Assert.Equal((false, 60), Made(saved, null));
+
+        Assert.Equal((false, 15), Made(null, quarter));
+        Assert.Equal((false, 15), Made(builtIn, quarter));
+        Assert.Equal((false, 60), Made(saved, quarter));
+        Assert.Equal((true, 0), Made(null, new PaddingDefault { ByLength = true, GridMinutes = 15 }));
+
+        // "None" as the default leaves no gap, so a bumper library still gets its two-minute break.
+        var clips = new ContentSource { Kind = SourceKind.Library, ItemId = BumpsLib, DisplayName = "Bumps" };
+        var gapless = StationSuggestionService.Prepare(suggested, 5, "UTC", null, clips, new PaddingDefault());
+        Assert.False(gapless.PaddingByLength);
+        Assert.Equal(2, gapless.Bumpers.BreakMinutes);
+
+        // A weather channel has nothing to pad.
+        var weather = new Station { Mode = ScheduleMode.Weather };
+        quarter.ApplyTo(weather);
+        Assert.Equal(0, weather.PaddingGridMinutes);
+    }
+
+    [Fact]
     public void Kitchen_sink_plays_every_library_and_does_not_count_as_coverage()
     {
         var a = Library();

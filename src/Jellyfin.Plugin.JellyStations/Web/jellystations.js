@@ -1463,7 +1463,22 @@
   }
 
   function newDraft() {
-    return {
+  /** The plugin-wide padding for new stations from Settings, or null when each preset keeps its own. */
+  function newStationPadding() {
+    return (state.settings && state.settings.NewStationPadding) || null;
+  }
+
+  /** Gives a new draft the padding from Settings, if one is set. A weather channel has nothing to pad. */
+  function applyNewStationPadding(d) {
+    const p = newStationPadding();
+    if (p && d.Mode !== 'Weather') {
+      d.PaddingByLength = !!p.ByLength;
+      d.PaddingGridMinutes = p.ByLength ? 0 : (parseInt(p.GridMinutes, 10) || 0);
+    }
+    return d;
+  }
+
+    return applyNewStationPadding({
       Id: ZERO_GUID,
       Name: '',
       ChannelNumber: nextChannelNumber(),
@@ -1495,7 +1510,7 @@
       Household: { SkipFinishedDays: 0, FollowProgress: false },
       Bumpers: { Enabled: false, Sources: [], BreakMinutes: 0, MaxClipMinutes: 5, PreRoll: { Enabled: false, Sources: [] }, PostRoll: { Enabled: false, Sources: [] } },
       CardText: null
-    };
+    });
   }
 
   function normalizeStation(station) {
@@ -1832,7 +1847,8 @@
     d.CallSign = null;
     d.Enabled = true;
     d.TimeZoneId = d.TimeZoneId || base.TimeZoneId;
-    return d;
+    // A built-in preset's padding gives way to the one set in Settings; a saved template keeps its own.
+    return t.BuiltIn ? applyNewStationPadding(d) : d;
   }
 
   /** Turns a normalized station into a new, unsaved one: no id, the next channel number, no logo file, a fresh schedule. */
@@ -4492,8 +4508,10 @@
     }
     const draft = newDraft();
     draft.Pool.Sources = sources;
-    draft.PaddingByLength = true;
-    draft.PaddingGridMinutes = 0;
+    if (!newStationPadding()) {
+      draft.PaddingByLength = true;
+      draft.PaddingGridMinutes = 0;
+    }
     state.detail = null;
     withBusy('Could not open station', () => openEditorWith(draft, null, null, null)
       .then(() => toast(plural(sources.length, 'title') + ' added; name the channel and save.')));
@@ -5451,6 +5469,8 @@
     setVal('#tvsSlateColor', color);
     $('#tvsSlateColorText').textContent = color;
     setChecked('#tvsShowText', s.ShowTextOnSlate !== false);
+    const pad = s.NewStationPadding;
+    setVal('#tvsNewPadding', !pad ? '' : pad.ByLength ? 'length' : String(pad.GridMinutes || 0));
     setChecked('#tvsShowLogo', s.ShowLogoOnSlate !== false);
     setVal('#tvsGlobalExcludedTags', Array.isArray(s.ExcludedTags) ? s.ExcludedTags.join(', ') : '');
     renderHouseholdUsers(Array.isArray(s.HouseholdUserIds) ? s.HouseholdUserIds : []);
@@ -5584,7 +5604,9 @@
   }
 
   // ------------------------------------------------------------------------------------------
+    const newPadding = val('#tvsNewPadding');
   // Status
+      NewStationPadding: newPadding === '' ? null : { ByLength: newPadding === 'length', GridMinutes: newPadding === 'length' ? 0 : (parseInt(newPadding, 10) || 0) },
   // ------------------------------------------------------------------------------------------
 
   function openStatus() {
