@@ -49,10 +49,20 @@ public sealed class FactIndex
             _ => (station.Pool?.Sources ?? new List<ContentSource>()).Concat(blocks)
         };
 
+        // The station's own excluded libraries; the global ones never reach the facts at all.
+        var libraries = StationCompiler.EffectiveExcludedLibraries(station, null);
         foreach (var source in sources)
         {
+            var dropLibraries = libraries.Count > 0
+                && (LibraryContentResolver.LeavesOutLibraries(source, libraries)
+                    || (source.Kind is SourceKind.Genre or SourceKind.Tag && (source.LibraryId ?? Guid.Empty) == Guid.Empty));
             foreach (var fact in Match(source, tags))
             {
+                if (dropLibraries && fact.LibraryId is { } lib && libraries.Contains(lib))
+                {
+                    continue;
+                }
+
                 ids.Add(fact.Id);
             }
         }

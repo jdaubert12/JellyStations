@@ -172,6 +172,34 @@ public class SuggestionCoverageTests
         Assert.DoesNotContain(w.Heat.Id, index.ItemsOf(ownList));
     }
 
+    [Fact]
+    public void A_station_s_excluded_libraries_drop_broad_sources_and_collections_but_not_picks()
+    {
+        var w = new World();
+        var index = w.Index;
+        Station Leaving(Guid library, params ContentSource[] sources)
+        {
+            var station = Pool(sources);
+            station.ExcludedLibraryIds = new List<Guid> { library };
+            return station;
+        }
+
+        // Comedy from everywhere but Shows: the movies stay, the sitcom episodes go.
+        var comedy = index.ItemsOf(Leaving(ShowsLib, Source(SourceKind.Genre, genre: "Comedy")));
+        Assert.Equal(new[] { w.Elf.Id, w.Unrated.Id }.ToHashSet(), comedy);
+
+        // A Genre source set to the library on purpose still reads it.
+        var picked = Source(SourceKind.Genre, genre: "Comedy");
+        picked.LibraryId = ShowsLib;
+        Assert.Equal(4, index.ItemsOf(Leaving(ShowsLib, picked)).Count);
+
+        // A collection drops members from the left-out library; a series, a hand-pick and a Library source do not.
+        Assert.Empty(index.ItemsOf(Leaving(MoviesLib, Source(SourceKind.BoxSet, BondSet))));
+        Assert.Equal(3, index.ItemsOf(Leaving(ShowsLib, Source(SourceKind.Series, Cheers))).Count);
+        Assert.Contains(w.Heat.Id, index.ItemsOf(Leaving(MoviesLib, Source(SourceKind.Movie, w.Heat.Id))));
+        Assert.Equal(4, index.ItemsOf(Leaving(MoviesLib, Source(SourceKind.Library, MoviesLib))).Count);
+    }
+
     private static StationSuggestionDto Suggestion(string key, string category, double hours, Station station)
         => new() { Key = key, Category = category, Name = key, Hours = hours, NewHours = hours, Station = station };
 

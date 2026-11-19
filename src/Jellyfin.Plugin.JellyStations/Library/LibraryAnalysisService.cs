@@ -118,9 +118,16 @@ public sealed class LibraryAnalysisService
             return s;
         }
 
+        // Libraries excluded in Settings are not suggested from and do not count as left off a channel.
+        var allowed = _resolver.AllowedLibraries();
         foreach (var folder in _libraryManager.GetVirtualFolders().Where(v => Guid.TryParse(v.ItemId, out _)))
         {
             var libraryId = Guid.Parse(folder.ItemId);
+            if (allowed is not null && !allowed.Contains(libraryId))
+            {
+                continue;
+            }
+
             IReadOnlyList<BaseItem> items;
             try
             {

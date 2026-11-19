@@ -24,10 +24,12 @@ public sealed class StationCompiler
     /// <param name="effectiveProfile">The encoding profile in force (its audio language preference picks tracks).</param>
     /// <param name="globalExcludedTags">The plugin-wide excluded tags.</param>
     /// <param name="householdUsers">The users ticked under Settings &gt; Our household; their history is read when the station asks for it.</param>
-    public CompiledStation Compile(Station station, EncodingProfile effectiveProfile, IReadOnlyCollection<string>? globalExcludedTags = null, IReadOnlyList<Guid>? householdUsers = null)
+    /// <param name="globalExcludedLibraries">The plugin-wide excluded libraries.</param>
+    public CompiledStation Compile(Station station, EncodingProfile effectiveProfile, IReadOnlyCollection<string>? globalExcludedTags = null, IReadOnlyList<Guid>? householdUsers = null, IReadOnlyCollection<Guid>? globalExcludedLibraries = null)
     {
         var lang = effectiveProfile.AudioLanguagePreference ?? string.Empty;
         var tags = EffectiveExcludedTags(station, globalExcludedTags);
+        var libraries = EffectiveExcludedLibraries(station, globalExcludedLibraries);
         var compiled = new CompiledStation
         {
             StationId = station.Id,
@@ -43,7 +45,9 @@ public sealed class StationCompiler
             compiled.Excluded,
             tags,
             compiled.TagExcluded,
-            (source, found, kept, alreadyListed) => compiled.Sources.Add(SourceExpansion.For(section, source, found, kept, alreadyListed)));
+            (source, found, kept, alreadyListed) => compiled.Sources.Add(SourceExpansion.For(section, source, found, kept, alreadyListed)),
+            libraries,
+            compiled.LibraryExcluded);
 
         // Programs: expanded, minus the station's excluded items, minus anything under the minimum runtime.
         List<PlayableItem> Programs(List<ContentSource> sources, string section)
@@ -170,6 +174,19 @@ public sealed class StationCompiler
         }
 
         return roll.Sources.Count == 0 ? bumpers.ToList() : clips(roll.Sources);
+    }
+
+    /// <summary>The station's own excluded libraries plus the global list when the station has not opted out.</summary>
+    public static HashSet<Guid> EffectiveExcludedLibraries(Station station, IEnumerable<Guid>? globalExcludedLibraries)
+    {
+        var all = new HashSet<Guid>(station.ExcludedLibraryIds ?? new List<Guid>());
+        if (station.UseGlobalExcludedLibraries && globalExcludedLibraries is not null)
+        {
+            all.UnionWith(globalExcludedLibraries);
+        }
+
+        all.Remove(Guid.Empty);
+        return all;
     }
 
     /// <summary>The station's own excluded tags plus the global list when the station has not opted out.</summary>

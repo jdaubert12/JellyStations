@@ -23,12 +23,14 @@ public sealed class SettingsController : ControllerBase
     private readonly SettingsRepository _settings;
     private readonly StreamSessionManager _sessions;
     private readonly StationService _stations;
+    private readonly LibraryAnalysisService _analysis;
 
-    public SettingsController(SettingsRepository settings, StreamSessionManager sessions, StationService stations)
+    public SettingsController(SettingsRepository settings, StreamSessionManager sessions, StationService stations, LibraryAnalysisService analysis)
     {
         _settings = settings;
         _sessions = sessions;
         _stations = stations;
+        _analysis = analysis;
     }
 
     [HttpGet]
@@ -44,9 +46,9 @@ public sealed class SettingsController : ControllerBase
         settings.UpNextCard.Normalize();
         settings.Suggestions ??= new SuggestionThresholds();
         settings.Suggestions.Normalize();
+        settings.NewStationPadding?.Normalize();
         var errors = StationService.ValidateEncoding(settings.DefaultEncoding);
         if (settings.LingerSeconds < 0 || settings.LingerSeconds > 600)
-        settings.NewStationPadding?.Normalize();
         {
             errors.Add("Linger must be between 0 and 600 seconds.");
         }
@@ -83,6 +85,7 @@ public sealed class SettingsController : ControllerBase
         settings.StationTemplates = previous.StationTemplates ?? new List<StationTemplate>();
         settings.WeekLayouts = previous.WeekLayouts ?? new List<WeekLayout>();
         settings.HouseholdUserIds = (settings.HouseholdUserIds ?? new List<Guid>()).Where(id => id != Guid.Empty).Distinct().ToList();
+        settings.ExcludedLibraryIds = (settings.ExcludedLibraryIds ?? new List<Guid>()).Where(id => id != Guid.Empty).Distinct().ToList();
         _settings.Save(settings);
         if (!JsonFileStore.SameJson(previous.DefaultEncoding, settings.DefaultEncoding))
         {
@@ -103,7 +106,13 @@ public sealed class SettingsController : ControllerBase
         }
 
         var householdChanged = !(previous.HouseholdUserIds ?? new List<Guid>()).OrderBy(u => u).SequenceEqual(settings.HouseholdUserIds.OrderBy(u => u));
-        if (householdChanged || !previous.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).SequenceEqual(settings.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
+        var librariesChanged = !(previous.ExcludedLibraryIds ?? new List<Guid>()).OrderBy(u => u).SequenceEqual(settings.ExcludedLibraryIds.OrderBy(u => u));
+        if (librariesChanged)
+        {
+            _analysis.Invalidate();
+        }
+
+        if (householdChanged || librariesChanged || !previous.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).SequenceEqual(settings.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
         {
             _stations.RecompileAll();
         }

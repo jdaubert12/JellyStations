@@ -92,6 +92,16 @@ public sealed class Station
     /// <summary>Also apply the plugin-wide excluded tags from Settings (default on).</summary>
     public bool UseGlobalExcludedTags { get; set; } = true;
 
+    /// <summary>
+    /// Libraries this station leaves out: Genre and Tag sources with no library picked skip them, and collections and
+    /// playlists drop the items that live in them. Library sources, series, seasons, movies and episodes picked on
+    /// purpose still play, and lineups are not affected.
+    /// </summary>
+    public List<Guid> ExcludedLibraryIds { get; set; } = new();
+
+    /// <summary>Also apply the plugin-wide excluded libraries from Settings (default on).</summary>
+    public bool UseGlobalExcludedLibraries { get; set; } = true;
+
     /// <summary>Items shorter than this many minutes are skipped (pool, filler and blocks; not lineups or bumpers). 0 = off.</summary>
     public int MinRuntimeMinutes { get; set; }
 

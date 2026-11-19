@@ -510,6 +510,7 @@ public sealed class StationService
 
         Add(compiled.UserExcluded, "Excluded", true);
         Add(compiled.TagExcluded, "Excluded by tag", true, byRule: true);
+        Add(compiled.LibraryExcluded ?? new List<PlayableItem>(), "Excluded by library", true, byRule: true);
         Add(compiled.HouseholdExcluded, "Watched recently", true, byRule: true);
 
         var bySource = rows.Where(r => !r.Excluded).GroupBy(r => r.Source).ToDictionary(g => g.Key, g => g.Count());
@@ -522,7 +523,7 @@ public sealed class StationService
             Items = rows.Skip(offset).Take(limit).ToList(),
             UniqueHours = Math.Round(uniqueTicks / TimeSpan.TicksPerHour, 1),
             CycleHours = station.Mode == ScheduleMode.Pool ? Math.Round(compiled.Pool.Sum(i => (double)i.RuntimeTicks) / TimeSpan.TicksPerHour, 1) : null,
-            ExcludedCount = compiled.UserExcluded.Count + compiled.TagExcluded.Count + compiled.HouseholdExcluded.Count,
+            ExcludedCount = compiled.UserExcluded.Count + compiled.TagExcluded.Count + (compiled.LibraryExcluded?.Count ?? 0) + compiled.HouseholdExcluded.Count,
             BySource = bySource
         };
     }
@@ -586,7 +587,7 @@ public sealed class StationService
     private CompiledStation Compile(Station station)
     {
         var settings = _settings.Get();
-        return _compiler.Compile(station, EffectiveProfile(station), settings.ExcludedTags, settings.HouseholdUserIds);
+        return _compiler.Compile(station, EffectiveProfile(station), settings.ExcludedTags, settings.HouseholdUserIds, settings.ExcludedLibraryIds);
     }
 
     /// <summary>
@@ -763,6 +764,7 @@ public sealed class StationService
         s.ActiveWindows ??= new List<SeasonWindow>();
         s.ExcludedItemIds = (s.ExcludedItemIds ?? new List<Guid>()).Where(g => g != Guid.Empty).Distinct().ToList();
         s.ExcludedTags = NormalizeTags(s.ExcludedTags);
+        s.ExcludedLibraryIds = (s.ExcludedLibraryIds ?? new List<Guid>()).Where(g => g != Guid.Empty).Distinct().ToList();
         foreach (var w in s.ActiveWindows)
         {
             w.Label = Text.TrimOrNull(w.Label);

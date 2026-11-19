@@ -59,6 +59,20 @@ public sealed class StationImportResolver
             }
         }
 
+        if (draft.ExcludedLibraryIds is { Count: > 0 })
+        {
+            var libraries = _libraryManager.GetVirtualFolders()
+                .Select(v => Guid.TryParse(v.ItemId, out var id) ? id : Guid.Empty)
+                .ToHashSet();
+            var known = draft.ExcludedLibraryIds.Where(libraries.Contains).ToList();
+            var dropped = draft.ExcludedLibraryIds.Count - known.Count;
+            if (dropped > 0)
+            {
+                draft.ExcludedLibraryIds = known;
+                result.Unmatched.Add($"{dropped} excluded librar{(dropped == 1 ? "y" : "ies")} unknown on this server were dropped");
+            }
+        }
+
         return result;
     }
 

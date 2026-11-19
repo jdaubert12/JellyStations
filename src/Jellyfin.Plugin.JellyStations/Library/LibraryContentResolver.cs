@@ -19,12 +19,51 @@ public sealed class LibraryContentResolver
     private readonly ILibraryManager _libraryManager;
     private readonly ILogger<LibraryContentResolver> _logger;
     private readonly ClipFolderScanner? _clips;
+    private readonly Storage.SettingsRepository? _settings;
 
-    public LibraryContentResolver(ILibraryManager libraryManager, ILogger<LibraryContentResolver> logger, ClipFolderScanner? clips = null)
+    public LibraryContentResolver(ILibraryManager libraryManager, ILogger<LibraryContentResolver> logger, ClipFolderScanner? clips = null, Storage.SettingsRepository? settings = null)
     {
         _libraryManager = libraryManager;
         _logger = logger;
         _clips = clips;
+        _settings = settings;
+    }
+
+    /// <summary>
+    /// The libraries the library analysis (suggestions, "Not on a channel") may read, or null when none are excluded
+    /// in Settings. See <see cref="GlobalSettings.ExcludedLibraryIds"/>. Stations get theirs through Expand.
+    /// </summary>
+    public IReadOnlyList<Guid>? AllowedLibraries()
+    {
+        var excluded = _settings?.Get().ExcludedLibraryIds;
+        return excluded is null || excluded.Count == 0 ? null : AllowedLibraries(AllLibraryIds(), excluded);
+    }
+
+    private IEnumerable<Guid> AllLibraryIds()
+        => _libraryManager.GetVirtualFolders()
+            .Select(v => Guid.TryParse(v.ItemId, out var id) ? id : Guid.Empty)
+            .Where(id => id != Guid.Empty);
+
+    /// <summary>Every library in <paramref name="all"/> that is not in <paramref name="excluded"/>, in order, without repeats.</summary>
+    public static IReadOnlyList<Guid> AllowedLibraries(IEnumerable<Guid> all, IEnumerable<Guid> excluded)
+    {
+        var drop = new HashSet<Guid>(excluded);
+        return all.Where(id => !drop.Contains(id)).Distinct().ToList();
+    }
+
+    /// <summary>
+    /// Merges per-library results back into one list in the order a single whole-server query returns (sort name,
+    /// then season, then episode), keeping the first copy of an item found in two libraries.
+    /// </summary>
+    public static List<BaseItem> MergeLibraryResults(IEnumerable<IEnumerable<BaseItem>> perLibrary)
+    {
+        var seen = new HashSet<Guid>();
+        return perLibrary.SelectMany(l => l)
+            .Where(i => seen.Add(i.Id))
+            .OrderBy(i => i.SortName ?? i.Name ?? string.Empty, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(i => i.ParentIndexNumber ?? -1)
+            .ThenBy(i => i.IndexNumber ?? -1)
+            .ToList();
     }
 
     /// <summary>
@@ -42,7 +81,9 @@ public sealed class LibraryContentResolver
         List<ExcludedItem> excluded,
         IReadOnlyCollection<string>? excludedTags = null,
         List<PlayableItem>? tagExcluded = null,
-        Action<ContentSource, int, int, int>? onSource = null)
+        Action<ContentSource, int, int, int>? onSource = null,
+        IReadOnlyCollection<Guid>? excludedLibraries = null,
+        List<PlayableItem>? libraryExcluded = null)
     {
         var result = new List<PlayableItem>();
         var seen = new HashSet<Guid>();
@@ -85,7 +126,7 @@ public sealed class LibraryContentResolver
                 }
             }
 
-            foreach (var item in source.Kind == SourceKind.Folder ? Array.Empty<BaseItem>() : ExpandSource(source))
+            foreach (var item in source.Kind == SourceKind.Folder ? Array.Empty<BaseItem>() : ExpandSource(source, excludedLibraries))
             {
                 found++;
                 if (!seen.Add(item.Id))
@@ -97,6 +138,17 @@ public sealed class LibraryContentResolver
                 var playable = ToPlayable(item, tracks, excluded);
                 if (playable is null)
                 {
+                    continue;
+                }
+
+                if (!pinned.Contains(playable.ItemId) && LeavesOutLibraries(source, excludedLibraries) && InLibraries(item, excludedLibraries!))
+                {
+                    if (libraryExcluded is null || libraryExcluded.All(t => t.ItemId != playable.ItemId))
+                    {
+                        libraryExcluded?.Add(playable);
+                        excluded.Add(new ExcludedItem { ItemId = playable.ItemId, Name = playable.DisplayTitle, Reason = ExclusionReason.LibraryExcluded });
+                    }
+
                     continue;
                 }
 
@@ -161,7 +213,7 @@ public sealed class LibraryContentResolver
     /// the excluded tags the way <see cref="Expand"/> does. Hand-picked Movie/Episode sources are not consulted: the point
     /// is to tell the editor that a wider source (genre, tag, series, collection, playlist, library) already covers a hand-pick.
     /// </summary>
-    public Dictionary<Guid, ContentSource> CoveredBy(IEnumerable<ContentSource> sources, IEnumerable<Guid> itemIds, IReadOnlyCollection<string>? excludedTags)
+    public Dictionary<Guid, ContentSource> CoveredBy(IEnumerable<ContentSource> sources, IEnumerable<Guid> itemIds, IReadOnlyCollection<string>? excludedTags, IReadOnlyCollection<Guid>? excludedLibraries = null)
     {
         var result = new Dictionary<Guid, ContentSource>();
         var wanted = new HashSet<Guid>(itemIds.Where(g => g != Guid.Empty));
@@ -179,9 +231,15 @@ public sealed class LibraryContentResolver
             }
 
             var dropTags = EffectiveExcludedTags(source, excludedTags);
-            foreach (var item in ExpandSource(source))
+            var dropLibraries = LeavesOutLibraries(source, excludedLibraries);
+            foreach (var item in ExpandSource(source, excludedLibraries))
             {
                 if (!wanted.Contains(item.Id) || result.ContainsKey(item.Id))
+                {
+                    continue;
+                }
+
+                if (dropLibraries && InLibraries(item, excludedLibraries!))
                 {
                     continue;
                 }
@@ -235,7 +293,34 @@ public sealed class LibraryContentResolver
         return ToPlayable(item, audioLanguage, excluded);
     }
 
-    public IEnumerable<BaseItem> ExpandSource(ContentSource source)
+    /// <summary>
+    /// True when <paramref name="source"/> drops items by library one at a time: collections and playlists, which can
+    /// hold items from any library. Genre and Tag sources skip excluded libraries in the query itself
+    /// (<see cref="ExpandSource"/>); everything else names its content on purpose.
+    /// </summary>
+    public static bool LeavesOutLibraries(ContentSource source, IReadOnlyCollection<Guid>? excludedLibraries)
+        => excludedLibraries is { Count: > 0 } && source.Kind is SourceKind.BoxSet or SourceKind.Playlist;
+
+    /// <summary>True when the item lives in one of <paramref name="libraries"/> (any of them, if it is in several).</summary>
+    private bool InLibraries(BaseItem item, IReadOnlyCollection<Guid> libraries)
+    {
+        try
+        {
+            return _libraryManager.GetCollectionFolders(item).Any(f => libraries.Contains(f.Id));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "JellyStations: could not tell which library {Item} is in", Text.ForLog(item.Name));
+            return false;
+        }
+    }
+
+    /// <param name="source">The source to expand.</param>
+    /// <param name="excludedLibraries">
+    /// Libraries a Genre or Tag source with no library picked skips. Collections and playlists are filtered by
+    /// <see cref="Expand"/> instead, so the items they lose can be reported.
+    /// </param>
+    public IEnumerable<BaseItem> ExpandSource(ContentSource source, IReadOnlyCollection<Guid>? excludedLibraries = null)
     {
         try
         {
@@ -262,10 +347,10 @@ public sealed class LibraryContentResolver
                     }
 
                 case SourceKind.Genre:
-                    return Tuned(ByGenre(source), source);
+                    return Tuned(ByGenre(source, excludedLibraries), source);
 
                 case SourceKind.Tag:
-                    return Tuned(ByTag(source), source);
+                    return Tuned(ByTag(source, excludedLibraries), source);
 
                 case SourceKind.Library:
                     return source.ItemId.HasValue ? Tuned(FilterKinds(VideosUnder(source.ItemId.Value), source), source) : Array.Empty<BaseItem>();
@@ -465,14 +550,14 @@ public sealed class LibraryContentResolver
         }
     }
 
-    private IReadOnlyList<BaseItem> ByGenre(ContentSource source)
-        => ByGenreOrTag(source, source.Genre, q => q.Genres = new[] { source.Genre! });
+    private IReadOnlyList<BaseItem> ByGenre(ContentSource source, IReadOnlyCollection<Guid>? excludedLibraries)
+        => ByGenreOrTag(source, source.Genre, q => q.Genres = new[] { source.Genre! }, excludedLibraries);
 
     /// <summary>Movies and episodes tagged with source.Tag, plus every episode of a series carrying the tag.</summary>
-    private IReadOnlyList<BaseItem> ByTag(ContentSource source)
-        => ByGenreOrTag(source, source.Tag, q => q.Tags = new[] { source.Tag!.Trim() });
+    private IReadOnlyList<BaseItem> ByTag(ContentSource source, IReadOnlyCollection<Guid>? excludedLibraries)
+        => ByGenreOrTag(source, source.Tag, q => q.Tags = new[] { source.Tag!.Trim() }, excludedLibraries);
 
-    private IReadOnlyList<BaseItem> ByGenreOrTag(ContentSource source, string? term, Action<InternalItemsQuery> apply)
+    private IReadOnlyList<BaseItem> ByGenreOrTag(ContentSource source, string? term, Action<InternalItemsQuery> apply, IReadOnlyCollection<Guid>? excludedLibraries)
     {
         if (string.IsNullOrWhiteSpace(term))
         {
@@ -498,17 +583,32 @@ public sealed class LibraryContentResolver
             OrderBy = new[] { (ItemSortBy.SortName, SortOrder.Ascending), (ItemSortBy.ParentIndexNumber, SortOrder.Ascending), (ItemSortBy.IndexNumber, SortOrder.Ascending) },
             DtoOptions = new DtoOptions(true)
         };
-        void Restrict(InternalItemsQuery q)
+        // A library picked on the source wins; otherwise the whole server, less the libraries the station leaves out.
+        var picked = source.LibraryId is { } lib && lib != Guid.Empty ? lib : (Guid?)null;
+        var allowed = picked is null && excludedLibraries is { Count: > 0 } ? AllowedLibraries(AllLibraryIds(), excludedLibraries) : null;
+
+        IReadOnlyList<BaseItem> Run(InternalItemsQuery q)
         {
             apply(q);
-            if (source.LibraryId.HasValue && source.LibraryId.Value != Guid.Empty)
+            if (picked is { } one)
             {
-                q.ParentId = source.LibraryId.Value;
+                q.ParentId = one;
+                return _libraryManager.GetItemList(q);
             }
+
+            if (allowed is null)
+            {
+                return _libraryManager.GetItemList(q);
+            }
+
+            return MergeLibraryResults(allowed.Select(id =>
+            {
+                q.ParentId = id;
+                return _libraryManager.GetItemList(q);
+            }).ToList());
         }
 
-        Restrict(query);
-        var items = _libraryManager.GetItemList(query);
+        var items = Run(query);
 
         // Episodes whose own genre/tag list is empty inherit from the series; include those too.
         if (kinds.Contains(BaseItemKind.Episode))
@@ -519,11 +619,9 @@ public sealed class LibraryContentResolver
                 Recursive = true,
                 DtoOptions = new DtoOptions(true)
             };
-            Restrict(seriesQuery);
-
             var list = items.ToList();
             var seen = new HashSet<Guid>(list.Select(i => i.Id));
-            foreach (var series in _libraryManager.GetItemList(seriesQuery))
+            foreach (var series in Run(seriesQuery))
             {
                 foreach (var ep in EpisodesOfSeries(series.Id))
                 {

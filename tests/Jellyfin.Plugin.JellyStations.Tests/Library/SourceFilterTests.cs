@@ -12,6 +12,49 @@ public class SourceFilterTests
     private static List<BaseItem> Episodes(params int[] seasons) => seasons.Select(s => (BaseItem)new Episode { ParentIndexNumber = s }).ToList();
 
     [Fact]
+    public void AllowedLibraries_DropsExcluded_KeepsOrder_NoRepeats()
+    {
+        Guid a = Guid.NewGuid(), b = Guid.NewGuid(), c = Guid.NewGuid();
+        Assert.Equal(new[] { a, c }, LibraryContentResolver.AllowedLibraries(new[] { a, b, c, a }, new[] { b }));
+        Assert.Empty(LibraryContentResolver.AllowedLibraries(new[] { a }, new[] { a }));
+    }
+
+    [Fact]
+    public void StationExcludedLibraries_MergeWithGlobal_UnlessOptedOut()
+    {
+        Guid own = Guid.NewGuid(), global = Guid.NewGuid();
+        var station = new Station { ExcludedLibraryIds = { own, Guid.Empty } };
+        Assert.Equal(new[] { own, global }.ToHashSet(), StationCompiler.EffectiveExcludedLibraries(station, new[] { global }));
+
+        station.UseGlobalExcludedLibraries = false;
+        Assert.Equal(new[] { own }.ToHashSet(), StationCompiler.EffectiveExcludedLibraries(station, new[] { global }));
+    }
+
+    [Fact]
+    public void LeavesOutLibraries_OnlyCollectionsAndPlaylists_AndOnlyWithALibraryToLeaveOut()
+    {
+        var some = new[] { Guid.NewGuid() };
+        Assert.True(LibraryContentResolver.LeavesOutLibraries(new ContentSource { Kind = SourceKind.BoxSet }, some));
+        Assert.True(LibraryContentResolver.LeavesOutLibraries(new ContentSource { Kind = SourceKind.Playlist }, some));
+        Assert.False(LibraryContentResolver.LeavesOutLibraries(new ContentSource { Kind = SourceKind.Playlist }, Array.Empty<Guid>()));
+        Assert.False(LibraryContentResolver.LeavesOutLibraries(new ContentSource { Kind = SourceKind.Series }, some));
+        Assert.False(LibraryContentResolver.LeavesOutLibraries(new ContentSource { Kind = SourceKind.Library }, some));
+    }
+
+    [Fact]
+    public void MergeLibraryResults_SortsLikeOneQuery_AndDropsRepeats()
+    {
+        Episode Ep(Guid id, string sort, int season, int number) => new() { Id = id, SortName = sort, ParentIndexNumber = season, IndexNumber = number };
+        Guid shared = Guid.NewGuid();
+        var tv = new List<BaseItem> { Ep(Guid.NewGuid(), "M*A*S*H", 1, 2), Ep(shared, "Taxi", 1, 1) };
+        var kids = new List<BaseItem> { Ep(Guid.NewGuid(), "Bluey", 2, 1), Ep(Guid.NewGuid(), "M*A*S*H", 1, 1), Ep(shared, "Taxi", 1, 1) };
+
+        var merged = LibraryContentResolver.MergeLibraryResults(new[] { tv, kids });
+
+        Assert.Equal(new[] { "Bluey 2x1", "M*A*S*H 1x1", "M*A*S*H 1x2", "Taxi 1x1" }, merged.Select(i => $"{i.SortName} {i.ParentIndexNumber}x{i.IndexNumber}"));
+    }
+
+    [Fact]
     public void FilterSeasons_NoSettings_ReturnsEverything()
     {
         var eps = Episodes(0, 1, 2, 3);

@@ -46,6 +46,12 @@ public sealed class GlobalSettings
     /// </summary>
     public List<string> ExcludedTags { get; set; } = new();
 
+    /// <summary>
+    /// Libraries left out of every station unless it opts out (<see cref="Station.UseGlobalExcludedLibraries"/>), the
+    /// same way as <see cref="Station.ExcludedLibraryIds"/>, and out of station suggestions and "Not on a channel".
+    /// </summary>
+    public List<Guid> ExcludedLibraryIds { get; set; } = new();
+
     /// <summary>Saved time blocks (days, time, sources, order) that can be added to any station.</summary>
     public List<SlotBlock> BlockTemplates { get; set; } = new();
 

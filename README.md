@@ -216,6 +216,20 @@ Tag source for that same tag are never affected, whatever order the sources are 
 holiday station keeps its films while "christmas" stays off every regular channel all year. Items
 dropped by a tag rule appear in the Content section marked "by tag".
 
+### Excluded libraries
+
+A **Genre** or **Tag** source with no library picked searches every library on the server, and so do
+station suggestions and "Not on a channel". **Excluded libraries**, per station or plugin-wide in
+Settings, leave libraries out of that: a Genre or Tag source with no library picked skips them, and a
+collection or playlist drops the items that live in them (listed in the Content section as "by
+library"). Picking a library on purpose still plays it: a Library source, a Genre or Tag source set to
+that library, or a series, season, movie or episode from it. A station follows the plugin-wide list
+unless it turns off **Also apply the excluded libraries from Settings**, so a Kids channel can leave out
+a horror library of its own while a holiday channel still reads a library left out everywhere else.
+Libraries excluded in Settings are also left out of station suggestions and "Not on a channel".
+Changing either list recompiles the stations it touches. Importing a station from another server drops
+the libraries this one does not have.
+
 ### Family hours
 
 Pools can carry **family hours** (daytime rating rules) such as "nothing above PG between 06:00 and
@@ -592,8 +606,8 @@ number and what the channel plays), **What plays** (shows, films and how they pl
 onto a seven-day grid: click or drag to add one, drag sideways to cover several days, click a block to
 edit it. The rarely needed settings (call sign, padding grid, schedule anchor, card text, encoding) sit
 under **Advanced** at the bottom of every step. **All settings** shows the whole form on one page.
-Step 2 also has a **Leave out** section: tags to exclude, the minimum length, and whether the
-plugin-wide excluded tags from Settings apply to this station.
+Step 2 also has a **Leave out** section: tags and libraries to exclude, the minimum length, and
+whether the plugin-wide excluded tags and libraries from Settings apply to this station.
 
 ### Keeping stations fresh
 
@@ -846,8 +860,8 @@ by title, genre, rating or library.
   kind of channel (see [Filling out the lineup](#filling-out-the-lineup)). Values out of range are
   pulled back into it on save. This replaces the "Include small channels" box the suggestions page
   used to have.
-- **Excluded tags** (plugin-wide), **station templates**, **block templates** and **week layouts** are
-  managed here too; see [Tags](#tags), [Station templates](#station-templates),
+- **Excluded tags** and **excluded libraries** (plugin-wide), **station templates**, **block templates** and **week layouts** are
+  managed here too; see [Tags](#tags), [Excluded libraries](#excluded-libraries), [Station templates](#station-templates),
   [Time block repeats and templates](#time-block-repeats-and-templates) and [Week layouts](#week-layouts).
 
 ## Troubleshooting

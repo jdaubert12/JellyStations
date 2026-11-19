@@ -55,7 +55,8 @@
     TagExcluded: 'Excluded by tag',
     TooShort: 'Shorter than the station minimum',
     HouseholdWatched: 'Watched by the household recently',
-    Unreadable: 'Could not be read as a video'
+    Unreadable: 'Could not be read as a video',
+    LibraryExcluded: 'In a library this station leaves out'
   };
   const RESOLUTIONS = [['3840x2160', '3840 × 2160 (4K)'], ['1920x1080', '1920 × 1080 (1080p)'], ['1280x720', '1280 × 720 (720p)'], ['854x480', '854 × 480 (480p)'], ['custom', 'Custom']];
   const ENCODERS = [['libx264', 'libx264 (software)'], ['h264_nvenc', 'h264_nvenc (NVIDIA)'], ['h264_qsv', 'h264_qsv (Intel Quick Sync)'], ['h264_vaapi', 'h264_vaapi (VA-API)'], ['libx265', 'libx265 (software, HEVC)'], ['hevc_nvenc', 'hevc_nvenc (NVIDIA, HEVC)'], ['hevc_qsv', 'hevc_qsv (Intel Quick Sync, HEVC)'], ['hevc_vaapi', 'hevc_vaapi (VA-API, HEVC)'], ['custom', 'Custom…']];
@@ -1462,7 +1463,6 @@
     return String(max + 1);
   }
 
-  function newDraft() {
   /** The plugin-wide padding for new stations from Settings, or null when each preset keeps its own. */
   function newStationPadding() {
     return (state.settings && state.settings.NewStationPadding) || null;
@@ -1478,6 +1478,7 @@
     return d;
   }
 
+  function newDraft() {
     return applyNewStationPadding({
       Id: ZERO_GUID,
       Name: '',
@@ -1506,6 +1507,8 @@
       ExcludedItemIds: [],
       ExcludedTags: [],
       UseGlobalExcludedTags: true,
+      ExcludedLibraryIds: [],
+      UseGlobalExcludedLibraries: true,
       MinRuntimeMinutes: 0,
       Household: { SkipFinishedDays: 0, FollowProgress: false },
       Bumpers: { Enabled: false, Sources: [], BreakMinutes: 0, MaxClipMinutes: 5, PreRoll: { Enabled: false, Sources: [] }, PostRoll: { Enabled: false, Sources: [] } },
@@ -1546,6 +1549,8 @@
     s.ExcludedTags = Array.isArray(s.ExcludedTags) ? s.ExcludedTags : [];
     s.PaddingByLength = !!s.PaddingByLength;
     s.UseGlobalExcludedTags = s.UseGlobalExcludedTags !== false;
+    s.ExcludedLibraryIds = Array.isArray(s.ExcludedLibraryIds) ? s.ExcludedLibraryIds : [];
+    s.UseGlobalExcludedLibraries = s.UseGlobalExcludedLibraries !== false;
     s.MinRuntimeMinutes = clampTo(s.MinRuntimeMinutes, LIMITS.minRuntimeMinutes);
     s.Bumpers = s.Bumpers || {};
     s.Bumpers.Enabled = !!s.Bumpers.Enabled;
@@ -2029,6 +2034,8 @@
     setVal('#tvsCardText', d.CardText || '');
     setVal('#tvsExcludedTags', d.ExcludedTags.join(', '));
     setChecked('#tvsUseGlobalTags', d.UseGlobalExcludedTags !== false);
+    renderLibraryChecks('#tvsStationLibraries', '#tvsStationLibrariesEmpty', d.ExcludedLibraryIds);
+    setChecked('#tvsUseGlobalLibraries', d.UseGlobalExcludedLibraries !== false);
     setVal('#tvsMinRuntime', d.MinRuntimeMinutes || 0);
     setVal('#tvsHouseholdDays', d.Household.SkipFinishedDays || 0);
     setChecked('#tvsHouseholdFollow', !!d.Household.FollowProgress);
@@ -2709,6 +2716,8 @@
     d.UpNextCard = checked('#tvsUpNextCustom') ? state.stationUpNext.get() : null;
     d.ExcludedTags = parseTagList(val('#tvsExcludedTags'));
     d.UseGlobalExcludedTags = checked('#tvsUseGlobalTags');
+    d.ExcludedLibraryIds = checkedLibraries('#tvsStationLibraries', d.ExcludedLibraryIds);
+    d.UseGlobalExcludedLibraries = checked('#tvsUseGlobalLibraries');
     d.MinRuntimeMinutes = clampTo(val('#tvsMinRuntime'), LIMITS.minRuntimeMinutes);
     d.Household.SkipFinishedDays = clampTo(val('#tvsHouseholdDays'), LIMITS.householdDays);
     d.Household.FollowProgress = checked('#tvsHouseholdFollow');
@@ -5460,6 +5469,8 @@
     state.settingsOverlay.set(s.LogoOverlay);
     state.settingsUpNext.set(s.UpNextCard);
     renderOverrideCounts();
+    const pad = s.NewStationPadding;
+    setVal('#tvsNewPadding', !pad ? '' : pad.ByLength ? 'length' : String(pad.GridMinutes || 0));
     setVal('#tvsLinger', s.LingerSeconds !== undefined ? s.LingerSeconds : 30);
     setVal('#tvsIdleStop', s.IdleStopSeconds !== undefined ? s.IdleStopSeconds : 120);
     setVal('#tvsMaxSessions', s.MaxConcurrentSessions !== undefined ? s.MaxConcurrentSessions : 4);
@@ -5469,11 +5480,10 @@
     setVal('#tvsSlateColor', color);
     $('#tvsSlateColorText').textContent = color;
     setChecked('#tvsShowText', s.ShowTextOnSlate !== false);
-    const pad = s.NewStationPadding;
-    setVal('#tvsNewPadding', !pad ? '' : pad.ByLength ? 'length' : String(pad.GridMinutes || 0));
     setChecked('#tvsShowLogo', s.ShowLogoOnSlate !== false);
     setVal('#tvsGlobalExcludedTags', Array.isArray(s.ExcludedTags) ? s.ExcludedTags.join(', ') : '');
     renderHouseholdUsers(Array.isArray(s.HouseholdUserIds) ? s.HouseholdUserIds : []);
+    renderExcludedLibraries(Array.isArray(s.ExcludedLibraryIds) ? s.ExcludedLibraryIds : []);
     const sug = s.Suggestions || {};
     SUGGESTION_FIELDS.forEach(f => setVal(f.id, sug[f.key] !== undefined && sug[f.key] !== null ? sug[f.key] : f.fallback));
     renderTemplateRows('BlockTemplates', Array.isArray(s.BlockTemplates) ? s.BlockTemplates : []);
@@ -5548,6 +5558,42 @@
     }).catch(() => draw([]));
   }
 
+  /** Settings, Content rules: one checkbox per video library; ticked = left out of whole-server searches. */
+  function renderExcludedLibraries(ids) {
+    renderLibraryChecks('#tvsExcludedLibraries', '#tvsExcludedLibrariesEmpty', ids);
+  }
+
+  /** The library ids ticked in a list drawn by renderLibraryChecks; `fallback` while the list has not drawn yet. */
+  function checkedLibraries(hostSel, fallback) {
+    const boxes = $all(hostSel + ' input[type="checkbox"]');
+    return boxes.length ? boxes.filter(b => b.checked).map(b => b.value) : (fallback || []);
+  }
+
+  /** One checkbox per video library under hostSel, ticked for `ids`. */
+  function renderLibraryChecks(hostSel, emptySel, ids) {
+    const host = clear($(hostSel));
+    // A newer draw (another station opened meanwhile) wins; an older one that resolves late draws nothing.
+    const gen = String((parseInt(host.getAttribute('data-gen'), 10) || 0) + 1);
+    host.setAttribute('data-gen', gen);
+    const key = id => String(id || '').replace(/-/g, '').toLowerCase();
+    const selected = {};
+    ids.forEach(id => { selected[key(id)] = true; });
+    // Libraries that hold no programs (music, books, photos) are never searched by a station, so they are not offered.
+    const notVideo = { music: 1, books: 1, photos: 1, playlists: 1, boxsets: 1, livetv: 1 };
+    cachedList('libraries', 'Library/Libraries').then(libs => {
+      if (host.getAttribute('data-gen') !== gen) {
+        return;
+      }
+      const list = libs.filter(l => !notVideo[String(l.CollectionType || '').toLowerCase()] || selected[key(l.Id)]);
+      show($(emptySel), !list.length);
+      list.forEach(l => {
+        const box = el('input', { type: 'checkbox', value: l.Id });
+        box.checked = !!selected[key(l.Id)];
+        host.appendChild(el('label', { className: 'tvs-day', title: 'Leave this library out' }, [box, el('span', { text: l.Name })]));
+      });
+    }).catch(() => show($(emptySel), true));
+  }
+
   function saveSettings() {
     const suggestions = {};
     const suggestionErrors = [];
@@ -5558,7 +5604,9 @@
       }
       suggestions[f.key] = n;
     });
+    const newPadding = val('#tvsNewPadding');
     const payload = {
+      NewStationPadding: newPadding === '' ? null : { ByLength: newPadding === 'length', GridMinutes: newPadding === 'length' ? 0 : (parseInt(newPadding, 10) || 0) },
       DefaultEncoding: state.settingsEncoding.get(),
       LogoOverlay: state.settingsOverlay.get(),
       UpNextCard: state.settingsUpNext.get(),
@@ -5572,6 +5620,8 @@
       ShowLogoOnSlate: checked('#tvsShowLogo'),
       ExcludedTags: parseTagList(val('#tvsGlobalExcludedTags')),
       HouseholdUserIds: Array.from($all('#tvsHouseholdUsers input[type="checkbox"]')).filter(b => b.checked).map(b => b.value),
+      // Before the library list has drawn (or if it failed), keep what was saved rather than clearing it.
+      ExcludedLibraryIds: checkedLibraries('#tvsExcludedLibraries', state.settings && state.settings.ExcludedLibraryIds),
       Suggestions: suggestions
       // Block and station templates are kept server side; PUT Settings leaves them as they are.
     };
@@ -5604,9 +5654,7 @@
   }
 
   // ------------------------------------------------------------------------------------------
-    const newPadding = val('#tvsNewPadding');
   // Status
-      NewStationPadding: newPadding === '' ? null : { ByLength: newPadding === 'length', GridMinutes: newPadding === 'length' ? 0 : (parseInt(newPadding, 10) || 0) },
   // ------------------------------------------------------------------------------------------
 
   function openStatus() {

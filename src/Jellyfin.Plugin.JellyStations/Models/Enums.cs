@@ -107,5 +107,8 @@ public enum ExclusionReason
     HouseholdWatched,
 
     /// <summary>A file in a clip folder that ffprobe could not read as a video with a length.</summary>
-    Unreadable
+    Unreadable,
+
+    /// <summary>A collection or playlist item that lives in a library the station leaves out.</summary>
+    LibraryExcluded
 }
