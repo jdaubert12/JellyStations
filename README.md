@@ -854,6 +854,10 @@ by title, genre, rating or library.
   reports a viewer gone when the client says so or its connection closes, so a killed app, a TV
   switched off on a channel or a dropped network can leave the count stuck at 1 and ffmpeg
   encoding for nobody; the reader count tells the truth within seconds.
+- **New stations**: the padding grid (none, 5/10/15/30/60 minutes, or by length) a new station starts
+  with, whether blank, from a built-in preset, from "Not on a channel" or from a suggestion; "Each
+  preset's own" leaves each its own choice. A saved station template keeps the padding it was saved
+  with, and a station's own padding can be changed freely afterwards.
 - **Max concurrent sessions**: cap on simultaneously encoded stations.
 - **Slate**: color and whether to draw text / the station logo on break cards.
 - **Station suggestions**: how much the library must hold before **Suggest stations** proposes each
