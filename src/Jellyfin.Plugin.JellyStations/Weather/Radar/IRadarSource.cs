@@ -6,7 +6,7 @@ namespace Jellyfin.Plugin.JellyStations.Weather.Radar;
 /// <summary>A place where precipitation radar imagery comes from. Sources are tried in registration order; the first that covers a place wins.</summary>
 public interface IRadarSource
 {
-    /// <summary>Short stable id ("nexrad", "rainviewer"), part of the cached frame file names.</summary>
+    /// <summary>Short stable id ("mrms", "rainviewer"), part of the cached frame file names.</summary>
     string Id { get; }
 
     /// <summary>What the screen calls it.</summary>
@@ -56,8 +56,9 @@ public sealed class RadarHttp
     /// <summary>
     /// Fetches the window's slippy-map tiles and draws them onto one transparent PNG of the window. A tile that fails
     /// is reported to <paramref name="onTileFailed"/> and left blank; the PNG is null only when every tile failed.
+    /// <paramref name="finish"/> can repaint the stitched window before it is encoded.
     /// </summary>
-    public async Task<(byte[]? Png, Exception? LastError)> StitchTilesAsync(RadarViewport viewport, Func<int, int, string> tileUrl, Action<Exception, int, int> onTileFailed, CancellationToken ct)
+    public async Task<(byte[]? Png, Exception? LastError)> StitchTilesAsync(RadarViewport viewport, Func<int, int, string> tileUrl, Action<Exception, int, int> onTileFailed, CancellationToken ct, Action<SKBitmap>? finish = null)
     {
         using var bitmap = new SKBitmap(viewport.DataWidth, viewport.DataHeight, SKColorType.Rgba8888, SKAlphaType.Premul);
         using var canvas = new SKCanvas(bitmap);
@@ -95,6 +96,7 @@ public sealed class RadarHttp
         }
 
         canvas.Flush();
+        finish?.Invoke(bitmap);
         using var image = SKImage.FromBitmap(bitmap);
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
         return (data.ToArray(), lastError);

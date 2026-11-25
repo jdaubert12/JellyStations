@@ -4,6 +4,7 @@ using Jellyfin.Plugin.JellyStations.Streaming;
 using Jellyfin.Plugin.JellyStations.Weather;
 using Jellyfin.Plugin.JellyStations.Weather.Radar;
 using Jellyfin.Plugin.JellyStations.Weather.Screens;
+using Microsoft.Extensions.Logging.Abstractions;
 using SkiaSharp;
 using Xunit;
 
@@ -73,12 +74,14 @@ public class RadarTests
         Assert.Equal(zoom, WebMercator.ZoomOf(area));
     }
 
-    // ---- NEXRAD -------------------------------------------------------------------------------
+    // ---- MRMS ---------------------------------------------------------------------------------
+
+    private static MrmsSource Mrms() => new(null!, NullLogger<MrmsSource>.Instance);
 
     [Fact]
-    public void Nexrad_CoversTheLower48_NotTokyoOrHonolulu()
+    public void Mrms_CoversTheLower48_NotTokyoOrHonolulu()
     {
-        var source = new NexradSource(null!);
+        var source = Mrms();
 
         Assert.True(source.Covers(Boston.Latitude, Boston.Longitude));
         Assert.True(source.Covers(39.74, -104.99));
@@ -88,36 +91,43 @@ public class RadarTests
     }
 
     [Fact]
-    public async Task Nexrad_AsksForFiveMinuteFrames_AFewMinutesBehindTheClock()
+    public async Task Mrms_AsksForSixMinuteFrames_BehindTheClock()
     {
-        var source = new NexradSource(null!);
+        var now = new DateTime(2026, 11, 25, 13, 17, 40, DateTimeKind.Utc);
+        var times = await Mrms().FrameTimesAsync(now, 10, CancellationToken.None);
 
-        Assert.Equal(new DateTime(2026, 10, 26, 21, 30, 0, DateTimeKind.Utc), NexradSource.NewestFrame(Now));
-        var times = await source.FrameTimesAsync(Now, 10, CancellationToken.None);
         Assert.Equal(10, times.Count);
-        Assert.Equal(new DateTime(2026, 10, 26, 21, 30, 0, DateTimeKind.Utc), times[^1]);
-        Assert.Equal(new DateTime(2026, 10, 26, 20, 45, 0, DateTimeKind.Utc), times[0]);
-        for (var i = 1; i < times.Count; i++)
-        {
-            Assert.Equal(TimeSpan.FromMinutes(5), times[i] - times[i - 1]);
-        }
+        Assert.Equal(new DateTime(2026, 11, 25, 13, 6, 0, DateTimeKind.Utc), times[^1]);
+        Assert.Equal(new DateTime(2026, 11, 25, 12, 12, 0, DateTimeKind.Utc), times[0]);
+        Assert.All(times, t => Assert.Equal(0, t.Minute % 2));
+        Assert.Equal(new DateTime(2026, 11, 25, 13, 12, 0, DateTimeKind.Utc), MrmsSource.NewestFrame(new DateTime(2026, 11, 25, 13, 18, 0, DateTimeKind.Utc)));
     }
 
     [Fact]
-    public void Nexrad_RequestsTheWindowFromTheTimeEnabledWms()
+    public void Mrms_NamesItsTilesByTime()
     {
-        var url = NexradSource.BuildUrl(RadarViewport.For(Boston, 8), new DateTime(2026, 10, 26, 21, 30, 0, DateTimeKind.Utc));
+        Assert.Equal(
+            "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/mrms::lcref-202611251224/7/38/47.png",
+            MrmsSource.TileUrl(new DateTime(2026, 11, 25, 12, 24, 0, DateTimeKind.Utc), 7, 38, 47));
+    }
 
-        Assert.StartsWith("https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q-t.cgi?", url);
-        Assert.Contains("LAYERS=nexrad-n0q-wmst", url);
-        Assert.Contains("SRS=EPSG:900913", url);
-        Assert.Contains("WIDTH=880&HEIGHT=380", url);
-        Assert.Contains("TRANSPARENT=true", url);
-        Assert.EndsWith("TIME=2026-10-26T21:30:00Z", url);
-        var bbox = url.Split("BBOX=")[1].Split('&')[0].Split(',');
-        Assert.Equal(4, bbox.Length);
-        Assert.True(double.Parse(bbox[0], System.Globalization.CultureInfo.InvariantCulture) < -7_900_000);
-        Assert.True(double.Parse(bbox[2], System.Globalization.CultureInfo.InvariantCulture) > -7_900_000);
+    [Fact]
+    public void Mrms_IsRepaintedInTheNexradColours()
+    {
+        using var bitmap = new SKBitmap(5, 1, SKColorType.Rgba8888, SKAlphaType.Premul);
+        bitmap.SetPixel(0, 0, SKColors.Transparent);
+        bitmap.SetPixel(1, 0, new SKColor(158, 158, 249)); // 12 dBZ
+        bitmap.SetPixel(2, 0, new SKColor(0, 242, 0)); // 32 dBZ
+        bitmap.SetPixel(3, 0, new SKColor(245, 0, 0)); // 52 dBZ
+        bitmap.SetPixel(4, 0, new SKColor(1, 2, 3)); // not an MRMS colour
+
+        MrmsSource.Recolour(bitmap);
+
+        Assert.Equal(0, bitmap.GetPixel(0, 0).Alpha);
+        Assert.Equal(new SKColor(79, 132, 182), bitmap.GetPixel(1, 0));
+        Assert.Equal(new SKColor(9, 115, 12), bitmap.GetPixel(2, 0));
+        Assert.Equal(new SKColor(213, 0, 0), bitmap.GetPixel(3, 0));
+        Assert.Equal(new SKColor(1, 2, 3), bitmap.GetPixel(4, 0));
     }
 
     // ---- RainViewer ----------------------------------------------------------------------------
@@ -172,7 +182,7 @@ public class RadarTests
         var time = new DateTime(2026, 10, 26, 21, 30, 0, DateTimeKind.Utc);
         var unix = new DateTimeOffset(time).ToUnixTimeSeconds();
 
-        Assert.Equal("nexrad-state-" + unix + ".png", RadarService.FrameFileName("nexrad", RadarZoom.State, time));
+        Assert.Equal("mrms-state-" + unix + ".png", RadarService.FrameFileName("mrms", RadarZoom.State, time));
     }
 
     [Fact]
@@ -318,7 +328,7 @@ public class RadarTests
         // Frames beyond what was fetched are simply not there; a stale run yields nothing to play.
         Assert.Equal(22, loop.ForecastFrames(now, 18, 15).Count);
         Assert.Empty(loop.ForecastFrames(run.AddHours(9), 3, 15));
-        Assert.Empty(new RadarLoop("nexrad", "n", "a", RadarZoom.State, frames, now).ForecastFrames(now, 3, 15));
+        Assert.Empty(new RadarLoop("mrms", "n", "a", RadarZoom.State, frames, now).ForecastFrames(now, 3, 15));
     }
 
     [Fact]
@@ -408,7 +418,7 @@ public class RadarTests
         var report = OpenMeteoProvider.Parse(OpenMeteoParserTests.Fixture("open-meteo-boston.json"), Now);
         var places = new List<PlaceWeather> { new(Boston, report, false) };
         var config = new WeatherConfig { ShowLogo = false, RadarZoom = RadarZoom.State };
-        var frame = new RadarFrameRequest("nexrad", "NOAA NEXRAD via Iowa Environmental Mesonet", "Radar: NOAA NEXRAD, Iowa Environmental Mesonet", Now.AddMinutes(-7), overlay, 7, 10, 8);
+        var frame = new RadarFrameRequest("mrms", "NOAA MRMS via Iowa Environmental Mesonet", "Radar: NOAA MRMS, Iowa Environmental Mesonet", Now.AddMinutes(-7), overlay, 7, 10, 8);
 
         foreach (var theme in new[] { WeatherTheme.Classic, WeatherTheme.Dark, WeatherTheme.Light })
         {

@@ -393,15 +393,15 @@ Font License) is embedded in the plugin.
 ### Radar
 
 With **Show the local radar screen** (on by default) each place's current conditions are followed by
-a **local radar** screen: a loop of the last three quarters of an hour of precipitation radar over a
+a **local radar** screen: a loop of about the last hour of precipitation radar over a
 map of the area, with nearby towns, the place marked, a light-to-heavy legend and the clock of the
 frame on air. Four map areas: metro (about 250 miles across), state (500, the default), regional
 (1,000) and wide (2,000). Short screens play the loop once; longer ones repeat it about every eight
 seconds, holding the newest frame a moment each time.
 
-Two sources, picked per place: **NOAA NEXRAD** through the [Iowa Environmental Mesonet](https://mesonet.agron.iastate.edu/ogc/)'s
-time-enabled WMS for places in the contiguous United States (one small image per frame, five-minute
-steps), and [RainViewer](https://www.rainviewer.com/api.html) everywhere else (ten-minute steps, tiles
+Two sources, picked per place: **NOAA MRMS** (the national NEXRAD mosaic with ground clutter,
+birds and interference removed) as map tiles from the [Iowa Environmental Mesonet](https://mesonet.agron.iastate.edu/ogc/)
+for places in the contiguous United States (six-minute steps, about six minutes behind the clock), and [RainViewer](https://www.rainviewer.com/api.html) everywhere else (ten-minute steps, tiles
 stitched by the plugin; free for non-commercial use with the credit the screen shows). Frames are
 fetched every five minutes while the station is enabled and in season, only the frames not already on
 disk, and kept under `data/JellyStations/weather/radar/` so a restart has a loop to show. A place no

@@ -13,7 +13,7 @@ public sealed record RainViewerIndex(string Host, IReadOnlyList<RainViewerFrame>
 /// <summary>
 /// RainViewer's worldwide radar composite (free for non-commercial use with attribution): a public index lists the
 /// last two hours of frames every ten minutes, each as slippy-map tiles that are stitched into the window here.
-/// The fallback for places NEXRAD does not cover.
+/// The fallback for places MRMS does not cover.
 /// </summary>
 public sealed class RainViewerSource : IRadarSource
 {

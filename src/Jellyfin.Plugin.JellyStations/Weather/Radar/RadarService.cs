@@ -17,7 +17,7 @@ namespace Jellyfin.Plugin.JellyStations.Weather.Radar;
 /// </summary>
 public sealed partial class RadarService : LocationPoller
 {
-    /// <summary>Frames per loop: 45 minutes of NEXRAD at five-minute steps, 90 minutes of RainViewer at ten.</summary>
+    /// <summary>Frames per loop: 54 minutes of MRMS at six-minute steps, 90 minutes of RainViewer at ten.</summary>
     public const int FrameCount = 10;
 
     public static readonly TimeSpan Interval = TimeSpan.FromMinutes(5);
@@ -253,6 +253,12 @@ public sealed partial class RadarService : LocationPoller
 
                 var time = DateTime.UnixEpoch.AddSeconds(long.Parse(m.Groups[3].Value, CultureInfo.InvariantCulture));
                 if (now - time > KeepFrames)
+                {
+                    continue;
+                }
+
+                // Frames of a source that is gone (the raw NEXRAD composite, before MRMS) are not put back on air.
+                if (!_sources.Any(s => s.Id == m.Groups[1].Value))
                 {
                     continue;
                 }

@@ -96,7 +96,7 @@ public sealed class WeatherConfig
     /// <summary>Show an alerts screen for a place while a watch, warning or advisory is in force for it (United States, from the National Weather Service). Places with no alert skip it.</summary>
     public bool ShowAlerts { get; set; } = true;
 
-    /// <summary>Show the local radar loop for each place (NEXRAD in the contiguous United States, RainViewer elsewhere).</summary>
+    /// <summary>Show the local radar loop for each place (MRMS in the contiguous United States, RainViewer elsewhere).</summary>
     public bool ShowRadar { get; set; } = true;
 
     /// <summary>How much map the radar screen shows around the place.</summary>

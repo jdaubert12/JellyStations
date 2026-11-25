@@ -48,7 +48,7 @@ public sealed class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IWeatherProvider, OpenMeteoProvider>();
         serviceCollection.AddSingleton<WeatherService>();
         serviceCollection.AddSingleton<Weather.Radar.RadarHttp>();
-        serviceCollection.AddSingleton<Weather.Radar.IRadarSource, Weather.Radar.NexradSource>();
+        serviceCollection.AddSingleton<Weather.Radar.IRadarSource, Weather.Radar.MrmsSource>();
         serviceCollection.AddSingleton<Weather.Radar.IRadarSource, Weather.Radar.RainViewerSource>();
         serviceCollection.AddSingleton<Weather.Radar.IForecastRadarSource, Weather.Radar.HrrrSource>();
         serviceCollection.AddSingleton<Weather.Radar.RadarService>();

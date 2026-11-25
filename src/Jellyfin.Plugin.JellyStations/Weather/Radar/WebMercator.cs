@@ -59,7 +59,7 @@ public static class WebMercator
 /// <summary>
 /// The map window of a radar screen: a place at its centre, a zoom, and a size in screen pixels (the painter's
 /// 1080 grid). Radar imagery is fetched one zoom level down at half the pixel size (<see cref="DataWidth"/> by
-/// <see cref="DataHeight"/>) and scaled up when drawn; NEXRAD and RainViewer data are coarser than that anyway.
+/// <see cref="DataHeight"/>) and scaled up when drawn; MRMS and RainViewer data are coarser than that anyway.
 /// </summary>
 public sealed record RadarViewport(double Latitude, double Longitude, int Zoom, int Width, int Height)
 {
