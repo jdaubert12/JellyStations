@@ -9,6 +9,14 @@
         "imageUrl":  "",
         "versions":  [
                          {
+                             "version":  "1.39.0.0",
+                             "changelog":  "New: Settings \u003e Content rules \u003e Hide shows and movies added after. Shows and movies added to the Jellyfin library after the date are left out of every station (genre, tag, library, collection and playlist sources), station suggestions and Not on a channel. New episodes of a show that was already there still play, and so does anything picked by name and any fixed lineup. Fixed: the local radar no longer shows speckle on dry days. Places in the contiguous United States now use NOAA MRMS, the quality-controlled national radar mosaic, instead of the raw NEXRAD composite; frames are six minutes apart and the loop covers 54 minutes. The Content section now names the rule that dropped an item instead of always saying by tag.",
+                             "targetAbi":  "12.0.0.0",
+                             "sourceUrl":  "https://github.com/jdaubert12/JellyStations/releases/download/v1.39.0.0/JellyStations_1.39.0.0.zip",
+                             "checksum":  "e4d87420a2d325e2737b442986d5445e",
+                             "timestamp":  "2026-11-25T13:36:52Z"
+                         },
+                         {
                              "version":  "1.38.0.0",
                              "changelog":  "Excluded libraries: tick libraries in Settings, or in a station\u0027s Leave out section, to keep them out of Genre and Tag sources that have no library picked and out of collections and playlists; the plugin-wide list also keeps them out of station suggestions and Not on a channel. A Library source, a Genre or Tag source set to that library, and series, seasons, movies and episodes picked on purpose still play, and a station can turn the plugin-wide list off. New: Settings \u003e New stations sets the padding grid a new station starts with (blank, built-in preset, Not on a channel, or suggested); a saved template keeps its own.",
                              "targetAbi":  "12.0.0.0",
