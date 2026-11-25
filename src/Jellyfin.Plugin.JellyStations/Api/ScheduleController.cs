@@ -38,7 +38,7 @@ public sealed class ScheduleController : ControllerBase
         {
             var tags = StationCompiler.EffectiveExcludedTags(request.Draft ?? new Station(), _settings.Get().ExcludedTags);
             var libraries = StationCompiler.EffectiveExcludedLibraries(request.Draft ?? new Station(), _settings.Get().ExcludedLibraryIds);
-            var covered = _resolver.CoveredBy(request.Sources ?? new List<ContentSource>(), request.ItemIds ?? new List<Guid>(), tags, libraries);
+            var covered = _resolver.CoveredBy(request.Sources ?? new List<ContentSource>(), request.ItemIds ?? new List<Guid>(), tags, libraries, AddedCutoff.For(_settings.Get().HideAddedAfter));
             return Ok(covered.Select(kv => new CoveredItemDto
             {
                 ItemId = kv.Key,

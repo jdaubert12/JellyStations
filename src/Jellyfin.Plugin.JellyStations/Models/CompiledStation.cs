@@ -56,6 +56,9 @@ public sealed class CompiledStation
     /// <summary>Snapshots of collection and playlist items dropped because their library is left out, for the content view.</summary>
     public List<PlayableItem> LibraryExcluded { get; set; } = new();
 
+    /// <summary>Snapshots of items hidden by <see cref="GlobalSettings.HideAddedAfter"/>, for the content view.</summary>
+    public List<PlayableItem> AddedExcluded { get; set; } = new();
+
     /// <summary>Snapshots of items left out because the household finished them recently (see <see cref="HouseholdConfig"/>).</summary>
     public List<PlayableItem> HouseholdExcluded { get; set; } = new();
 

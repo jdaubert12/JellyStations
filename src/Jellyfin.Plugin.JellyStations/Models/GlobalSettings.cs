@@ -52,6 +52,13 @@ public sealed class GlobalSettings
     /// </summary>
     public List<Guid> ExcludedLibraryIds { get; set; } = new();
 
+    /// <summary>
+    /// Shows and movies added to the Jellyfin library after this date (server time, the date itself still counts as
+    /// in time) are left out of every station, station suggestions and "Not on a channel"; null = no cutoff. An
+    /// episode goes by its show's date. Anything picked by name still plays. See <c>AddedCutoff</c>.
+    /// </summary>
+    public DateOnly? HideAddedAfter { get; set; }
+
     /// <summary>Saved time blocks (days, time, sources, order) that can be added to any station.</summary>
     public List<SlotBlock> BlockTemplates { get; set; } = new();
 

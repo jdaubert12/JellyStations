@@ -25,7 +25,8 @@ public sealed class StationCompiler
     /// <param name="globalExcludedTags">The plugin-wide excluded tags.</param>
     /// <param name="householdUsers">The users ticked under Settings &gt; Our household; their history is read when the station asks for it.</param>
     /// <param name="globalExcludedLibraries">The plugin-wide excluded libraries.</param>
-    public CompiledStation Compile(Station station, EncodingProfile effectiveProfile, IReadOnlyCollection<string>? globalExcludedTags = null, IReadOnlyList<Guid>? householdUsers = null, IReadOnlyCollection<Guid>? globalExcludedLibraries = null)
+    /// <param name="addedCutoff">The plugin-wide "added after" date; null when none is set.</param>
+    public CompiledStation Compile(Station station, EncodingProfile effectiveProfile, IReadOnlyCollection<string>? globalExcludedTags = null, IReadOnlyList<Guid>? householdUsers = null, IReadOnlyCollection<Guid>? globalExcludedLibraries = null, AddedCutoff? addedCutoff = null)
     {
         var lang = effectiveProfile.AudioLanguagePreference ?? string.Empty;
         var tags = EffectiveExcludedTags(station, globalExcludedTags);
@@ -47,7 +48,9 @@ public sealed class StationCompiler
             compiled.TagExcluded,
             (source, found, kept, alreadyListed) => compiled.Sources.Add(SourceExpansion.For(section, source, found, kept, alreadyListed)),
             libraries,
-            compiled.LibraryExcluded);
+            compiled.LibraryExcluded,
+            addedCutoff,
+            compiled.AddedExcluded);
 
         // Programs: expanded, minus the station's excluded items, minus anything under the minimum runtime.
         List<PlayableItem> Programs(List<ContentSource> sources, string section)
@@ -119,6 +122,8 @@ public sealed class StationCompiler
             compiled.PostRoll = CompileRoll(station.Bumpers.PostRoll, compiled.Bumpers, s => Clips(s, "Post-roll"));
         }
 
+        KeepNamed(compiled);
+
         // Same item may be excluded via several sources; report once.
         compiled.Excluded = compiled.Excluded
             .GroupBy(e => e.ItemId)
@@ -163,6 +168,22 @@ public sealed class StationCompiler
             Progress = station.Household.FollowProgress ? HouseholdHistory.Progress(compiled.ProgramItems, states) : new Dictionary<string, HouseholdPosition>(StringComparer.Ordinal),
             Skipped = compiled.HouseholdExcluded.Count
         };
+    }
+
+    /// <summary>
+    /// A genre (say) may hide a new show that another source names: what plays anywhere on the station is not
+    /// reported as hidden by the date added.
+    /// </summary>
+    public static void KeepNamed(CompiledStation compiled)
+    {
+        if (compiled.AddedExcluded.Count == 0)
+        {
+            return;
+        }
+
+        var playing = compiled.ProgramItems.Concat(compiled.Bumpers).Concat(compiled.PreRoll).Concat(compiled.PostRoll).Select(i => i.ItemId).ToHashSet();
+        compiled.AddedExcluded = compiled.AddedExcluded.Where(i => !playing.Contains(i.ItemId)).DistinctBy(i => i.ItemId).ToList();
+        compiled.Excluded.RemoveAll(e => e.Reason == ExclusionReason.AddedAfterCutoff && playing.Contains(e.ItemId));
     }
 
     /// <summary>The clips for a pre/post-roll position: its own sources when it has any, otherwise the main bumper list.</summary>

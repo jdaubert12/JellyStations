@@ -107,12 +107,13 @@ public sealed class SettingsController : ControllerBase
 
         var householdChanged = !(previous.HouseholdUserIds ?? new List<Guid>()).OrderBy(u => u).SequenceEqual(settings.HouseholdUserIds.OrderBy(u => u));
         var librariesChanged = !(previous.ExcludedLibraryIds ?? new List<Guid>()).OrderBy(u => u).SequenceEqual(settings.ExcludedLibraryIds.OrderBy(u => u));
-        if (librariesChanged)
+        var cutoffChanged = previous.HideAddedAfter != settings.HideAddedAfter;
+        if (librariesChanged || cutoffChanged)
         {
             _analysis.Invalidate();
         }
 
-        if (householdChanged || librariesChanged || !previous.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).SequenceEqual(settings.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
+        if (householdChanged || librariesChanged || cutoffChanged || !previous.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase).SequenceEqual(settings.ExcludedTags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
         {
             _stations.RecompileAll();
         }

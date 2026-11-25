@@ -56,7 +56,15 @@
     TooShort: 'Shorter than the station minimum',
     HouseholdWatched: 'Watched by the household recently',
     Unreadable: 'Could not be read as a video',
-    LibraryExcluded: 'In a library this station leaves out'
+    LibraryExcluded: 'In a library this station leaves out',
+    AddedAfterCutoff: 'Added after the date in Settings'
+  };
+  // Content section: what dropped a row the Include button cannot bring back, by the row's Source.
+  const RULE_TEXT = {
+    'Excluded by tag': { text: 'by tag', title: 'Dropped by an excluded tag (station or Settings). Remove the tag rule to include it.' },
+    'Excluded by library': { text: 'by library', title: 'Lives in a library left out here or in Settings.' },
+    'Excluded by date added': { text: 'by date added', title: 'Added to the library after the date in Settings. Pick it by name to play it anyway.' },
+    'Watched recently': { text: 'watched', title: 'Everyone in the household finished it recently.' }
   };
   const RESOLUTIONS = [['3840x2160', '3840 × 2160 (4K)'], ['1920x1080', '1920 × 1080 (1080p)'], ['1280x720', '1280 × 720 (720p)'], ['854x480', '854 × 480 (480p)'], ['custom', 'Custom']];
   const ENCODERS = [['libx264', 'libx264 (software)'], ['h264_nvenc', 'h264_nvenc (NVIDIA)'], ['h264_qsv', 'h264_qsv (Intel Quick Sync)'], ['h264_vaapi', 'h264_vaapi (VA-API)'], ['libx265', 'libx265 (software, HEVC)'], ['hevc_nvenc', 'hevc_nvenc (NVIDIA, HEVC)'], ['hevc_qsv', 'hevc_qsv (Intel Quick Sync, HEVC)'], ['hevc_vaapi', 'hevc_vaapi (VA-API, HEVC)'], ['custom', 'Custom…']];
@@ -2994,7 +3002,7 @@
       const btn = r.IsMusic
         ? el('span', { className: 'tvs-secondary', text: 'music' })
         : r.ExcludedByRule
-        ? el('span', { className: 'tvs-secondary', text: 'by tag', title: 'Dropped by an excluded tag (station or Settings). Remove the tag rule to include it.' })
+        ? el('span', Object.assign({ className: 'tvs-secondary' }, RULE_TEXT[r.Source] || { text: 'by rule' }))
         : el('button', { type: 'button', text: excluded ? 'Include' : 'Exclude', onClick: () => {
           setExcluded(r.ItemId, !excluded);
           renderContent();
@@ -5484,6 +5492,7 @@
     setVal('#tvsGlobalExcludedTags', Array.isArray(s.ExcludedTags) ? s.ExcludedTags.join(', ') : '');
     renderHouseholdUsers(Array.isArray(s.HouseholdUserIds) ? s.HouseholdUserIds : []);
     renderExcludedLibraries(Array.isArray(s.ExcludedLibraryIds) ? s.ExcludedLibraryIds : []);
+    setVal('#tvsHideAddedAfter', s.HideAddedAfter || '');
     const sug = s.Suggestions || {};
     SUGGESTION_FIELDS.forEach(f => setVal(f.id, sug[f.key] !== undefined && sug[f.key] !== null ? sug[f.key] : f.fallback));
     renderTemplateRows('BlockTemplates', Array.isArray(s.BlockTemplates) ? s.BlockTemplates : []);
@@ -5622,10 +5631,15 @@
       HouseholdUserIds: Array.from($all('#tvsHouseholdUsers input[type="checkbox"]')).filter(b => b.checked).map(b => b.value),
       // Before the library list has drawn (or if it failed), keep what was saved rather than clearing it.
       ExcludedLibraryIds: checkedLibraries('#tvsExcludedLibraries', state.settings && state.settings.ExcludedLibraryIds),
+      HideAddedAfter: val('#tvsHideAddedAfter') || null,
       Suggestions: suggestions
       // Block and station templates are kept server side; PUT Settings leaves them as they are.
     };
     const errors = suggestionErrors;
+    // A half-typed date reads as empty, which would switch the cutoff off without saying so.
+    if ($('#tvsHideAddedAfter').validity.badInput) {
+      errors.push('Hide shows and movies added after must be a whole date, or empty.');
+    }
     if (isNaN(payload.LingerSeconds)) {
       errors.push('Linger seconds must be a number.');
     }

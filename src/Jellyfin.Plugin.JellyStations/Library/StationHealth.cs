@@ -159,6 +159,7 @@ public static class StationHealth
         ExclusionReason.TooShort => "shorter than the station's minimum runtime",
         ExclusionReason.Unreadable => "could not be read as a video",
         ExclusionReason.LibraryExcluded => "in a library this station leaves out",
+        ExclusionReason.AddedAfterCutoff => "added to the library after the date in Settings",
         _ => reason.ToString()
     };
 }

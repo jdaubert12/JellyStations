@@ -39,6 +39,9 @@ public sealed class LibraryContentResolver
         return excluded is null || excluded.Count == 0 ? null : AllowedLibraries(AllLibraryIds(), excluded);
     }
 
+    /// <summary>The "added after" date from Settings for the library analysis; stations get theirs through Expand.</summary>
+    public AddedCutoff? Cutoff() => AddedCutoff.For(_settings?.Get().HideAddedAfter);
+
     private IEnumerable<Guid> AllLibraryIds()
         => _libraryManager.GetVirtualFolders()
             .Select(v => Guid.TryParse(v.ItemId, out var id) ? id : Guid.Empty)
@@ -73,7 +76,8 @@ public sealed class LibraryContentResolver
     /// An item hand-picked anywhere in <paramref name="sources"/> is never tag-dropped by another source, whatever the
     /// order, so adding a movie on purpose always wins over a tag that would otherwise hide it. A Folder source is
     /// not a library query: its clips come from <see cref="ClipFolderScanner"/>, carry no tags, and the files that
-    /// could not be read are recorded in <paramref name="excluded"/>.
+    /// could not be read are recorded in <paramref name="excluded"/>. Movies and shows <paramref name="added"/> hides
+    /// are dropped from the sources it filters, and stay free for a later source that names them.
     /// </summary>
     public List<PlayableItem> Expand(
         IEnumerable<ContentSource> sources,
@@ -83,12 +87,16 @@ public sealed class LibraryContentResolver
         List<PlayableItem>? tagExcluded = null,
         Action<ContentSource, int, int, int>? onSource = null,
         IReadOnlyCollection<Guid>? excludedLibraries = null,
-        List<PlayableItem>? libraryExcluded = null)
+        List<PlayableItem>? libraryExcluded = null,
+        AddedCutoff? added = null,
+        List<PlayableItem>? addedExcluded = null)
     {
         var result = new List<PlayableItem>();
         var seen = new HashSet<Guid>();
         var sourceList = sources as IReadOnlyCollection<ContentSource> ?? sources.ToList();
         var pinned = HandPickedIds(sourceList);
+        var hidden = new HashSet<Guid>();
+        var seriesOf = SeriesLookup();
         foreach (var source in sourceList)
         {
             var block = new List<PlayableItem>();
@@ -163,6 +171,18 @@ public sealed class LibraryContentResolver
                     continue;
                 }
 
+                if (added is not null && !pinned.Contains(item.Id) && AddedCutoff.Filters(source) && added.Hides(item, seriesOf))
+                {
+                    seen.Remove(item.Id);
+                    if (hidden.Add(item.Id))
+                    {
+                        addedExcluded?.Add(playable);
+                        excluded.Add(new ExcludedItem { ItemId = item.Id, Name = playable.DisplayTitle, Reason = ExclusionReason.AddedAfterCutoff });
+                    }
+
+                    continue;
+                }
+
                 playable.Source = SourceExpansion.Describe(source);
                 block.Add(playable);
             }
@@ -213,7 +233,7 @@ public sealed class LibraryContentResolver
     /// the excluded tags the way <see cref="Expand"/> does. Hand-picked Movie/Episode sources are not consulted: the point
     /// is to tell the editor that a wider source (genre, tag, series, collection, playlist, library) already covers a hand-pick.
     /// </summary>
-    public Dictionary<Guid, ContentSource> CoveredBy(IEnumerable<ContentSource> sources, IEnumerable<Guid> itemIds, IReadOnlyCollection<string>? excludedTags, IReadOnlyCollection<Guid>? excludedLibraries = null)
+    public Dictionary<Guid, ContentSource> CoveredBy(IEnumerable<ContentSource> sources, IEnumerable<Guid> itemIds, IReadOnlyCollection<string>? excludedTags, IReadOnlyCollection<Guid>? excludedLibraries = null, AddedCutoff? added = null)
     {
         var result = new Dictionary<Guid, ContentSource>();
         var wanted = new HashSet<Guid>(itemIds.Where(g => g != Guid.Empty));
@@ -223,6 +243,7 @@ public sealed class LibraryContentResolver
         }
 
         var scratch = new List<ExcludedItem>();
+        var seriesOf = SeriesLookup();
         foreach (var source in sources)
         {
             if (source.Kind is SourceKind.Movie or SourceKind.Episode)
@@ -240,6 +261,11 @@ public sealed class LibraryContentResolver
                 }
 
                 if (dropLibraries && InLibraries(item, excludedLibraries!))
+                {
+                    continue;
+                }
+
+                if (added is not null && AddedCutoff.Filters(source) && added.Hides(item, seriesOf))
                 {
                     continue;
                 }
@@ -375,6 +401,26 @@ public sealed class LibraryContentResolver
         => PictureSize.Normalize(source.MinResolution) is { } tier
             ? items.Where(i => PictureSize.Meets(i.Width, i.Height, tier))
             : items;
+
+    /// <summary><see cref="SeriesOf"/> that looks each show up once.</summary>
+    private static Func<Episode, BaseItem?> SeriesLookup()
+    {
+        var cache = new Dictionary<Guid, BaseItem?>();
+        return e =>
+        {
+            if (e.SeriesId == Guid.Empty)
+            {
+                return SeriesOf(e);
+            }
+
+            if (!cache.TryGetValue(e.SeriesId, out var series))
+            {
+                cache[e.SeriesId] = series = SeriesOf(e);
+            }
+
+            return series;
+        };
+    }
 
     private static BaseItem? SeriesOf(BaseItem item)
     {

@@ -1104,6 +1104,10 @@
             <div class="fieldDescription" style="margin-top:1em"><strong>Excluded libraries.</strong> Ticked libraries are left out of every station unless the station opts out: Genre and Tag sources with no library picked skip them, and collections and playlists drop the items that live in them. Station suggestions and “Not on a channel” ignore them too. Picking one on purpose still plays it (a Library source, a Genre or Tag source set to that library, or a series, season, movie or episode from it). A station can also leave out libraries of its own. Changing this recompiles all stations.</div>
             <div id="tvsExcludedLibrariesEmpty" class="tvs-secondary tvs-hidden">No libraries found.</div>
             <div id="tvsExcludedLibraries" class="tvs-days"></div>
+            <div class="inputContainer" style="margin-top:1em">
+              <input is="emby-input" id="tvsHideAddedAfter" label="Hide shows and movies added after" type="date">
+              <div class="fieldDescription">Leave empty for no cutoff. Shows and movies added to the Jellyfin library after this date (server time) are left out of every station: genre, tag, library, collection and playlist sources drop them, and station suggestions and “Not on a channel” ignore them. New episodes of a show that was already there still play, and so does anything you pick by name (a show, season, movie or episode, or a fixed lineup). Changing this recompiles all stations.</div>
+            </div>
           </div>
 
           <div class="verticalSection tvs-section">

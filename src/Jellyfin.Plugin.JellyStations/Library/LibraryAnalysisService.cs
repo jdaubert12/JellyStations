@@ -119,7 +119,9 @@ public sealed class LibraryAnalysisService
         }
 
         // Libraries excluded in Settings are not suggested from and do not count as left off a channel.
+        // Neither do shows and movies hidden by the date they were added.
         var allowed = _resolver.AllowedLibraries();
+        var cutoff = _resolver.Cutoff();
         foreach (var folder in _libraryManager.GetVirtualFolders().Where(v => Guid.TryParse(v.ItemId, out _)))
         {
             var libraryId = Guid.Parse(folder.ItemId);
@@ -149,6 +151,11 @@ public sealed class LibraryAnalysisService
             foreach (var item in items)
             {
                 if (item is not Video video || !seen.Add(video.Id))
+                {
+                    continue;
+                }
+
+                if (cutoff is not null && cutoff.Hides(video, SeriesOf))
                 {
                     continue;
                 }

@@ -230,6 +230,16 @@ Libraries excluded in Settings are also left out of station suggestions and "Not
 Changing either list recompiles the stations it touches. Importing a station from another server drops
 the libraries this one does not have.
 
+### Hiding new additions
+
+**Hide shows and movies added after** (Settings, Content rules) keeps anything added to the Jellyfin
+library after a date off every station: genre, tag, library, collection and playlist sources drop it
+(listed in the Content section as "by date added"), and station suggestions and "Not on a channel"
+ignore it. The date itself still plays, in the server's time zone. An episode goes by the date its
+show was added, so new episodes of a show that was already there keep airing. A show, season, movie or
+episode picked by name, and a fixed lineup, always play. Bumper clips and other plain videos are not
+affected. It is off while the date is empty; changing it recompiles all stations.
+
 ### Family hours
 
 Pools can carry **family hours** (daytime rating rules) such as "nothing above PG between 06:00 and
@@ -864,8 +874,9 @@ by title, genre, rating or library.
   kind of channel (see [Filling out the lineup](#filling-out-the-lineup)). Values out of range are
   pulled back into it on save. This replaces the "Include small channels" box the suggestions page
   used to have.
-- **Excluded tags** and **excluded libraries** (plugin-wide), **station templates**, **block templates** and **week layouts** are
-  managed here too; see [Tags](#tags), [Excluded libraries](#excluded-libraries), [Station templates](#station-templates),
+- **Excluded tags**, **excluded libraries** and **hide shows and movies added after** (plugin-wide), **station templates**, **block templates** and **week layouts** are
+  managed here too; see [Tags](#tags), [Excluded libraries](#excluded-libraries),
+  [Hiding new additions](#hiding-new-additions), [Station templates](#station-templates),
   [Time block repeats and templates](#time-block-repeats-and-templates) and [Week layouts](#week-layouts).
 
 ## Troubleshooting

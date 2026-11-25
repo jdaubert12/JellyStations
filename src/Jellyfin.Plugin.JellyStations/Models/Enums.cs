@@ -110,5 +110,8 @@ public enum ExclusionReason
     Unreadable,
 
     /// <summary>A collection or playlist item that lives in a library the station leaves out.</summary>
-    LibraryExcluded
+    LibraryExcluded,
+
+    /// <summary>A movie, or an episode of a show, added to the library after <see cref="GlobalSettings.HideAddedAfter"/>.</summary>
+    AddedAfterCutoff
 }
