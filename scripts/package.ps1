@@ -6,7 +6,7 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$version = "1.38.0.0"
+$version = "1.39.0.0"
 $dll = Join-Path $root "src\Jellyfin.Plugin.JellyStations\bin\$Configuration\net10.0\Jellyfin.Plugin.JellyStations.dll"
 if (-not (Test-Path $dll)) { throw "Build first: $dll not found" }
 
@@ -27,7 +27,7 @@ $meta = @{
     version = $version
     targetAbi = "12.0.0.0"
     framework = "net10.0"
-    changelog = "Excluded libraries: tick libraries in Settings, or in a station's Leave out section, to keep them out of Genre and Tag sources that have no library picked and out of collections and playlists; the plugin-wide list also keeps them out of station suggestions and Not on a channel. A Library source, a Genre or Tag source set to that library, and series, seasons, movies and episodes picked on purpose still play, and a station can turn the plugin-wide list off. New: Settings > New stations sets the padding grid a new station starts with (blank, built-in preset, Not on a channel, or suggested); a saved template keeps its own."
+    changelog = "New: Settings > Content rules > Hide shows and movies added after. Shows and movies added to the Jellyfin library after the date are left out of every station (genre, tag, library, collection and playlist sources), station suggestions and Not on a channel. New episodes of a show that was already there still play, and so does anything picked by name and any fixed lineup. Fixed: the local radar no longer shows speckle on dry days. Places in the contiguous United States now use NOAA MRMS, the quality-controlled national radar mosaic, instead of the raw NEXRAD composite; frames are six minutes apart and the loop covers 54 minutes. The Content section now names the rule that dropped an item instead of always saying by tag."
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     status = "Active"
     autoUpdate = $true
