@@ -1,7 +1,7 @@
 ---
 name: "JellyStations"
 guid: "b7f3c1d2-5e8a-4f0b-9c6d-2a1e7f4b8d31"
-version: "1.39.0.0"
+version: "1.40.0.0"
 targetAbi: "12.0.0.0"
 framework: "net10.0"
 owner: "JD"
@@ -15,6 +15,7 @@ category: "LiveTV"
 artifacts:
   - "Jellyfin.Plugin.JellyStations.dll"
 changelog: >
+  1.40.0.0: New: a block's late-start setting has an Always let the previous program finish option. The program playing when the block is due plays out however long it has left, and the block then starts late and keeps its full length; the minutes allowance is ignored. The block still never pushes into the next block.
   1.39.0.0: New: Settings > Content rules > Hide shows and movies added after. Shows and movies added to the Jellyfin library after the date are left out of every station (genre, tag, library, collection and playlist sources), station suggestions and Not on a channel. New episodes of a show that was already there still play, and so does anything picked by name and any fixed lineup. Fixed: the local radar no longer shows speckle on dry days. Places in the contiguous United States now use NOAA MRMS, the quality-controlled national radar mosaic, instead of the raw NEXRAD composite; frames are six minutes apart and the loop covers 54 minutes. The Content section now names the rule that dropped an item instead of always saying by tag.
   1.38.0.0: Excluded libraries: tick libraries in Settings, or in a station's Leave out section, to keep them out of Genre and Tag sources that have no library picked and out of collections and playlists; the plugin-wide list also keeps them out of station suggestions and Not on a channel. A Library source, a Genre or Tag source set to that library, and series, seasons, movies and episodes picked on purpose still play, and a station can turn the plugin-wide list off. New: Settings > New stations sets the padding grid a new station starts with (blank, built-in preset, Not on a channel, or suggested); a saved template keeps its own.
   1.37.1.0: Not on a channel names the episodes of a partly played show that no channel plays: season and episode number, title, and the file name when the title does not already give it, up to twelve with a count of the rest. 1.37.0.0 said why such episodes were left out but not which they were.
