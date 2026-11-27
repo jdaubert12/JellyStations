@@ -284,9 +284,10 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
             if (occ.StartUtc > state.CarryEnd)
             {
                 // The stream before the block may finish its program past the block start when the block allows a
-                // late start, within the block's delay allowance and never into the block's own end.
-                var latest = Min(Min(occ.StartUtc + block.MaxStartDelay, occ.EndUtc), next);
-                var gapReached = FillFiller(entries, state, state.CarryEnd, occ.StartUtc, block.MaxStartDelay > TimeSpan.Zero && latest > occ.StartUtc ? latest : null);
+                // late start, within the block's delay allowance and never into the block's own end. A block that
+                // always lets it finish waits however long it takes, short of the next block.
+                var latest = block.AlwaysLetPreviousFinish ? next : Min(Min(occ.StartUtc + block.MaxStartDelay, occ.EndUtc), next);
+                var gapReached = FillFiller(entries, state, state.CarryEnd, occ.StartUtc, block.MayStartLate && latest > occ.StartUtc ? latest : null);
                 if (gapReached > state.CarryEnd)
                 {
                     state.CarryEnd = gapReached;
@@ -295,7 +296,7 @@ internal sealed class WeeklySlotScheduler : IStationScheduler
 
             var blockStart = occ.StartUtc > state.CarryEnd ? occ.StartUtc : state.CarryEnd;
             var blockEnd = occ.EndUtc;
-            if (blockStart > occ.StartUtc && block.MaxStartDelay > TimeSpan.Zero && carryBefore <= occ.StartUtc)
+            if (blockStart > occ.StartUtc && block.MayStartLate && carryBefore <= occ.StartUtc)
             {
                 // Started late to let a program finish: keep the full duration, up to whatever comes next. A block
                 // joined at the handover is not late; it ends on time.

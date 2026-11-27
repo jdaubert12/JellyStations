@@ -13,7 +13,7 @@ public class BlockLateStartTests
     private static readonly TimeZoneInfo NewYork = TimeZones.Resolve("America/New_York");
     private static readonly List<DayOfWeek> EveryDay = Enum.GetValues<DayOfWeek>().ToList();
 
-    private static SlotBlock Block(Guid id, string name, string start, int minutes, int delay) => new()
+    private static SlotBlock Block(Guid id, string name, string start, int minutes, int delay, bool always = false) => new()
     {
         Id = id,
         Name = name,
@@ -22,7 +22,8 @@ public class BlockLateStartTests
         DurationMinutes = minutes,
         Order = PlayOrder.Sequential,
         Overflow = SlotOverflow.FillerRemainder,
-        MaxStartDelayMinutes = delay
+        MaxStartDelayMinutes = delay,
+        AlwaysLetPreviousFinish = always
     };
 
     private static DateTime At(int d, int h, int min) => TimeZoneInfo.ConvertTimeToUtc(new DateTime(2026, 10, d, h, min, 0, DateTimeKind.Unspecified), NewYork);
@@ -31,9 +32,9 @@ public class BlockLateStartTests
     /// Anchor Monday 00:00; 22-minute episodes in order, so episode 50 runs 17:58 to 18:20 across the 18:00 block
     /// start. The block holds one 84-minute movie.
     /// </summary>
-    private static ScheduleInput Input(int delay, SlotBlock? second = null)
+    private static ScheduleInput Input(int delay, SlotBlock? second = null, bool always = false, int minutes = 120)
     {
-        var blocks = new List<SlotBlock> { Block(MovieBlockId, "Movie", "18:00", 120, delay) };
+        var blocks = new List<SlotBlock> { Block(MovieBlockId, "Movie", "18:00", minutes, delay, always) };
         var items = new Dictionary<Guid, List<PlayableItem>> { [MovieBlockId] = new() { Items.Movie("Beauty and the Beast", 84) } };
         if (second is not null)
         {
@@ -99,6 +100,50 @@ public class BlockLateStartTests
 
         var movie = ScheduleResolver.ResolveInput(input, At(12, 18, 20))!;
         Assert.Equal("Movie", movie.Entry.SourceLabel);
+
+        var lateMovie = ScheduleResolver.ResolveInput(input, At(12, 20, 0))!;
+        Assert.Equal("Late", lateMovie.Entry.SourceLabel);
+        Assert.Equal(TimeSpan.Zero, lateMovie.Offset);
+    }
+
+    [Fact]
+    public void AlwaysLetFinish_IgnoresTheMinutes()
+    {
+        // No minute allowance at all, yet the episode running across 18:00 plays out.
+        var input = Input(delay: 0, always: true);
+
+        var episode = ScheduleResolver.ResolveInput(input, At(12, 18, 5))!.Entry;
+        Assert.Equal("Pool", episode.SourceLabel);
+        Assert.False(episode.IsTruncated);
+        Assert.Equal(At(12, 18, 20), episode.EndUtc);
+
+        var movie = ScheduleResolver.ResolveInput(input, At(12, 18, 20))!;
+        Assert.Equal("Movie", movie.Entry.SourceLabel);
+        Assert.Equal(TimeSpan.Zero, movie.Offset);
+    }
+
+    [Fact]
+    public void AlwaysLetFinish_MayRunPastTheBlocksOwnEnd()
+    {
+        // A 10-minute block: the episode ends 18:20, past the block's 18:10 end; the block follows it at full length.
+        var input = Input(delay: 0, always: true, minutes: 10);
+
+        var episode = ScheduleResolver.ResolveInput(input, At(12, 18, 15))!.Entry;
+        Assert.Equal("Pool", episode.SourceLabel);
+        Assert.False(episode.IsTruncated);
+        Assert.Equal(At(12, 18, 20), episode.EndUtc);
+
+        var block = ScheduleResolver.ResolveInput(input, At(12, 18, 25))!.Entry;
+        Assert.Equal("Movie", block.SourceLabel);
+        Assert.Equal(At(12, 18, 20), block.StartUtc);
+        Assert.Equal(At(12, 18, 30), block.EndUtc);
+    }
+
+    [Fact]
+    public void AlwaysLetFinish_StillNeverPushesIntoTheNextBlock()
+    {
+        var late = Block(LateBlockId, "Late", "20:00", 120, delay: 0);
+        var input = Input(delay: 0, late, always: true);
 
         var lateMovie = ScheduleResolver.ResolveInput(input, At(12, 20, 0))!;
         Assert.Equal("Late", lateMovie.Entry.SourceLabel);

@@ -1622,6 +1622,7 @@
     b.Overflow = b.Overflow || 'FillerRemainder';
     b.RemainderMayOverrun = !!b.RemainderMayOverrun;
     b.MaxStartDelayMinutes = clampTo(b.MaxStartDelayMinutes, LIMITS.blockStartDelayMinutes);
+    b.AlwaysLetPreviousFinish = !!b.AlwaysLetPreviousFinish;
     b.Kind = b.Kind === 'Weather' ? 'Weather' : 'Content';
     b.RepeatEveryMinutes = clampTo(b.RepeatEveryMinutes, LIMITS.blockRepeatEveryMinutes);
     b.RepeatUntilLocal = parseHm(b.RepeatUntilLocal) === null ? '' : b.RepeatUntilLocal;
@@ -3583,6 +3584,7 @@
         inputHtml(p + 'until', 'Repeat until (station local; empty = midnight)', 'time', { step: 60 }) +
         inputHtml(p + 'delay', 'Start up to this many minutes late so the previous program can finish', 'number', { min: 0, max: 240, step: 5 }, '0 = start on time and cut the program. When the block starts late it keeps its full duration, unless another block follows.') +
       '</div>' +
+      '<label class="emby-checkbox-label tvs-block-overrun"><input type="checkbox" id="' + p + 'waitall"><span>Always let the previous program finish, however long it has left (the minutes above are ignored; the block still never pushes into the next block)</span></label>' +
       '<div class="tvs-grid2" data-kind="Content">' +
         selectHtml(p + 'order', 'Play order', [['Sequential', 'Sequential – continue where the last occurrence left off'], ['Shuffle', 'Shuffle – re-rolled every occurrence'], ['ShuffleEpisodesInOrder', 'Shuffle shows, episodes in order – re-rolled every occurrence']]) +
         selectHtml(p + 'overflow', 'When the next item does not fit', [['FillerRemainder', 'Hand the remainder to ' + betweenBlocksName()], ['TruncateLast', 'Play it anyway and cut it off at the block end']]) +
@@ -3635,6 +3637,8 @@
     q('overflow').value = b.Overflow || 'FillerRemainder';
     q('overrun').checked = !!b.RemainderMayOverrun;
     q('delay').value = b.MaxStartDelayMinutes || 0;
+    q('waitall').checked = !!b.AlwaysLetPreviousFinish;
+    q('delay').disabled = !!b.AlwaysLetPreviousFinish;
     const showKindPanels = () => $all('[data-kind]', body).forEach(panel => show(panel, panel.getAttribute('data-kind') === (b.Kind || 'Content')));
     showKindPanels();
     q('kind').addEventListener('change', () => {
@@ -3654,6 +3658,7 @@
     q('overflow').addEventListener('change', () => { b.Overflow = q('overflow').value; });
     q('overrun').addEventListener('change', () => { b.RemainderMayOverrun = q('overrun').checked; });
     q('delay').addEventListener('input', () => { b.MaxStartDelayMinutes = clampTo(q('delay').value, LIMITS.blockStartDelayMinutes); });
+    q('waitall').addEventListener('change', () => { b.AlwaysLetPreviousFinish = q('waitall').checked; q('delay').disabled = b.AlwaysLetPreviousFinish; });
   }
 
   /** When a block occurs: the repeat rule, its interval, weeks of the month, dates and days. */
@@ -3915,6 +3920,7 @@
       Overflow: t.Overflow,
       RemainderMayOverrun: t.RemainderMayOverrun,
       MaxStartDelayMinutes: t.MaxStartDelayMinutes,
+      AlwaysLetPreviousFinish: t.AlwaysLetPreviousFinish,
       Kind: t.Kind,
       RepeatEveryMinutes: t.RepeatEveryMinutes,
       RepeatUntilLocal: t.RepeatUntilLocal,

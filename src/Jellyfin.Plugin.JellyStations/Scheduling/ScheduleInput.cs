@@ -119,6 +119,7 @@ public sealed class ScheduleInput
                 Overflow = b.Overflow,
                 RemainderMayOverrun = b.RemainderMayOverrun,
                 MaxStartDelay = TimeSpan.FromMinutes(Math.Clamp(b.MaxStartDelayMinutes, 0, 240)),
+                AlwaysLetPreviousFinish = b.AlwaysLetPreviousFinish,
                 Recurrence = b.Recurrence,
                 IntervalWeeks = Math.Clamp(b.IntervalWeeks, 1, 52),
                 RecurrenceStart = RecurrenceRule.ParseDate(b.RecurrenceStart) ?? RecurrenceRule.MondayOf(TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(station.AnchorUtc, DateTimeKind.Utc), TimeZones.Resolve(station.TimeZoneId)).Date),
@@ -242,6 +243,12 @@ public sealed class SlotBlockInput
 
     /// <summary>How late the block may start so the previous program can finish. Zero = start on time.</summary>
     public TimeSpan MaxStartDelay { get; init; }
+
+    /// <summary>Let the previous program finish however long it has left (bounded only by the next block).</summary>
+    public bool AlwaysLetPreviousFinish { get; init; }
+
+    /// <summary>Whether the block may start late at all.</summary>
+    public bool MayStartLate => AlwaysLetPreviousFinish || MaxStartDelay > TimeSpan.Zero;
 
     public BlockRecurrence Recurrence { get; init; } = BlockRecurrence.Weekly;
 

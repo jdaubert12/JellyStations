@@ -88,6 +88,12 @@ public sealed class SlotBlock
     /// </summary>
     public int MaxStartDelayMinutes { get; set; }
 
+    /// <summary>
+    /// Always let the program already playing finish, however long it has left: <see cref="MaxStartDelayMinutes"/>
+    /// is ignored. The block still never pushes into the next block; it keeps its full duration up to that one.
+    /// </summary>
+    public bool AlwaysLetPreviousFinish { get; set; }
+
     /// <summary>How often the block's days recur. Weekly (the default) keeps the pre-1.5 behaviour.</summary>
     public BlockRecurrence Recurrence { get; set; } = BlockRecurrence.Weekly;
 
